@@ -70,9 +70,11 @@ const placeholderSx = (palette: RmpPalette) => ({
 export const WeightmentFieldLabel = ({
   children,
   palette,
+  required = false,
 }: {
   children: ReactNode;
   palette: RmpPalette;
+  required?: boolean;
 }) => (
   <Typography
     sx={{
@@ -85,6 +87,11 @@ export const WeightmentFieldLabel = ({
     }}
   >
     {children}
+    {required ? (
+      <Box component="span" sx={{ color: palette.danger ?? "error.main", ml: 0.5 }}>
+        *
+      </Box>
+    ) : null}
   </Typography>
 );
 
@@ -100,6 +107,8 @@ type WeightmentTextFieldProps = {
   helperText?: string;
   palette: RmpPalette;
   width?: number | string | Record<string, number | string>;
+  required?: boolean;
+  fieldPath?: string;
 };
 
 export const WeightmentTextField = ({
@@ -114,9 +123,15 @@ export const WeightmentTextField = ({
   helperText,
   palette,
   width = "100%",
+  required = false,
+  fieldPath,
 }: WeightmentTextFieldProps) => (
-  <Box sx={{ width, flexShrink: 0 }}>
-    {label ? <WeightmentFieldLabel palette={palette}>{label}</WeightmentFieldLabel> : null}
+  <Box sx={{ width, flexShrink: 0 }} data-rmp-field={fieldPath}>
+    {label ? (
+      <WeightmentFieldLabel palette={palette} required={required}>
+        {label}
+      </WeightmentFieldLabel>
+    ) : null}
     <TextField
       size="small"
       fullWidth
@@ -144,6 +159,8 @@ type WeightmentSelectFieldProps = {
   error?: boolean;
   helperText?: string;
   palette: RmpPalette;
+  required?: boolean;
+  fieldPath?: string;
 };
 
 export const WeightmentSelectField = ({
@@ -156,9 +173,15 @@ export const WeightmentSelectField = ({
   error = false,
   helperText,
   palette,
+  required = false,
+  fieldPath,
 }: WeightmentSelectFieldProps) => (
-  <Box>
-    {label ? <WeightmentFieldLabel palette={palette}>{label}</WeightmentFieldLabel> : null}
+  <Box data-rmp-field={fieldPath}>
+    {label ? (
+      <WeightmentFieldLabel palette={palette} required={required}>
+        {label}
+      </WeightmentFieldLabel>
+    ) : null}
     <TextField
       select
       size="small"
@@ -205,6 +228,7 @@ export const WeightmentTableInput = ({
   helperText,
   palette,
   selectOptions,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -216,9 +240,13 @@ export const WeightmentTableInput = ({
   helperText?: string;
   palette: RmpPalette;
   selectOptions?: { value: string; label: string; disabled?: boolean }[];
+  fieldPath?: string;
 }) => {
+  const wrap = (node: ReactNode) =>
+    fieldPath ? <Box data-rmp-field={fieldPath}>{node}</Box> : node;
+
   if (selectOptions) {
-    return (
+    return wrap(
       <TextField
         select
         size="small"
@@ -250,22 +278,22 @@ export const WeightmentTableInput = ({
             {option.label}
           </MenuItem>
         ))}
-      </TextField>
+      </TextField>,
     );
   }
 
   if (type === "datetime") {
-    return (
+    return wrap(
       <DateTimeField
         value={value}
         onChange={onChange}
         disabled={disabled}
         compact
-      />
+      />,
     );
   }
 
-  return (
+  return wrap(
     <TextField
       size="small"
       fullWidth
@@ -279,6 +307,6 @@ export const WeightmentTableInput = ({
       InputProps={{ readOnly }}
       InputLabelProps={type === "datetime-local" ? { shrink: true } : undefined}
       sx={buildTableFieldSx(palette, error)}
-    />
+    />,
   );
 };

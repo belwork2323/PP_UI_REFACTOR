@@ -33,10 +33,7 @@ import {
   getStatus,
   getSystemManagerLabel,
 } from "@utils/batchManagementUtils";
-import {
-  mixingCycleLabel,
-  formatArticlesForDisplay,
-} from "@data/models/admin/BatchManagement/BatchManagementModel";
+import { formatArticlesForDisplay } from "@data/models/admin/BatchManagement/BatchManagementModel";
 
 const S = STRINGS.BATCH_MANAGEMENT.DETAILS;
 
@@ -143,7 +140,6 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
           : []),
         { label: S.PROJECT, value: projectLabel },
         { label: S.MOTOR_STAGE, value: displayValue(getMotorStage(batch)) },
-        { label: S.MIXING_CYCLE, value: mixingCycleLabel(batch.mixingCycle) },
         { label: S.MOTOR_COUNT, value: displayValue(batch.numberOfMotors) },
         {
           label: S.MOTOR_IDS,

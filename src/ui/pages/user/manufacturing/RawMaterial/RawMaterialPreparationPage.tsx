@@ -43,7 +43,6 @@ const RawMaterialPreparationPage = () => {
     detailsData,
     detailsLoading,
     handleBackFromDetails,
-    handlePremixDateChange,
     addedPremixSelections,
     premixSessions,
     weightmentSheet,
@@ -58,6 +57,7 @@ const RawMaterialPreparationPage = () => {
     premixFieldErrors,
     weightmentErrors,
     validationAttempt,
+    validationFocusRequest,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -108,7 +108,6 @@ const RawMaterialPreparationPage = () => {
             premixGroups={premixGroups}
             identificationSheet={identificationSheet}
             allMaterials={allMaterials}
-            onPremixDateChange={handlePremixDateChange}
             addedPremixSelections={addedPremixSelections}
             premixSessions={premixSessions}
             availableSolidMaterials={availableSolidMaterials}
@@ -133,6 +132,7 @@ const RawMaterialPreparationPage = () => {
             premixFieldErrors={premixFieldErrors}
             weightmentErrors={weightmentErrors}
             validationAttempt={validationAttempt}
+            validationFocusRequest={validationFocusRequest}
           />
         </Box>
       )}

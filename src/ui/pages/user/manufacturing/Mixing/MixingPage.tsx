@@ -88,6 +88,7 @@ const MixingPage = () => {
             initialData={formData}
             numberOfPremix={numberOfPremix}
             motorStage={motorStage}
+            projectId={activeBatch?.projectId ?? null}
             onBlocksChange={handleFormChange}
             identificationSheet={activeBatch?.identificationSheet}
             mixCardStatusById={mixCardStatusById}

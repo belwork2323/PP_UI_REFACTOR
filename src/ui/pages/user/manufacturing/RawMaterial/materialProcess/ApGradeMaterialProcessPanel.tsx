@@ -10,6 +10,10 @@ import {
 } from "../../../../../../data/models/user/rmp/apUltraFineProcessForm";
 import type { AluminumProcessForm } from "../../../../../../data/models/user/rmp/aluminumProcessForm";
 import type { DoaProcessForm } from "../../../../../../data/models/user/rmp/doaProcessForm";
+import {
+  isLiquidDispatchUiKey,
+  liquidDispatchSectionTitle,
+} from "../../../../../../data/models/user/rmp/doaProcessForm";
 import type {
   DryingTrayOvenForm,
   RmpMaterialProcessForm,
@@ -20,6 +24,7 @@ import {
   type RmpMaterialUiKey,
 } from "../../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
 import LotDetailsSection from "./LotDetailsSection";
+import DoaFormatSection from "./DoaFormatSection";
 import DryingTrayOvenSection from "./DryingTrayOvenSection";
 import SievingSection from "./SievingSection";
 import {
@@ -40,7 +45,7 @@ type TypedSolidForm =
 type Props = {
   uiKey: Extract<
     RmpMaterialUiKey,
-    "apCoarse" | "apFine" | "apUltraFine" | "aluminum" | "doa"
+    "apCoarse" | "apFine" | "apUltraFine" | "aluminum" | "doa" | "htpb" | "tdi"
   >;
   value: TypedSolidForm;
   onChange: (next: RmpMaterialProcessForm) => void;
@@ -92,7 +97,7 @@ const ApGradeMaterialProcessPanel = ({
     onChange({ ...value, ...partial });
   };
   const patchDoa = (partial: Partial<DoaProcessForm>) => {
-    if (value.uiKey !== "doa") return;
+    if (!isLiquidDispatchUiKey(value.uiKey)) return;
     onChange({ ...value, ...partial });
   };
 
@@ -509,37 +514,21 @@ const ApGradeMaterialProcessPanel = ({
         </ApSectionCard>
       ) : null}
 
-      {uiKey === "doa" && value.uiKey === "doa" ? (
-        <ApSectionCard title="DOA">
-          <Box>
-            <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-              Date/ Time of dispatch
-            </Typography>
-            <DateTimeField
-              value={value.dispatchDatetime}
-              onChange={(v) => patchDoa({ dispatchDatetime: v })}
-              disabled={disabled}
-              compact
-            />
-          </Box>
-          <CasePrepTextField
-            label="Any other Observation"
-            value={value.observation}
-            disabled={disabled}
-            width="100%"
-            theme={theme}
-            onChange={(v) => patchDoa({ observation: v })}
-          />
-          <CasePrepTextField
-            label="Total Quantity sent for premix"
-            value={value.totalQtySentForPremix}
-            disabled={disabled}
-            width="100%"
-            theme={theme}
-            {...fieldError(validationErrors, "totalQtySentForPremix")}
-            onChange={(v) => patchDoa({ totalQtySentForPremix: v })}
-          />
-        </ApSectionCard>
+      {isLiquidDispatchUiKey(uiKey) && isLiquidDispatchUiKey(value.uiKey) ? (
+        <DoaFormatSection
+          title={liquidDispatchSectionTitle(uiKey)}
+          dispatchDatetime={value.dispatchDatetime}
+          observation={value.observation}
+          totalQtySentForPremix={value.totalQtySentForPremix}
+          onDispatchDatetimeChange={(dispatchDatetime) => patchDoa({ dispatchDatetime })}
+          onObservationChange={(observation) => patchDoa({ observation })}
+          onTotalQtySentForPremixChange={(totalQtySentForPremix) =>
+            patchDoa({ totalQtySentForPremix })
+          }
+          disabled={disabled}
+          theme={theme}
+          validationErrors={validationErrors}
+        />
       ) : null}
     </>
   );

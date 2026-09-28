@@ -382,7 +382,11 @@ export const canLoadCuringForm = ({
   curingFormLoaded: boolean;
 }) => {
   if (curingFormLoaded) return false;
-  return Boolean(String(setup.oven ?? "").trim() && String(setup.ovenNo ?? "").trim());
+  return Boolean(
+    String(setup.curingType ?? "").trim() &&
+      String(setup.oven ?? "").trim() &&
+      String(setup.ovenNo ?? "").trim(),
+  );
 };
 
 export const canAddCastingCuringMotors = (params: {
@@ -528,12 +532,12 @@ export const resolveMotorStage = (batch?: { motorStage?: unknown; motorType?: un
   if (stage && typeof stage === "object") {
     const record = stage as { motorStageId?: number; id?: number };
     const parsed = Number(record.motorStageId ?? record.id);
-    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 3) return parsed;
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
     return 1;
   }
 
   const numeric = Number(stage);
-  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 3) return numeric;
+  if (Number.isFinite(numeric) && numeric >= 0) return numeric;
   return 1;
 };
 
@@ -561,7 +565,7 @@ export const formatMotorStageLabel = (
       ? Number(config.motorStage)
       : resolveMotorStage(batch);
 
-  if (Number.isFinite(stage) && stage >= 0 && stage <= 3) {
+  if (Number.isFinite(stage) && stage >= 0) {
     return `Stage ${stage}`;
   }
 

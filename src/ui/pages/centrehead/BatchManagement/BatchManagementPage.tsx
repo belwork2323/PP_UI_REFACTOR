@@ -268,10 +268,6 @@ const CHBatchManagementPage = () => {
         availableMotorsLoading={lookups.availableMotorsLoading}
         onFetchApprovedMotors={lookups.fetchApprovedMotors}
         onClearApprovedMotors={lookups.clearApprovedMotors}
-        mixingCycleOptions={lookups.mixingCycleOptions}
-        mixingCyclesLoading={lookups.mixingCyclesLoading}
-        onFetchMixingCycles={lookups.fetchMixingCycles}
-        onClearMixingCycles={lookups.clearMixingCycles}
         articleOptions={lookups.articleOptions}
         articlesLoading={lookups.subscaleArticlesLoading}
         saving={form.saving}

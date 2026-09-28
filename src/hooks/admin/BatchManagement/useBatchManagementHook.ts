@@ -42,7 +42,6 @@ import { getDashboardFilterBounds, toDashboardApiFilterType } from "@utils/dateU
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
 import type {
-  MixingCycleMasterItem,
   SubscaleArticleOption,
   SystemMasterOption,
 } from "@data/api/common/generalAPI";

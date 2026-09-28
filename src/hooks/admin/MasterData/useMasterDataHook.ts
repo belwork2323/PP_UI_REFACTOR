@@ -170,12 +170,10 @@ export default function useMasterDataHook() {
   }, [items, selectedType, projectFilter, motorStageFilter]);
 
   const motorStageFilterOptions = useMemo(() => {
-    if (selectedType !== "motor-stages") return [];
+    if (selectedType !== "motor-stages" || !projectFilter) return [];
     const stages = new Set<string>();
     for (const record of items) {
-      if (projectFilter && String(record.attributes?.projectId ?? "") !== projectFilter) {
-        continue;
-      }
+      if (String(record.attributes?.projectId ?? "") !== projectFilter) continue;
       const stage = record.attributes?.motorStage;
       if (stage == null || stage === "") continue;
       stages.add(String(stage));

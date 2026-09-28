@@ -25,10 +25,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import type { BatchListItemModel } from "@data/models/centrehead/BatchManagement/BatchManagementModel";
-import {
-  formatMasterDataLabel,
-  mixingCycleLabel,
-} from "@data/models/centrehead/BatchManagement/BatchManagementModel";
+import { formatMasterDataLabel } from "@data/models/centrehead/BatchManagement/BatchManagementModel";
 import {
   getBatchId,
   getMotorId,
@@ -143,7 +140,6 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
           : []),
         { label: S.PROJECT, value: projectLabel },
         { label: S.MOTOR_STAGE, value: displayValue(getMotorStage(batch)) },
-        { label: S.MIXING_CYCLE, value: mixingCycleLabel(batch.mixingCycle) },
         { label: S.MOTOR_COUNT, value: displayValue(batch.numberOfMotors) },
         {
           label: S.MOTOR_IDS,

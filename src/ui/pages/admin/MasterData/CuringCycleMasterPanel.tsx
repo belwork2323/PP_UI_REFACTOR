@@ -81,7 +81,7 @@ const CuringCycleMasterPanel = ({
 
   const filterProjectId = hook.projectFilter || "";
   const { options: filterMotorStageOptions, loading: filterMotorStageLoading } =
-    useMotorStageOptions(true, filterProjectId || undefined);
+    useMotorStageOptions(true, filterProjectId);
 
   const createProjectId = hook.form.projectId || "";
   const { options: createMotorStageOptions, loading: createMotorStageLoading } =

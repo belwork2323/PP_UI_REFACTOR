@@ -246,9 +246,6 @@ export const PremixDetailPanel = ({
       <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, fontWeight: 700 }}>
         {premix.materialType}
       </Typography>
-      <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
-        {RM.PREMIX_DATE}: {formatDate(premix.premixDate)}
-      </Typography>
     </Stack>
 
     {premix.premixSubmissionStatus === "REJECTED" && premix.rejectionReason ? (

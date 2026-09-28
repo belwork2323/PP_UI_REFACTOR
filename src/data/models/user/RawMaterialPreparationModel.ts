@@ -1,7 +1,8 @@
-import { materialSelectionKey, type MaterialsListItem } from "./MaterialsListModel";
+import { materialSelectionKey, materialUsesApForm, type MaterialsListItem } from "./MaterialsListModel";
 import {
   findGradeInMaterial,
   findMaterialInList,
+  processTypeToUiKey,
   uiKeyToProcessType,
   type PreparationPremixEntry,
   type PreparationProcessEntry,
@@ -378,6 +379,10 @@ export type RawMaterialPrepPremixSession = {
   solidMaterialCode: string;
   solidGradeCode: string;
   liquidMaterialCode: string;
+  /** Material master RMP form template for solid (preferred over material-code heuristics). */
+  solidRmpFormTemplate?: string | null;
+  /** Material master RMP form template for liquid. */
+  liquidRmpFormTemplate?: string | null;
   solid: RawMaterialPrepMaterialProcessSlot;
   liquid: RawMaterialPrepMaterialProcessSlot;
   /**
@@ -443,8 +448,9 @@ const emptyProcessSlot = (
   slot: RmpProcessSlot,
   materialCode = "",
   gradeCode = "",
+  rmpFormTemplate?: string | null,
 ): RawMaterialPrepMaterialProcessSlot => {
-  const uiKey = resolveMaterialUiKey({ materialCode, slot, gradeCode });
+  const uiKey = resolveMaterialUiKey({ materialCode, slot, gradeCode, rmpFormTemplate });
   return {
     uiKey,
     processForm: createEmptyProcessFormForUiKey(uiKey),
@@ -465,20 +471,17 @@ export const hydratePremixProcessSlot = (
   materialCode: string,
   entry: PreparationProcessEntry | undefined,
   gradeCode?: string,
+  rmpFormTemplate?: string | null,
 ): RawMaterialPrepMaterialProcessSlot => {
   const resolvedGrade = gradeCode ?? entry?.gradeCode ?? "";
   const uiKey = entry?.processType
-    ? (() => {
-        const fromType = String(entry.processType).toUpperCase();
-        if (fromType === "AP_COARSE") return "apCoarse" as const;
-        if (fromType === "AP_FINE") return "apFine" as const;
-        if (fromType === "AP_ULTRA_FINE") return "apUltraFine" as const;
-          if (fromType === "ALUMINUM" || fromType === "ALUMINIUM") return "aluminum" as const;
-          if (fromType === "DOA") return "doa" as const;
-          if (fromType === "DEFAULT_LIQUID" || fromType === "LIQUID") return "defaultLiquid" as const;
-        return resolveMaterialUiKey({ materialCode, slot, gradeCode: resolvedGrade });
-      })()
-    : resolveMaterialUiKey({ materialCode, slot, gradeCode: resolvedGrade });
+    ? processTypeToUiKey(entry.processType)
+    : resolveMaterialUiKey({
+        materialCode,
+        slot,
+        gradeCode: resolvedGrade,
+        rmpFormTemplate,
+      });
   return {
     uiKey,
     processForm: hydrateProcessFormFromEntry(uiKey, entry),
@@ -490,9 +493,12 @@ export const normalizeMaterialProcessSlot = (
   materialCode: string,
   partial?: Partial<RawMaterialPrepMaterialProcessSlot> | null,
   gradeCode = "",
+  rmpFormTemplate?: string | null,
 ): RawMaterialPrepMaterialProcessSlot => {
   const code = String(materialCode ?? "").trim();
-  const uiKey = partial?.uiKey ?? resolveMaterialUiKey({ materialCode: code, slot, gradeCode });
+  const uiKey =
+    partial?.uiKey ??
+    resolveMaterialUiKey({ materialCode: code, slot, gradeCode, rmpFormTemplate });
   const processForm = partial?.processForm
     ? (cloneValue(partial.processForm) as RmpMaterialProcessForm)
     : createEmptyProcessFormForUiKey(uiKey);
@@ -664,10 +670,7 @@ export const mapPreparationDetailsPayload = (params: {
         };
 
         const apSlots = session.apGradeSlots;
-        const isAp =
-          String(entry.solidMaterialCode ?? "")
-            .trim()
-            .toUpperCase() === "AP";
+        const isAp = materialUsesApForm(solidMaterial);
 
         if (isAp && Array.isArray(apSlots)) {
           // Host-managed AP grades (may be empty after user deleted all).
@@ -989,25 +992,28 @@ export const mapPreparationDetailsFromApi = (
         ? (JSON.parse(JSON.stringify(liquidEntry)) as PreparationProcessEntry)
         : undefined;
 
+      const solidMaterial = findMaterialInList(solidMaterials, selection.solidMaterialCode);
+      const liquidMaterial = findMaterialInList(liquidMaterials, selection.liquidMaterialCode);
+
       const solidSlot = hydratePremixProcessSlot(
         "solid",
         selection.solidMaterialCode,
         pendingSolid,
         selection.solidGradeCode,
+        solidMaterial?.rmpFormTemplate,
       );
 
       let apGradeSlots:
         Array<{ gradeCode: string; slot: RawMaterialPrepMaterialProcessSlot }> | undefined;
-      if (
-        String(selection.solidMaterialCode ?? "")
+      if (materialUsesApForm(solidMaterial)) {
+        const apCode = String(selection.solidMaterialCode ?? "")
           .trim()
-          .toUpperCase() === "AP"
-      ) {
+          .toUpperCase();
         const apProcesses = (apiPremix?.solidProcess ?? []).filter(
           (process) =>
             String(process.materialCode ?? "")
               .trim()
-              .toUpperCase() === "AP",
+              .toUpperCase() === apCode,
         );
         if (apProcesses.length > 0) {
           apGradeSlots = apProcesses.map((process) => {
@@ -1016,7 +1022,13 @@ export const mapPreparationDetailsFromApi = (
             ).trim();
             return {
               gradeCode,
-              slot: hydratePremixProcessSlot("solid", "AP", process, gradeCode),
+              slot: hydratePremixProcessSlot(
+                "solid",
+                selection.solidMaterialCode,
+                process,
+                gradeCode,
+                solidMaterial?.rmpFormTemplate ?? "AP",
+              ),
             };
           });
         } else if (selection.solidGradeCode) {
@@ -1035,8 +1047,16 @@ export const mapPreparationDetailsFromApi = (
         solidMaterialCode: selection.solidMaterialCode,
         solidGradeCode: apGradeSlots?.[0]?.gradeCode ?? selection.solidGradeCode,
         liquidMaterialCode: selection.liquidMaterialCode,
+        solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? null,
+        liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? null,
         solid: apGradeSlots?.[0]?.slot ?? solidSlot,
-        liquid: hydratePremixProcessSlot("liquid", selection.liquidMaterialCode, pendingLiquid),
+        liquid: hydratePremixProcessSlot(
+          "liquid",
+          selection.liquidMaterialCode,
+          pendingLiquid,
+          "",
+          liquidMaterial?.rmpFormTemplate,
+        ),
         apGradeSlots,
         pendingSolidProcess: pendingSolid,
         pendingLiquidProcess: pendingLiquid,

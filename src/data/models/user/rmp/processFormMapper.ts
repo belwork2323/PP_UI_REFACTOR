@@ -20,10 +20,9 @@ import type {
   SievingForm,
 } from "./defaultSolidProcessForm";
 import {
-  createEmptyDefaultLiquidProcessForm,
-  createEmptyDefaultSolidProcessForm,
   createEmptyDryingTrayOvenForm,
   createEmptyLotDetailRow,
+  createEmptyProcessFormForUiKey,
   createEmptySievingForm,
 } from "./defaultSolidProcessForm";
 import type { RmpMaterialUiKey } from "./rmpMaterialUiRegistry";
@@ -34,7 +33,13 @@ import {
   type ApUltraFineProcessForm,
 } from "./apUltraFineProcessForm";
 import { createEmptyAluminumProcessForm, type AluminumProcessForm } from "./aluminumProcessForm";
-import { createEmptyDoaProcessForm, type DoaProcessForm } from "./doaProcessForm";
+import {
+  createEmptyDoaProcessForm,
+  type DoaProcessForm,
+  type LiquidDispatchUiKey,
+} from "./doaProcessForm";
+import { createEmptyCcProcessForm, type CcProcessForm, type CcIoUiKey } from "./ccProcessForm";
+import { createEmptyNonoxDProcessForm, type NonoxDProcessForm } from "./nonoxDProcessForm";
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
@@ -365,23 +370,77 @@ const aluminumFormFromDto = (
   };
 };
 
-const doaDtoFromForm = (form: DoaProcessForm): DoaProcessDto => ({
+const doaDtoFromForm = (form: {
+  dispatchDatetime: string;
+  observation: string;
+  totalQtySentForPremix: string;
+  sievingDatetime?: string;
+  quantitySieved?: string;
+  sieveMeshSize?: string;
+}): DoaProcessDto => ({
+  sievingDatetime:
+    form.sievingDatetime != null ? formatDateTimeForApi(form.sievingDatetime) || null : null,
+  quantitySieved: form.quantitySieved != null ? form.quantitySieved.trim() || null : null,
+  sieveMeshSize: form.sieveMeshSize != null ? form.sieveMeshSize.trim() || null : null,
   dispatchDatetime: formatDateTimeForApi(form.dispatchDatetime) || null,
   observation: form.observation.trim() || null,
   totalQtySentForPremix: form.totalQtySentForPremix.trim() || null,
 });
 
 const doaFormFromDto = (
+  uiKey: LiquidDispatchUiKey,
   dto: DoaProcessDto | null | undefined,
   lotDetails: LotDetailFormRow[],
 ): DoaProcessForm => {
-  const empty = createEmptyDoaProcessForm();
+  const empty = createEmptyDoaProcessForm(uiKey);
   if (!dto) {
     return { ...empty, lotDetails };
   }
   return {
-    uiKey: "doa",
+    uiKey,
     lotDetails,
+    dispatchDatetime: str(dto.dispatchDatetime),
+    observation: str(dto.observation),
+    totalQtySentForPremix: str(dto.totalQtySentForPremix),
+  };
+};
+
+const ccFormFromDto = (
+  uiKey: CcIoUiKey,
+  dto: DoaProcessDto | null | undefined,
+  lotDetails: LotDetailFormRow[],
+  drying: DryingTrayOvenForm,
+  sieving: SievingForm,
+): CcProcessForm => {
+  const empty = createEmptyCcProcessForm(uiKey);
+  if (!dto) {
+    return { ...empty, lotDetails, drying, sieving };
+  }
+  return {
+    uiKey,
+    lotDetails,
+    sievingDatetime: str(dto.sievingDatetime),
+    dispatchDatetime: str(dto.dispatchDatetime),
+    observation: str(dto.observation),
+    totalQtySentForPremix: str(dto.totalQtySentForPremix),
+    drying,
+    sieving,
+  };
+};
+
+const nonoxDFormFromDto = (
+  dto: DoaProcessDto | null | undefined,
+  lotDetails: LotDetailFormRow[],
+): NonoxDProcessForm => {
+  const empty = createEmptyNonoxDProcessForm();
+  if (!dto) {
+    return { ...empty, lotDetails };
+  }
+  return {
+    uiKey: "nonoxD",
+    lotDetails,
+    quantitySieved: str(dto.quantitySieved),
+    sieveMeshSize: str(dto.sieveMeshSize),
     dispatchDatetime: str(dto.dispatchDatetime),
     observation: str(dto.observation),
     totalQtySentForPremix: str(dto.totalQtySentForPremix),
@@ -449,9 +508,7 @@ export const hydrateProcessFormFromEntry = (
   entry: PreparationProcessEntry | null | undefined,
 ): RmpMaterialProcessForm => {
   if (!entry) {
-    return uiKey === "defaultLiquid"
-      ? createEmptyDefaultLiquidProcessForm()
-      : createEmptyDefaultSolidProcessForm();
+    return createEmptyProcessFormForUiKey(uiKey);
   }
 
   const migrated = migrateLegacySections(entry);
@@ -481,8 +538,22 @@ export const hydrateProcessFormFromEntry = (
     return aluminumFormFromDto(entry.aluminum ?? null, lotDetails);
   }
 
-  if (uiKey === "doa") {
-    return doaFormFromDto(entry.doa ?? null, lotDetails);
+  if (uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi") {
+    return doaFormFromDto(uiKey, entry.doa ?? null, lotDetails);
+  }
+
+  if (uiKey === "cc" || uiKey === "io") {
+    return ccFormFromDto(
+      uiKey,
+      entry.doa ?? null,
+      lotDetails,
+      dryingFormFromDto(migrated.drying),
+      sievingFormFromDto(migrated.sieving),
+    );
+  }
+
+  if (uiKey === "nonoxD") {
+    return nonoxDFormFromDto(entry.doa ?? null, lotDetails);
   }
 
   const form: DefaultSolidProcessForm = {
@@ -590,9 +661,48 @@ export const processFormToTypedFields = (
       doa: null,
     };
   }
-  if (form.uiKey === "doa") {
+  if (form.uiKey === "doa" || form.uiKey === "htpb" || form.uiKey === "tdi") {
     return {
-      processType: "DOA",
+      processType: uiKeyToProcessType(form.uiKey),
+      lotDetails,
+      drying: null,
+      sieving: null,
+      apCoarse: null,
+      apFine: null,
+      apUltraFine: null,
+      aluminum: null,
+      doa: doaDtoFromForm(form),
+    };
+  }
+  if (form.uiKey === "cc") {
+    return {
+      processType: "CC",
+      lotDetails,
+      drying: dryingDtoFromForm(form.drying),
+      sieving: sievingDtoFromForm(form.sieving),
+      apCoarse: null,
+      apFine: null,
+      apUltraFine: null,
+      aluminum: null,
+      doa: doaDtoFromForm(form),
+    };
+  }
+  if (form.uiKey === "io") {
+    return {
+      processType: "IO",
+      lotDetails,
+      drying: null,
+      sieving: null,
+      apCoarse: null,
+      apFine: null,
+      apUltraFine: null,
+      aluminum: null,
+      doa: doaDtoFromForm(form),
+    };
+  }
+  if (form.uiKey === "nonoxD") {
+    return {
+      processType: "NONOX_D",
       lotDetails,
       drying: null,
       sieving: null,
@@ -793,6 +903,9 @@ export const typedProcessToDisplaySections = (
       sectionId: "doaProcessing",
       sectionData: [
         {
+          sievingDatetime: d.sievingDatetime,
+          quantitySieved: d.quantitySieved,
+          sieveMeshSize: d.sieveMeshSize,
           dispatchDatetime: d.dispatchDatetime,
           observation: d.observation,
           totalQtySentForPremix: d.totalQtySentForPremix,

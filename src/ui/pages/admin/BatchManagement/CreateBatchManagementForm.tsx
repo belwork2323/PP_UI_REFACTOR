@@ -56,9 +56,6 @@ const BatchFormModal = ({
   availableMotorsLoading = false,
   onFetchApprovedMotors,
   onClearApprovedMotors,
-  mixingCycleOptions = [],
-  mixingCyclesLoading = false,
-  onFetchMixingCycles,
   articleOptions = [],
   articlesLoading = false,
   saving,
@@ -80,21 +77,9 @@ const BatchFormModal = ({
   // For subscale, hide project / motors / implementation until subtype is chosen.
   const canShowBatchDetails = isMain || (isSubscale && hasSubBatchTypeSelected);
   const showsMotorStage = !isSubscale || isQualification;
-  const hasMotorStageSelected = Boolean(String(form.motorStage ?? "").trim());
-  const showsMixingCycleField = showsMotorStage && Boolean(form.batchType);
-  const mixingCycleLocked =
-    hasMotorStageSelected && !mixingCyclesLoading && mixingCycleOptions.length === 1;
-  const mixingCycleDisabled =
-    !hasMotorStageSelected ||
-    mixingCyclesLoading ||
-    mixingCycleLocked ||
-    (hasMotorStageSelected && !mixingCyclesLoading && mixingCycleOptions.length === 0);
   const motorDetailsValid = isExperimental
     ? true
     : (form.motorIds?.length ?? 0) > 0 && form.motorIds.every((id: string) => id?.trim());
-  const mixingCycleValid =
-    !showsMotorStage ||
-    (hasMotorStageSelected && Boolean(String(form.mixingCycleCode ?? "").trim()));
   const basicFormValid =
     !!form.batchType &&
     (isSubscale ? hasSubBatchTypeSelected : true) &&
@@ -146,13 +131,8 @@ const BatchFormModal = ({
 
   const handleMotorStageChange = (motorStage: string) => {
     onFormChange("motorStage")({ target: { value: motorStage } });
-    // onFormChange("mixingCycleCode")({ target: { value: "" } });
     resetMotorIdSlots();
     onClearApprovedMotors?.();
-  };
-
-  const handleMixingCycleChange = (mixingCycleCode: string) => {
-    onFormChange("mixingCycleCode")({ target: { value: mixingCycleCode } });
   };
 
   const handleBatchTypeChange = (batchType: string) => {
@@ -181,67 +161,6 @@ const BatchFormModal = ({
     onFetchApprovedMotors,
     onClearApprovedMotors,
   ]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    void onFetchMixingCycles?.();
-  }, [open, onFetchMixingCycles]);
-
-  useEffect(() => {
-    if (!open || !showsMotorStage || !hasMotorStageSelected || mixingCyclesLoading) return;
-
-    if (!mixingCycleOptions.length) {
-      if (form.mixingCycleCode) {
-        onFormChange("mixingCycleCode")({ target: { value: "" } });
-      }
-      return;
-    }
-
-    const current = String(form.mixingCycleCode ?? "").trim();
-    const codes = mixingCycleOptions.map((cycle: { mixingCycleCode: string }) =>
-      String(cycle.mixingCycleCode ?? "").trim(),
-    );
-    const firstCode = codes[0] ?? "";
-
-    if (mixingCycleOptions.length === 1) {
-      if (current !== firstCode) {
-        onFormChange("mixingCycleCode")({ target: { value: firstCode } });
-      }
-      return;
-    }
-
-    if (!current || !codes.includes(current)) {
-      onFormChange("mixingCycleCode")({ target: { value: firstCode } });
-    }
-  }, [
-    open,
-    showsMotorStage,
-    hasMotorStageSelected,
-    mixingCyclesLoading,
-    mixingCycleOptions,
-    form.mixingCycleCode,
-    onFormChange,
-  ]);
-
-  const getMixingCyclePlaceholder = () => {
-    if (mixingCyclesLoading) return S.LOADING_MIXING_CYCLES;
-    if (mixingCycleOptions.length) return S.SELECT_MIXING_CYCLE;
-    return S.NO_MIXING_CYCLES;
-  };
-
-  const renderMixingCycleValue = (code: string) => {
-    const selected =
-      mixingCycleOptions.find(
-        (cycle: { mixingCycleCode: string }) => cycle.mixingCycleCode === code,
-      ) ?? null;
-    if (!selected) return code;
-    return selected.mixingCycleName && selected.mixingCycleName !== code
-      ? `${selected.mixingCycleName} (${code})`
-      : selected.mixingCycleName || code;
-  };
 
   const renderMotorStageValue = (motorStage: string) => `Stage ${motorStage}`;
 

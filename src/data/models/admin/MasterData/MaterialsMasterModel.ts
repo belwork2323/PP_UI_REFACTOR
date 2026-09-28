@@ -28,6 +28,17 @@ export type PreparationTypeValue =
   | "AP Fine"
   | "AP ultrafine";
 
+export type RmpFormTemplateValue =
+  | "DEFAULT"
+  | "AP"
+  | "ALUMINUM"
+  | "DOA"
+  | "HTPB"
+  | "TDI"
+  | "CC"
+  | "IO"
+  | "NONOX_D";
+
 export const RAW_MATERIAL_TYPE_OPTIONS: { value: RawMaterialTypeValue; label: string }[] = [
   { value: "NORMAL", label: "Non ACEM" },
   { value: "ACEM", label: "ACEM materials" },
@@ -40,6 +51,57 @@ export const PREPARATION_TYPE_OPTIONS: { value: PreparationTypeValue; label: str
   { value: "ADDUCT", label: "ADDUCT" },
   { value: "HTPB Blending", label: "HTPB Blending" },
 ];
+
+/** Specialty templates available for a given material type (DEFAULT always included separately). */
+export const getRmpFormTemplateOptions = (
+  materialType: MaterialTypeValue,
+): { value: RmpFormTemplateValue; label: string }[] => {
+  const defaultLabel =
+    materialType === "LIQUID"
+      ? "Default Liquid Form Template"
+      : "Default Solid Form Template";
+  const options: { value: RmpFormTemplateValue; label: string }[] = [
+    { value: "DEFAULT", label: defaultLabel },
+  ];
+  if (materialType === "SOLID") {
+    options.push(
+      { value: "AP", label: "AP Form Template" },
+      { value: "ALUMINUM", label: "Aluminum Form Template" },
+      { value: "CC", label: "CC Form Template" },
+      { value: "IO", label: "IO Form Template" },
+      { value: "NONOX_D", label: "NONOX-D Form Template" },
+    );
+  } else {
+    options.push(
+      { value: "DOA", label: "DOA Form Template" },
+      { value: "HTPB", label: "HTPB Form Template" },
+      { value: "TDI", label: "TDI Form Template" },
+    );
+  }
+  return options;
+};
+
+export const isRmpFormTemplateAllowed = (
+  template: RmpFormTemplateValue,
+  materialType: MaterialTypeValue,
+): boolean => getRmpFormTemplateOptions(materialType).some((o) => o.value === template);
+
+export const parseRmpFormTemplate = (raw: unknown): RmpFormTemplateValue => {
+  const value = String(raw ?? "DEFAULT")
+    .trim()
+    .toUpperCase()
+    .replace(/-/g, "_")
+    .replace(/\s+/g, "_");
+  if (value === "AP") return "AP";
+  if (value === "ALUMINUM" || value === "ALUMINIUM" || value === "AL") return "ALUMINUM";
+  if (value === "DOA") return "DOA";
+  if (value === "HTPB") return "HTPB";
+  if (value === "TDI" || value === "TBI") return "TDI";
+  if (value === "CC" || value === "COPPER_CHROMITE") return "CC";
+  if (value === "IO" || value === "IRON_OXIDE") return "IO";
+  if (value === "NONOX_D" || value === "NONOXD" || value === "NONOX") return "NONOX_D";
+  return "DEFAULT";
+};
 
 const LEGACY_PREPARATION_TYPE_VALUES = new Set<string>(["AP Fine", "AP ultrafine"]);
 
@@ -84,6 +146,7 @@ export type MaterialsMasterRecord = MasterDataAuditFields & {
   materialType: MaterialTypeValue;
   rawMaterialType: RawMaterialTypeValue;
   preparationType: PreparationTypeValue | "";
+  rmpFormTemplate: RmpFormTemplateValue;
   isActive: boolean;
   grades: MaterialGradeForm[];
   specifications: MaterialSpecForm[];
@@ -101,6 +164,7 @@ export type MaterialsMasterFormState = {
   materialType: MaterialTypeValue;
   rawMaterialType: RawMaterialTypeValue | "";
   preparationType: PreparationTypeValue | "";
+  rmpFormTemplate: RmpFormTemplateValue;
   isActive: boolean;
   grades: MaterialGradeForm[];
   specifications: MaterialSpecForm[];
@@ -145,6 +209,7 @@ export const createEmptyMaterialsForm = (): MaterialsMasterFormState => ({
   materialType: "SOLID",
   rawMaterialType: "",
   preparationType: "",
+  rmpFormTemplate: "DEFAULT",
   isActive: true,
   grades: [],
   specifications: [],
@@ -174,6 +239,7 @@ export const MaterialsMasterRecordModel = {
     materialType: String(raw?.materialType ?? "SOLID").toUpperCase() === "LIQUID" ? "LIQUID" : "SOLID",
     rawMaterialType: parseRawMaterialType(raw?.rawMaterialType),
     preparationType: parsePreparationType(raw?.preparationType),
+    rmpFormTemplate: parseRmpFormTemplate(raw?.rmpFormTemplate),
     isActive: raw?.isActive !== false,
     grades: Array.isArray(raw?.grades) ? raw.grades.map(mapGrade) : [],
     specifications: Array.isArray(raw?.specifications) ? raw.specifications.map(mapSpec) : [],
@@ -201,6 +267,7 @@ export const mapMaterialRecordToForm = (record: MaterialsMasterRecord): Material
   materialType: record.materialType,
   rawMaterialType: record.rawMaterialType,
   preparationType: record.preparationType,
+  rmpFormTemplate: record.rmpFormTemplate,
   isActive: record.isActive,
   grades: record.grades.map((g) => ({
     ...g,
@@ -237,6 +304,7 @@ export type MaterialsFormFieldErrors = {
   materialName?: string;
   rawMaterialType?: string;
   preparationType?: string;
+  rmpFormTemplate?: string;
   materialType?: string;
   form?: string;
   grades?: MaterialGradeFieldErrors[];
@@ -306,6 +374,7 @@ const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
   if (rawMaterialType === "ACEM") {
     body.preparationType = form.preparationType;
   }
+  body.rmpFormTemplate = form.rmpFormTemplate || "DEFAULT";
   return body;
 };
 
@@ -356,6 +425,11 @@ export const getMaterialsFormFieldErrors = (
   if (nameError) errors.materialName = nameError;
   if (form.materialType !== "SOLID" && form.materialType !== "LIQUID") {
     errors.materialType = "Material type must be SOLID or LIQUID";
+  }
+  if (!form.rmpFormTemplate || !isRmpFormTemplateAllowed(form.rmpFormTemplate, form.materialType)) {
+    errors.rmpFormTemplate = "RMP process form is required";
+  } else if (form.rmpFormTemplate === "AP" && form.grades.length === 0) {
+    errors.rmpFormTemplate = "AP Form Template requires at least one grade";
   }
   if (form.grades.length === 0 && form.specifications.length === 0) {
     errors.form = "Add at least one grade or top-level specification";

@@ -5,17 +5,21 @@ import {
   type LotDetailFormRow,
 } from "./lotDetailForm";
 
-/** DOA — lot details replace mfg lot nos / quantity; dispatch + total qty for premix. */
+/** Shared DOA-format fields (dispatch / observation / total qty). Used by DOA, HTPB, TDI. */
+export type LiquidDispatchUiKey = "doa" | "htpb" | "tdi";
+
 export type DoaProcessForm = {
-  uiKey: "doa";
+  uiKey: LiquidDispatchUiKey;
   lotDetails: LotDetailFormRow[];
   dispatchDatetime: string;
   observation: string;
   totalQtySentForPremix: string;
 };
 
-export const createEmptyDoaProcessForm = (): DoaProcessForm => ({
-  uiKey: "doa",
+export const createEmptyDoaProcessForm = (
+  uiKey: LiquidDispatchUiKey = "doa",
+): DoaProcessForm => ({
+  uiKey,
   lotDetails: [createEmptyLotDetailRow()],
   dispatchDatetime: "",
   observation: "",
@@ -31,4 +35,16 @@ export const doaFormHasUserData = (form: DoaProcessForm): boolean => {
   );
 };
 
-export const isDoaUiKey = (uiKey: RmpMaterialUiKey): boolean => uiKey === "doa";
+export const isLiquidDispatchUiKey = (
+  uiKey: RmpMaterialUiKey,
+): uiKey is LiquidDispatchUiKey =>
+  uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi";
+
+/** @deprecated Prefer isLiquidDispatchUiKey */
+export const isDoaUiKey = isLiquidDispatchUiKey;
+
+export const liquidDispatchSectionTitle = (uiKey: LiquidDispatchUiKey): string => {
+  if (uiKey === "htpb") return "HTPB";
+  if (uiKey === "tdi") return "TDI";
+  return "DOA";
+};

@@ -7,16 +7,12 @@ import type {
 } from "@data/models/user/RawMaterialProcurementModel";
 import {
   isAcemAdductMaterial,
-  isAcemApFineMaterial,
-  isAcemApUltrafineMaterial,
   isAcemHtpbBlendingMaterial,
 } from "@data/models/user/RawMaterialProcurementModel";
 import { formatDisplayDate } from "@/utils/dateUtils";
 
 const ADDUCT = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
 const HTPB = STRINGS.SOURCING.SPECIFICATION_FORM.HTPB_BLENDING_PREPARATION;
-const AP_FINE = STRINGS.SOURCING.SPECIFICATION_FORM.AP_FINE_PREPARATION;
-const AP_ULTRAFINE = STRINGS.SOURCING.SPECIFICATION_FORM.AP_ULTRAFINE_PREPARATION;
 
 type Palette = {
   primary: string;
@@ -165,14 +161,8 @@ const RawMaterialPreparationDetailsView = ({
   const showHtpb =
     Boolean(block.htpbBlendingPreparation) &&
     isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType);
-  const showApFine =
-    Boolean(block.apFinePreparation) &&
-    isAcemApFineMaterial(block.rawMaterialType, block.preparationType);
-  const showApUltrafine =
-    Boolean(block.apUltrafinePreparation) &&
-    isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType);
 
-  if (!showAdduct && !showHtpb && !showApFine && !showApUltrafine) {
+  if (!showAdduct && !showHtpb) {
     return null;
   }
 
@@ -189,20 +179,6 @@ const RawMaterialPreparationDetailsView = ({
         <PreparationSection
           title={HTPB.SECTION_TITLE}
           fields={buildHtpbBlendingFields(block.htpbBlendingPreparation)}
-          palette={palette}
-        />
-      ) : null}
-      {showApFine && block.apFinePreparation ? (
-        <PreparationSection
-          title={AP_FINE.SECTION_TITLE}
-          fields={buildBlendingStyleFields(AP_FINE, block.apFinePreparation)}
-          palette={palette}
-        />
-      ) : null}
-      {showApUltrafine && block.apUltrafinePreparation ? (
-        <PreparationSection
-          title={AP_ULTRAFINE.SECTION_TITLE}
-          fields={buildBlendingStyleFields(AP_ULTRAFINE, block.apUltrafinePreparation)}
           palette={palette}
         />
       ) : null}

@@ -29,19 +29,14 @@ import type {
 import {
   computeIsOutOfRange,
   emptyAdductPreparationDetails,
-  emptyApFinePreparationDetails,
-  emptyApUltrafinePreparationDetails,
   emptyHtpbBlendingPreparationDetails,
   isAcemAdductMaterial,
-  isAcemApFineMaterial,
-  isAcemApUltrafineMaterial,
   isAcemHtpbBlendingMaterial,
   isReferenceRangeNotApplicable,
   isSpecRowFailed,
   sanitizeNumericAnalysedResultInput,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import AdductPreparationSection from "./AdductPreparationSection";
-import BlendingStylePreparationSection from "./BlendingStylePreparationSection";
 import HtpbBlendingPreparationSection from "./HtpbBlendingPreparationSection";
 import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import {
@@ -205,11 +200,6 @@ const MaterialSpecificationBlock = ({
     block.rawMaterialType,
     block.preparationType,
   );
-  const showApFinePreparation = isAcemApFineMaterial(block.rawMaterialType, block.preparationType);
-  const showApUltrafinePreparation = isAcemApUltrafineMaterial(
-    block.rawMaterialType,
-    block.preparationType,
-  );
 
   const handleCertificatesChange = useCallback(
     (certificates: LotCertificate[]) => {
@@ -357,42 +347,6 @@ const MaterialSpecificationBlock = ({
           validationAttempt={validationAttempt}
           mfgLotOptions={approvedPreparationLots.getHtpbLotOptions(
             block.htpbBlendingPreparation?.mfgBatchLotNo,
-          )}
-          loadingLots={approvedPreparationLots.loadingLots}
-          theme={theme}
-        />
-      ) : null}
-
-      {showApFinePreparation ? (
-        <BlendingStylePreparationSection
-          details={block.apFinePreparation ?? emptyApFinePreparationDetails()}
-          blockIndex={index}
-          preparationKey="apFinePreparation"
-          labels={formStrings.AP_FINE_PREPARATION}
-          onChange={(next) => onUpdate(index, (current) => ({ ...current, apFinePreparation: next }))}
-          errors={errors}
-          validationAttempt={validationAttempt}
-          mfgLotOptions={approvedPreparationLots.getApSourceLotOptions(
-            block.apFinePreparation?.mfgBatchLotNo,
-          )}
-          loadingLots={approvedPreparationLots.loadingLots}
-          theme={theme}
-        />
-      ) : null}
-
-      {showApUltrafinePreparation ? (
-        <BlendingStylePreparationSection
-          details={block.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails()}
-          blockIndex={index}
-          preparationKey="apUltrafinePreparation"
-          labels={formStrings.AP_ULTRAFINE_PREPARATION}
-          onChange={(next) =>
-            onUpdate(index, (current) => ({ ...current, apUltrafinePreparation: next }))
-          }
-          errors={errors}
-          validationAttempt={validationAttempt}
-          mfgLotOptions={approvedPreparationLots.getApSourceLotOptions(
-            block.apUltrafinePreparation?.mfgBatchLotNo,
           )}
           loadingLots={approvedPreparationLots.loadingLots}
           theme={theme}

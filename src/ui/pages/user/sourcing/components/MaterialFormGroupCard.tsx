@@ -32,8 +32,6 @@ import useValidationDisplay, {
 import { isMaterialMetaComplete } from "../../../../../data/models/user/rawMaterialProcurementValidation";
 import {
   isAcemAdductMaterial,
-  isAcemApFineMaterial,
-  isAcemApUltrafineMaterial,
   isAcemHtpbBlendingMaterial,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 
@@ -92,11 +90,6 @@ const MaterialFormGroupCard = ({
   const canAddLot = isMaterialMetaComplete(group);
   const showAdductPreparation = isAcemAdductMaterial(group.rawMaterialType, group.preparationType);
   const showHtpbBlendingPreparation = isAcemHtpbBlendingMaterial(
-    group.rawMaterialType,
-    group.preparationType,
-  );
-  const showApFinePreparation = isAcemApFineMaterial(group.rawMaterialType, group.preparationType);
-  const showApUltrafinePreparation = isAcemApUltrafineMaterial(
     group.rawMaterialType,
     group.preparationType,
   );
@@ -218,8 +211,6 @@ const MaterialFormGroupCard = ({
             getAnalysedResultError={getAnalysedResultError}
             showAdductPreparation={showAdductPreparation}
             showHtpbBlendingPreparation={showHtpbBlendingPreparation}
-            showApFinePreparation={showApFinePreparation}
-            showApUltrafinePreparation={showApUltrafinePreparation}
             approvedPreparationLots={approvedPreparationLots}
             theme={theme}
           />

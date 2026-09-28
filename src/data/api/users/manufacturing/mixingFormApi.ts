@@ -16,6 +16,13 @@ export const updateMixingFormApi = async (payload: any) => {
   return await put(USER_MIXING_FORM_ENDPOINTS.UPDATE_FORM, payload);
 };
 
-export const fetchQualityCheck = async (mixType: string, motorStage: number) => {
-  return await post(SYSTEM.GET_QUALITY_CHECKS, { mixType, motorStage });
+export const fetchQualityCheck = async (
+  mixType: string,
+  motorStage: number,
+  mixingCycleCode?: string,
+) => {
+  const payload: Record<string, unknown> = { mixType, motorStage };
+  const code = String(mixingCycleCode ?? "").trim();
+  if (code) payload.mixingCycleCode = code;
+  return await post(SYSTEM.GET_QUALITY_CHECKS, payload);
 };

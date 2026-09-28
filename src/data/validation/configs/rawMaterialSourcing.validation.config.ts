@@ -2,12 +2,8 @@ import { STRINGS } from "@/app/config/strings";
 import type { MaterialBlock, SpecRow } from "@/data/models/user/RawMaterialProcurementModel";
 import {
   emptyAdductPreparationDetails,
-  emptyApFinePreparationDetails,
-  emptyApUltrafinePreparationDetails,
   emptyHtpbBlendingPreparationDetails,
   isAcemAdductMaterial,
-  isAcemApFineMaterial,
-  isAcemApUltrafineMaterial,
   isAcemHtpbBlendingMaterial,
   isReferenceRangeNotApplicable,
   type AdductPreparationDetails,
@@ -308,20 +304,6 @@ function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
         block.htpbBlendingPreparation ?? emptyHtpbBlendingPreparationDetails(),
       );
     }
-
-    if (isAcemApFineMaterial(block.rawMaterialType, block.preparationType)) {
-      appendBlendingStylePaths(
-        "apFinePreparation",
-        block.apFinePreparation ?? emptyApFinePreparationDetails(),
-      );
-    }
-
-    if (isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType)) {
-      appendBlendingStylePaths(
-        "apUltrafinePreparation",
-        block.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails(),
-      );
-    }
   });
 
   return paths;
@@ -431,18 +413,6 @@ const isHtpbBlendingSubmitComplete = (block: MaterialBlock): boolean =>
     block.htpbBlendingPreparation ?? emptyHtpbBlendingPreparationDetails(),
   );
 
-const isApFineSubmitComplete = (block: MaterialBlock): boolean =>
-  isBlendingStyleSubmitComplete(
-    isAcemApFineMaterial(block.rawMaterialType, block.preparationType),
-    block.apFinePreparation ?? emptyApFinePreparationDetails(),
-  );
-
-const isApUltrafineSubmitComplete = (block: MaterialBlock): boolean =>
-  isBlendingStyleSubmitComplete(
-    isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType),
-    block.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails(),
-  );
-
 /** Submit for approval: manufacturer, lot ID, certificates, and every analysed result. */
 export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
   const fields = rawMaterialSourcingFieldRules;
@@ -468,9 +438,7 @@ export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
     certTypesOk &&
     rowsOk &&
     isAdductSubmitComplete(block) &&
-    isHtpbBlendingSubmitComplete(block) &&
-    isApFineSubmitComplete(block) &&
-    isApUltrafineSubmitComplete(block)
+    isHtpbBlendingSubmitComplete(block)
   );
 };
 

@@ -234,33 +234,6 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchDetails]);
 
-  // Seed cycle stage/code from batch mixingCycle when empty (qualification + experimental prefill)
-  useEffect(() => {
-    const batchCycle = batchDetails?.mixingCycle;
-    if (!batchCycle) return;
-
-    const stageFromBatch = String(batchCycle.motorStage ?? "").trim();
-    const codeFromBatch = String(batchCycle.mixingCycleCode ?? "").trim();
-    const nameFromBatch = String(batchCycle.mixingCycleName ?? "").trim();
-    if (!stageFromBatch && !codeFromBatch) return;
-
-    const needsSeed = mixingCycles.some(
-      (cycle) => !String(cycle.stage ?? "").trim() || !String(cycle.mixingCycleCode ?? "").trim(),
-    );
-    if (!needsSeed) return;
-
-    updateMixingCycles(
-      mixingCycles.map((cycle) => ({
-        ...cycle,
-        stage: String(cycle.stage ?? "").trim() || stageFromBatch,
-        mixingCycleCode: String(cycle.mixingCycleCode ?? "").trim() || codeFromBatch,
-        mixingCycleName: String(cycle.mixingCycleName ?? "").trim() || nameFromBatch,
-        mixingCycleId: cycle.mixingCycleId ?? batchCycle.id ?? batchCycle.mixingCycleId ?? null,
-      })),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batchDetails?.mixingCycle?.mixingCycleCode, batchDetails?.mixingCycle?.motorStage]);
-
   // Load motor stages for Experimental dropdowns (once batchDetails is available)
   useEffect(() => {
     if (!isExperimental || !batchDetails) return;

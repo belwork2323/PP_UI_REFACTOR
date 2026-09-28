@@ -21,7 +21,6 @@ import {
   mapMixingFormStateToPayload,
   mapBackendQualityChecksToRows,
   mergeProcessParticularsWithOperations,
-  resolveApiMixingCycleDisplayValue,
   resolveMixingCycleOperations,
   resolveMixingCycleQualityChecks,
   type FinalMixEntry,
@@ -151,7 +150,6 @@ export const useMixingHook = () => {
     const identificationSheet = (details?.identificationSheet ??
       null) as IdentificationSheet | null;
     const numberOfPremix = Number(identificationSheet?.numberOfPremix) || 1;
-    const mixingCycle = details?.mixingCycle ?? null;
     const parallelFlowEnabled = parseParallelFlowEnabled(details?.parallelFlowEnabled);
     const stageProgress = normalizeStageProgressArray(details?.stageProgress);
     const currentStage = normalizeStageProgressArray(details?.currentStage);
@@ -159,7 +157,6 @@ export const useMixingHook = () => {
     return {
       identificationSheet,
       numberOfPremix,
-      mixingCycle,
       parallelFlowEnabled,
       stageProgress,
       currentStage,
@@ -233,7 +230,6 @@ export const useMixingHook = () => {
         const {
           identificationSheet,
           numberOfPremix,
-          mixingCycle,
           parallelFlowEnabled,
           stageProgress,
           currentStage,
@@ -252,7 +248,6 @@ export const useMixingHook = () => {
           ...batch,
           identificationSheet,
           numberOfPremix,
-          mixingCycle,
           parallelFlowEnabled,
           stageProgress: stageProgress ?? batch.stageProgress,
           currentStage: currentStage ?? batch.currentStage,
@@ -267,16 +262,10 @@ export const useMixingHook = () => {
               bldgNo: "",
               premixDate: String(identificationSheet?.date ?? ""),
               premixQuantity: String(identificationSheet?.batchSize ?? ""),
-              mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
-              mixingCycleCode: String(
-                (mixingCycle as any)?.mixingCycleCode ??
-                  (mixingCycle as any)?.mixingCycleCode ??
-                  "",
-              ),
-              mixingCycleId: String(
-                (mixingCycle as any)?.id ?? (mixingCycle as any)?.mixingCycleId ?? "",
-              ),
-              mixingCycleName: String((mixingCycle as any)?.mixingCycleName ?? ""),
+              mixingCycle: "",
+              mixingCycleCode: "",
+              mixingCycleId: "",
+              mixingCycleName: "",
             }),
           );
 
@@ -287,14 +276,10 @@ export const useMixingHook = () => {
               finalMixNo: String(index + 1),
               mixerType: resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: "",
-              mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
-              mixingCycleCode: String(
-                (mixingCycle as any)?.mixingCycleCode ?? (mixingCycle as any)?.id ?? "",
-              ),
-              mixingCycleId: String(
-                (mixingCycle as any)?.id ?? (mixingCycle as any)?.mixingCycleId ?? "",
-              ),
-              mixingCycleName: String((mixingCycle as any)?.mixingCycleName ?? ""),
+              mixingCycle: "",
+              mixingCycleCode: "",
+              mixingCycleId: "",
+              mixingCycleName: "",
             }),
           );
 
@@ -347,21 +332,20 @@ export const useMixingHook = () => {
               bldgNo: card.bldgNo || "",
               premixDate: card.premixDate || String(identificationSheet?.date ?? ""),
               premixQuantity: card.premixQuantity || String(identificationSheet?.batchSize ?? ""),
-              mixingCycle: card.mixingCycle || resolveApiMixingCycleDisplayValue(mixingCycle) || "",
-              mixingCycleCode:
-                card.mixingCycleCode || String((mixingCycle as any)?.mixingCycleCode ?? ""),
-              mixingCycleName:
-                card.mixingCycleName || String((mixingCycle as any)?.mixingCycleName ?? ""),
+              // Keep cycle from saved Mixing form details only — do not fall back to batch.
+              mixingCycle: card.mixingCycle || "",
+              mixingCycleCode: card.mixingCycleCode || "",
+              mixingCycleId: card.mixingCycleId || "",
+              mixingCycleName: card.mixingCycleName || "",
             })),
             finalMixCards: (nextFormData.finalMixCards ?? []).map((card) => ({
               ...card,
               mixerType: card.mixerType || resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: card.bldgNo || "",
-              mixingCycle: card.mixingCycle || resolveApiMixingCycleDisplayValue(mixingCycle) || "",
-              mixingCycleCode:
-                card.mixingCycleCode || String((mixingCycle as any)?.mixingCycleCode ?? ""),
-              mixingCycleName:
-                card.mixingCycleName || String((mixingCycle as any)?.mixingCycleName ?? ""),
+              mixingCycle: card.mixingCycle || "",
+              mixingCycleCode: card.mixingCycleCode || "",
+              mixingCycleId: card.mixingCycleId || "",
+              mixingCycleName: card.mixingCycleName || "",
             })),
           };
         }
@@ -388,8 +372,7 @@ export const useMixingHook = () => {
         try {
           const mixingCycleCode = String(
             nextFormData.premixCards[0]?.mixingCycleCode ??
-              (nextBatch?.mixingCycle as { mixingCycleCode?: string } | undefined)
-                ?.mixingCycleCode ??
+              nextFormData.finalMixCards[0]?.mixingCycleCode ??
               "",
           ).trim();
 

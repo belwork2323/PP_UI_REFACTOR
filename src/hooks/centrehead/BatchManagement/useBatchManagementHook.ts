@@ -31,11 +31,7 @@ import { canDeleteAdminBatch } from "@utils/batchManagementUtils";
 import { getDashboardFilterBounds, toDashboardApiFilterType } from "@utils/dateUtils";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
-import type {
-  MixingCycleMasterItem,
-  SubscaleArticleOption,
-  SystemMasterOption,
-} from "@data/api/common/generalAPI";
+import type { SubscaleArticleOption, SystemMasterOption } from "@data/api/common/generalAPI";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 
@@ -232,11 +228,9 @@ function useBatchLookupsSection() {
   const [projects, setProjects] = useState<any[]>([]);
   const [motorStages, setMotorStages] = useState<any[]>([]);
   const [availableMotors, setAvailableMotors] = useState<any[]>([]);
-  const [mixingCycles, setMixingCycles] = useState<MixingCycleMasterItem[]>([]);
   const [subscaleArticles, setSubscaleArticles] = useState<SubscaleArticleOption[]>([]);
   const [lookupsLoading, setLookupsLoading] = useState(true);
   const [availableMotorsLoading, setAvailableMotorsLoading] = useState(false);
-  const [mixingCyclesLoading, setMixingCyclesLoading] = useState(false);
 
   const loadLookups = useCallback(async () => {
     setLookupsLoading(true);
@@ -331,23 +325,6 @@ function useBatchLookupsSection() {
     setAvailableMotors([]);
   }, []);
 
-  const fetchMixingCycles = useCallback(async () => {
-    setMixingCyclesLoading(true);
-    try {
-      const resp = await generalController.getMixingCycles();
-      setMixingCycles(resp?.success && Array.isArray(resp.data) ? resp.data : []);
-    } catch (err) {
-      console.error("Failed to fetch mixing cycles:", err);
-      setMixingCycles([]);
-    } finally {
-      setMixingCyclesLoading(false);
-    }
-  }, []);
-
-  const clearMixingCycles = useCallback(() => {
-    setMixingCycles([]);
-  }, []);
-
   useEffect(() => {
     void loadLookups();
   }, [loadLookups]);
@@ -380,15 +357,6 @@ function useBatchLookupsSection() {
     status: motor.status ?? "",
   }));
 
-  const mixingCycleOptions = mixingCycles.map((cycle) => ({
-    mixingCycleId: cycle.mixingCycleId,
-    mixingCycleCode: cycle.mixingCycleCode,
-    mixingCycleName: cycle.mixingCycleName,
-    motorStage: cycle.motorStage,
-    value: String(cycle.mixingCycleId),
-    label: cycle.mixingCycleName || cycle.mixingCycleCode,
-  }));
-
   // Keep current batch API shape (article names); display uses the same label.
   const articleOptions = subscaleArticles.map((article) => ({
     value: article.subscaleArticleName,
@@ -409,10 +377,6 @@ function useBatchLookupsSection() {
     availableMotorsLoading,
     fetchApprovedMotors,
     clearApprovedMotors,
-    mixingCycleOptions,
-    mixingCyclesLoading,
-    fetchMixingCycles,
-    clearMixingCycles,
     articleOptions,
     subscaleArticlesLoading: lookupsLoading,
     deptNames,

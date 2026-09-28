@@ -111,31 +111,37 @@ const LotDetailsSection = ({
                 alignItems: "start",
               }}
             >
-              <CasePrepSelect
-                label="Lot ID"
-                value={row.lotId}
-                placeholder="Select lot"
-                options={options}
-                disabled={disabled}
-                width="100%"
-                theme={theme}
-                error={Boolean(fieldErrors[`${index}.lotId`])}
-                onChange={(v) => updateRow(index, { lotId: v })}
-              />
-              <CasePrepTextField
-                label="Quantity"
-                value={row.quantity}
-                disabled={disabled}
-                error={Boolean(fieldErrors[`${index}.quantity`])}
-                helperText={fieldErrors[`${index}.quantity`] ?? null}
-                width="100%"
-                theme={theme}
-                onChange={(v) => {
-                  const next = sanitizeMasterDataDecimalInput(v);
-                  if (next === null) return;
-                  updateRow(index, { quantity: next });
-                }}
-              />
+              <Box data-rmp-field={`lotDetails.${index}.lotId`}>
+                <CasePrepSelect
+                  label="Lot ID"
+                  value={row.lotId}
+                  placeholder="Select lot"
+                  options={options}
+                  disabled={disabled}
+                  width="100%"
+                  theme={theme}
+                  required
+                  error={Boolean(fieldErrors[`${index}.lotId`])}
+                  onChange={(v) => updateRow(index, { lotId: v })}
+                />
+              </Box>
+              <Box data-rmp-field={`lotDetails.${index}.quantity`}>
+                <CasePrepTextField
+                  label="Quantity"
+                  value={row.quantity}
+                  disabled={disabled}
+                  required
+                  error={Boolean(fieldErrors[`${index}.quantity`])}
+                  helperText={fieldErrors[`${index}.quantity`] ?? null}
+                  width="100%"
+                  theme={theme}
+                  onChange={(v) => {
+                    const next = sanitizeMasterDataDecimalInput(v);
+                    if (next === null) return;
+                    updateRow(index, { quantity: next });
+                  }}
+                />
+              </Box>
               <IconButton
                 size="small"
                 onClick={() => removeRow(index)}

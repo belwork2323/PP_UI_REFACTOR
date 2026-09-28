@@ -6,6 +6,12 @@ import {
   DialogTitle,
   Divider,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
   Zoom,
 } from "@mui/material";
@@ -16,7 +22,6 @@ import {
   formatMotorStageLabel,
   type MixingCycleRecord,
 } from "@data/models/admin/MasterData/MixingCycleMasterModel";
-import { formatMasterDataReferenceRangeLabel } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
@@ -50,51 +55,12 @@ const DetailItem = ({ label, children }: { label: string; children: ReactNode })
   </Box>
 );
 
-const renderOperations = (title: string, ops: MixingCycleRecord["cycles"]["premixOperations"]) => (
-  <Box
-    sx={{
-      border: "1px solid",
-      borderColor: "divider",
-      borderRadius: 1.5,
-      overflow: "hidden",
-    }}
-  >
-    <Box sx={{ px: 2, py: 1.25, bgcolor: "action.hover" }}>
-      <Typography variant="subtitle2">{title}</Typography>
-    </Box>
-    <Divider />
-    <Stack spacing={0.75} sx={{ px: 2, py: 1.5 }}>
-      {ops.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {S.MIXING_CYCLES.VIEW_NO_OPERATIONS}
-        </Typography>
-      ) : (
-        ops.map((op, index) => (
-          <Box
-            key={`${op.operationId ?? "op"}-${index}`}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              opacity: op.isActive ? 1 : 0.72,
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-              {op.sequenceNo != null ? `${op.sequenceNo}. ` : ""}
-              {op.operationName}
-            </Typography>
-            <MasterDataActiveStatusChip isActive={op.isActive} />
-          </Box>
-        ))
-      )}
-    </Stack>
-  </Box>
-);
+const formatSamples = (value: number | "" | null | undefined) => {
+  if (value === "" || value == null) return "—";
+  return String(value);
+};
 
-const renderQualityChecks = (
-  title: string,
-  params: MixingCycleRecord["cycles"]["premixQualityChecks"],
-) => (
+const SectionShell = ({ title, children }: { title: string; children: ReactNode }) => (
   <Box
     sx={{
       border: "1px solid",
@@ -107,33 +73,7 @@ const renderQualityChecks = (
       <Typography variant="subtitle2">{title}</Typography>
     </Box>
     <Divider />
-    <Stack spacing={0.75} sx={{ px: 2, py: 1.5 }}>
-      {params.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          {S.MIXING_CYCLES.VIEW_NO_QUALITY_CHECKS}
-        </Typography>
-      ) : (
-        params.map((param, index) => (
-          <Box
-            key={`${param.parameterId || "qc"}-${index}`}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              opacity: param.isActive ? 1 : 0.72,
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-              {param.parameterName}
-              {param.noOfSamples !== "" ? ` · ${param.noOfSamples} samples` : ""}
-              {" · "}
-              {formatMasterDataReferenceRangeLabel(param.specification)}
-            </Typography>
-            <MasterDataActiveStatusChip isActive={param.isActive} />
-          </Box>
-        ))
-      )}
-    </Stack>
+    {children}
   </Box>
 );
 
@@ -145,12 +85,134 @@ const MixingCycleMasterViewDialog = ({
   onClose,
   t,
 }: Props) => {
-  const { modal } = t;
+  const { modal, table } = t;
   const projectLabel =
     projectOptions.find((o) => o.value === record?.projectId)?.label ||
     record?.projectId ||
     "—";
   const recordLabel = record?.mixingCycleName || record?.mixingCycleCode || "record";
+
+  const renderOperationsTable = (
+    title: string,
+    ops: MixingCycleRecord["cycles"]["premixOperations"],
+  ) => (
+    <SectionShell title={title}>
+      {ops.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 2 }}>
+          {S.MIXING_CYCLES.VIEW_NO_OPERATIONS}
+        </Typography>
+      ) : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={table?.headerRow}>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.OP_SEQUENCE}</TableCell>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.OP_NAME}</TableCell>
+                <TableCell sx={table?.headerCell} align="right">
+                  {S.TABLE.COL_ACTIVE}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {ops.map((op, index) => (
+                <TableRow
+                  key={`${op.operationId ?? "op"}-${index}`}
+                  sx={{
+                    ...table?.row,
+                    opacity: op.isActive ? 1 : 0.72,
+                  }}
+                >
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>
+                      {op.sequenceNo != null ? String(op.sequenceNo) : "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>{op.operationName || "—"}</Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell} align="right">
+                    <Box sx={{ display: "inline-flex" }}>
+                      <MasterDataActiveStatusChip isActive={op.isActive} />
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </SectionShell>
+  );
+
+  const renderQualityChecksTable = (
+    title: string,
+    params: MixingCycleRecord["cycles"]["premixQualityChecks"],
+  ) => (
+    <SectionShell title={title}>
+      {params.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 2 }}>
+          {S.MIXING_CYCLES.VIEW_NO_QUALITY_CHECKS}
+        </Typography>
+      ) : (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={table?.headerRow}>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.QC_PARAM_NAME}</TableCell>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.QC_MIN}</TableCell>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.QC_MAX}</TableCell>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.QC_UNIT}</TableCell>
+                <TableCell sx={table?.headerCell}>{S.MIXING_CYCLES.QC_SAMPLES}</TableCell>
+                <TableCell sx={table?.headerCell} align="right">
+                  {S.TABLE.COL_ACTIVE}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {params.map((param, index) => (
+                <TableRow
+                  key={`${param.parameterId || "qc"}-${index}`}
+                  sx={{
+                    ...table?.row,
+                    opacity: param.isActive ? 1 : 0.72,
+                  }}
+                >
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>{param.parameterName || "—"}</Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>
+                      {param.specification?.minValue ?? "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>
+                      {param.specification?.maxValue ?? "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>
+                      {param.specification?.unit || "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell}>
+                    <Typography sx={table?.bodyText}>
+                      {formatSamples(param.noOfSamples)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={table?.cell} align="right">
+                    <Box sx={{ display: "inline-flex" }}>
+                      <MasterDataActiveStatusChip isActive={param.isActive} />
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </SectionShell>
+  );
 
   return (
     <Dialog
@@ -219,10 +281,13 @@ const MixingCycleMasterViewDialog = ({
               </Typography>
             ) : null}
 
-            {renderOperations(S.MIXING_CYCLES.VIEW_PREMIX, record.cycles.premixOperations)}
-            {renderQualityChecks(S.MIXING_CYCLES.VIEW_PREMIX_QC, record.cycles.premixQualityChecks)}
-            {renderOperations(S.MIXING_CYCLES.VIEW_FINAL_MIX, record.cycles.finalMixOperations)}
-            {renderQualityChecks(
+            {renderOperationsTable(S.MIXING_CYCLES.VIEW_PREMIX, record.cycles.premixOperations)}
+            {renderQualityChecksTable(
+              S.MIXING_CYCLES.VIEW_PREMIX_QC,
+              record.cycles.premixQualityChecks,
+            )}
+            {renderOperationsTable(S.MIXING_CYCLES.VIEW_FINAL_MIX, record.cycles.finalMixOperations)}
+            {renderQualityChecksTable(
               S.MIXING_CYCLES.VIEW_FINAL_MIX_QC,
               record.cycles.finalMixQualityChecks,
             )}

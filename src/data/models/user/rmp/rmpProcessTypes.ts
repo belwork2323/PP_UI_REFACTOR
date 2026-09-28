@@ -8,7 +8,12 @@ export type RmpProcessType =
   | "AP_FINE"
   | "AP_ULTRA_FINE"
   | "ALUMINUM"
-  | "DOA";
+  | "DOA"
+  | "HTPB"
+  | "TDI"
+  | "CC"
+  | "IO"
+  | "NONOX_D";
 
 export type LotDetailDto = {
   lotId: string;
@@ -99,6 +104,9 @@ export type AluminumProcessDto = {
 };
 
 export type DoaProcessDto = {
+  sievingDatetime?: string | null;
+  quantitySieved?: string | null;
+  sieveMeshSize?: string | null;
   dispatchDatetime?: string | null;
   observation?: string | null;
   totalQtySentForPremix?: string | null;
@@ -154,6 +162,11 @@ export const uiKeyToProcessType = (uiKey: RmpMaterialUiKey): RmpProcessType => {
   if (uiKey === "apUltraFine") return "AP_ULTRA_FINE";
   if (uiKey === "aluminum") return "ALUMINUM";
   if (uiKey === "doa") return "DOA";
+  if (uiKey === "htpb") return "HTPB";
+  if (uiKey === "tdi") return "TDI";
+  if (uiKey === "cc") return "CC";
+  if (uiKey === "io") return "IO";
+  if (uiKey === "nonoxD") return "NONOX_D";
   return "DEFAULT_SOLID";
 };
 
@@ -167,6 +180,11 @@ export const processTypeToUiKey = (processType: string | null | undefined): RmpM
   if (raw === "AP_ULTRA_FINE") return "apUltraFine";
   if (raw === "ALUMINUM" || raw === "ALUMINIUM") return "aluminum";
   if (raw === "DOA") return "doa";
+  if (raw === "HTPB") return "htpb";
+  if (raw === "TDI" || raw === "TBI") return "tdi";
+  if (raw === "CC") return "cc";
+  if (raw === "IO") return "io";
+  if (raw === "NONOX_D" || raw === "NONOXD") return "nonoxD";
   return "defaultSolid";
 };
 

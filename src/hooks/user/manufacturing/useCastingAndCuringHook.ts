@@ -87,6 +87,10 @@ type CastingCuringBatch = {
 
 const CC_STATUS = MANUFACTURING_STATUS;
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
+const normalizeCuringType = (value: unknown) => {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  return normalized === "N2_PRESSURE_CURING" ? "NITROGEN_PRESSURE_CURING" : normalized;
+};
 
 const buildAddedMotorsFromForm = (formData: CastingCuringFormState): CastingCuringAddedMotor[] =>
   (formData.motors ?? []).map((motor) => ({
@@ -448,35 +452,44 @@ export const useCastingAndCuringHook = () => {
     [activeBatch, addedMotors, castingMotorDraftsById, formData, previousStageGate, showAlert],
   );
 
-  const fetchCuringCycleConfig = useCallback(async () => {
+  const fetchCuringCycleConfig = useCallback(async (curingType: string) => {
     if (!activeBatch) return null;
 
     const projectId = String(activeBatch.projectId ?? "").trim();
     const motorStage = resolveMotorStage(activeBatch);
+    const selectedCuringType = String(curingType ?? "").trim();
     if (!projectId) {
       setCuringCyclesError("Project is required to load curing cycle configuration.");
       return null;
     }
+    if (!selectedCuringType) return null;
 
     const cached = curingCycleConfigRef.current;
     if (
       cached &&
       cached.motorStage === motorStage &&
-      String(cached.projectId ?? "") === projectId
+      String(cached.projectId ?? "") === projectId &&
+      normalizeCuringType(cached.curingType) === normalizeCuringType(selectedCuringType)
     ) {
       return cached;
     }
 
     setCuringCyclesLoading(true);
     setCuringCyclesError(null);
+    setCuringCycleConfig(null);
 
     try {
       const response = await castingCuringController.fetchCuringCycles({
         projectId,
         motorStage,
+        curingType: selectedCuringType,
       });
       if (response?.success && response.data) {
         const next = { ...response.data, projectId };
+        if (normalizeCuringType(next.curingType) !== normalizeCuringType(selectedCuringType)) {
+          setCuringCyclesError("The returned curing cycle does not match the selected curing type.");
+          return null;
+        }
         setCuringCycleConfig(next);
         return next;
       }
@@ -490,11 +503,6 @@ export const useCastingAndCuringHook = () => {
     }
   }, [activeBatch, showAlert]);
 
-  useEffect(() => {
-    if (view !== "form" || !activeBatch) return;
-    void fetchCuringCycleConfig();
-  }, [view, activeBatch, fetchCuringCycleConfig]);
-
   const getCuringSetupDraft = useCallback(
     (motorId: string): CuringProcessSetup =>
       curingSetupDrafts[normalizeCastingCuringMotorId(motorId)] ?? createDefaultCuringProcessSetup(),
@@ -504,10 +512,15 @@ export const useCastingAndCuringHook = () => {
   const handleCuringSetupDraftChange = useCallback(
     (motorId: string, field: keyof CuringProcessSetup, value: string | number | "") => {
       const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
+      const current = curingSetupDrafts[normalizedMotorId] ?? createDefaultCuringProcessSetup();
+      if (field === "curingType" && current.curingType !== value) {
+        setCuringCycleConfig(null);
+        curingCycleConfigRef.current = null;
+      }
       setCuringSetupDrafts((prev) => {
-        const current = prev[normalizedMotorId] ?? createDefaultCuringProcessSetup();
+        const currentSetup = prev[normalizedMotorId] ?? createDefaultCuringProcessSetup();
         const nextSetup = {
-          ...current,
+          ...currentSetup,
           [field]: value,
         };
         if (field === "configuration" && String(value).toLowerCase() !== "multiple") {
@@ -516,7 +529,7 @@ export const useCastingAndCuringHook = () => {
         return { ...prev, [normalizedMotorId]: nextSetup };
       });
     },
-    [],
+    [curingSetupDrafts],
   );
 
   const handleLoadCuringForm = useCallback(
@@ -529,22 +542,12 @@ export const useCastingAndCuringHook = () => {
       const draft = curingSetupDrafts[normalizedMotorId] ?? createDefaultCuringProcessSetup();
       if (!canLoadCuringForm({ setup: draft, curingFormLoaded: false })) return;
 
-      const projectId = String(activeBatch.projectId ?? "").trim();
-      const motorStage = resolveMotorStage(activeBatch);
-      const cached = curingCycleConfigRef.current;
-      let cycleConfig =
-        cached &&
-        cached.motorStage === motorStage &&
-        String(cached.projectId ?? "") === projectId
-          ? cached
-          : null;
-      if (!cycleConfig) {
-        cycleConfig = await fetchCuringCycleConfig();
-      }
+      const cycleConfig = await fetchCuringCycleConfig(draft.curingType);
+      if (!cycleConfig) return;
 
       const setupSnapshot = {
         ...draft,
-        curingType: cycleConfig?.curingType ?? draft.curingType,
+        curingType: draft.curingType,
       };
       const targetMotor = (formData.motors ?? []).find(
         (motor) => normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId,

@@ -82,14 +82,15 @@ export const mixingController = {
     }
   },
 
-  fetchQualityChecks: async (mixType: string, motorStage: number) => {
-    const cacheKey = `${String(mixType).toUpperCase()}:${Number(motorStage) || 0}`;
+  fetchQualityChecks: async (mixType: string, motorStage: number, mixingCycleCode?: string) => {
+    const code = String(mixingCycleCode ?? "").trim();
+    const cacheKey = `${String(mixType).toUpperCase()}:${Number(motorStage) || 0}:${code}`;
     const existing = qualityChecksInflight.get(cacheKey);
     if (existing) return existing;
 
     const request = (async () => {
       try {
-        return await fetchQualityCheck(mixType, motorStage);
+        return await fetchQualityCheck(mixType, motorStage, code || undefined);
       } catch (error) {
         console.error("Failed to fetch quality checks:", error);
         return new ApiResponseModel(error);

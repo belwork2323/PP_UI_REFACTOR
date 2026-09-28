@@ -76,6 +76,10 @@ const DimensionalParametersMasterPanel = ({
     onRefresh,
   });
 
+  const filterProjectId = hook.projectFilter || "";
+  const { options: filterMotorStageOptions, loading: filterMotorStageLoading } =
+    useMotorStageOptions(true, filterProjectId);
+
   const createProjectId = hook.createForm.projectId || "";
   const { options: createMotorStageOptions, loading: createMotorStageLoading } =
     useMotorStageOptions(hook.inlineMode === "create", createProjectId || "");
@@ -84,6 +88,12 @@ const DimensionalParametersMasterPanel = ({
   const formOpen = hook.inlineMode != null;
   const columnCount = 6 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
   const [viewTarget, setViewTarget] = useState<DimensionalParametersMasterRecord | null>(null);
+
+  const viewProjectId = viewTarget?.projectId || "";
+  const { options: viewMotorStageOptions } = useMotorStageOptions(
+    viewTarget != null,
+    viewProjectId || "",
+  );
 
   const resolveProject = (projectId: string) => {
     const match = projectSelectOptions.find((p) => p.projectId === projectId);
@@ -129,7 +139,8 @@ const DimensionalParametersMasterPanel = ({
           projectLoading={projectLoading}
           motorStageFilter={hook.motorStageFilter}
           onMotorStageFilterChange={hook.setMotorStageFilter}
-          motorStageOptions={hook.motorStageFilterOptions}
+          motorStageOptions={filterMotorStageOptions}
+          motorStageLoading={filterMotorStageLoading}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
           t={t}
@@ -184,11 +195,11 @@ const DimensionalParametersMasterPanel = ({
                     <TableCell sx={{ ...table.cell, minWidth: 220 }}>
                       {renderProjectCell(row.projectId)}
                     </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>
-                        {formatMotorStageLabel(row.motorType, hook.motorStageFilterOptions)}
-                      </Typography>
-                    </TableCell>
+                      <TableCell sx={table.cell}>
+                        <Typography sx={table.bodyText}>
+                          {formatMotorStageLabel(row.motorType, filterMotorStageOptions)}
+                        </Typography>
+                      </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.minValue ?? "—"}</Typography>
                     </TableCell>
@@ -312,7 +323,7 @@ const DimensionalParametersMasterPanel = ({
               )
             : []
         }
-        motorStageOptions={hook.motorStageFilterOptions}
+        motorStageOptions={viewMotorStageOptions}
         projectOptions={projectOptions}
         onClose={() => setViewTarget(null)}
         t={t}

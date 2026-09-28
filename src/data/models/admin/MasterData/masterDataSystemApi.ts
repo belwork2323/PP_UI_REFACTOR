@@ -176,11 +176,16 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
     name: "Curing cycles (ops, active only)",
     method: "POST",
     endpoint: USER_CASTING_CURING_FORM_ENDPOINTS.CURING_CYCLES,
-    request: { projectId: "PRJ-2026-0028", motorStage: 1 },
+    request: {
+      projectId: "PRJ-2026-0028",
+      motorStage: 1,
+      curingType: "NORMAL_CURING",
+    },
     fetch: async () => {
       const body = await fetchCuringCyclesApi({
         projectId: "PRJ-2026-0028",
         motorStage: 1,
+        curingType: "NORMAL_CURING",
       });
       return (body as any)?.data ?? body;
     },

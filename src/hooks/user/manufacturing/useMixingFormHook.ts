@@ -6,6 +6,8 @@ import {
   createEmptyPremixEntry,
   createPremixEntryWithDefaults,
   createFinalMixEntryWithDefaults,
+  mergeProcessParticularsWithOperations,
+  resolveApiMixingCycleDisplayValue,
   type FinalMixEntry,
   type MixingFormState,
   type PremixEntry,
@@ -13,6 +15,74 @@ import {
   type QualityCheckRow,
 } from "../../../data/models/user/MixingFormModel";
 import { resolveMasterDataName } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+
+export type MixingCycleSelectionFields = {
+  mixingCycleCode: string;
+  mixingCycleId?: string;
+  mixingCycleName?: string;
+  mixingCycle?: string;
+};
+
+export type MixingCycleEnrichment = {
+  premixOperations?: Array<{ operationId: number; operationName?: string; sequenceNo?: number }>;
+  finalMixOperations?: Array<{ operationId: number; operationName?: string; sequenceNo?: number }>;
+  premixQualityChecks?: QualityCheckRow[];
+  finalMixQualityChecks?: QualityCheckRow[];
+};
+
+/** Apply a single shared mixing cycle (and optional ops/QC enrichment) to every card. */
+export const applyMixingCycleToAllCardsState = (
+  premixCards: PremixEntry[],
+  finalMixCards: FinalMixEntry[],
+  cycle: MixingCycleSelectionFields,
+  enrichment?: MixingCycleEnrichment,
+): MixingFormState => {
+  const display =
+    String(cycle.mixingCycle ?? "").trim() ||
+    resolveApiMixingCycleDisplayValue({
+      mixingCycleName: cycle.mixingCycleName,
+      mixingCycleCode: cycle.mixingCycleCode,
+    });
+  const patch = {
+    mixingCycle: display,
+    mixingCycleCode: String(cycle.mixingCycleCode ?? "").trim(),
+    mixingCycleId: String(cycle.mixingCycleId ?? "").trim(),
+    mixingCycleName: String(cycle.mixingCycleName ?? "").trim(),
+  };
+
+  const mergeQc = (template: QualityCheckRow[] | undefined, current: QualityCheckRow[]) => {
+    if (!template?.length) return current;
+    return template.map((row) => {
+      const existing = current.find((item) => item.parameterId === row.parameterId);
+      return existing ? { ...row, observedValues: existing.observedValues } : row;
+    });
+  };
+
+  return {
+    premixCards: premixCards.map((card) => ({
+      ...card,
+      ...patch,
+      processParticulars: enrichment?.premixOperations?.length
+        ? mergeProcessParticularsWithOperations(
+            enrichment.premixOperations,
+            card.processParticulars,
+          )
+        : card.processParticulars,
+      qualityChecks: mergeQc(enrichment?.premixQualityChecks, card.qualityChecks),
+    })),
+    finalMixCards: finalMixCards.map((card) => ({
+      ...card,
+      ...patch,
+      processParticulars: enrichment?.finalMixOperations?.length
+        ? mergeProcessParticularsWithOperations(
+            enrichment.finalMixOperations,
+            card.processParticulars,
+          )
+        : card.processParticulars,
+      qualityChecks: mergeQc(enrichment?.finalMixQualityChecks, card.qualityChecks),
+    })),
+  };
+};
 
 const buildInitialPremixCardsWithDefaults = (
   count: number,
@@ -386,6 +456,23 @@ export const useMixingFormHook = (
     [],
   );
 
+  const cardsRef = useRef({ premixCards, finalMixCards });
+  cardsRef.current = { premixCards, finalMixCards };
+
+  const applyMixingCycleToAllCards = useCallback(
+    (cycle: MixingCycleSelectionFields, enrichment?: MixingCycleEnrichment) => {
+      const next = applyMixingCycleToAllCardsState(
+        cardsRef.current.premixCards,
+        cardsRef.current.finalMixCards,
+        cycle,
+        enrichment,
+      );
+      setPremixCards(next.premixCards);
+      setFinalMixCards(next.finalMixCards);
+    },
+    [],
+  );
+
   const formState = useMemo(() => ({ premixCards, finalMixCards }), [finalMixCards, premixCards]);
 
   return {
@@ -411,6 +498,7 @@ export const useMixingFormHook = (
     updateFinalMixQualityCheck,
     applyPremixQualityChecks,
     applyFinalMixQualityChecks,
+    applyMixingCycleToAllCards,
   };
 };
 

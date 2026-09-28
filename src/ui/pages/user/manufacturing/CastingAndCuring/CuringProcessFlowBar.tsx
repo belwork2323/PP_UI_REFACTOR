@@ -2,11 +2,11 @@ import { useMemo } from "react";
 import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import type { CuringProcessSetup } from "../../../../../data/models/user/CastingCuringFormModel";
+import { CURING_TYPE_OPTIONS } from "../../../../../data/models/admin/MasterData/curingTypeOptions";
 import {
   CASTING_CURING_FLOW_LABELS,
   buildCuringOvenNoOptions,
   canLoadCuringForm,
-  formatCuringTypeLabel,
   formatMotorStageLabel,
   type CastingCuringBatchMotorSource,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
@@ -74,10 +74,6 @@ const CuringProcessFlowBar = ({
     [curingFormLoaded, setup],
   );
 
-  const curingTypeLabel = useMemo(
-    () => formatCuringTypeLabel(curingCycleConfig?.curingType ?? setup.curingType),
-    [curingCycleConfig?.curingType, setup.curingType],
-  );
   const motorStageLabel = useMemo(
     () => formatMotorStageLabel(curingCycleConfig, batch),
     [batch, curingCycleConfig],
@@ -97,13 +93,20 @@ const CuringProcessFlowBar = ({
           label={L.curingMotorStage}
           value={curingCyclesLoading ? L.curingCyclesLoading : motorStageLabel}
         />
-        <DetailItem
-          label={L.curingType}
-          value={curingCyclesLoading ? L.curingCyclesLoading : curingTypeLabel}
-        />
       </Stack>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={flowBar.topRow}>
+          <CasePrepSelect
+            label={L.curingType}
+            value={setup.curingType}
+            placeholder={L.curingTypePlaceholder}
+            options={CURING_TYPE_OPTIONS}
+            width={220}
+            theme={theme}
+            required
+            disabled={curingCyclesLoading}
+            onChange={(value) => onChange("curingType", value)}
+          />
           <CasePrepSelect
             label={L.curingSelectOven}
             value={setup.oven}

@@ -71,13 +71,13 @@ const validationMessages = {
 };
 
 const TABLE_COLUMNS = [
-  RM.WEIGHTMENT_TABLE_COL_MATERIAL_CODE,
-  RM.WEIGHTMENT_TABLE_COL_MATERIAL_NAME,
-  RM.WEIGHTMENT_TABLE_COL_CONTAINER_TYPE,
-  RM.WEIGHTMENT_TABLE_COL_CONTAINER_NO,
-  RM.WEIGHTMENT_TABLE_COL_WEIGH_SCALE,
-  RM.WEIGHTMENT_TABLE_COL_WEIGHT,
-  RM.WEIGHTMENT_TABLE_COL_WEIGHING_TIME,
+  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_CODE, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_NAME, required: false },
+  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_TYPE, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_NO, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGH_SCALE, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHT, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHING_TIME, required: true },
 ] as const;
 
 type RawMaterialWeightmentSheetPanelProps = {
@@ -108,6 +108,11 @@ type RawMaterialWeightmentSheetPanelProps = {
   allowAddRemoveRows?: boolean;
   weightmentErrors?: ValidationErrors;
   validationAttempt?: ValidationAttemptFlags;
+  /**
+   * Maps filtered row index → full weightment sheet index.
+   * Required when the panel shows a material-scoped subset of rows.
+   */
+  rowSourceIndices?: number[];
 };
 
 const RawMaterialWeightmentSheetPanel = ({
@@ -122,11 +127,16 @@ const RawMaterialWeightmentSheetPanel = ({
   allowAddRemoveRows = true,
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
+  rowSourceIndices,
 }: RawMaterialWeightmentSheetPanelProps) => {
   const { visibleError: submitVisibleError } = useValidationDisplay(
     weightmentErrors,
     validationAttempt,
   );
+  const resolveErrorRowIndex = (localIndex: number) =>
+    Array.isArray(rowSourceIndices) && rowSourceIndices[localIndex] != null
+      ? rowSourceIndices[localIndex]
+      : localIndex;
   const [identificationViewOpen, setIdentificationViewOpen] = useState(false);
   const [resolvedIdentificationSheet, setResolvedIdentificationSheet] =
     useState<IdentificationSheet | null>(identificationSheet ?? null);
@@ -225,7 +235,7 @@ const RawMaterialWeightmentSheetPanel = ({
     rowIndex: number,
     field: keyof RawMaterialPrepWeightmentDetail,
   ): string | undefined => {
-    const submitError = submitVisibleError(weightmentPath(rowIndex, field));
+    const submitError = submitVisibleError(weightmentPath(resolveErrorRowIndex(rowIndex), field));
     if (submitError) return submitError;
     return rowErrors[rowIndex]?.[field];
   };
@@ -349,6 +359,7 @@ const RawMaterialWeightmentSheetPanel = ({
 
   const renderMaterialCodeField = (row: RawMaterialPrepWeightmentDetail, index: number) => {
     const materialCodeError = getRowFieldError(index, "materialCode");
+    const fieldPath = weightmentPath(resolveErrorRowIndex(index), "materialCode");
 
     // QC (compareHighlightOnly): always free-text; compare only highlights mismatches.
     // RMP: when compare is on, use identification-sheet dropdown + auto-fill.
@@ -363,6 +374,7 @@ const RawMaterialWeightmentSheetPanel = ({
           palette={palette}
           selectOptions={getMaterialSelectOptionsForRow(index)}
           disabled={disabled}
+          fieldPath={fieldPath}
         />
       );
     }
@@ -376,6 +388,7 @@ const RawMaterialWeightmentSheetPanel = ({
         helperText={materialCodeError}
         palette={palette}
         disabled={disabled}
+        fieldPath={fieldPath}
       />
     );
   };
@@ -449,6 +462,8 @@ const RawMaterialWeightmentSheetPanel = ({
             options={mixerBuildingSelectOptions}
             palette={palette}
             disabled={disabled || loadingBuildings}
+            required
+            fieldPath={weightmentMixerBuildingPath()}
             error={Boolean(mixerBuildingError)}
             helperText={mixerBuildingError}
           />
@@ -490,9 +505,9 @@ const RawMaterialWeightmentSheetPanel = ({
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  {TABLE_COLUMNS.map((header) => (
+                  {TABLE_COLUMNS.map((col) => (
                     <TableCell
-                      key={header}
+                      key={col.label}
                       sx={
                         dt.tableHeaderCell
                           ? dt.tableHeaderCell()
@@ -512,7 +527,12 @@ const RawMaterialWeightmentSheetPanel = ({
                             }
                       }
                     >
-                      {header}
+                      {col.label}
+                      {col.required ? (
+                        <Box component="span" sx={{ color: "#FFCDD2", ml: 0.35 }}>
+                          *
+                        </Box>
+                      ) : null}
                     </TableCell>
                   ))}
                   {allowAddRemoveRows ? (
@@ -550,6 +570,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           error={Boolean(getRowFieldError(index, "materialName"))}
                           helperText={getRowFieldError(index, "materialName")}
                           palette={palette}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "materialName")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 140, py: 1.1, verticalAlign: "top" }}>
@@ -562,6 +583,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                           error={Boolean(getRowFieldError(index, "containerType"))}
                           helperText={getRowFieldError(index, "containerType")}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "containerType")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
@@ -573,6 +595,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                           error={Boolean(getRowFieldError(index, "containerNumber"))}
                           helperText={getRowFieldError(index, "containerNumber")}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "containerNumber")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
@@ -584,6 +607,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                           error={Boolean(getRowFieldError(index, "weighScaleNumber"))}
                           helperText={getRowFieldError(index, "weighScaleNumber")}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "weighScaleNumber")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 150, py: 1.1, verticalAlign: "top" }}>
@@ -596,6 +620,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           helperText={getRowFieldError(index, "weightTransferred")}
                           palette={palette}
                           disabled={disabled}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "weightTransferred")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 200, py: 1.1, verticalAlign: "top" }}>
@@ -607,6 +632,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                           error={Boolean(getRowFieldError(index, "weighingDateTime"))}
                           helperText={getRowFieldError(index, "weighingDateTime")}
+                          fieldPath={weightmentPath(resolveErrorRowIndex(index), "weighingDateTime")}
                         />
                       </TableCell>
                       {allowAddRemoveRows ? (

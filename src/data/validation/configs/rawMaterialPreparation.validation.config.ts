@@ -350,12 +350,13 @@ export const isFieldRequiredOnSubmit = (
   );
 };
 
-/** AP Coarse submit requires weightment mixer building when any coarse material is on premix. */
+/**
+ * @deprecated Mixer building is required for all materials on SUBMIT.
+ * Kept for callers; always returns true when any selection exists.
+ */
 export const premixRequiresWeightmentOnSubmit = (
-  selections: Array<{ solidMaterialCode?: string; solidGradeCode?: string }>,
-): boolean =>
-  selections.some(
-    (entry) =>
-      String(entry.solidMaterialCode ?? "").toUpperCase() === "AP" &&
-      String(entry.solidGradeCode ?? "").toUpperCase() === "COARSE",
-  );
+  selections: Array<{
+    solidGradeCode?: string;
+    solidRmpFormTemplate?: string | null;
+  }>,
+): boolean => selections.length > 0;

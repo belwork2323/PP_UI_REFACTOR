@@ -109,6 +109,7 @@ const DimensionalParametersTableToolbar = ({
           filterPanel
           fullWidth
           size="small"
+          disabled={!projectFilter}
           sx={filterFieldSx}
         />
       </Box>

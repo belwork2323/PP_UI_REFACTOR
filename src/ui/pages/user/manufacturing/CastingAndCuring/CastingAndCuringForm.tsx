@@ -114,7 +114,7 @@ type CastingAndCuringFormProps = {
   addedMotors: Array<{ motorId: string; motorReceivedAt: string; castingStation?: string }>;
   curingCycleConfig?: CuringCycleConfig | null;
   curingCyclesLoading?: boolean;
-  onFetchCuringCycleConfig?: () => void | Promise<unknown>;
+  onFetchCuringCycleConfig?: (curingType: string) => void | Promise<unknown>;
   onCastingMotorDraftChange: (
     motorId: string,
     field: "castingStation" | "motorReceivedAt",
@@ -304,9 +304,17 @@ const CastingAndCuringForm = ({
     : { castingStation: "", motorReceivedAt: "" };
 
   useEffect(() => {
-    if (activeProcessTab !== "CURING") return;
-    void onFetchCuringCycleConfig?.();
-  }, [activeProcessTab, onFetchCuringCycleConfig, batch?.batchId, batch?.motorStage, batch?.projectId]);
+    if (activeProcessTab !== "CURING" || curingFormLoaded || !curingSetupDraft?.curingType) return;
+    void onFetchCuringCycleConfig?.(curingSetupDraft.curingType);
+  }, [
+    activeProcessTab,
+    curingFormLoaded,
+    curingSetupDraft?.curingType,
+    onFetchCuringCycleConfig,
+    batch?.batchId,
+    batch?.motorStage,
+    batch?.projectId,
+  ]);
 
   useEffect(() => {
     if (!curingFormLoaded) return;

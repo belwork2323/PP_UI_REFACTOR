@@ -67,8 +67,6 @@ export type BlendingStylePreparationDetails = {
 };
 
 export type HtpbBlendingPreparationDetails = BlendingStylePreparationDetails;
-export type ApFinePreparationDetails = BlendingStylePreparationDetails;
-export type ApUltrafinePreparationDetails = BlendingStylePreparationDetails;
 
 export const emptyBlendingStylePreparationDetails = (): BlendingStylePreparationDetails => ({
   mfgBatchLotNo: "",
@@ -85,12 +83,6 @@ export const emptyBlendingStylePreparationDetails = (): BlendingStylePreparation
 export const emptyHtpbBlendingPreparationDetails = (): HtpbBlendingPreparationDetails =>
   emptyBlendingStylePreparationDetails();
 
-export const emptyApFinePreparationDetails = (): ApFinePreparationDetails =>
-  emptyBlendingStylePreparationDetails();
-
-export const emptyApUltrafinePreparationDetails = (): ApUltrafinePreparationDetails =>
-  emptyBlendingStylePreparationDetails();
-
 export const isAcemHtpbBlendingMaterial = (
   rawMaterialType?: string | null,
   preparationType?: string | null,
@@ -98,22 +90,6 @@ export const isAcemHtpbBlendingMaterial = (
   String(rawMaterialType ?? "")
     .trim()
     .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "HTPB_BLENDING";
-
-export const isAcemApFineMaterial = (
-  rawMaterialType?: string | null,
-  preparationType?: string | null,
-): boolean =>
-  String(rawMaterialType ?? "")
-    .trim()
-    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "AP_FINE";
-
-export const isAcemApUltrafineMaterial = (
-  rawMaterialType?: string | null,
-  preparationType?: string | null,
-): boolean =>
-  String(rawMaterialType ?? "")
-    .trim()
-    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "AP_ULTRAFINE";
 
 const parseAdductNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -195,10 +171,6 @@ export const serializeBlendingStylePreparationDetails = (
 
 export const parseHtpbBlendingPreparationDetails = parseBlendingStylePreparationDetails;
 export const serializeHtpbBlendingPreparationDetails = serializeBlendingStylePreparationDetails;
-export const parseApFinePreparationDetails = parseBlendingStylePreparationDetails;
-export const serializeApFinePreparationDetails = serializeBlendingStylePreparationDetails;
-export const parseApUltrafinePreparationDetails = parseBlendingStylePreparationDetails;
-export const serializeApUltrafinePreparationDetails = serializeBlendingStylePreparationDetails;
 
 /** Re-export for sourcing pages that previously imported from sourcingWorkflowData */
 export const SOURCING_STATUS = OPERATION_STATUS;
@@ -423,8 +395,6 @@ export type MaterialBlock = {
   manufacturerName?: string;
   adductPreparation?: AdductPreparationDetails;
   htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
-  apFinePreparation?: ApFinePreparationDetails;
-  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   certificates?: LotCertificate[];
   rows: SpecRow[];
 };
@@ -433,8 +403,6 @@ export type MaterialLotBlock = {
   lotNo: string;
   adductPreparation?: AdductPreparationDetails;
   htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
-  apFinePreparation?: ApFinePreparationDetails;
-  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   certificates: LotCertificate[];
   rows: SpecRow[];
 };
@@ -555,8 +523,6 @@ export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBloc
       ...(lot.htpbBlendingPreparation
         ? { htpbBlendingPreparation: lot.htpbBlendingPreparation }
         : {}),
-      ...(lot.apFinePreparation ? { apFinePreparation: lot.apFinePreparation } : {}),
-      ...(lot.apUltrafinePreparation ? { apUltrafinePreparation: lot.apUltrafinePreparation } : {}),
     })),
   );
 }
@@ -589,10 +555,6 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
         ...(block.adductPreparation ? { adductPreparation: block.adductPreparation } : {}),
         ...(block.htpbBlendingPreparation
           ? { htpbBlendingPreparation: block.htpbBlendingPreparation }
-          : {}),
-        ...(block.apFinePreparation ? { apFinePreparation: block.apFinePreparation } : {}),
-        ...(block.apUltrafinePreparation
-          ? { apUltrafinePreparation: block.apUltrafinePreparation }
           : {}),
       })),
     };
@@ -682,7 +644,6 @@ export const PREPARATION_SOURCE_MATERIAL = {
   HTPB: "HTPB",
   TMP: "TMP",
   NBD: "NBD",
-  AP: "AP",
 } as const;
 
 export const normalizePreparationSourceMaterialCode = (code: string | undefined | null): string =>
@@ -709,16 +670,6 @@ export const getPreparationSourceLotsForMaterial = (
 ): RawMaterialLotListRow[] => {
   const key = normalizePreparationSourceMaterialCode(materialCode);
   return key ? (lotsByMaterialCode[key] ?? []) : [];
-};
-
-export const isApPreparationSourceLot = (lot: RawMaterialLotListRow): boolean => {
-  if (normalizePreparationSourceMaterialCode(lot.materialCode) !== PREPARATION_SOURCE_MATERIAL.AP) {
-    return false;
-  }
-  const grade = String(lot.grade?.gradeCode ?? "")
-    .trim()
-    .toUpperCase();
-  return !grade || grade === "COARSE";
 };
 
 export type PreparationLotDropdownOption = {
@@ -753,7 +704,6 @@ export type ApprovedPreparationLotLookups = {
   getHtpbLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
   getTmpLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
   getNbdLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
-  getApSourceLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
 };
 
 export const blocksRequireApprovedPreparationLots = (
@@ -762,9 +712,7 @@ export const blocksRequireApprovedPreparationLots = (
   blocks.some(
     (block) =>
       isAcemAdductMaterial(block.rawMaterialType, block.preparationType) ||
-      isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType) ||
-      isAcemApFineMaterial(block.rawMaterialType, block.preparationType) ||
-      isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType),
+      isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType),
   );
 
 /** Read-only lot details page context (from list row + details API) */
@@ -816,8 +764,6 @@ export type RawMaterialLotCreatePayload = {
   certificates: RawMaterialCertificateApiPayload[];
   adductPreparation?: AdductPreparationDetails;
   htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
-  apFinePreparation?: ApFinePreparationDetails;
-  apUltrafinePreparation?: ApUltrafinePreparationDetails;
 };
 
 export type RawMaterialMaterialCreatePayload = {
@@ -859,8 +805,6 @@ export type RawMaterialLotUpdatePayload = {
   certificates: RawMaterialCertificateApiPayload[];
   adductPreparation?: AdductPreparationDetails;
   htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
-  apFinePreparation?: ApFinePreparationDetails;
-  apUltrafinePreparation?: ApUltrafinePreparationDetails;
 };
 
 export type RawMaterialLotListRequest = {
@@ -1037,8 +981,6 @@ export class RawMaterialLotDetailsModel {
   certificates: LotCertificate[];
   adductPreparation?: AdductPreparationDetails;
   htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
-  apFinePreparation?: ApFinePreparationDetails;
-  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   rawMaterialType?: RawMaterialTypeValue;
   preparationType?: PreparationTypeValue | "" | null;
   progressInsights?: Record<string, unknown>;
@@ -1071,12 +1013,6 @@ export class RawMaterialLotDetailsModel {
       : undefined;
     this.htpbBlendingPreparation = payload?.htpbBlendingPreparation
       ? parseHtpbBlendingPreparationDetails(payload.htpbBlendingPreparation)
-      : undefined;
-    this.apFinePreparation = payload?.apFinePreparation
-      ? parseApFinePreparationDetails(payload.apFinePreparation)
-      : undefined;
-    this.apUltrafinePreparation = payload?.apUltrafinePreparation
-      ? parseApUltrafinePreparationDetails(payload.apUltrafinePreparation)
       : undefined;
     this.rawMaterialType =
       String(payload?.rawMaterialType ?? "NORMAL")
@@ -1114,10 +1050,6 @@ export class RawMaterialLotDetailsModel {
         ...(model.adductPreparation ? { adductPreparation: model.adductPreparation } : {}),
         ...(model.htpbBlendingPreparation
           ? { htpbBlendingPreparation: model.htpbBlendingPreparation }
-          : {}),
-        ...(model.apFinePreparation ? { apFinePreparation: model.apFinePreparation } : {}),
-        ...(model.apUltrafinePreparation
-          ? { apUltrafinePreparation: model.apUltrafinePreparation }
           : {}),
         rows: (model.specifications ?? []).map((spec) => {
           const referenceRange = parseApiReferenceRange(spec.referenceRange);
@@ -1377,14 +1309,6 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
   if (htpbBlendingPreparation) {
     payload.htpbBlendingPreparation = htpbBlendingPreparation;
   }
-  const apFinePreparation = serializeApFinePreparationDetails(lot.apFinePreparation);
-  if (apFinePreparation) {
-    payload.apFinePreparation = apFinePreparation;
-  }
-  const apUltrafinePreparation = serializeApUltrafinePreparationDetails(lot.apUltrafinePreparation);
-  if (apUltrafinePreparation) {
-    payload.apUltrafinePreparation = apUltrafinePreparation;
-  }
   return payload;
 }
 
@@ -1447,16 +1371,6 @@ export function mapFirstBlockToLotUpdatePayload(
       ? {
           htpbBlendingPreparation: serializeHtpbBlendingPreparationDetails(
             block.htpbBlendingPreparation,
-          ),
-        }
-      : {}),
-    ...(serializeApFinePreparationDetails(block.apFinePreparation)
-      ? { apFinePreparation: serializeApFinePreparationDetails(block.apFinePreparation) }
-      : {}),
-    ...(serializeApUltrafinePreparationDetails(block.apUltrafinePreparation)
-      ? {
-          apUltrafinePreparation: serializeApUltrafinePreparationDetails(
-            block.apUltrafinePreparation,
           ),
         }
       : {}),

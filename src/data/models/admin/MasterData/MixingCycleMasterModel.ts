@@ -306,27 +306,6 @@ export const getMixingCycleFieldErrors = (
   const nameError = validateMasterDataNameField(form.mixingCycleName, "Mixing cycle name");
   if (nameError) errors.mixingCycleName = nameError;
 
-  if (
-    !isEdit &&
-    form.isActive &&
-    form.projectId.trim() &&
-    form.motorStage !== "" &&
-    !errors.motorStage &&
-    !errors.projectId
-  ) {
-    const stage = Number(form.motorStage);
-    const projectId = form.projectId.trim();
-    const conflict = existingRecords.some(
-      (item) =>
-        item.isActive &&
-        item.projectId === projectId &&
-        item.motorStage === stage,
-    );
-    if (conflict) {
-      errors.motorStage = `Mixing cycle already exists and is active for this project and motor stage ${stage}`;
-    }
-  }
-
   if (form.cycles.premixOperations.length === 0) {
     errors.form = "Add at least one premix operation";
     return errors;

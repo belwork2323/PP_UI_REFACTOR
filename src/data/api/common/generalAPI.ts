@@ -392,6 +392,7 @@ export type MixingCycleMasterItem = {
   mixingCycleCode: string;
   mixingCycleName: string;
   motorStage: number;
+  projectId: string;
 };
 
 /** Normalize to string for this API only — e.g. 0 → "0", 1 → "1", ALL → "ALL" */
@@ -411,6 +412,7 @@ const mapMixingCycleMasterItem = (row: Record<string, unknown>): MixingCycleMast
   mixingCycleCode: String(row.mixingCycleCode ?? row.code ?? "").trim(),
   mixingCycleName: String(row.mixingCycleName ?? row.name ?? "").trim(),
   motorStage: Number(row.motorStage ?? 0),
+  projectId: String(row.projectId ?? "").trim(),
 });
 
 /**

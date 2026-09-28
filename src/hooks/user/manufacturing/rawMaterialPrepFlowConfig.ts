@@ -8,6 +8,7 @@ import { processFormHasUserData } from "../../../data/models/user/rmp/defaultSol
 import { findGradeInMaterial } from "../../../data/models/user/rmp/rmpProcessTypes";
 import {
   materialSelectionKey,
+  materialUsesApForm,
   normalizeMaterialsListResponse,
   type MaterialsListGrade,
   type MaterialsListItem,
@@ -374,12 +375,16 @@ export const buildPremixMaterialSessionsFromSelections = (
   }>,
   solidMaterials: RawMaterialPrepMaterialOption[],
   existing: Record<string, RawMaterialPrepPremixSession> = {},
+  liquidMaterials: RawMaterialPrepMaterialOption[] = [],
 ) => {
   const sessions = { ...existing };
 
   selections.forEach((entry) => {
     const key = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
     if (sessions[key]) return;
+
+    const solidMaterial = findPrepMaterialByCode(solidMaterials, entry.solidMaterialCode);
+    const liquidMaterial = findPrepMaterialByCode(liquidMaterials, entry.liquidMaterialCode);
 
     const gradesRequired =
       entry.selectedProcesses.solid &&
@@ -393,33 +398,40 @@ export const buildPremixMaterialSessionsFromSelections = (
       solidMaterialCode: entry.solidMaterialCode,
       solidGradeCode: entry.solidGradeCode,
       liquidMaterialCode: entry.liquidMaterialCode,
+      solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? null,
+      liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? null,
       solid: normalizeMaterialProcessSlot(
         "solid",
         solidMaterialReady ? entry.solidMaterialCode : "",
         null,
         entry.solidGradeCode,
+        solidMaterial?.rmpFormTemplate,
       ),
       liquid: entry.selectedProcesses.liquid
-        ? normalizeMaterialProcessSlot("liquid", entry.liquidMaterialCode)
+        ? normalizeMaterialProcessSlot(
+            "liquid",
+            entry.liquidMaterialCode,
+            null,
+            "",
+            liquidMaterial?.rmpFormTemplate,
+          )
         : normalizeMaterialProcessSlot("liquid", ""),
-      apGradeSlots:
-        String(entry.solidMaterialCode ?? "")
-          .trim()
-          .toUpperCase() === "AP"
-          ? entry.solidGradeCode
-            ? [
-                {
-                  gradeCode: entry.solidGradeCode,
-                  slot: normalizeMaterialProcessSlot(
-                    "solid",
-                    entry.solidMaterialCode,
-                    null,
-                    entry.solidGradeCode,
-                  ),
-                },
-              ]
-            : []
-          : undefined,
+      apGradeSlots: materialUsesApForm(solidMaterial)
+        ? entry.solidGradeCode
+          ? [
+              {
+                gradeCode: entry.solidGradeCode,
+                slot: normalizeMaterialProcessSlot(
+                  "solid",
+                  entry.solidMaterialCode,
+                  null,
+                  entry.solidGradeCode,
+                  solidMaterial?.rmpFormTemplate ?? "AP",
+                ),
+              },
+            ]
+          : []
+        : undefined,
     };
   });
 
@@ -755,15 +767,40 @@ export const applyMaterialOptionToPremix = (
     solidMaterialCode: hasSolid ? option.materialCode : "",
     solidGradeCode: hasSolid ? option.gradeCode : "",
     liquidMaterialCode: hasLiquid ? option.materialCode : "",
+    solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? null,
+    liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? null,
     solid: normalizeMaterialProcessSlot(
       "solid",
       hasSolid && solidMaterialReady ? option.materialCode : "",
       null,
       hasSolid ? option.gradeCode : "",
+      solidMaterial?.rmpFormTemplate,
     ),
     liquid: hasLiquid
-      ? normalizeMaterialProcessSlot("liquid", option.materialCode)
+      ? normalizeMaterialProcessSlot(
+          "liquid",
+          option.materialCode,
+          null,
+          "",
+          liquidMaterial?.rmpFormTemplate,
+        )
       : normalizeMaterialProcessSlot("liquid", ""),
+    apGradeSlots: materialUsesApForm(solidMaterial)
+      ? option.gradeCode
+        ? [
+            {
+              gradeCode: option.gradeCode,
+              slot: normalizeMaterialProcessSlot(
+                "solid",
+                option.materialCode,
+                null,
+                option.gradeCode,
+                solidMaterial?.rmpFormTemplate ?? "AP",
+              ),
+            },
+          ]
+        : []
+      : undefined,
   };
 
   return { entry, session };

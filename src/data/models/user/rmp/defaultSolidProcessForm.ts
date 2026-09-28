@@ -23,7 +23,19 @@ import {
   createEmptyDoaProcessForm,
   doaFormHasUserData,
   type DoaProcessForm,
+  type LiquidDispatchUiKey,
 } from "./doaProcessForm";
+import {
+  createEmptyCcProcessForm,
+  ccFormHasUserData,
+  type CcProcessForm,
+  type CcIoUiKey,
+} from "./ccProcessForm";
+import {
+  createEmptyNonoxDProcessForm,
+  nonoxDFormHasUserData,
+  type NonoxDProcessForm,
+} from "./nonoxDProcessForm";
 import {
   createEmptyLotDetailRow,
   lotDetailsHaveUserData,
@@ -70,7 +82,9 @@ export type RmpMaterialProcessForm =
   | ApFineProcessForm
   | ApUltraFineProcessForm
   | AluminumProcessForm
-  | DoaProcessForm;
+  | DoaProcessForm
+  | CcProcessForm
+  | NonoxDProcessForm;
 
 export const createEmptyDryingTrayOvenForm = (): DryingTrayOvenForm => ({
   ovenType: "",
@@ -106,7 +120,13 @@ export const createEmptyProcessFormForUiKey = (uiKey: RmpMaterialUiKey): RmpMate
   if (uiKey === "apFine") return createEmptyApFineProcessForm();
   if (uiKey === "apUltraFine") return createEmptyApUltraFineProcessForm();
   if (uiKey === "aluminum") return createEmptyAluminumProcessForm();
-  if (uiKey === "doa") return createEmptyDoaProcessForm();
+  if (uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi") {
+    return createEmptyDoaProcessForm(uiKey as LiquidDispatchUiKey);
+  }
+  if (uiKey === "cc" || uiKey === "io") {
+    return createEmptyCcProcessForm(uiKey as CcIoUiKey);
+  }
+  if (uiKey === "nonoxD") return createEmptyNonoxDProcessForm();
   if (uiKey === "defaultLiquid") return createEmptyDefaultLiquidProcessForm();
   return createEmptyDefaultSolidProcessForm();
 };
@@ -128,6 +148,10 @@ export const processFormHasUserData = (form: RmpMaterialProcessForm): boolean =>
   if (form.uiKey === "apFine") return apFineFormHasUserData(form);
   if (form.uiKey === "apUltraFine") return apUltraFineFormHasUserData(form);
   if (form.uiKey === "aluminum") return aluminumFormHasUserData(form);
-  if (form.uiKey === "doa") return doaFormHasUserData(form);
+  if (form.uiKey === "doa" || form.uiKey === "htpb" || form.uiKey === "tdi") {
+    return doaFormHasUserData(form);
+  }
+  if (form.uiKey === "cc" || form.uiKey === "io") return ccFormHasUserData(form);
+  if (form.uiKey === "nonoxD") return nonoxDFormHasUserData(form);
   return defaultSolidFormHasUserData(form);
 };

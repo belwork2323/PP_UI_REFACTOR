@@ -107,7 +107,10 @@ const DEFAULT_SOLID_FIELD_SPECS: DefaultSolidFieldSpec[] = [
   },
 ];
 
-const readDefaultSolidPath = (form: DefaultSolidProcessForm, path: string): unknown => {
+const readDefaultSolidPath = (
+  form: { drying: DefaultSolidProcessForm["drying"]; sieving: DefaultSolidProcessForm["sieving"] },
+  path: string,
+): unknown => {
   const [section, field] = path.split(".");
   if (section === "drying" && field in form.drying) {
     return form.drying[field as keyof DefaultSolidProcessForm["drying"]];
@@ -165,10 +168,25 @@ const validateLotDetails = (
   intent: MaterialProcessValidationIntent,
   quantityPerPremix: number | undefined,
   errors: Record<string, string>,
+  options?: { requireAtLeastOne?: boolean },
 ) => {
   const list = rows ?? [];
+  const requireAtLeastOne = Boolean(options?.requireAtLeastOne) && intent === "SUBMIT";
   const requireLots = intent === "SUBMIT" || lotDetailsHaveUserData(list);
-  if (!requireLots) return;
+  if (!requireLots && !requireAtLeastOne) return;
+
+  if (requireAtLeastOne) {
+    const hasComplete = list.some((row) => {
+      const lotId = str(row.lotId);
+      const qty = str(row.quantity).replace(/,/g, "");
+      return Boolean(lotId) && isFiniteNumber(qty) && Number(qty) > 0;
+    });
+    if (!hasComplete) {
+      errors["lotDetails.0.lotId"] = errors["lotDetails.0.lotId"] ?? "At least one lot is required.";
+      errors["lotDetails.0.quantity"] =
+        errors["lotDetails.0.quantity"] ?? "At least one lot quantity is required.";
+    }
+  }
 
   const seen = new Set<string>();
   list.forEach((row, index) => {
@@ -178,7 +196,7 @@ const validateLotDetails = (
 
     if (!lotId) {
       if (intent === "SUBMIT" || qty) {
-        errors[`${prefix}.lotId`] = "Lot is required.";
+        errors[`${prefix}.lotId`] = errors[`${prefix}.lotId`] ?? "Lot is required.";
       }
     } else if (seen.has(lotId)) {
       errors[`${prefix}.lotId`] = "Duplicate lot selected.";
@@ -188,7 +206,7 @@ const validateLotDetails = (
 
     if (!qty) {
       if (intent === "SUBMIT" || lotId) {
-        errors[`${prefix}.quantity`] = "Quantity is required.";
+        errors[`${prefix}.quantity`] = errors[`${prefix}.quantity`] ?? "Quantity is required.";
       }
     } else if (!isFiniteNumber(qty) || Number(qty) <= 0) {
       errors[`${prefix}.quantity`] = "Quantity must be a positive number.";
@@ -203,6 +221,19 @@ const validateLotDetails = (
         `Total lot quantity (${sum}) exceeds quantity per premix (${limit}).`;
     }
   }
+};
+
+/** Lots-only validation for RMP save/submit (no process fields). */
+export const validateLotDetailsForPremix = (
+  rows: LotDetailFormRow[] | undefined,
+  intent: MaterialProcessValidationIntent,
+  quantityPerPremix?: number,
+): Record<string, string> => {
+  const errors: Record<string, string> = {};
+  validateLotDetails(rows, intent, quantityPerPremix, errors, {
+    requireAtLeastOne: intent === "SUBMIT",
+  });
+  return errors;
 };
 
 export const validateMaterialProcessForm = (
@@ -223,7 +254,12 @@ export const validateMaterialProcessForm = (
     processForm.uiKey === "apFine" ||
     processForm.uiKey === "apUltraFine" ||
     processForm.uiKey === "aluminum" ||
-    processForm.uiKey === "doa"
+    processForm.uiKey === "doa" ||
+    processForm.uiKey === "htpb" ||
+    processForm.uiKey === "tdi" ||
+    processForm.uiKey === "cc" ||
+    processForm.uiKey === "io" ||
+    processForm.uiKey === "nonoxD"
   ) {
     validateLotDetails(
       processForm.lotDetails,
@@ -363,8 +399,57 @@ export const validateMaterialProcessForm = (
     return errors;
   }
 
-  if (uiKey === "doa" && processForm.uiKey === "doa") {
+  if (
+    (uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi") &&
+    (processForm.uiKey === "doa" || processForm.uiKey === "htpb" || processForm.uiKey === "tdi")
+  ) {
     if (validationIntent === "SUBMIT") {
+      if (!str(processForm.dispatchDatetime)) {
+        errors.dispatchDatetime = "Date/Time of dispatch is required.";
+      }
+      if (!str(processForm.totalQtySentForPremix)) {
+        errors.totalQtySentForPremix = "Total Quantity sent for premix is required.";
+      }
+    }
+    return errors;
+  }
+
+  if (
+    (uiKey === "cc" || uiKey === "io") &&
+    (processForm.uiKey === "cc" || processForm.uiKey === "io")
+  ) {
+    if (validationIntent === "SUBMIT") {
+      if (!str(processForm.sievingDatetime)) {
+        errors.sievingDatetime = "Sieving date and time is required.";
+      }
+      if (!str(processForm.dispatchDatetime)) {
+        errors.dispatchDatetime = "Date/Time of dispatch is required.";
+      }
+      if (!str(processForm.totalQtySentForPremix)) {
+        errors.totalQtySentForPremix = "Total Quantity sent for premix is required.";
+      }
+    }
+    if (processForm.uiKey === "cc") {
+      if (!processFormHasUserData(processForm) && validationIntent === "DRAFT") {
+        return errors;
+      }
+      DEFAULT_SOLID_FIELD_SPECS.forEach((spec) => {
+        const raw = readDefaultSolidPath(processForm, spec.path);
+        if (validationIntent === "DRAFT" && !str(raw)) return;
+        validateDefaultSolidField(spec, raw, validationIntent, errors, materialContext);
+      });
+    }
+    return errors;
+  }
+
+  if (uiKey === "nonoxD" && processForm.uiKey === "nonoxD") {
+    if (validationIntent === "SUBMIT") {
+      if (!str(processForm.quantitySieved)) {
+        errors.quantitySieved = "Quantity sieved is required.";
+      }
+      if (!str(processForm.sieveMeshSize)) {
+        errors.sieveMeshSize = "Sieve Mesh Size is required.";
+      }
       if (!str(processForm.dispatchDatetime)) {
         errors.dispatchDatetime = "Date/Time of dispatch is required.";
       }

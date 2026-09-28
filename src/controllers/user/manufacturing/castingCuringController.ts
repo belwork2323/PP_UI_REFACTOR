@@ -70,7 +70,11 @@ export const castingCuringController = {
     }
   },
 
-  fetchCuringCycles: async (payload: { projectId: string; motorStage: number }) => {
+  fetchCuringCycles: async (payload: {
+    projectId: string;
+    motorStage: number;
+    curingType: string;
+  }) => {
     try {
       const response = await fetchCuringCyclesApi(payload);
       const normalizedResponse = {

@@ -31,6 +31,8 @@ import {
   getMaterialsFormValidationMessage,
   PREPARATION_TYPE_OPTIONS,
   RAW_MATERIAL_TYPE_OPTIONS,
+  getRmpFormTemplateOptions,
+  isRmpFormTemplateAllowed,
   type MaterialGradeFieldErrors,
   type MaterialSpecFieldErrors,
   type MaterialsFormFieldErrors,
@@ -39,6 +41,7 @@ import {
   type MaterialsMasterFormState,
   type PreparationTypeValue,
   type RawMaterialTypeValue,
+  type RmpFormTemplateValue,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
@@ -415,6 +418,15 @@ const MaterialsMasterFormDialog = ({
     form.materialName.trim().length > 0,
     showErrors,
   );
+  const rmpFormTemplateError = visibleValidationError(
+    fieldErrors.rmpFormTemplate,
+    Boolean(form.rmpFormTemplate),
+    showErrors,
+  );
+  const rmpFormTemplateOptions = useMemo(
+    () => getRmpFormTemplateOptions(form.materialType),
+    [form.materialType],
+  );
 
   useEffect(() => {
     if (!open) setShowErrors(false);
@@ -530,7 +542,36 @@ const MaterialsMasterFormDialog = ({
                 required
                 width={160}
                 theme={fieldTheme}
-                onChange={(value) => onChange({ ...form, materialType: value as "SOLID" | "LIQUID" })}
+                onChange={(value) => {
+                  const materialType = value as "SOLID" | "LIQUID";
+                  if (isEdit && !isRmpFormTemplateAllowed(form.rmpFormTemplate, materialType)) {
+                    return;
+                  }
+                  const rmpFormTemplate = isRmpFormTemplateAllowed(
+                    form.rmpFormTemplate,
+                    materialType,
+                  )
+                    ? form.rmpFormTemplate
+                    : "DEFAULT";
+                  onChange({ ...form, materialType, rmpFormTemplate });
+                }}
+              />
+              <CasePrepSelect
+                label="RMP Process Form"
+                value={form.rmpFormTemplate}
+                placeholder="Select form template"
+                options={rmpFormTemplateOptions}
+                disabled={saving || isEdit}
+                required
+                error={Boolean(rmpFormTemplateError)}
+                width={260}
+                theme={fieldTheme}
+                onChange={(value) =>
+                  onChange({
+                    ...form,
+                    rmpFormTemplate: value as RmpFormTemplateValue,
+                  })
+                }
               />
               <MasterDataEnableDisableField
                 checked={form.isActive}

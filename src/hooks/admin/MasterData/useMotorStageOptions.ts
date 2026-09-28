@@ -32,12 +32,16 @@ export default function useMotorStageOptions(enabled: boolean, projectId?: strin
       .then((response) => {
         if (cancelled) return;
         const stages = response?.success && response.data ? response.data.stages ?? [] : [];
-        setOptions(
-          stages.map((stage) => {
-            const value = String(stage.motorStage ?? "");
-            return { value, label: `Stage ${value}` };
-          }),
-        );
+        const seen = new Set<string>();
+        const next: AppDropdownOption[] = [];
+        for (const stage of stages) {
+          const value = String(stage.motorStage ?? "").trim();
+          if (!value || seen.has(value)) continue;
+          seen.add(value);
+          next.push({ value, label: `Stage ${value}` });
+        }
+        next.sort((a, b) => Number(a.value) - Number(b.value));
+        setOptions(next);
       })
       .catch(() => {
         if (!cancelled) setOptions([]);

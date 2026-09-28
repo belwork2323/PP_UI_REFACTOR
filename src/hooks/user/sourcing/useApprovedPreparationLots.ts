@@ -5,7 +5,6 @@ import {
   buildPreparationLotDropdownOptions,
   getPreparationSourceLotsForMaterial,
   groupPreparationSourceLotsByMaterialCode,
-  isApPreparationSourceLot,
   mapLotListApiRow,
   PREPARATION_SOURCE_MATERIAL,
   toRawMaterialLotListApiStatus,
@@ -96,25 +95,10 @@ export function useApprovedPreparationLots(enabled = true): ApprovedPreparationL
     [lotsByMaterialCode],
   );
 
-  const getApSourceLotOptions = useCallback(
-    (currentValue?: string) => {
-      const apLots = getPreparationSourceLotsForMaterial(
-        lotsByMaterialCode,
-        PREPARATION_SOURCE_MATERIAL.AP,
-      );
-      return buildPreparationLotDropdownOptions(
-        apLots.filter(isApPreparationSourceLot),
-        currentValue,
-      );
-    },
-    [lotsByMaterialCode],
-  );
-
   return {
     loadingLots,
     getHtpbLotOptions,
     getTmpLotOptions,
     getNbdLotOptions,
-    getApSourceLotOptions,
   };
 }

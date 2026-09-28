@@ -429,7 +429,6 @@ export interface BatchWritePayload {
   subBatchType?: string;
   projectId?: string | null;
   motorStage?: string | number;
-  mixingCycleCode?: string;
   numberOfMotors?: number;
   motorIds?: string[];
   priority: string;
@@ -495,9 +494,6 @@ function applyBatchWriteFields(target: BatchWritePayload, form: Record<string, a
     const stage = motorStageForApi(form.motorStage ?? form.motorType);
     if (stage !== undefined) target.motorStage = stage;
 
-    const mixingCycleCode = mixingCycleCodeForApi(form.mixingCycleCode);
-    if (mixingCycleCode) target.mixingCycleCode = mixingCycleCode;
-
     target.numberOfMotors = form.numberOfMotors ?? 0;
     target.motorIds = Array.isArray(form.motorIds)
       ? form.motorIds.filter((id: string) => String(id ?? "").trim())
@@ -526,7 +522,6 @@ export class CreateBatchPayload implements BatchWritePayload {
   subBatchType?: string;
   projectId?: string | null;
   motorStage?: string | number;
-  mixingCycleCode?: string;
   numberOfMotors?: number;
   motorIds?: string[];
   priority: string;
@@ -550,7 +545,6 @@ export class UpdateBatchPayload implements BatchWritePayload {
   subBatchType?: string;
   projectId?: string | null;
   motorStage?: string | number;
-  mixingCycleCode?: string;
   numberOfMotors?: number;
   motorIds?: string[];
   priority: string;
@@ -637,7 +631,6 @@ export type BatchFormState = {
   subBatchType: string;
   projectId: string;
   motorStage: string;
-  mixingCycleCode: string;
   numberOfMotors: number;
   motorIds: string[];
   priority: string;
@@ -670,7 +663,6 @@ export const createEmptyBatchFormState = (): BatchFormState => ({
   subBatchType: "",
   projectId: "",
   motorStage: "",
-  mixingCycleCode: "",
   numberOfMotors: 0,
   motorIds: [],
   priority: "Medium",
@@ -721,15 +713,11 @@ export const mapBatchToFormState = (batch: any): BatchFormState => {
         )
       : "";
 
-  const mixingCycle =
-    batch?.mixingCycle ?? parseMixingCycleFromApi(batch?.mixingCycleCode ?? batch?.mixingCycle);
-
   return {
     batchType: batch?.batchType ?? "MAIN",
     subBatchType: batch?.subBatchType ?? "",
     projectId: batch?.projectId ?? batch?.project?.projectId ?? "",
     motorStage,
-    mixingCycleCode: mixingCycle?.mixingCycleCode ?? "",
     // Draft "how many to add" input — keep empty; actual count comes from motorIds.
     numberOfMotors: 0,
     motorIds: Array.isArray(batch?.motorIds) && batch.motorIds.length > 0 ? batch.motorIds : [""],
@@ -757,7 +745,6 @@ const BATCH_ADDITIONAL_DETAIL_FIELDS = [
   "subBatchType",
   "projectId",
   "motorStage",
-  "mixingCycleCode",
   // numberOfMotors is only a draft "add count" input — real count is motorIds.length
   "motorIds",
   "priority",
@@ -790,7 +777,6 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
     subBatchType: batchForm.subBatchType,
     projectId: batchForm.projectId,
     motorStage: batchForm.motorStage,
-    mixingCycleCode: batchForm.mixingCycleCode,
     numberOfMotors: motorIds.length,
     motorIds,
     priority: batchForm.priority,

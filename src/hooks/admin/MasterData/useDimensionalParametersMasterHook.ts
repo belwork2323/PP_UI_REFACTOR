@@ -128,18 +128,6 @@ export default function useDimensionalParametersMasterHook({
     });
   }, [items, activeFilter, projectFilter, motorStageFilter, search]);
 
-  const motorStageFilterOptions = useMemo(() => {
-    const stages = new Set<string>();
-    for (const record of items) {
-      if (projectFilter && record.projectId !== projectFilter) continue;
-      if (record.motorType == null) continue;
-      stages.add(String(record.motorType));
-    }
-    return Array.from(stages)
-      .sort((a, b) => Number(a) - Number(b))
-      .map((value) => ({ value, label: `Stage ${value}` }));
-  }, [items, projectFilter]);
-
   const paginated = useMemo(() => {
     const start = page * rowsPerPage;
     return filteredItems.slice(start, start + rowsPerPage);
@@ -398,7 +386,6 @@ export default function useDimensionalParametersMasterHook({
       setMotorStageFilter(value);
       setPage(0);
     },
-    motorStageFilterOptions,
     page,
     setPage,
     rowsPerPage,

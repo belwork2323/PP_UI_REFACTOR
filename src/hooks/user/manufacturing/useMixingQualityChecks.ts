@@ -87,6 +87,7 @@ export const useMixingQualityChecks = (motorStage?: number, mixingCycleCode?: st
           const response = await mixingController.fetchQualityChecks(
             mixType,
             Number(motorStage) || 0,
+            code || undefined,
           );
           rows = extractQualityChecksFromResponse(response);
         }

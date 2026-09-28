@@ -35,9 +35,10 @@ const gradeLabel = (gradeCode: string) =>
 
 const makeSlotForGrade = (gradeCode: string): RawMaterialPrepMaterialProcessSlot => {
   const uiKey = resolveMaterialUiKey({
-    materialCode: "AP",
+    materialCode: "",
     slot: "solid",
     gradeCode,
+    rmpFormTemplate: "AP",
   });
   return {
     uiKey,

@@ -16,6 +16,8 @@ export type MaterialsListItem = {
   materialName: string;
   rawMaterialType: "NORMAL" | "ACEM";
   preparationType: string | null;
+  /** RMP process UI template from material master (DEFAULT | AP | ALUMINUM | DOA | HTPB | TDI | CC | IO | NONOX_D). */
+  rmpFormTemplate: string;
   specCount: number;
   grades: MaterialsListGrade[];
 };
@@ -25,6 +27,11 @@ export const findMaterialByCode = (
   materialCode: string,
 ): MaterialsListItem | undefined =>
   items.find((item) => item.materialCode === String(materialCode ?? "").trim());
+
+/** Whether this material should use the AP multi-grade RMP UI (template only). */
+export const materialUsesApForm = (
+  item: MaterialsListItem | undefined | null,
+): boolean => String(item?.rmpFormTemplate ?? "").trim().toUpperCase() === "AP";
 
 export const getMaterialGrades = (
   items: MaterialsListItem[],
@@ -83,6 +90,7 @@ export const normalizeMaterialsListResponse = (data: unknown): MaterialsListItem
           item?.preparationType == null || item?.preparationType === ""
             ? null
             : String(item.preparationType).trim(),
+        rmpFormTemplate: String(item?.rmpFormTemplate ?? "").trim() || "DEFAULT",
         specCount: Number(item?.specCount ?? 0),
         grades,
       };

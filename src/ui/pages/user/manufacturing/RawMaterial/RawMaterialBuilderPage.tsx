@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RawMaterialMaterialProcessPanel from "./materialProcess/RawMaterialMaterialProcessPanel";
 import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
-import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -25,6 +24,11 @@ import FinalApprovalPremixDialog, {
   buildFinalApprovalPremixRows,
 } from "./components/FinalApprovalPremixDialog";
 import type { MaterialsListItem } from "../../../../../data/models/user/MaterialsListModel";
+import { findMaterialByCode } from "../../../../../data/models/user/MaterialsListModel";
+import {
+  focusRmpField,
+  type RmpValidationFocusTarget,
+} from "../../../../../data/validation/adapters/rawMaterialPreparation.validation";
 import { getPremixMaterialSessionKey } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import {
   ensureWeightmentRowForMaterialPremix,
@@ -51,7 +55,6 @@ const RawMaterialBuilderForm = ({
   numberOfPremix,
   premixGroups,
   identificationSheet,
-  onPremixDateChange,
   addedPremixSelections,
   premixSessions,
   onPremixSlotChange,
@@ -71,12 +74,14 @@ const RawMaterialBuilderForm = ({
   premixFieldErrors = {},
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
+  validationFocusRequest = null,
 }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
   const groups = Array.isArray(premixGroups) ? premixGroups : [];
   const [activePremixIndex, setActivePremixIndex] = useState(0);
   const [activeMaterialIndex, setActiveMaterialIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
+  const [pendingFocus, setPendingFocus] = useState<RmpValidationFocusTarget | null>(null);
 
   useEffect(() => {
     if (groups.length === 0) {
@@ -86,6 +91,35 @@ const RawMaterialBuilderForm = ({
     }
     setActivePremixIndex((prev) => Math.min(prev, groups.length - 1));
   }, [groups.length]);
+
+  /** Switch premix/material tabs to the first error; focus runs after tabs settle. */
+  useEffect(() => {
+    const request = validationFocusRequest as
+      | { id: number; target: RmpValidationFocusTarget | null }
+      | null;
+    if (!request?.target) return;
+    const target = request.target;
+
+    const premixIdx = groups.findIndex(
+      (group: { premix?: number }) => Number(group?.premix) === target.premixNo,
+    );
+    if (premixIdx >= 0) {
+      setActivePremixIndex(premixIdx);
+    }
+
+    const materials =
+      premixIdx >= 0
+        ? ((groups[premixIdx]?.materials ?? []) as RawMaterialPrepPremixSelection[])
+        : [];
+    if (target.materialKey) {
+      const materialIdx = materials.findIndex((entry) => entry.materialKey === target.materialKey);
+      if (materialIdx >= 0) {
+        setActiveMaterialIndex(materialIdx);
+      }
+    }
+
+    setPendingFocus(target);
+  }, [validationFocusRequest, groups]);
 
   const activePremixGroup = useMemo(
     () => (groups.length > 0 ? groups[activePremixIndex] : null),
@@ -111,6 +145,30 @@ const RawMaterialBuilderForm = ({
     [activePremixMaterials, activeMaterialIndex],
   );
 
+  /** After tab state matches the error target, scroll/focus the field. */
+  useEffect(() => {
+    if (!pendingFocus) return;
+
+    const activePremixNo = Number(activePremixGroup?.premix ?? 0);
+    if (activePremixNo !== pendingFocus.premixNo) return;
+
+    if (pendingFocus.materialKey) {
+      if (!activeMaterialEntry || activeMaterialEntry.materialKey !== pendingFocus.materialKey) {
+        return;
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      const root: ParentNode =
+        pendingFocus.slot != null
+          ? (document.querySelector(`[data-rmp-slot="${pendingFocus.slot}"]`) ?? document)
+          : document;
+      focusRmpField(pendingFocus.fieldPath, root);
+      setPendingFocus(null);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [pendingFocus, activePremixGroup, activeMaterialEntry]);
+
   const activeMaterialCode = useMemo(() => {
     if (!activeMaterialEntry) return "";
     return String(
@@ -120,18 +178,47 @@ const RawMaterialBuilderForm = ({
     ).trim();
   }, [activeMaterialEntry]);
 
-  const activeMaterialWeightmentSheet = useMemo(() => {
-    if (!activeMaterialEntry || !activeMaterialCode) return null;
+  const { activeMaterialWeightmentSheet, activeWeightmentRowSourceIndices } = useMemo(() => {
+    if (!activeMaterialEntry || !activeMaterialCode) {
+      return {
+        activeMaterialWeightmentSheet: null as RawMaterialPrepWeightmentSheet | null,
+        activeWeightmentRowSourceIndices: undefined as number[] | undefined,
+      };
+    }
     const ensured = ensureWeightmentRowForMaterialPremix(weightmentSheet, {
       materialCode: activeMaterialCode,
       materialName: activeMaterialEntry.materialName,
       premixNo: activeMaterialEntry.premix,
     });
-    return filterWeightmentSheetForMaterial(
-      ensured,
-      activeMaterialCode,
-      activeMaterialEntry.premix,
-    );
+    const code = activeMaterialCode.trim().toUpperCase();
+    const premix = Number(activeMaterialEntry.premix);
+    const rowSourceIndices: number[] = [];
+    const filteredDetails = (ensured.weightmentDetails ?? []).filter((row, idx) => {
+      const scopeCode = String(row.scopeMaterialCode ?? row.materialCode ?? "")
+        .trim()
+        .toUpperCase();
+      if (scopeCode && scopeCode !== code) return false;
+      if (!scopeCode) {
+        rowSourceIndices.push(idx);
+        return true;
+      }
+      const rowPremix =
+        row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+          ? null
+          : Number(row.premixNo);
+      if (rowPremix == null || rowPremix === premix) {
+        rowSourceIndices.push(idx);
+        return true;
+      }
+      return false;
+    });
+    return {
+      activeMaterialWeightmentSheet: {
+        ...ensured,
+        weightmentDetails: filteredDetails,
+      } as RawMaterialPrepWeightmentSheet,
+      activeWeightmentRowSourceIndices: rowSourceIndices,
+    };
   }, [activeMaterialCode, activeMaterialEntry, weightmentSheet]);
 
   useEffect(() => {
@@ -194,6 +281,22 @@ const RawMaterialBuilderForm = ({
         getPremixMaterialSessionKey(activeMaterialEntry.premix, activeMaterialEntry.materialKey)
       ] ?? createEmptyPremixProcessSession()
     : createEmptyPremixProcessSession();
+
+  const activeSolidRmpFormTemplate = useMemo(() => {
+    if (!activeMaterialEntry?.solidMaterialCode) return null;
+    return (
+      findMaterialByCode(availableSolidMaterials ?? [], activeMaterialEntry.solidMaterialCode)
+        ?.rmpFormTemplate ?? null
+    );
+  }, [activeMaterialEntry?.solidMaterialCode, availableSolidMaterials]);
+
+  const activeLiquidRmpFormTemplate = useMemo(() => {
+    if (!activeMaterialEntry?.liquidMaterialCode) return null;
+    return (
+      findMaterialByCode(availableLiquidMaterials ?? [], activeMaterialEntry.liquidMaterialCode)
+        ?.rmpFormTemplate ?? null
+    );
+  }, [activeMaterialEntry?.liquidMaterialCode, availableLiquidMaterials]);
 
   const sheetMaterialCount = identificationSheet?.materials?.length ?? 0;
   const statusConfig = rmTheme.details.bannerStatusConfig as Record<
@@ -455,28 +558,17 @@ const RawMaterialBuilderForm = ({
             {activeMaterialEntry.selectedProcesses?.solid &&
               activeMaterialEntry.solidMaterialCode &&
               Boolean(activeMaterialEntry.solidGradeCode || !activeMaterialEntry.solidGradeCode) && (
-              <Box mt={1.2} sx={rmTheme.builder.sectionContainer}>
+              <Box mt={1.2} sx={rmTheme.builder.sectionContainer} data-rmp-slot="solid">
                 <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, mb: 0.75 }}>
                   Solid: {activeMaterialEntry.solidMaterialCode}
                   {activeMaterialEntry.solidGradeCode ? ` (${activeMaterialEntry.solidGradeCode})` : ""}
                 </Typography>
-                <Box sx={{ mb: 1, maxWidth: 240 }}>
-                  <FlowBarDateField
-                    label={RM.SELECT_PREMIX_DATE_LABEL}
-                    value={activeMaterialEntry.premixDate ?? activePremixGroup.premixDate ?? ""}
-                    placeholder={RM.SELECT_PREMIX_DATE_PLACEHOLDER}
-                    width={220}
-                    flowBar={rmTheme.flowBar}
-                    accentColor={theme.palette.primaryLight ?? theme.palette.primary}
-                    disabled={activePremixLocked}
-                    onChange={(value) => onPremixDateChange(activeMaterialEntry.premix, value)}
-                  />
-                </Box>
                 <RawMaterialMaterialProcessPanel
                   key={`process-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.solid}
                   session={activeSession}
                   materialCode={activeMaterialEntry.solidMaterialCode}
+                  rmpFormTemplate={activeSolidRmpFormTemplate}
                   lotOptions={activeMaterialEntry.lotIds ?? []}
                   quantityPerPremix={Number(activeMaterialEntry.quantityPerPremix ?? 0)}
                   onSlotChange={(next) =>
@@ -509,27 +601,15 @@ const RawMaterialBuilderForm = ({
               )}
 
             {activeMaterialEntry.selectedProcesses?.liquid && activeMaterialEntry.liquidMaterialCode && (
-              <Box mt={1.2} sx={rmTheme.builder.sectionContainer}>
+              <Box mt={1.2} sx={rmTheme.builder.sectionContainer} data-rmp-slot="liquid">
                 <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, mb: 0.75 }}>
                   Liquid: {activeMaterialEntry.liquidMaterialCode}
                 </Typography>
-                {!activeMaterialEntry.selectedProcesses?.solid ? (
-                  <Box sx={{ mb: 1, maxWidth: 240 }}>
-                    <FlowBarDateField
-                      label={RM.SELECT_PREMIX_DATE_LABEL}
-                      value={activeMaterialEntry.premixDate ?? activePremixGroup.premixDate ?? ""}
-                      placeholder={RM.SELECT_PREMIX_DATE_PLACEHOLDER}
-                      width={220}
-                      flowBar={rmTheme.flowBar}
-                      accentColor={theme.palette.primaryLight ?? theme.palette.primary}
-                      disabled={activePremixLocked}
-                      onChange={(value) => onPremixDateChange(activeMaterialEntry.premix, value)}
-                    />
-                  </Box>
-                ) : null}
                 <RawMaterialMaterialProcessPanel
                   key={`process-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.liquid}
+                  materialCode={activeMaterialEntry.liquidMaterialCode}
+                  rmpFormTemplate={activeLiquidRmpFormTemplate}
                   lotOptions={activeMaterialEntry.lotIds ?? []}
                   quantityPerPremix={Number(activeMaterialEntry.quantityPerPremix ?? 0)}
                   onSlotChange={(next) =>
@@ -564,6 +644,7 @@ const RawMaterialBuilderForm = ({
               allowAddRemoveRows={true}
               weightmentErrors={weightmentErrors}
               validationAttempt={validationAttempt}
+              rowSourceIndices={activeWeightmentRowSourceIndices}
             />
           ) : null}
         </Stack>

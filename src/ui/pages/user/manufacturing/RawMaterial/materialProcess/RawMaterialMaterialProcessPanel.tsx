@@ -4,20 +4,27 @@ import type {
   RawMaterialPrepPremixSession,
 } from "../../../../../../data/models/user/RawMaterialPreparationModel";
 import {
-  isApMaterialCode,
+  isApRmpFormTemplate,
   rmpUiKeyShowsProcessPanel,
 } from "../../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
 import DefaultSolidMaterialProcessPanel from "./DefaultSolidMaterialProcessPanel";
 import ApGradeMaterialProcessPanel, { isApGradeUiKey } from "./ApGradeMaterialProcessPanel";
 import ApMaterialHostPanel, { type ApGradeCardState } from "./ApMaterialHostPanel";
+import CcMaterialProcessPanel from "./CcMaterialProcessPanel";
+import NonoxDMaterialProcessPanel from "./NonoxDMaterialProcessPanel";
+import type { CcProcessForm } from "../../../../../../data/models/user/rmp/ccProcessForm";
+import type { NonoxDProcessForm } from "../../../../../../data/models/user/rmp/nonoxDProcessForm";
+import { isCcIoUiKey } from "../../../../../../data/models/user/rmp/ccProcessForm";
 
 type Props = {
   slotState: RawMaterialPrepMaterialProcessSlot;
   onSlotChange: (next: RawMaterialPrepMaterialProcessSlot) => void;
-  /** When material is AP — multi-grade cards on the session. */
+  /** When material uses AP form template — multi-grade cards on the session. */
   session?: RawMaterialPrepPremixSession | null;
   onApGradeSlotsChange?: (cards: ApGradeCardState[]) => void;
   materialCode?: string;
+  /** From material master; preferred over material-code heuristics. */
+  rmpFormTemplate?: string | null;
   lotOptions: string[];
   quantityPerPremix: number;
   readOnly?: boolean;
@@ -31,18 +38,21 @@ const RawMaterialMaterialProcessPanel = ({
   session,
   onApGradeSlotsChange,
   materialCode = "",
+  rmpFormTemplate,
   lotOptions,
   quantityPerPremix,
   readOnly = false,
   theme,
   validationErrors,
 }: Props) => {
-  const apCards: ApGradeCardState[] = useMemo(() => {
-    if (!isApMaterialCode(materialCode)) return [];
-    return Array.isArray(session?.apGradeSlots) ? session.apGradeSlots : [];
-  }, [materialCode, session?.apGradeSlots]);
+  const isAp = isApRmpFormTemplate(rmpFormTemplate);
 
-  if (isApMaterialCode(materialCode) && onApGradeSlotsChange) {
+  const apCards: ApGradeCardState[] = useMemo(() => {
+    if (!isAp) return [];
+    return Array.isArray(session?.apGradeSlots) ? session.apGradeSlots : [];
+  }, [isAp, session?.apGradeSlots]);
+
+  if (isAp && onApGradeSlotsChange) {
     return (
       <ApMaterialHostPanel
         cards={apCards}
@@ -73,6 +83,44 @@ const RawMaterialMaterialProcessPanel = ({
         onChange={(processForm) =>
           onSlotChange({
             uiKey: slotState.uiKey,
+            processForm,
+          })
+        }
+      />
+    );
+  }
+
+  if (isCcIoUiKey(slotState.uiKey)) {
+    return (
+      <CcMaterialProcessPanel
+        value={slotState.processForm as CcProcessForm}
+        lotOptions={lotOptions}
+        quantityPerPremix={quantityPerPremix}
+        disabled={readOnly}
+        theme={theme}
+        validationErrors={validationErrors}
+        onChange={(processForm) =>
+          onSlotChange({
+            uiKey: slotState.uiKey,
+            processForm,
+          })
+        }
+      />
+    );
+  }
+
+  if (slotState.uiKey === "nonoxD") {
+    return (
+      <NonoxDMaterialProcessPanel
+        value={slotState.processForm as NonoxDProcessForm}
+        lotOptions={lotOptions}
+        quantityPerPremix={quantityPerPremix}
+        disabled={readOnly}
+        theme={theme}
+        validationErrors={validationErrors}
+        onChange={(processForm) =>
+          onSlotChange({
+            uiKey: "nonoxD",
             processForm,
           })
         }

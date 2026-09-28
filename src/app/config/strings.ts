@@ -706,94 +706,6 @@ export const STRINGS = {
           invalid: "Enter a valid date and time",
         },
       },
-      AP_FINE_PREPARATION: {
-        SECTION_TITLE: "AP fine preparation details",
-        MFG_BATCH_LOT_NO: "Mfg / Batch lot no",
-        TOTAL_QTY: "Total qty",
-        EQUIPMENT_ID: "Equipment id",
-        AGITATOR_RPM: "Agitator RPM",
-        PROCESS_TEMP: "Process temp",
-        JACKET_TEMP: "Jacket temp",
-        PROCESS_START_TIME: "Start date / time",
-        PROCESS_END_TIME: "End date / time",
-        OTHER_OBSERVATIONS: "Any other observation",
-        mfgBatchLotNo: {
-          required: "Mfg / Batch lot no is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
-        },
-        totalQty: {
-          required: "Total qty is required",
-          invalid: "Enter a valid number",
-        },
-        equipmentId: {
-          required: "Equipment id is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
-        },
-        agitatorRpm: {
-          required: "Agitator RPM is required",
-          invalid: "Enter a valid number",
-        },
-        processTemp: {
-          required: "Process temp is required",
-          invalid: "Enter a valid number",
-        },
-        jacketTemp: {
-          required: "Jacket temp is required",
-          invalid: "Enter a valid number",
-        },
-        processStartTime: {
-          required: "Start date / time is required",
-          invalid: "Enter a valid date and time",
-        },
-        processEndTime: {
-          required: "End date / time is required",
-          invalid: "Enter a valid date and time",
-        },
-      },
-      AP_ULTRAFINE_PREPARATION: {
-        SECTION_TITLE: "AP ultrafine preparation details",
-        MFG_BATCH_LOT_NO: "Mfg / Batch lot no",
-        TOTAL_QTY: "Total qty",
-        EQUIPMENT_ID: "Equipment id",
-        AGITATOR_RPM: "Agitator RPM",
-        PROCESS_TEMP: "Process temp",
-        JACKET_TEMP: "Jacket temp",
-        PROCESS_START_TIME: "Start date / time",
-        PROCESS_END_TIME: "End date / time",
-        OTHER_OBSERVATIONS: "Any other observation",
-        mfgBatchLotNo: {
-          required: "Mfg / Batch lot no is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
-        },
-        totalQty: {
-          required: "Total qty is required",
-          invalid: "Enter a valid number",
-        },
-        equipmentId: {
-          required: "Equipment id is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
-        },
-        agitatorRpm: {
-          required: "Agitator RPM is required",
-          invalid: "Enter a valid number",
-        },
-        processTemp: {
-          required: "Process temp is required",
-          invalid: "Enter a valid number",
-        },
-        jacketTemp: {
-          required: "Jacket temp is required",
-          invalid: "Enter a valid number",
-        },
-        processStartTime: {
-          required: "Start date / time is required",
-          invalid: "Enter a valid date and time",
-        },
-        processEndTime: {
-          required: "End date / time is required",
-          invalid: "Enter a valid date and time",
-        },
-      },
       MANDATORY_FIELDS_PENDING:
         "Complete manufacturer, lot ID, every analyzed result, and upload a certificate for each lot before submitting.",
       FIELD_REQUIRED_ANALYZED_RESULT: "Analyze Result @ Source is required",
@@ -1557,6 +1469,12 @@ export const STRINGS = {
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       VALIDATION: {
+        premixDate: {
+          required: "Premix date is required",
+          invalid: "Enter a valid date",
+        },
+        validationFailedSnackbar:
+          "Validation Error — Check mandatory fields or wrong input",
         lotNumber: {
           required: "Lot number is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
@@ -1697,6 +1615,10 @@ export const STRINGS = {
           required: "Material code is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
         },
+        weightmentMaterialName: {
+          required: "Material name is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
         weightmentPercentage: {
           required: "Percentage is required",
           invalid: "Enter a valid number",
@@ -1715,7 +1637,7 @@ export const STRINGS = {
         },
         weightmentWeighScale: {
           required: "Weigh scale number is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Enter a valid number",
         },
         weightmentWeighingDatetime: {
           required: "Weighing date and time is required",
@@ -3961,6 +3883,13 @@ export const STRINGS = {
       VIEW_FINAL_MIX_QC: "Final mix quality checks",
       VIEW_NO_OPERATIONS: "No operations defined.",
       VIEW_NO_QUALITY_CHECKS: "No quality checks defined.",
+      OP_SEQUENCE: "Seq.",
+      OP_NAME: "Operation",
+      QC_PARAM_NAME: "Parameter name",
+      QC_MIN: "Min",
+      QC_MAX: "Max",
+      QC_UNIT: "Unit",
+      QC_SAMPLES: "Samples",
       PREMIX_OPERATIONS: "Premix operations",
       PREMIX_QUALITY_CHECKS: "Premix quality checks",
       FINAL_MIX_OPERATIONS: "Final mix operations",
