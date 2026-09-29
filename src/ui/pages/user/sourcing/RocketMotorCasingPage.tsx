@@ -48,6 +48,7 @@ const RocketMotorCasing = () => {
     canSubmit,
     canSaveDraft,
     validationErrors,
+    validationFocusRequest,
     validateBeforeDraft,
     validateBeforeSubmit,
     submitConfirm,
@@ -194,6 +195,7 @@ const RocketMotorCasing = () => {
               onDeleteCasing={handleDeleteCasingFromForm}
               deleteLoading={deleteLoading}
               validationErrors={validationErrors}
+              validationFocusRequest={validationFocusRequest}
               theme={theme}
             />
           </Box>

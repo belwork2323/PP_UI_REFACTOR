@@ -8,7 +8,10 @@ import {
 } from "../../../hooks/user/manufacturing/mixingConfig";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { normalizeApproverBatchStatus } from "../approver/ApproverBatchListModel";
-import { resolveMasterDataCode, resolveMasterDataName } from "../admin/BatchManagement/BatchManagementModel";
+import {
+  resolveMasterDataCode,
+  resolveMasterDataName,
+} from "../admin/BatchManagement/BatchManagementModel";
 import {
   getPremixStatusLabel,
   type PremixSubmissionStatus,
@@ -672,9 +675,7 @@ export const resolveMixingCycleForApi = (
 
   const idRaw = entry.mixingCycleId;
   const id =
-    idRaw !== undefined && idRaw !== null && String(idRaw).trim() !== ""
-      ? Number(idRaw)
-      : null;
+    idRaw !== undefined && idRaw !== null && String(idRaw).trim() !== "" ? Number(idRaw) : null;
   if (id != null && !Number.isNaN(id)) {
     return { mixingCycleId: id };
   }
@@ -948,7 +949,7 @@ const readObservationValues = (observations: unknown[]): string[] => {
   return byIndex;
 };
 
-const mapProcessRows = (
+export const mapProcessRows = (
   operations: MixingOperation[] = [],
   apiRows: any[] = [],
 ): ProcessParticularRow[] => {

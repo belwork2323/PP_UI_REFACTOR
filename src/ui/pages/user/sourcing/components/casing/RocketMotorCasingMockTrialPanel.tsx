@@ -142,6 +142,17 @@ const RocketMotorCasingMockTrialPanel = ({
   const cellFieldSx = {
     ...theme.workflow.formElements.cellField,
     ...casingTheme.dimInput,
+    "& .MuiOutlinedInput-root": {
+      ...(theme.workflow.formElements.cellField?.["& .MuiOutlinedInput-root"] ?? {}),
+      background: "#fff",
+      backgroundColor: "#fff",
+      "&.Mui-focused": { background: "#fff", backgroundColor: "#fff" },
+    },
+    "& .MuiInputBase-input::placeholder": {
+      color: theme.palette.textSub ?? "#5D6D7E",
+      opacity: 0.45,
+      fontWeight: 400,
+    },
   };
 
   const addRowSx = {
@@ -185,6 +196,7 @@ const RocketMotorCasingMockTrialPanel = ({
           disabled={disabled}
           error={validationErrors["mockTrial.castingStation"]}
           theme={theme}
+          fieldPath="mockTrial.castingStation"
         />
         <TextFieldField
           label={S.MOCK_TRIAL_MANDREL_ID}
@@ -195,6 +207,7 @@ const RocketMotorCasingMockTrialPanel = ({
           disabled={disabled}
           error={validationErrors["mockTrial.mandrelId"]}
           theme={theme}
+          fieldPath="mockTrial.mandrelId"
         />
         <TextFieldField
           label={S.MOCK_TRIAL_BOTTOM_CUP_ID}
@@ -204,13 +217,14 @@ const RocketMotorCasingMockTrialPanel = ({
           disabled={disabled}
           error={validationErrors["mockTrial.bottomCupId"]}
           theme={theme}
+          fieldPath="mockTrial.bottomCupId"
         />
       </FieldGrid>
 
       <Box sx={{ mt: 2.5 }}>
         <SubsectionTitle cf={cf}>{S.MOCK_TRIAL_MOTOR_DIMS}</SubsectionTitle>
         {validationErrors["mockTrial.motorDimensions"] ? (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
+          <Typography data-rmc-field="mockTrial.motorDimensions" color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
             {validationErrors["mockTrial.motorDimensions"]}
           </Typography>
         ) : null}
@@ -259,17 +273,19 @@ const RocketMotorCasingMockTrialPanel = ({
                   <TableCell sx={theme.workflow.formElements.tableCell}>{row.srNo}</TableCell>
                   {[...MOTOR_DIM_KEYS, ...MOTOR_LENGTH_KEYS].map((key) => (
                     <TableCell key={key} sx={theme.workflow.formElements.tableCell}>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={row[key]}
-                        onChange={(e) => updateMotorDimension(index, key, e.target.value)}
-                        disabled={disabled}
-                        error={Boolean(validationErrors[`mockTrial.motorDimensions.${index}.${key}`])}
-                        helperText={validationErrors[`mockTrial.motorDimensions.${index}.${key}`]}
-                        inputProps={{ inputMode: "decimal" }}
-                        sx={cellFieldSx}
-                      />
+                      <Box data-rmc-field={`mockTrial.motorDimensions.${index}.${key}`}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          value={row[key]}
+                          onChange={(e) => updateMotorDimension(index, key, e.target.value)}
+                          disabled={disabled}
+                          error={Boolean(validationErrors[`mockTrial.motorDimensions.${index}.${key}`])}
+                          helperText={validationErrors[`mockTrial.motorDimensions.${index}.${key}`]}
+                          inputProps={{ inputMode: "decimal" }}
+                          sx={cellFieldSx}
+                        />
+                      </Box>
                     </TableCell>
                   ))}
                   <TableCell sx={theme.workflow.formElements.tableCell}>
@@ -318,7 +334,7 @@ const RocketMotorCasingMockTrialPanel = ({
       <Box sx={{ mt: 2.5 }}>
         <SubsectionTitle cf={cf}>{S.MOCK_TRIAL_MANDREL_ASSEMBLY}</SubsectionTitle>
         {validationErrors["mockTrial.mandrelAssemblyMeasurements"] ? (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
+          <Typography data-rmc-field="mockTrial.mandrelAssemblyMeasurements" color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
             {validationErrors["mockTrial.mandrelAssemblyMeasurements"]}
           </Typography>
         ) : null}
@@ -360,17 +376,19 @@ const RocketMotorCasingMockTrialPanel = ({
                     <TableCell sx={theme.workflow.formElements.tableCell}>{row.srNo}</TableCell>
                     {MANDREL_A_B_KEYS.map((key) => (
                       <TableCell key={key} sx={theme.workflow.formElements.tableCell}>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          value={row[key]}
-                          onChange={(e) => updateMandrelRow(index, key, e.target.value)}
-                          disabled={disabled}
-                          error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`])}
-                          helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`]}
-                          inputProps={{ inputMode: "decimal" }}
-                          sx={cellFieldSx}
-                        />
+                        <Box data-rmc-field={`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`}>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            value={row[key]}
+                            onChange={(e) => updateMandrelRow(index, key, e.target.value)}
+                            disabled={disabled}
+                            error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`])}
+                            helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`]}
+                            inputProps={{ inputMode: "decimal" }}
+                            sx={cellFieldSx}
+                          />
+                        </Box>
                       </TableCell>
                     ))}
                     <TableCell sx={theme.workflow.formElements.tableCell}>
@@ -379,19 +397,21 @@ const RocketMotorCasingMockTrialPanel = ({
                       </Typography>
                     </TableCell>
                     <TableCell sx={theme.workflow.formElements.tableCell}>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={row.bellowThicknessD}
-                        onChange={(e) =>
-                          updateMandrelRow(index, "bellowThicknessD", e.target.value)
-                        }
-                        disabled={disabled}
-                        error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`])}
-                        helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`]}
-                        inputProps={{ inputMode: "decimal" }}
-                        sx={cellFieldSx}
-                      />
+                      <Box data-rmc-field={`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          value={row.bellowThicknessD}
+                          onChange={(e) =>
+                            updateMandrelRow(index, "bellowThicknessD", e.target.value)
+                          }
+                          disabled={disabled}
+                          error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`])}
+                          helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`]}
+                          inputProps={{ inputMode: "decimal" }}
+                          sx={cellFieldSx}
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell sx={theme.workflow.formElements.tableCell}>
                       <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>

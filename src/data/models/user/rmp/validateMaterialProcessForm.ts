@@ -1,13 +1,7 @@
-import {
-  getSchemaFieldRule,
-  isFieldRequiredOnSubmit,
-  type SchemaValidationMaterialContext,
-} from "@/data/validation/configs/rawMaterialPreparation.validation.config";
+import type { SchemaValidationMaterialContext } from "@/data/validation/configs/rawMaterialPreparation.validation.config";
 import {
   lotDetailsHaveUserData,
-  processFormHasUserData,
   sumLotDetailQuantities,
-  type DefaultSolidProcessForm,
   type LotDetailFormRow,
   type RmpMaterialProcessForm,
 } from "./defaultSolidProcessForm";
@@ -20,147 +14,6 @@ const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 const isFiniteNumber = (value: unknown): boolean => {
   const text = str(value).replace(/,/g, "");
   return Boolean(text) && Number.isFinite(Number(text));
-};
-
-const isValidUiDate = (value: unknown): boolean => {
-  const text = str(value);
-  if (!text) return false;
-  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(text)) {
-    const [d, m, y] = text.split("-").map(Number);
-    const dt = new Date(y, m - 1, d);
-    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
-  }
-  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
-    return !Number.isNaN(Date.parse(text.slice(0, 10)));
-  }
-  return false;
-};
-
-const isValidUiDateTime = (value: unknown): boolean => {
-  const text = str(value);
-  if (!text) return false;
-  if (/^\d{1,2}-\d{1,2}-\d{4}[ T]\d{1,2}:\d{2}/.test(text)) {
-    const [datePart, timePart] = text.split(/[T ]/);
-    if (!isValidUiDate(datePart)) return false;
-    const tm = timePart.match(/^(\d{1,2}):(\d{2})/);
-    if (!tm) return false;
-    const h = Number(tm[1]);
-    const mi = Number(tm[2]);
-    return h >= 0 && h <= 23 && mi >= 0 && mi <= 59;
-  }
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
-    return !Number.isNaN(Date.parse(text));
-  }
-  if (/^\d{1,2}:\d{2}$/.test(text)) {
-    const [h, m] = text.split(":").map(Number);
-    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
-  }
-  return isValidUiDate(text);
-};
-
-type DefaultSolidFieldSpec = {
-  fieldId: string;
-  path: string;
-  fieldType: "text" | "number" | "datetime";
-  label: string;
-};
-
-const DEFAULT_SOLID_FIELD_SPECS: DefaultSolidFieldSpec[] = [
-  { fieldId: "OVEN_TYPE", path: "drying.ovenType", fieldType: "text", label: "Oven type" },
-  { fieldId: "OVEN_NUMBER", path: "drying.ovenNumber", fieldType: "text", label: "Oven number" },
-  {
-    fieldId: "OVEN_SET_TEMPERATURE",
-    path: "drying.ovenSetTemperature",
-    fieldType: "number",
-    label: "Set temperature",
-  },
-  {
-    fieldId: "START_DATETIME",
-    path: "drying.startDatetime",
-    fieldType: "datetime",
-    label: "Start date/time",
-  },
-  {
-    fieldId: "END_DATETIME",
-    path: "drying.endDatetime",
-    fieldType: "datetime",
-    label: "End date/time",
-  },
-  { fieldId: "MOISTURE", path: "drying.moisture", fieldType: "number", label: "Moisture" },
-  {
-    fieldId: "SIEVING_DISPATCH_DATETIME",
-    path: "sieving.sievingDispatchDatetime",
-    fieldType: "datetime",
-    label: "Sieving / dispatch date/time",
-  },
-  {
-    fieldId: "SIEVED_QUANTITY",
-    path: "sieving.sievedQuantity",
-    fieldType: "number",
-    label: "Sieved quantity",
-  },
-  {
-    fieldId: "SIEVE_MESH_SIZE",
-    path: "sieving.sieveMeshSize",
-    fieldType: "text",
-    label: "Sieve mesh size",
-  },
-];
-
-const readDefaultSolidPath = (
-  form: { drying: DefaultSolidProcessForm["drying"]; sieving: DefaultSolidProcessForm["sieving"] },
-  path: string,
-): unknown => {
-  const [section, field] = path.split(".");
-  if (section === "drying" && field in form.drying) {
-    return form.drying[field as keyof DefaultSolidProcessForm["drying"]];
-  }
-  if (section === "sieving" && field in form.sieving) {
-    return form.sieving[field as keyof DefaultSolidProcessForm["sieving"]];
-  }
-  return "";
-};
-
-const validateDefaultSolidField = (
-  spec: DefaultSolidFieldSpec,
-  raw: unknown,
-  intent: MaterialProcessValidationIntent,
-  errors: Record<string, string>,
-  materialContext?: SchemaValidationMaterialContext,
-) => {
-  const text = str(raw);
-  const rule = getSchemaFieldRule(spec.fieldId);
-  const required =
-    intent === "SUBMIT" &&
-    isFieldRequiredOnSubmit(spec.fieldId, spec.fieldType, materialContext, {
-      validation: { required: spec.fieldId === "OBSERVATION" ? false : undefined },
-      label: spec.label,
-    });
-
-  if (!text) {
-    if (required) {
-      errors[spec.path] = rule?.requiredMessage ?? `${spec.label} is required.`;
-    }
-    return;
-  }
-
-  if (spec.fieldType === "number") {
-    if (!isFiniteNumber(text)) {
-      errors[spec.path] = rule?.invalidMessage ?? `${spec.label} must be numeric.`;
-    }
-    return;
-  }
-
-  if (spec.fieldType === "datetime") {
-    if (!isValidUiDateTime(text)) {
-      errors[spec.path] = rule?.invalidMessage ?? `${spec.label} must be a valid date/time.`;
-    }
-    return;
-  }
-
-  if (rule?.pattern && !rule.pattern.test(text)) {
-    errors[spec.path] = rule.invalidMessage ?? `${spec.label} is invalid.`;
-  }
 };
 
 const validateLotDetails = (
@@ -182,9 +35,9 @@ const validateLotDetails = (
       return Boolean(lotId) && isFiniteNumber(qty) && Number(qty) > 0;
     });
     if (!hasComplete) {
-      errors["lotDetails.0.lotId"] = errors["lotDetails.0.lotId"] ?? "At least one lot is required.";
+      errors["lotDetails.0.lotId"] = errors["lotDetails.0.lotId"] ?? "This Field is required";
       errors["lotDetails.0.quantity"] =
-        errors["lotDetails.0.quantity"] ?? "At least one lot quantity is required.";
+        errors["lotDetails.0.quantity"] ?? "This Field is required";
     }
   }
 
@@ -196,7 +49,7 @@ const validateLotDetails = (
 
     if (!lotId) {
       if (intent === "SUBMIT" || qty) {
-        errors[`${prefix}.lotId`] = errors[`${prefix}.lotId`] ?? "Lot is required.";
+        errors[`${prefix}.lotId`] = errors[`${prefix}.lotId`] ?? "This Field is required";
       }
     } else if (seen.has(lotId)) {
       errors[`${prefix}.lotId`] = "Duplicate lot selected.";
@@ -206,7 +59,7 @@ const validateLotDetails = (
 
     if (!qty) {
       if (intent === "SUBMIT" || lotId) {
-        errors[`${prefix}.quantity`] = errors[`${prefix}.quantity`] ?? "Quantity is required.";
+        errors[`${prefix}.quantity`] = errors[`${prefix}.quantity`] ?? "This Field is required";
       }
     } else if (!isFiniteNumber(qty) || Number(qty) <= 0) {
       errors[`${prefix}.quantity`] = "Quantity must be a positive number.";
@@ -223,7 +76,7 @@ const validateLotDetails = (
   }
 };
 
-/** Lots-only validation for RMP save/submit (no process fields). */
+/** Lots-only helper (SUBMIT requires ≥1 complete lot row). */
 export const validateLotDetailsForPremix = (
   rows: LotDetailFormRow[] | undefined,
   intent: MaterialProcessValidationIntent,
@@ -236,8 +89,13 @@ export const validateLotDetailsForPremix = (
   return errors;
 };
 
+/**
+ * RMP material process validation:
+ * - DRAFT: no required gates
+ * - SUBMIT: lot details only (drying / sieving / process tables are never required)
+ */
 export const validateMaterialProcessForm = (
-  uiKey: RmpMaterialUiKey,
+  _uiKey: RmpMaterialUiKey,
   processForm: RmpMaterialProcessForm,
   intent: MaterialProcessValidationIntent,
   materialContext?: SchemaValidationMaterialContext & {
@@ -266,213 +124,9 @@ export const validateMaterialProcessForm = (
       validationIntent,
       materialContext?.quantityPerPremix,
       errors,
+      { requireAtLeastOne: validationIntent === "SUBMIT" },
     );
   }
-
-  if (uiKey === "apCoarse" && processForm.uiKey === "apCoarse") {
-    if (validationIntent === "SUBMIT") {
-      processForm.blendingDryingParameters.forEach((row, index) => {
-        if (!str(row.actualParameter)) {
-          errors[`blendingDryingParameters.${index}.actualParameter`] =
-            "Actual parameter is required.";
-        }
-      });
-      processForm.dryingOperationRvd.forEach((row, index) => {
-        if (!str(row.actualParameter)) {
-          errors[`dryingOperationRvd.${index}.actualParameter`] = "Actual parameter is required.";
-        }
-        if (!str(row.startTime)) {
-          errors[`dryingOperationRvd.${index}.startTime`] = "Start time is required.";
-        }
-        if (!str(row.endTime)) {
-          errors[`dryingOperationRvd.${index}.endTime`] = "End time is required.";
-        }
-      });
-      processForm.particleSizeDistribution.forEach((row, index) => {
-        if (!str(row.result)) {
-          errors[`particleSizeDistribution.${index}.result`] = "Result is required.";
-        }
-      });
-    }
-    return errors;
-  }
-
-  if (uiKey === "apFine" && processForm.uiKey === "apFine") {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.acmEquipmentId)) {
-        errors.acmEquipmentId = "ACM Equipment Id is required.";
-      }
-      (["millRpm", "classifierRpm", "screwFeederRpm", "idFanRpm"] as const).forEach((key) => {
-        if (!str(processForm[key])) {
-          errors[key] = "Required.";
-        }
-      });
-      if (!str(processForm.setPressure)) {
-        errors.setPressure = "Set Pressure is required.";
-      }
-      if (!str(processForm.grindingStartDatetime)) {
-        errors.grindingStartDatetime = "Start Date/Time is required.";
-      }
-      if (!str(processForm.grindingEndDatetime)) {
-        errors.grindingEndDatetime = "End Date/Time is required.";
-      }
-      processForm.particleSizeDistribution.forEach((row, index) => {
-        if (!str(row.result)) {
-          errors[`particleSizeDistribution.${index}.result`] = "Result is required.";
-        }
-      });
-      if (!str(processForm.qtyKgQualified)) {
-        errors.qtyKgQualified = "Qty. (kg) qualified is required.";
-      }
-      processForm.blendingDryingParameters.forEach((row, index) => {
-        if (!str(row.actualParameter)) {
-          errors[`blendingDryingParameters.${index}.actualParameter`] =
-            "Actual parameter is required.";
-        }
-      });
-      processForm.dryingOperationRvd.forEach((row, index) => {
-        if (!str(row.actualParameter)) {
-          errors[`dryingOperationRvd.${index}.actualParameter`] = "Actual parameter is required.";
-        }
-        if (!str(row.startTime)) {
-          errors[`dryingOperationRvd.${index}.startTime`] = "Start time is required.";
-        }
-        if (!str(row.endTime)) {
-          errors[`dryingOperationRvd.${index}.endTime`] = "End time is required.";
-        }
-      });
-    }
-    return errors;
-  }
-
-  if (uiKey === "apUltraFine" && processForm.uiKey === "apUltraFine") {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.equipmentId)) {
-        errors.equipmentId = "Equipment Id is required.";
-      }
-      if (!str(processForm.screwFeederRpm)) {
-        errors.screwFeederRpm = "Screw Feeder RPM is required.";
-      }
-      if (!str(processForm.feedPressure)) {
-        errors.feedPressure = "Feed Pressure is required.";
-      }
-      if (!str(processForm.grindingPressure)) {
-        errors.grindingPressure = "Grinding Pressure is required.";
-      }
-      if (!str(processForm.grindingStartDatetime)) {
-        errors.grindingStartDatetime = "Start Date/Time is required.";
-      }
-      if (!str(processForm.grindingEndDatetime)) {
-        errors.grindingEndDatetime = "End Date/Time is required.";
-      }
-      if (!str(processForm.particleSizeResult)) {
-        errors.particleSizeResult = "Particle Size is required.";
-      }
-      if (!str(processForm.qtyKgQualified)) {
-        errors.qtyKgQualified = "Qty. (kg) qualified is required.";
-      }
-    }
-    return errors;
-  }
-
-  if (uiKey === "aluminum" && processForm.uiKey === "aluminum") {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.equipmentId)) {
-        errors.equipmentId = "Equipment Id is required.";
-      }
-      if (!str(processForm.setRpm)) {
-        errors.setRpm = "Set RPM is required.";
-      }
-      if (!str(processForm.startDatetime)) {
-        errors.startDatetime = "Start Date/Time is required.";
-      }
-      if (!str(processForm.endDatetime)) {
-        errors.endDatetime = "End Date/Time is required.";
-      }
-      if (!str(processForm.qtyKgQualified)) {
-        errors.qtyKgQualified = "Qty. (kg) qualified is required.";
-      }
-      if (!str(processForm.dispatchDatetime)) {
-        errors.dispatchDatetime = "Date/Time of dispatch is required.";
-      }
-    }
-    return errors;
-  }
-
-  if (
-    (uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi") &&
-    (processForm.uiKey === "doa" || processForm.uiKey === "htpb" || processForm.uiKey === "tdi")
-  ) {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.dispatchDatetime)) {
-        errors.dispatchDatetime = "Date/Time of dispatch is required.";
-      }
-      if (!str(processForm.totalQtySentForPremix)) {
-        errors.totalQtySentForPremix = "Total Quantity sent for premix is required.";
-      }
-    }
-    return errors;
-  }
-
-  if (
-    (uiKey === "cc" || uiKey === "io") &&
-    (processForm.uiKey === "cc" || processForm.uiKey === "io")
-  ) {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.sievingDatetime)) {
-        errors.sievingDatetime = "Sieving date and time is required.";
-      }
-      if (!str(processForm.dispatchDatetime)) {
-        errors.dispatchDatetime = "Date/Time of dispatch is required.";
-      }
-      if (!str(processForm.totalQtySentForPremix)) {
-        errors.totalQtySentForPremix = "Total Quantity sent for premix is required.";
-      }
-    }
-    if (processForm.uiKey === "cc") {
-      if (!processFormHasUserData(processForm) && validationIntent === "DRAFT") {
-        return errors;
-      }
-      DEFAULT_SOLID_FIELD_SPECS.forEach((spec) => {
-        const raw = readDefaultSolidPath(processForm, spec.path);
-        if (validationIntent === "DRAFT" && !str(raw)) return;
-        validateDefaultSolidField(spec, raw, validationIntent, errors, materialContext);
-      });
-    }
-    return errors;
-  }
-
-  if (uiKey === "nonoxD" && processForm.uiKey === "nonoxD") {
-    if (validationIntent === "SUBMIT") {
-      if (!str(processForm.quantitySieved)) {
-        errors.quantitySieved = "Quantity sieved is required.";
-      }
-      if (!str(processForm.sieveMeshSize)) {
-        errors.sieveMeshSize = "Sieve Mesh Size is required.";
-      }
-      if (!str(processForm.dispatchDatetime)) {
-        errors.dispatchDatetime = "Date/Time of dispatch is required.";
-      }
-      if (!str(processForm.totalQtySentForPremix)) {
-        errors.totalQtySentForPremix = "Total Quantity sent for premix is required.";
-      }
-    }
-    return errors;
-  }
-
-  if (uiKey !== "defaultSolid" || processForm.uiKey !== "defaultSolid") {
-    return errors;
-  }
-
-  if (!processFormHasUserData(processForm) && validationIntent === "DRAFT") {
-    return errors;
-  }
-
-  DEFAULT_SOLID_FIELD_SPECS.forEach((spec) => {
-    const raw = readDefaultSolidPath(processForm, spec.path);
-    if (validationIntent === "DRAFT" && !str(raw)) return;
-    validateDefaultSolidField(spec, raw, validationIntent, errors, materialContext);
-  });
 
   return errors;
 };

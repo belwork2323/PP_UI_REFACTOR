@@ -680,6 +680,19 @@ const parseNum = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/** Form display for weighment — blank when unset (avoids legacy defaulted `0`). */
+const weightValueToFormString = (value: unknown): string => {
+  if (value == null || value === "") return "";
+  const n = parseApiNumeric(value);
+  if (n == null) {
+    const text = String(value).trim();
+    return text === "" || text === "0" ? "" : text;
+  }
+  // Empty weighment was previously persisted as 0 on draft save.
+  if (n === 0) return "";
+  return String(n);
+};
+
 /** Resolves API numeric fields that may be a scalar or `{ source, parsedValue }`. */
 const parseApiNumeric = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
@@ -1228,8 +1241,8 @@ export function buildCasingFormPayload(
       : {}),
   }));
 
-  const w1 = parseNum(form.weightWithoutHarness) ?? 0;
-  const w2 = parseNum(form.weightWithHarness) ?? 0;
+  const w1 = parseNum(form.weightWithoutHarness);
+  const w2 = parseNum(form.weightWithHarness);
 
   const stageRaw = form.motorStageApi.trim();
   const stageNum = Number(stageRaw);
@@ -1545,18 +1558,8 @@ export function parseSectionsToFormData(
     ...parseRadiographyPlanMetaFromSections(sections),
     radiographyPlanRows: parseRadiographyPlanRowsFromSections(sections),
     visualInspection,
-    weightWithoutHarness:
-      parseApiNumeric(wwh.value) != null
-        ? String(parseApiNumeric(wwh.value))
-        : wwh.value != null
-          ? String(wwh.value)
-          : "",
-    weightWithHarness:
-      parseApiNumeric(wwh2.value) != null
-        ? String(parseApiNumeric(wwh2.value))
-        : wwh2.value != null
-          ? String(wwh2.value)
-          : "",
+    weightWithoutHarness: weightValueToFormString(wwh.value),
+    weightWithHarness: weightValueToFormString(wwh2.value),
     weighscaleEquipment: str(cal.equipmentDetails),
     calibrationDueDate: str(cal.calibrationDueDate).slice(0, 10),
     dimensionalData,
@@ -1798,8 +1801,8 @@ export class InsulationSpecificationModel {
                     specificationCode: param.specificationCode,
                     specificationName: param.specificationName ?? param.specificationCode ?? "",
                     referenceRange: {
-                      minValue: Number.isFinite(minNum) ? minNum : (param.referenceRange?.minValue as number),
-                      maxValue: Number.isFinite(maxNum) ? maxNum : (param.referenceRange?.maxValue as number),
+                      minValue: Number.isFinite(minNum) ? minNum : null,
+                      maxValue: Number.isFinite(maxNum) ? maxNum : null,
                       unit: param.referenceRange?.unit ?? "",
                     },
                   };
@@ -1815,6 +1818,18 @@ export function buildInsulationSpecifications(form: RocketMotorCasingFormData) {
 
   if (!specModel) return null;
 
+  const mapSpecValue = (
+    value: string | undefined,
+    range?: { minValue: number | null; maxValue: number | null },
+  ): string | null => {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) return null;
+    if (range == null || (range.minValue == null && range.maxValue == null)) {
+      return trimmed;
+    }
+    return trimmed.replace(/,/g, "");
+  };
+
   return {
     insulationType: specModel.insulationType,
     specifications: specModel.specifications.map((category) => ({
@@ -1822,11 +1837,12 @@ export function buildInsulationSpecifications(form: RocketMotorCasingFormData) {
       parameters: category.parameters.map((param) => {
         const mech = form.mechanicalProperties[param.specificationCode];
         const thermal = form.thermalProperties[param.specificationCode];
+        const range = param.referenceRange;
 
         return {
           specificationCode: param.specificationCode,
-          reported: parseNum(mech?.reported ?? thermal?.reported),
-          acemSpec: parseNum(mech?.acemSpec ?? thermal?.acemSpec),
+          reported: mapSpecValue(mech?.reported ?? thermal?.reported, range),
+          acemSpec: mapSpecValue(mech?.acemSpec ?? thermal?.acemSpec, range),
         };
       }),
     })),

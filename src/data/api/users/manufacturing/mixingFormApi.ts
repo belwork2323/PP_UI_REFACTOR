@@ -1,5 +1,5 @@
 import { post, put } from "../../httpClient";
-import { SYSTEM, USER_MIXING_FORM_ENDPOINTS } from "../../endPoints";
+import { ADMIN_ENDPOINTS, SYSTEM, USER_MIXING_FORM_ENDPOINTS } from "../../endPoints";
 
 export const createMixingFormApi = async (payload: any) => {
   return await post(USER_MIXING_FORM_ENDPOINTS.CREATE_FORM, payload);
@@ -25,4 +25,10 @@ export const fetchQualityCheck = async (
   const code = String(mixingCycleCode ?? "").trim();
   if (code) payload.mixingCycleCode = code;
   return await post(SYSTEM.GET_QUALITY_CHECKS, payload);
+};
+export const fetchMixingCycle = async (projectId: string, motorStage: number) => {
+  return await post(SYSTEM.MIXING_CYCLES_BY_PROJECTID, {
+    projectId,
+    motorStage,
+  });
 };

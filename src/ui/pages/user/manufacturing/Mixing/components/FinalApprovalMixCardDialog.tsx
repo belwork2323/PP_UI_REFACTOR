@@ -1,11 +1,4 @@
-import {
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from "@mui/material";
+import { Box, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
 import ConfirmAlertDialog from "../../../../../components/common/ConfirmAlertDialog";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {

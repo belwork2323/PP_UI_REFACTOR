@@ -18,6 +18,7 @@ import { validateFieldState } from "../fieldValidators";
 import { runValidation } from "../runValidation";
 import type { ValidationErrors, ValidationTier } from "../submissionIntent";
 import { legacyIntentToTier, tierToLegacyIntent } from "../submissionIntent";
+import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 export type RawMaterialValidationIntent = "DRAFT" | "SUBMIT";
 
@@ -179,6 +180,60 @@ export const hasRawMaterialDraftData = (blocks: MaterialBlock[]): boolean =>
         (row) => String(row.analysedResult ?? "").trim() || String(row.acemQcResult ?? "").trim(),
       ),
   );
+
+export type RmsValidationFocusTarget = {
+  fieldPath: string;
+  blockIndex?: number;
+};
+
+const str = (v: unknown) => (v == null ? "" : String(v)).trim();
+
+/** First non-empty validation message (stable key sort). */
+export const firstRmsValidationErrorMessage = (
+  errors: ValidationErrors,
+): string | undefined => {
+  for (const key of Object.keys(errors).sort()) {
+    const text = str(errors[key]);
+    if (text) return text;
+  }
+  return undefined;
+};
+
+/** Prefer manufacturer → lot → analysed results → certificates → prep fields. */
+const RMS_FOCUS_PATH_PRIORITY = (path: string): number => {
+  if (/\.manufacturerName$/.test(path)) return 10;
+  if (/\.lots\.0\.lotNo$/.test(path)) return 20;
+  if (/\.lots\.0\.rows\.\d+\.analysedResult$/.test(path)) return 30;
+  if (/\.lots\.0\.certificates$/.test(path)) return 40;
+  if (/\.lots\.0\.certificates\.\d+\.certificateType$/.test(path)) return 50;
+  if (/\.adductPreparation\./.test(path) || /\.htpbBlendingPreparation\./.test(path)) return 60;
+  if (/\.supplyOrderNo$|\.receiptDate$/.test(path)) return 70;
+  return 100;
+};
+
+export function resolveFirstRmsValidationFocus(
+  errors: ValidationErrors,
+): RmsValidationFocusTarget | null {
+  const paths = Object.keys(errors).filter((key) => str(errors[key]));
+  if (!paths.length) return null;
+  paths.sort((a, b) => {
+    const pa = RMS_FOCUS_PATH_PRIORITY(a);
+    const pb = RMS_FOCUS_PATH_PRIORITY(b);
+    if (pa !== pb) return pa - pb;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  const fieldPath = paths[0];
+  const blockMatch = fieldPath.match(/^blocks\.(\d+)\./);
+  return {
+    fieldPath,
+    blockIndex: blockMatch ? Number(blockMatch[1]) : undefined,
+  };
+}
+
+/** Scroll + focus the control tagged with `data-rms-field`. */
+export function focusRmsField(fieldPath: string, root: ParentNode = document): boolean {
+  return focusFieldByDataAttr("rms-field", fieldPath, root);
+}
 
 /** @deprecated Use fieldError(errors, path) with validationErrors from hook */
 export function getMaterialMetaErrors(

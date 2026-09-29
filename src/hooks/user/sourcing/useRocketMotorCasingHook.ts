@@ -51,6 +51,11 @@ import {
   formatValidationDetailsMessage,
   hasValidationErrors,
 } from "../../../data/validation/validationErrors";
+import {
+  firstRmcValidationErrorMessage,
+  resolveFirstRmcValidationFocus,
+  type RmcValidationFocusTarget,
+} from "../../../data/validation/adapters/rocketMotorCasing.validation";
 import type { ValidationAttemptFlags } from "../../../ui/components/validation/useValidationDisplay";
 import { flushCasingPendingDrafts } from "../../../ui/pages/user/sourcing/components/casing/casingPendingDrafts";
 
@@ -102,6 +107,10 @@ export const useRocketMotorCasingHook = () => {
     unit: false,
     submit: false,
   });
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    target: RmcValidationFocusTarget | null;
+  } | null>(null);
 
   const showAlert = useAlertStore.getState().showAlert;
   const showValidationAlert = useAlertStore.getState().showValidationAlert;
@@ -145,11 +154,6 @@ export const useRocketMotorCasingHook = () => {
     if (!activeValidationTier) return;
     setValidationErrors(validateRocketMotorCasing(casingForm, activeValidationTier));
   }, [activeValidationTier, casingForm]);
-
-  const formatErrors = useMemo(
-    () => validateRocketMotorCasing(casingForm, "FORMAT"),
-    [casingForm],
-  );
 
   const snapshotStateRef = useRef(casingForm);
   snapshotStateRef.current = casingForm;
@@ -258,6 +262,7 @@ export const useRocketMotorCasingHook = () => {
     setLoadingDetails(false);
     setValidationErrors({});
     setValidationAttempt({ format: false, unit: false, submit: false });
+    setValidationFocusRequest(null);
   };
 
   const alignDimensionalRows = (
@@ -607,18 +612,27 @@ export const useRocketMotorCasingHook = () => {
     if (Object.keys(nextValidationErrors).length > 0) {
       setValidationErrors(nextValidationErrors);
       setValidationAttempt({ format: true, unit: true, submit: intent === "submit" });
-      const firstError = firstValidationError(nextValidationErrors);
-      showValidationAlert(
-        firstError
-          ? `${
-              intent === "draft"
-                ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
-                : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED
-            } (${firstError})`
-          : intent === "draft"
-            ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
-            : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
-      );
+      const focus = resolveFirstRmcValidationFocus(nextValidationErrors);
+      setValidationFocusRequest((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        target: focus,
+      }));
+      const firstError =
+        firstRmcValidationErrorMessage(nextValidationErrors) ??
+        firstValidationError(nextValidationErrors);
+      requestAnimationFrame(() => {
+        showValidationAlert(
+          firstError
+            ? `${
+                intent === "draft"
+                  ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
+                  : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED
+              } (${firstError})`
+            : intent === "draft"
+              ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
+              : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
+        );
+      });
       return false;
     }
     setValidationErrors({});
@@ -796,11 +810,8 @@ export const useRocketMotorCasingHook = () => {
   ]);
 
   const canSaveDraft = useMemo(
-    () =>
-      canSaveCasingDraft(casingForm) &&
-      !hasValidationErrors(formatErrors) &&
-      !hasIncompleteCasingUploads(casingForm),
-    [casingForm, formatErrors],
+    () => canSaveCasingDraft(casingForm),
+    [casingForm],
   );
   const canSubmit = useMemo(
     () => isCasingSubmitComplete(casingForm) && !hasIncompleteCasingUploads(casingForm),
@@ -808,19 +819,12 @@ export const useRocketMotorCasingHook = () => {
   );
   const validateBeforeDraft = useCallback(() => {
     flushCasingPendingDrafts();
-    const formState = snapshotStateRef.current;
-    setValidationAttempt((previous) => ({ ...previous, format: true, unit: true }));
-    const unitErrors = validateRocketMotorCasing(formState, "UNIT");
-    setValidationErrors(unitErrors);
-    if (hasValidationErrors(unitErrors)) {
-      const firstError = firstValidationError(unitErrors);
-      showValidationAlert(
-        firstError
-          ? `${STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED} (${firstError})`
-          : STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED,
-      );
+    // Draft requires only identification (project / stage / motor ID); no field validation.
+    if (!canSaveCasingDraft(snapshotStateRef.current)) {
+      showValidationAlert(STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED);
       return false;
     }
+    setValidationErrors({});
     return true;
   }, [showValidationAlert]);
   const validateBeforeSubmit = useCallback(() => {
@@ -830,12 +834,20 @@ export const useRocketMotorCasingHook = () => {
     const submitErrors = validateRocketMotorCasing(formState, "SUBMIT");
     setValidationErrors(submitErrors);
     if (hasValidationErrors(submitErrors)) {
-      const firstError = firstValidationError(submitErrors);
-      showValidationAlert(
-        firstError
-          ? `${STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED} (${firstError})`
-          : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
-      );
+      const focus = resolveFirstRmcValidationFocus(submitErrors);
+      setValidationFocusRequest((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        target: focus,
+      }));
+      const firstError =
+        firstRmcValidationErrorMessage(submitErrors) ?? firstValidationError(submitErrors);
+      requestAnimationFrame(() => {
+        showValidationAlert(
+          firstError
+            ? `${STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED} (${firstError})`
+            : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
+        );
+      });
       return false;
     }
     return true;
@@ -879,6 +891,7 @@ export const useRocketMotorCasingHook = () => {
     canSaveDraft,
     validationErrors,
     validationAttempt,
+    validationFocusRequest,
     validateBeforeDraft,
     validateBeforeSubmit,
     ...listParams,

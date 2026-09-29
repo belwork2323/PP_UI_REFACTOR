@@ -25,7 +25,7 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
       metaRowTextField: {
         "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
           borderRadius: 1.5,
-          background: palette.surface,
+          background: isDark ? palette.pageBg : "#fff",
           fontSize: "0.84rem",
           height: 40,
           minHeight: 40,
@@ -68,7 +68,7 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
       textField: {
         "& .MuiOutlinedInput-root": {
           borderRadius: 1.5,
-          background: palette.surface,
+          background: isDark ? palette.pageBg : "#fff",
           fontSize: "0.84rem",
           transition: "all 0.18s",
           "& fieldset": { borderColor: palette.border },
@@ -81,7 +81,7 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
       multilineField: {
         "& .MuiOutlinedInput-root": {
           borderRadius: 1.5,
-          background: palette.surface,
+          background: isDark ? palette.pageBg : "#fff",
           fontSize: "0.84rem",
           transition: "all 0.18s",
           alignItems: "flex-start",
@@ -95,14 +95,23 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
       cellField: {
         "& .MuiOutlinedInput-root": {
           borderRadius: 1,
+          backgroundColor: isDark ? palette.pageBg : "#fff",
           background: isDark ? palette.pageBg : "#fff",
           fontSize: "0.78rem",
           "& fieldset": { borderColor: alpha(palette.border, 0.6) },
           "&:hover fieldset": { borderColor: palette.primaryLight },
           "&.Mui-focused fieldset": { borderColor: palette.primaryLight, borderWidth: 1.5 },
-          "&.Mui-focused": { background: isDark ? palette.pageBg : "#fff" },
+          "&.Mui-focused": {
+            backgroundColor: isDark ? palette.pageBg : "#fff",
+            background: isDark ? palette.pageBg : "#fff",
+          },
         },
-        "& .MuiInputBase-input": { fontWeight: 500, color: palette.text, padding: "5px 7px" },
+        "& .MuiInputBase-input": {
+          fontWeight: 500,
+          color: palette.text,
+          padding: "5px 7px",
+          backgroundColor: isDark ? palette.pageBg : "#fff",
+        },
       },
       sectionRow: { display: "flex", alignItems: "center", gap: 1, marginBottom: "10px" },
       sectionBlock: (borderColor: string) => ({

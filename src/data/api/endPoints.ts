@@ -226,6 +226,7 @@ export const SYSTEM = {
   /** GET — optional ?subBatchType= */
   SUBSCALE_ARTICLES: `${API_BASE}/system/subscale-articles`,
   GET_QUALITY_CHECKS: `${API_BASE}/user/subdepartment/mixing/quality-checks`,
+  MIXING_CYCLES_BY_PROJECTID: `${API_BASE}/system/mixing-cycles-project`,
 };
 
 // =============================

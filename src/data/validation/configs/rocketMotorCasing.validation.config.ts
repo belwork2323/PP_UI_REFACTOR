@@ -5,7 +5,7 @@ import {
   isUploadedCasingFileReady,
   type RocketMotorCasingFormData,
 } from "@/data/models/user/RocketMotorCasingFormModel";
-import { ALPHA_NUM, validateFieldState } from "../fieldValidators";
+import { ALPHA_NUM, DIMENSION_ALPHA_NUM, validateFieldState } from "../fieldValidators";
 import type { SubDeptValidationConfig } from "../runValidation";
 import { isRequiredForTier, type ValidationErrors, type ValidationTier } from "../submissionIntent";
 
@@ -40,7 +40,7 @@ export const rocketMotorCasingFieldRules = {
   },
   itemsDimension: {
     valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    pattern: DIMENSION_ALPHA_NUM,
     requiredIn: [] as ValidationTier[],
     messages: { required: M.itemsDimension.required, invalid: M.itemsDimension.invalid },
   },
@@ -143,7 +143,7 @@ export const rocketMotorCasingFieldRules = {
   },
   weightWithHarness: {
     valueType: "number" as const,
-    requiredIn: [] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.weightWithHarness.required, invalid: M.weightWithHarness.invalid },
   },
   weighscaleEquipment: {
@@ -170,7 +170,8 @@ export const rocketMotorCasingFieldRules = {
     messages: { required: M.mockTrialMandrelId.required, invalid: M.mockTrialMandrelId.invalid },
   },
   mockTrialBottomCupId: {
-    valueType: "number" as const,
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
     requiredIn: [] as ValidationTier[],
     messages: { required: M.mockTrialBottomCupId.required, invalid: M.mockTrialBottomCupId.invalid },
   },
@@ -204,6 +205,38 @@ const isWithinRange = (value: number, min: number | null, max: number | null): b
   if (max != null && value > max) return false;
   return true;
 };
+
+const isReferenceRangeNotApplicable = (
+  range?: { minValue: number | null; maxValue: number | null } | null,
+): boolean => !range || (range.minValue == null && range.maxValue == null);
+
+/** Reported / ACEM: required on submit; numeric+range when spec has min/max; ALPHA_NUM when N/A. */
+function validateInsulationSpecCell(
+  value: unknown,
+  range: { minValue: number | null; maxValue: number | null } | undefined,
+  messages: {
+    required: string;
+    invalid: string;
+    alphanumericInvalid: string;
+    outOfRange: string;
+  },
+  submitRequired: boolean,
+): string | undefined {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return submitRequired ? messages.required : undefined;
+  }
+  if (isReferenceRangeNotApplicable(range)) {
+    return ALPHA_NUM.test(text) ? undefined : messages.alphanumericInvalid;
+  }
+  if (!isFiniteNumber(text)) {
+    return messages.invalid;
+  }
+  if (!isWithinRange(Number(text), range?.minValue ?? null, range?.maxValue ?? null)) {
+    return messages.outOfRange;
+  }
+  return undefined;
+}
 
 const hasReadyReport = (files: { fileId?: string | null; fileUrl?: string }[] | undefined): boolean =>
   (files ?? []).some(isUploadedCasingFileReady);
@@ -286,45 +319,46 @@ function applyCasingNestedRules(
     if (!isThermal) {
       const reportedPath = `mechanicalProperties.${code}.reported`;
       const acemPath = `mechanicalProperties.${code}.acemSpec`;
-      if (String(row?.reported ?? "").trim() && !isFiniteNumber(row?.reported)) {
-        errors[reportedPath] = M.mechanicalReported.invalid;
-      }
-      if (submitRequired) {
-        if (!isFiniteNumber(row?.acemSpec)) {
-          errors[acemPath] = M.mechanicalAcemSpec.required;
-        } else if (
-          !isWithinRange(
-            Number(row?.acemSpec),
-            param.referenceRange.minValue,
-            param.referenceRange.maxValue,
-          )
-        ) {
-          errors[acemPath] = M.mechanicalAcemSpec.outOfRange;
-        }
-      }
+      const range = param.referenceRange;
+
+      const reportedError = validateInsulationSpecCell(
+        row?.reported,
+        range,
+        M.mechanicalReported,
+        submitRequired,
+      );
+      if (reportedError) errors[reportedPath] = reportedError;
+
+      const acemError = validateInsulationSpecCell(
+        row?.acemSpec,
+        range,
+        M.mechanicalAcemSpec,
+        submitRequired,
+      );
+      if (acemError) errors[acemPath] = acemError;
       return;
     }
 
     if (isThermal) {
       const reportedPath = `thermalProperties.${code}.reported`;
       const acemPath = `thermalProperties.${code}.acemSpec`;
-      if (String(row?.reported ?? "").trim() && !isFiniteNumber(row?.reported)) {
-        errors[reportedPath] = M.thermalReported.invalid;
-      }
-      if (String(row?.acemSpec ?? "").trim()) {
-        if (!isFiniteNumber(row?.acemSpec)) {
-          errors[acemPath] = M.thermalAcemSpec.invalid;
-        } else if (
-          submitRequired &&
-          !isWithinRange(
-            Number(row?.acemSpec),
-            param.referenceRange.minValue,
-            param.referenceRange.maxValue,
-          )
-        ) {
-          errors[acemPath] = M.thermalAcemSpec.outOfRange;
-        }
-      }
+      const range = param.referenceRange;
+
+      const reportedError = validateInsulationSpecCell(
+        row?.reported,
+        range,
+        M.thermalReported,
+        submitRequired,
+      );
+      if (reportedError) errors[reportedPath] = reportedError;
+
+      const acemError = validateInsulationSpecCell(
+        row?.acemSpec,
+        range,
+        M.thermalAcemSpec,
+        submitRequired,
+      );
+      if (acemError) errors[acemPath] = acemError;
     }
   });
 
@@ -332,12 +366,22 @@ function applyCasingNestedRules(
     (["sections", "orientations", "sfd", "normalExposures", "tangentialExposures"] as const).forEach(
       (field) => {
         const text = String(row[field] ?? "").trim();
-        if (text && !isFiniteNumber(text)) {
+        if (submitRequired && !text) {
+          errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.required;
+        } else if (text && !isFiniteNumber(text)) {
           errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.invalid;
         }
       },
     );
+    const detector = String(row.detectorType ?? "").trim();
+    if (submitRequired && !detector) {
+      errors[`radiographyPlanRows.${index}.detectorType`] = M.radiographyPlanRow.detectorRequired;
+    }
   });
+
+  if (submitRequired && !(form.radiographyPlanRows ?? []).length) {
+    errors.radiographyPlanRows = M.radiographyPlanRows.required;
+  }
 
   const planId = String(form.radiographyPlanId ?? "").trim();
   if (planId && !/^[A-Za-z0-9_-]+$/.test(planId)) {

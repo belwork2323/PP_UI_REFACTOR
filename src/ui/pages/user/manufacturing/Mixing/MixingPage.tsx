@@ -62,9 +62,7 @@ const MixingPage = () => {
       <WorkflowFormOpeningLoader
         open={listLoading || Boolean(loadingFormDetails)}
         title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
-        message={
-          loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading mixing batches…"
-        }
+        message={loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading mixing batches…"}
         color={MIXING_BRAND.mx}
         accentColor={MIXING_BRAND.mxLight}
       />
@@ -88,7 +86,6 @@ const MixingPage = () => {
             initialData={formData}
             numberOfPremix={numberOfPremix}
             motorStage={motorStage}
-            projectId={activeBatch?.projectId ?? null}
             onBlocksChange={handleFormChange}
             identificationSheet={activeBatch?.identificationSheet}
             mixCardStatusById={mixCardStatusById}

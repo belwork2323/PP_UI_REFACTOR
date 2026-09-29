@@ -39,6 +39,7 @@ export type CuringCycleRow = {
   END_TIME: string;
   PROPELLANT_PRESSURE: string;
   HOT_WATER_STATUS: HotWaterStatusValue | string;
+  REMARKS: string;
 };
 
 export type CuringMotorData = {
@@ -103,6 +104,7 @@ export const createEmptyCuringCycleRow = (srNo: number | string = 1): CuringCycl
   END_TIME: "",
   PROPELLANT_PRESSURE: "",
   HOT_WATER_STATUS: "",
+  REMARKS: "",
 });
 
 export const createEmptyCuringMotorData = (): CuringMotorData => ({
@@ -173,6 +175,7 @@ const curingCycleRowsForPayload = (rows: CuringCycleRow[]): Record<string, unkno
         endTime: toApiTime(row.END_TIME),
         hotWaterStatus: str(row.HOT_WATER_STATUS).trim() || undefined,
         propellantPressure: toApiNumber(row.PROPELLANT_PRESSURE),
+        remarks: str(row.REMARKS).trim() || undefined,
       }),
     )
     .filter(rowHasPayloadValues);
@@ -242,6 +245,7 @@ const parseCuringCycleRow = (item: unknown, index: number): CuringCycleRow => {
     HOT_WATER_STATUS: str(
       pickField(row, "hotWaterStatus", "HOT_WATER_STATUS", "hotWaterCirculation") ?? "",
     ),
+    REMARKS: str(pickField(row, "remarks", "REMARKS") ?? ""),
   };
 };
 
@@ -330,6 +334,7 @@ export const applyCuringCycleConfigRows = (
       HOT_WATER_STATUS: str(
         row.HOT_WATER_STATUS ?? row.hotWaterCirculation ?? base.HOT_WATER_STATUS,
       ),
+      REMARKS: str(row.REMARKS ?? row.remarks ?? base.REMARKS),
     };
   });
 

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { Box } from "@mui/material";
-import { createSubscaleInitialValues, hydrateSubscaleValuesFromSections } from "@/data/models/user/subscaleBatchType";
+import {
+  createSubscaleInitialValues,
+  hydrateSubscaleValuesFromSections,
+} from "@/data/models/user/subscaleBatchType";
 import type {
   SchemaDocumentV2,
   SchemaFormValues,

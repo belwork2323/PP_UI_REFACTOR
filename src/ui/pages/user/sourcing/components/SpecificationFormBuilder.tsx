@@ -8,6 +8,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useEffect } from "react";
 import { icons } from "../../../../../app/theme/icons";
 
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
@@ -18,6 +19,7 @@ import MaterialFormGroupCard from "./MaterialFormGroupCard";
 import useRawMaterialSpecificationForm, {
   SpecificationBlock,
 } from "../../../../../hooks/user/sourcing/useRawMaterialSpecificationForm";
+import { focusRmsField } from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
 
 const {
   add: AddRoundedIcon,
@@ -61,6 +63,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     canSaveDraft,
     validationErrors,
     validationAttempt,
+    validationFocusRequest,
     closeDraftConfirm,
     closeSubmitConfirm,
     createLotMode,
@@ -105,6 +108,15 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     totalRows,
     approvedPreparationLots,
   } = useRawMaterialSpecificationForm(formProps);
+
+  useEffect(() => {
+    if (!validationFocusRequest?.target?.fieldPath) return;
+    const path = validationFocusRequest.target.fieldPath;
+    const timer = window.setTimeout(() => {
+      focusRmsField(path);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [validationFocusRequest?.id, validationFocusRequest?.target?.fieldPath]);
 
   const materialsForDropdown = selectableMaterials;
   const addSelectionKey = `${selectedMaterial}${selectedGrade ? `::${selectedGrade}` : ""}`;

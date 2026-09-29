@@ -18,6 +18,11 @@ export const mixingFieldRules = {
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
+  mixingCycleCode: {
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
+  },
   bowlTrialDate: {
     valueType: "date" as const,
     pattern: undefined,
@@ -87,6 +92,11 @@ function resolveFieldPaths(data: MixingData) {
     paths.push({ path: `premixes.${i}.bldgNo`, value: p.bldgNo, ruleKey: "bldgNo" });
     paths.push({ path: `premixes.${i}.bowlId`, value: p.bowlId, ruleKey: "bowlId" });
     paths.push({
+      path: `premixes.${i}.mixingCycleCode`,
+      value: p.mixingCycleCode,
+      ruleKey: "mixingCycleCode",
+    });
+    paths.push({
       path: `premixes.${i}.bowlTrialDate`,
       value: p.bowlTrialDate,
       ruleKey: "bowlTrialDate",
@@ -98,9 +108,11 @@ function resolveFieldPaths(data: MixingData) {
     });
 
     (p.processParticulars ?? []).forEach((row, r) => {
+      console.log(row);
+
       paths.push({
         path: `premixes.${i}.processParticulars.${r}.operation`,
-        value: row.operation,
+        value: row.operationId,
         ruleKey: "operation",
       });
       paths.push({
@@ -139,10 +151,16 @@ function resolveFieldPaths(data: MixingData) {
   (data.finalMixes ?? []).forEach((p, i) => {
     paths.push({ path: `finalMixes.${i}.bldgNo`, value: p.bldgNo, ruleKey: "bldgNo" });
     paths.push({ path: `finalMixes.${i}.bowlId`, value: p.bowlId, ruleKey: "bowlId" });
+    paths.push({
+      path: `finalMixes.${i}.mixingCycleCode`,
+      value: p.mixingCycleCode,
+      ruleKey: "mixingCycleCode",
+    });
+
     (p.processParticulars ?? []).forEach((row, r) => {
       paths.push({
         path: `finalMixes.${i}.processParticulars.${r}.operation`,
-        value: row.operation,
+        value: row.operationId,
         ruleKey: "operation",
       });
       paths.push({
@@ -188,6 +206,7 @@ export const mixingValidationConfig: SubDeptValidationConfig<MixingData> = {
   customRules: [
     (data: MixingData, tier: string, errors: Record<string, string>) => {
       const isSubmit = tier === "SUBMIT";
+      console.log(data);
 
       const checkQualityRows = (prefix: string, qRows: any[] | undefined) => {
         if (!qRows || !qRows.length) {

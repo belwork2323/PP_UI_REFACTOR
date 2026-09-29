@@ -49,7 +49,10 @@ import {
   areMaterialGroupsMandatoryComplete,
   areMaterialGroupsUnitComplete,
   blockRowPath,
+  firstRmsValidationErrorMessage,
   isMaterialMetaComplete,
+  resolveFirstRmsValidationFocus,
+  type RmsValidationFocusTarget,
   validateRawMaterialSourcing,
 } from "../../../data/validation/adapters/rawMaterialSourcing.validation";
 import { fieldError, hasValidationErrors } from "../../../data/validation/validationErrors";
@@ -222,6 +225,10 @@ export const useRawMaterialSpecificationForm = ({
     unit: false,
     submit: false,
   });
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    target: RmsValidationFocusTarget | null;
+  } | null>(null);
   const [availableMaterials, setAvailableMaterials] = useState<MaterialOption[]>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
   const [addingMaterial, setAddingMaterial] = useState(false);
@@ -229,6 +236,7 @@ export const useRawMaterialSpecificationForm = ({
   const [loadingByMaterial, setLoadingByMaterial] = useState<LoadingMap>({});
 
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -776,12 +784,35 @@ export const useRawMaterialSpecificationForm = ({
     [updateBlocks],
   );
 
+  const notifyRmsValidationErrors = useCallback(
+    (errors: ValidationErrors) => {
+      const firstError = firstRmsValidationErrorMessage(errors);
+      const base =
+        formStrings.VALIDATION.validationFailedSnackbar ??
+        "Validation Error — Check mandatory fields or wrong input";
+      showValidationAlert(firstError ? `${base} (${firstError})` : base);
+    },
+    [formStrings.VALIDATION.validationFailedSnackbar, showValidationAlert],
+  );
+
+  const emitValidationFocus = useCallback((errors: ValidationErrors) => {
+    const focus = resolveFirstRmsValidationFocus(errors);
+    setValidationFocusRequest((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      target: focus,
+    }));
+    requestAnimationFrame(() => {
+      notifyRmsValidationErrors(errors);
+    });
+  }, [notifyRmsValidationErrors]);
+
   const openDraftConfirm = useCallback(() => {
     if (actionLoading || !hasBlocks) return;
     setValidationAttempt((previous) => ({ ...previous, format: true, unit: true }));
     const unitErrors = validateRawMaterialSourcing(blocks, "UNIT");
     setValidationErrors(unitErrors);
     if (hasValidationErrors(unitErrors)) {
+      emitValidationFocus(unitErrors);
       return;
     }
     if (!canSaveDraft) {
@@ -791,7 +822,15 @@ export const useRawMaterialSpecificationForm = ({
       return;
     }
     setDraftConfirm(true);
-  }, [actionLoading, blocks, canSaveDraft, formStrings.CERT_UPLOAD_PENDING, hasBlocks, showAlert]);
+  }, [
+    actionLoading,
+    blocks,
+    canSaveDraft,
+    emitValidationFocus,
+    formStrings.CERT_UPLOAD_PENDING,
+    hasBlocks,
+    showAlert,
+  ]);
 
   const openSubmitConfirm = useCallback(() => {
     if (actionLoading) return;
@@ -799,6 +838,7 @@ export const useRawMaterialSpecificationForm = ({
     const submitErrors = validateRawMaterialSourcing(blocks, "SUBMIT");
     setValidationErrors(submitErrors);
     if (hasValidationErrors(submitErrors)) {
+      emitValidationFocus(submitErrors);
       return;
     }
     if (!canSubmit) {
@@ -808,7 +848,14 @@ export const useRawMaterialSpecificationForm = ({
       return;
     }
     setSubmitConfirm(true);
-  }, [actionLoading, blocks, canSubmit, formStrings.CERT_UPLOAD_PENDING, showAlert]);
+  }, [
+    actionLoading,
+    blocks,
+    canSubmit,
+    emitValidationFocus,
+    formStrings.CERT_UPLOAD_PENDING,
+    showAlert,
+  ]);
 
   const closeDraftConfirm = useCallback(() => {
     setDraftConfirm(false);
@@ -840,6 +887,7 @@ export const useRawMaterialSpecificationForm = ({
     canSaveDraft,
     validationErrors,
     validationAttempt,
+    validationFocusRequest,
     /** @deprecated Use validationAttempt.format */
     showTypeErrors: validationAttempt.format,
     /** @deprecated Use validationAttempt.submit */

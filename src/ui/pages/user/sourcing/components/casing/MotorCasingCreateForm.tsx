@@ -37,7 +37,12 @@ import {
   createInitialMechanicalProperties,
   isThermalSpecificationCategory,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
-import { isCasingIdentificationComplete, isCasingFieldRequired } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
+import {
+  computeIsOutOfRange,
+  isReferenceRangeNotApplicable,
+  sanitizeNumericAnalysedResultInput,
+} from "../../../../../../data/models/user/RawMaterialProcurementModel";
+import { isCasingIdentificationComplete, isCasingFieldRequired, focusRmcField, type RmcValidationFocusTarget } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
 import CasingFormStepNav from "./CasingFormStepNav";
 import RocketMotorCasingMockTrialPanel from "./RocketMotorCasingMockTrialPanel";
 import type { useRocketMotorCasingLookups } from "../../../../../../hooks/user/sourcing/useRocketMotorCasingLookups";
@@ -55,6 +60,7 @@ import {
   TextFieldField,
   CasingDeferredInput,
   RequiredMark,
+  casingWhiteInputSx,
 } from "./CasingFormPrimitives";
 import CasingReportUpload from "./CasingReportUpload";
 import rocketMotorCasingController from "@/controllers/user/sourcing/rocketMotorCasingController";
@@ -96,6 +102,10 @@ type Props = {
   onDeleteCasing?: () => void;
   deleteLoading?: boolean;
   validationErrors?: Record<string, string>;
+  validationFocusRequest?: {
+    id: number;
+    target: RmcValidationFocusTarget | null;
+  } | null;
   theme: any;
 };
 
@@ -113,6 +123,7 @@ const MotorCasingCreateForm = ({
   onDeleteCasing,
   deleteLoading = false,
   validationErrors = {},
+  validationFocusRequest = null,
   theme,
 }: Props) => {
   const req = isCasingFieldRequired;
@@ -191,12 +202,18 @@ const MotorCasingCreateForm = ({
     paramKey: string,
     field: "specification" | "reported" | "acemSpec",
     value: string,
+    referenceRange?: { minValue: number | null; maxValue: number | null },
   ) => {
+    const nextValue =
+      (field === "reported" || field === "acemSpec") &&
+      !isReferenceRangeNotApplicable(referenceRange)
+        ? sanitizeNumericAnalysedResultInput(value)
+        : value;
     setForm((prev) => ({
       ...prev,
       mechanicalProperties: {
         ...prev.mechanicalProperties,
-        [paramKey]: { ...prev.mechanicalProperties[paramKey], [field]: value },
+        [paramKey]: { ...prev.mechanicalProperties[paramKey], [field]: nextValue },
       },
     }));
   };
@@ -205,12 +222,18 @@ const MotorCasingCreateForm = ({
     key: string,
     field: "specification" | "reported" | "acemSpec",
     value: string,
+    referenceRange?: { minValue: number | null; maxValue: number | null },
   ) => {
+    const nextValue =
+      (field === "reported" || field === "acemSpec") &&
+      !isReferenceRangeNotApplicable(referenceRange)
+        ? sanitizeNumericAnalysedResultInput(value)
+        : value;
     setForm((prev) => ({
       ...prev,
       thermalProperties: {
         ...prev.thermalProperties,
-        [key]: { ...prev.thermalProperties[key], [field]: value },
+        [key]: { ...prev.thermalProperties[key], [field]: nextValue },
       },
     }));
   };
@@ -306,6 +329,19 @@ const MotorCasingCreateForm = ({
     }
   }, [identificationComplete, step]);
 
+  // Switch wizard step then scroll/focus the first validation error field.
+  // Depend only on request id — including `step` re-ran this on every Next/Back and pinned the wizard.
+  useEffect(() => {
+    const target = validationFocusRequest?.target;
+    if (!target?.fieldPath) return;
+    setStep(target.step);
+    setStepError(null);
+    const timer = window.setTimeout(() => {
+      focusRmcField(target.fieldPath);
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [validationFocusRequest?.id]);
+
   return (
     <Box sx={{ ...casingTheme.root, ...cf.pageRoot }}>
       <Box sx={cf.headerRow}>
@@ -391,6 +427,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 cf={cf}
                 error={validationErrors.projectName}
+                fieldPath="projectName"
               />
               <SelectField
                 label={S.MOTOR_STAGE}
@@ -414,6 +451,7 @@ const MotorCasingCreateForm = ({
                 }
                 theme={theme}
                 error={validationErrors.motorStageApi}
+                fieldPath="motorStageApi"
               />
               <TextFieldField
                 label={S.MOTOR_ID}
@@ -427,6 +465,8 @@ const MotorCasingCreateForm = ({
                 disabled={lockIdentification}
                 theme={theme}
                 error={validationErrors.motorId}
+                fieldPath="motorId"
+                lightPlaceholder
               />
               {form.motorCasingId || lockIdentification ? (
                 <TextFieldField
@@ -489,6 +529,7 @@ const MotorCasingCreateForm = ({
                 disabled={!identificationComplete}
                 theme={theme}
                 error={validationErrors.radiographyPlanId}
+                fieldPath="radiographyPlanId"
               />
               <TextFieldField
                 label={S.RADIOGRAPHY_PLAN_NAME}
@@ -499,6 +540,7 @@ const MotorCasingCreateForm = ({
                 disabled={!identificationComplete}
                 theme={theme}
                 error={validationErrors.radiographyPlanName}
+                fieldPath="radiographyPlanName"
               />
             </FieldGrid>
             <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1.5, overflowX: "auto" }}>
@@ -544,60 +586,70 @@ const MotorCasingCreateForm = ({
                         ] as const
                       ).map((field) => (
                         <TableCell key={field} sx={theme.workflow.formElements.tableCell}>
-                          <TextField
-                            size="small"
-                            fullWidth
-                            value={row[field]}
-                            onChange={(e) => {
-                              const next = String(e.target.value).replace(/[^\d.]/g, "");
-                              patch({
-                                radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
-                                  i === index ? { ...r, [field]: next } : r,
-                                ),
-                              });
-                            }}
-                            disabled={!identificationComplete}
-                            error={Boolean(validationErrors[`radiographyPlanRows.${index}.${field}`])}
-                            helperText={validationErrors[`radiographyPlanRows.${index}.${field}`]}
-                            inputProps={{ inputMode: "decimal" }}
-                            sx={{
-                              ...theme.workflow.formElements.cellField,
-                              ...casingTheme.dimInput,
-                            }}
-                          />
+                          <Box data-rmc-field={`radiographyPlanRows.${index}.${field}`}>
+                            <TextField
+                              size="small"
+                              fullWidth
+                              value={row[field]}
+                              onChange={(e) => {
+                                const next = String(e.target.value).replace(/[^\d.]/g, "");
+                                patch({
+                                  radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
+                                    i === index ? { ...r, [field]: next } : r,
+                                  ),
+                                });
+                              }}
+                              disabled={!identificationComplete}
+                              error={Boolean(validationErrors[`radiographyPlanRows.${index}.${field}`])}
+                              helperText={validationErrors[`radiographyPlanRows.${index}.${field}`]}
+                              inputProps={{ inputMode: "decimal" }}
+                              sx={casingWhiteInputSx({
+                                ...theme.workflow.formElements.cellField,
+                                ...casingTheme.dimInput,
+                              })}
+                            />
+                          </Box>
                         </TableCell>
                       ))}
                       <TableCell sx={theme.workflow.formElements.tableCell}>
-                        <TextField
-                          select
-                          size="small"
-                          fullWidth
-                          value={row.detectorType}
-                          onChange={(e) =>
-                            patch({
-                              radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
-                                i === index ? { ...r, detectorType: e.target.value } : r,
-                              ),
-                            })
-                          }
-                          disabled={!identificationComplete}
-                          SelectProps={{ displayEmpty: true }}
-                          sx={{
-                            ...theme.workflow.formElements.cellField,
-                            ...casingTheme.dimInput,
-                          }}
-                        >
-                          <MenuItem value="">
-                            <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                              {S.RADIOGRAPHY_DETECTOR_PH}
-                            </Typography>
-                          </MenuItem>
-                          {CASING_DETECTOR_TYPE_OPTIONS.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              {option.label}
+                        <Box data-rmc-field={`radiographyPlanRows.${index}.detectorType`}>
+                          <TextField
+                            select
+                            size="small"
+                            fullWidth
+                            value={row.detectorType}
+                            onChange={(e) =>
+                              patch({
+                                radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
+                                  i === index ? { ...r, detectorType: e.target.value } : r,
+                                ),
+                              })
+                            }
+                            disabled={!identificationComplete}
+                            error={Boolean(
+                              validationErrors[`radiographyPlanRows.${index}.detectorType`],
+                            )}
+                            helperText={
+                              validationErrors[`radiographyPlanRows.${index}.detectorType`]
+                            }
+                            SelectProps={{ displayEmpty: true }}
+                            sx={casingWhiteInputSx({
+                              ...theme.workflow.formElements.cellField,
+                              ...casingTheme.dimInput,
+                            })}
+                          >
+                            <MenuItem value="">
+                              <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", opacity: 0.45 }}>
+                                {S.RADIOGRAPHY_DETECTOR_PH}
+                              </Typography>
                             </MenuItem>
-                          ))}
-                        </TextField>
+                            {CASING_DETECTOR_TYPE_OPTIONS.map((option) => (
+                              <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Box>
                       </TableCell>
                       <TableCell sx={theme.workflow.formElements.tableCell}>
                         {(form.radiographyPlanRows?.length ?? 0) > 1 ? (
@@ -679,6 +731,7 @@ const MotorCasingCreateForm = ({
                 placeholder={S.SELECT_CASING_TYPE}
                 theme={theme}
                 error={validationErrors.casingType}
+                fieldPath="casingType"
               />
               <DateField
                 label={S.RECEIVING_DATE}
@@ -687,6 +740,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ receivingDate: v })}
                 theme={theme}
                 error={validationErrors.receivingDate}
+                fieldPath="receivingDate"
               />
             </FieldGrid>
 
@@ -701,6 +755,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ itemsDimension: v })}
                 theme={theme}
                 error={validationErrors.itemsDimension}
+                fieldPath="itemsDimension"
               />
               <SearchableSelectField
                 label={S.UNIT}
@@ -711,6 +766,7 @@ const MotorCasingCreateForm = ({
                 loading={lookups.loading}
                 theme={theme}
                 error={validationErrors.itemsUnit}
+                fieldPath="itemsUnit"
               />
               <ReceiptStatusField
                 label={S.RECEIPT_STATUS}
@@ -727,6 +783,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ itemsObservations: v })}
                 theme={theme}
                 error={validationErrors.itemsObservations}
+                fieldPath="itemsObservations"
               />
             </FieldGrid>
 
@@ -748,6 +805,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ greenCardNo: v })}
                 theme={theme}
                 error={validationErrors.greenCardNo}
+                fieldPath="greenCardNo"
               />
               <DateField
                 label={S.CLEARANCE_DATE}
@@ -755,6 +813,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ clearanceDate: v })}
                 theme={theme}
                 error={validationErrors.clearanceDate}
+                fieldPath="clearanceDate"
               />
               <TextFieldField
                 label={S.CLEARANCE_AUTHORITY}
@@ -762,6 +821,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ clearanceAuthority: v })}
                 theme={theme}
                 error={validationErrors.clearanceAuthority}
+                fieldPath="clearanceAuthority"
               />
               <TextFieldField
                 label={S.CLEARANCE_DETAILS}
@@ -772,6 +832,7 @@ const MotorCasingCreateForm = ({
                 fullWidth
                 theme={theme}
                 error={validationErrors.clearanceDetails}
+                fieldPath="clearanceDetails"
               />
             </FieldGrid>
 
@@ -785,6 +846,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ insulationCuringDate: v })}
                 theme={theme}
                 error={validationErrors.insulationCuringDate}
+                fieldPath="insulationCuringDate"
               />
               <SelectField
                 label={S.INSULATION_TYPE}
@@ -795,6 +857,7 @@ const MotorCasingCreateForm = ({
                 placeholder={S.SELECT_INSULATION_TYPE}
                 theme={theme}
                 error={validationErrors.insulationType}
+                fieldPath="insulationType"
               />
               <TextFieldField
                 label={S.REPORT_NO}
@@ -803,6 +866,7 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => patch({ insulationReportNo: v })}
                 theme={theme}
                 error={validationErrors.insulationReportNo}
+                fieldPath="insulationReportNo"
               />
               <ReceiptStatusField
                 label={S.INSULATION_RECEIPT}
@@ -840,67 +904,127 @@ const MotorCasingCreateForm = ({
                     columns={[
                       S.COL_PARAMETER,
                       S.COL_SPECIFICATION,
-                      S.REPORTED,
-                      thermal
-                        ? { label: S.TEST_RESULT_ACEM, required: false }
-                        : { label: S.TEST_RESULT_ACEM, required: true },
+                      { label: S.REPORTED, required: true },
+                      { label: S.TEST_RESULT_ACEM, required: true },
                     ]}
-                    rows={parameters.map((item) => (
-                      <tr key={item.specificationCode}>
-                        <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
+                    rows={parameters.map((item) => {
+                      const rangeNotApplicable = isReferenceRangeNotApplicable(item.referenceRange);
+                      const inputType = rangeNotApplicable ? "text" : "number";
+                      const reportedValue = thermal
+                        ? form.thermalProperties[item.specificationCode]?.reported ?? ""
+                        : form.mechanicalProperties[item.specificationCode]?.reported ?? "";
+                      const acemValue = thermal
+                        ? form.thermalProperties[item.specificationCode]?.acemSpec ?? ""
+                        : form.mechanicalProperties[item.specificationCode]?.acemSpec ?? "";
+                      const reportedOutOfRange = computeIsOutOfRange(
+                        reportedValue,
+                        item.referenceRange,
+                      );
+                      const acemOutOfRange = computeIsOutOfRange(acemValue, item.referenceRange);
+                      const rowFailed = reportedOutOfRange || acemOutOfRange;
+                      const reportedPath = `${propertyPrefix}.${item.specificationCode}.reported`;
+                      const acemPath = `${propertyPrefix}.${item.specificationCode}.acemSpec`;
+                      const reportedError = Boolean(validationErrors[reportedPath]) || reportedOutOfRange;
+                      const acemError = Boolean(validationErrors[acemPath]) || acemOutOfRange;
+                      return (
+                      <Box
+                        component="tr"
+                        key={item.specificationCode}
+                        sx={cf.propertiesDataRow(rowFailed)}
+                      >
+                        <td>
+                          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                            <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                              {`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}
+                            </Typography>
+                            {rowFailed ? (
+                              <Chip
+                                label={STRINGS.SOURCING.SPECIFICATION_FORM.SPEC_STATUS_OUT_OF_RANGE}
+                                size="small"
+                                sx={cf.propertiesFailedChip}
+                              />
+                            ) : null}
+                          </Stack>
+                        </td>
                         <td>
                           <Chip
                             size="small"
-                            label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
-                            sx={theme.workflow.formElements.cellField}
+                            label={
+                              rangeNotApplicable
+                                ? "N/A"
+                                : `${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`
+                            }
                           />
                         </td>
 
                         <td>
-                          <CasingDeferredInput
-                            size="small"
-                            fullWidth
-                            type="number"
-                            value={
-                              thermal
-                                ? form.thermalProperties[item.specificationCode]?.reported ?? ""
-                                : form.mechanicalProperties[item.specificationCode]?.reported ?? ""
-                            }
-                            onChange={(value) =>
-                              thermal
-                                ? updateThermal(item.specificationCode, "reported", value)
-                                : updateMech(item.specificationCode, "reported", value)
-                            }
-                            error={Boolean(
-                              validationErrors[`${propertyPrefix}.${item.specificationCode}.reported`],
-                            )}
-                            sx={theme.workflow.formElements.cellField}
-                          />
+                          <Box data-rmc-field={reportedPath}>
+                            <CasingDeferredInput
+                              size="small"
+                              fullWidth
+                              type={inputType}
+                              inputMode={rangeNotApplicable ? "text" : "decimal"}
+                              placeholder="Enter value"
+                              value={reportedValue}
+                              onChange={(value) =>
+                                thermal
+                                  ? updateThermal(
+                                      item.specificationCode,
+                                      "reported",
+                                      value,
+                                      item.referenceRange,
+                                    )
+                                  : updateMech(
+                                      item.specificationCode,
+                                      "reported",
+                                      value,
+                                      item.referenceRange,
+                                    )
+                              }
+                              error={reportedError}
+                              sx={[
+                                casingWhiteInputSx(theme.workflow.formElements.cellField),
+                                ...(reportedError ? [cf.propertiesFailedField] : []),
+                              ]}
+                            />
+                          </Box>
                         </td>
 
                         <td>
-                          <CasingDeferredInput
-                            size="small"
-                            fullWidth
-                            type="number"
-                            value={
-                              thermal
-                                ? form.thermalProperties[item.specificationCode]?.acemSpec ?? ""
-                                : form.mechanicalProperties[item.specificationCode]?.acemSpec ?? ""
-                            }
-                            onChange={(value) =>
-                              thermal
-                                ? updateThermal(item.specificationCode, "acemSpec", value)
-                                : updateMech(item.specificationCode, "acemSpec", value)
-                            }
-                            error={Boolean(
-                              validationErrors[`${propertyPrefix}.${item.specificationCode}.acemSpec`],
-                            )}
-                            sx={theme.workflow.formElements.cellField}
-                          />
+                          <Box data-rmc-field={acemPath}>
+                            <CasingDeferredInput
+                              size="small"
+                              fullWidth
+                              type={inputType}
+                              inputMode={rangeNotApplicable ? "text" : "decimal"}
+                              placeholder="Enter value"
+                              value={acemValue}
+                              onChange={(value) =>
+                                thermal
+                                  ? updateThermal(
+                                      item.specificationCode,
+                                      "acemSpec",
+                                      value,
+                                      item.referenceRange,
+                                    )
+                                  : updateMech(
+                                      item.specificationCode,
+                                      "acemSpec",
+                                      value,
+                                      item.referenceRange,
+                                    )
+                              }
+                              error={acemError}
+                              sx={[
+                                casingWhiteInputSx(theme.workflow.formElements.cellField),
+                                ...(acemError ? [cf.propertiesFailedField] : []),
+                              ]}
+                            />
+                          </Box>
                         </td>
-                      </tr>
-                    ))}
+                      </Box>
+                      );
+                    })}
                   />
                 </React.Fragment>
               );
@@ -916,6 +1040,7 @@ const MotorCasingCreateForm = ({
                   onChange={(v) => patch({ postPptUtDate: v })}
                   theme={theme}
                   error={validationErrors.postPptUtDate}
+                  fieldPath="postPptUtDate"
                 />
                 <DateField
                   label={S.NDT_DATE}
@@ -923,6 +1048,7 @@ const MotorCasingCreateForm = ({
                   onChange={(v) => patch({ ndtDate: v })}
                   theme={theme}
                   error={validationErrors.ndtDate}
+                  fieldPath="ndtDate"
                 />
               </Box>
               <Box sx={cf.ndtObservationsGrid}>
@@ -934,6 +1060,7 @@ const MotorCasingCreateForm = ({
                   rows={3}
                   theme={theme}
                   error={validationErrors.ndtObservations}
+                  fieldPath="ndtObservations"
                 />
                 <TextFieldField
                   label={S.ACEM_NDT}
@@ -943,6 +1070,7 @@ const MotorCasingCreateForm = ({
                   rows={3}
                   theme={theme}
                   error={validationErrors.acemNdtObservations}
+                  fieldPath="acemNdtObservations"
                 />
                 <TextFieldField
                   label={S.PROJECT_RUBBER}
@@ -952,6 +1080,7 @@ const MotorCasingCreateForm = ({
                   rows={3}
                   theme={theme}
                   error={validationErrors.projectRubberSurfaceObservations}
+                  fieldPath="projectRubberSurfaceObservations"
                 />
                 <TextFieldField
                   label={S.OTHER_DETAILS}
@@ -961,6 +1090,7 @@ const MotorCasingCreateForm = ({
                   rows={3}
                   theme={theme}
                   error={validationErrors.otherDetails}
+                  fieldPath="otherDetails"
                 />
               </Box>
             </Box>
@@ -1001,6 +1131,7 @@ const MotorCasingCreateForm = ({
                   }}
                   error={validationErrors[`visualInspection.${idx}.observations`]}
                   theme={theme}
+                  fieldPath={`visualInspection.${idx}.observations`}
                 />
                 <TextFieldField
                   label={S.COL_REMARK}
@@ -1012,6 +1143,7 @@ const MotorCasingCreateForm = ({
                   }}
                   error={validationErrors[`visualInspection.${idx}.remark`]}
                   theme={theme}
+                  fieldPath={`visualInspection.${idx}.remark`}
                 />
               </Box>
 
@@ -1048,6 +1180,7 @@ const MotorCasingCreateForm = ({
                         }}
                         error={validationErrors[`visualInspection.${idx}.subItems.${si}.observations`]}
                         theme={theme}
+                        fieldPath={`visualInspection.${idx}.subItems.${si}.observations`}
                       />
                       <TextFieldField
                         label={S.COL_REMARK}
@@ -1061,6 +1194,7 @@ const MotorCasingCreateForm = ({
                         }}
                         error={validationErrors[`visualInspection.${idx}.subItems.${si}.remark`]}
                         theme={theme}
+                        fieldPath={`visualInspection.${idx}.subItems.${si}.remark`}
                       />
                     </React.Fragment>
                   ))}
@@ -1085,18 +1219,27 @@ const MotorCasingCreateForm = ({
               label={S.WEIGHT_WITHOUT}
               required={req("weightWithoutHarness")}
               value={form.weightWithoutHarness}
-              onChange={(v) => patch({ weightWithoutHarness: v })}
-              type="number"
+              onChange={(v) =>
+                patch({ weightWithoutHarness: sanitizeNumericAnalysedResultInput(v) })
+              }
+              type="text"
+              placeholder="Enter weight"
               theme={theme}
               error={validationErrors.weightWithoutHarness}
+              fieldPath="weightWithoutHarness"
             />
             <TextFieldField
               label={S.WEIGHT_WITH}
+              required={req("weightWithHarness")}
               value={form.weightWithHarness}
-              onChange={(v) => patch({ weightWithHarness: v })}
-              type="number"
+              onChange={(v) =>
+                patch({ weightWithHarness: sanitizeNumericAnalysedResultInput(v) })
+              }
+              type="text"
+              placeholder="Enter weight"
               theme={theme}
               error={validationErrors.weightWithHarness}
+              fieldPath="weightWithHarness"
             />
             <TextFieldField
               label={S.WEIGHSCALE}
@@ -1105,6 +1248,7 @@ const MotorCasingCreateForm = ({
               onChange={(v) => patch({ weighscaleEquipment: v })}
               theme={theme}
               error={validationErrors.weighscaleEquipment}
+              fieldPath="weighscaleEquipment"
             />
             <DateField
               label={S.CALIBRATION_DUE}
@@ -1113,6 +1257,7 @@ const MotorCasingCreateForm = ({
               onChange={(v) => patch({ calibrationDueDate: v })}
               theme={theme}
               error={validationErrors.calibrationDueDate}
+              fieldPath="calibrationDueDate"
             />
           </FieldGrid>
         </SectionCard>
@@ -1128,7 +1273,7 @@ const MotorCasingCreateForm = ({
           cf={cf}
         >
           {validationErrors.dimensionalData ? (
-            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+            <Typography data-rmc-field="dimensionalData" color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
               {validationErrors.dimensionalData}
             </Typography>
           ) : null}
@@ -1209,79 +1354,85 @@ const MotorCasingCreateForm = ({
                         {isLooseFlap ? (
                           <>
                             <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <CasingDeferredInput
-                                size="small"
-                                fullWidth
-                                type="number"
-                                placeholder={S.COL_ARC_LENGTH}
-                                value={row.looseFlap?.arcLength ?? ""}
-                                onChange={(value) => {
-                                  const next = [...form.dimensionalData];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    looseFlap: {
-                                      ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                      arcLength: value,
-                                    },
-                                  };
-                                  patch({ dimensionalData: next });
-                                }}
-                                error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`])}
-                                sx={{
-                                  ...theme.workflow.formElements.cellField,
-                                  ...casingTheme.dimInput,
-                                }}
-                              />
+                              <Box data-rmc-field={`dimensionalData.${idx}.looseFlap.arcLength`}>
+                                <CasingDeferredInput
+                                  size="small"
+                                  fullWidth
+                                  type="number"
+                                  placeholder={S.COL_ARC_LENGTH}
+                                  value={row.looseFlap?.arcLength ?? ""}
+                                  onChange={(value) => {
+                                    const next = [...form.dimensionalData];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      looseFlap: {
+                                        ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
+                                        arcLength: value,
+                                      },
+                                    };
+                                    patch({ dimensionalData: next });
+                                  }}
+                                  error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`])}
+                                  sx={casingWhiteInputSx({
+                                    ...theme.workflow.formElements.cellField,
+                                    ...casingTheme.dimInput,
+                                  })}
+                                />
+                              </Box>
                             </TableCell>
                             <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <CasingDeferredInput
-                                size="small"
-                                fullWidth
-                                type="number"
-                                placeholder={S.COL_AXIAL_LENGTH}
-                                value={row.looseFlap?.axialLength ?? ""}
-                                onChange={(value) => {
-                                  const next = [...form.dimensionalData];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    looseFlap: {
-                                      ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                      axialLength: value,
-                                    },
-                                  };
-                                  patch({ dimensionalData: next });
-                                }}
-                                error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.axialLength`])}
-                                sx={{
-                                  ...theme.workflow.formElements.cellField,
-                                  ...casingTheme.dimInput,
-                                }}
-                              />
+                              <Box data-rmc-field={`dimensionalData.${idx}.looseFlap.axialLength`}>
+                                <CasingDeferredInput
+                                  size="small"
+                                  fullWidth
+                                  type="number"
+                                  placeholder={S.COL_AXIAL_LENGTH}
+                                  value={row.looseFlap?.axialLength ?? ""}
+                                  onChange={(value) => {
+                                    const next = [...form.dimensionalData];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      looseFlap: {
+                                        ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
+                                        axialLength: value,
+                                      },
+                                    };
+                                    patch({ dimensionalData: next });
+                                  }}
+                                  error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.axialLength`])}
+                                  sx={casingWhiteInputSx({
+                                    ...theme.workflow.formElements.cellField,
+                                    ...casingTheme.dimInput,
+                                  })}
+                                />
+                              </Box>
                             </TableCell>
                           </>
                         ) : (
                           DIM_COLUMNS.map((col) => (
                             <TableCell key={col.key} sx={theme.workflow.formElements.tableCell}>
-                              <CasingDeferredInput
-                                size="small"
-                                fullWidth
-                                type="number"
-                                placeholder={col.label}
-                                value={row.readings[col.key]}
-                                onChange={(value) => {
-                                  const next = [...form.dimensionalData];
-                                  next[idx] = {
-                                    ...next[idx],
-                                    readings: { ...next[idx].readings, [col.key]: value },
-                                  };
-                                  patch({ dimensionalData: next });
-                                }}
-                                error={Boolean(validationErrors[`dimensionalData.${idx}.readings.${col.key}`])}
-                                sx={{
-                                  ...theme.workflow.formElements.cellField,
-                                  ...casingTheme.dimInput,
-                                }}
-                              />
+                              <Box data-rmc-field={`dimensionalData.${idx}.readings.${col.key}`}>
+                                <CasingDeferredInput
+                                  size="small"
+                                  fullWidth
+                                  type="number"
+                                  placeholder={col.label}
+                                  value={row.readings[col.key]}
+                                  onChange={(value) => {
+                                    const next = [...form.dimensionalData];
+                                    next[idx] = {
+                                      ...next[idx],
+                                      readings: { ...next[idx].readings, [col.key]: value },
+                                    };
+                                    patch({ dimensionalData: next });
+                                  }}
+                                  error={Boolean(validationErrors[`dimensionalData.${idx}.readings.${col.key}`])}
+                                  sx={casingWhiteInputSx({
+                                    ...theme.workflow.formElements.cellField,
+                                    ...casingTheme.dimInput,
+                                  })}
+                                />
+                              </Box>
                             </TableCell>
                           ))
                         )}

@@ -598,6 +598,7 @@ export const STRINGS = {
           required: "Certificate type is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
         },
+        validationFailedSnackbar: "Validation Error — Check mandatory fields or wrong input",
       },
       ADDUCT_PREPARATION: {
         SECTION_TITLE: "Adduct preparation details",
@@ -712,7 +713,8 @@ export const STRINGS = {
       FIELD_INVALID_ANALYZED_RESULT: "Analyze Result @ Source must be a valid number",
       FIELD_REQUIRED_CERTIFICATES: "Upload at least one certificate for this lot",
       CERTIFICATES_TITLE: "Certificates",
-      CERTIFICATES_SUBTITLE: "Upload PDF, images, or video. Multiple files allowed.",
+      CERTIFICATES_SUBTITLE:
+        "Upload PDF, images, MP3, or video (no zip, Excel, or Word). Multiple files allowed.",
       CERT_FILE_NAME: "File name",
       CERT_TYPE: "Certificate type",
       UPLOAD_CERTIFICATES: "Upload files",
@@ -725,7 +727,8 @@ export const STRINGS = {
       REUPLOAD_CERTIFICATE: "Retry upload",
       CERT_UPLOAD_PENDING:
         "Wait for file uploads to finish, or retry failed uploads, before saving or submitting.",
-      CERT_INVALID_FILE: "Invalid file type. Use PDF, images, or video only.",
+      CERT_INVALID_FILE:
+        "Invalid file type. Use PDF, images, MP3, or video only (no zip, Excel, or Word).",
       TABLE_HEADERS: {
         MATERIAL: "Material",
         LOT_ID: "Lot ID",
@@ -834,7 +837,8 @@ export const STRINGS = {
       CREATE_FAILED: "Failed to create rocket motor casing form.",
       UPDATE_FAILED: "Failed to update rocket motor casing form.",
       VALIDATION_FAILED: "Please fix the highlighted fields.",
-      DRAFT_VALIDATION_FAILED: "Cannot save draft. Fix the validation errors first.",
+      DRAFT_VALIDATION_FAILED:
+        "Select project name, motor stage, and motor ID before saving as draft.",
       SUBMIT_VALIDATION_FAILED: "Cannot submit. Fix the validation errors first.",
       FORM_ALREADY_EXISTS:
         "A casing form already exists for this batch. Please continue from existing form.",
@@ -893,7 +897,8 @@ export const STRINGS = {
         },
         itemsDimension: {
           required: "Rubber sheet dimension is required.",
-          invalid: "Rubber sheet dimension must be alphanumeric.",
+          invalid:
+            "Rubber sheet dimension may use letters, numbers, spaces, *, x, hyphens, underscores, or slashes only.",
         },
         itemsUnit: {
           required: "Rubber sheet unit is required.",
@@ -931,14 +936,32 @@ export const STRINGS = {
           required: "Rubber properties report no. is required.",
           invalid: "Rubber properties report no. must be alphanumeric.",
         },
-        mechanicalReported: { invalid: "Reported value must be numeric." },
+        mechanicalReported: {
+          required: "Reported value is required.",
+          invalid: "Reported value must be numeric.",
+          alphanumericInvalid:
+            "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          outOfRange: "Reported value must be within specification.",
+        },
         mechanicalAcemSpec: {
-          required: "Test Result @ ACEM is required and must be numeric.",
+          required: "Test Result @ ACEM is required.",
+          invalid: "Test Result @ ACEM must be numeric.",
+          alphanumericInvalid:
+            "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
           outOfRange: "Test Result @ ACEM must be within specification.",
         },
-        thermalReported: { invalid: "Reported value must be numeric." },
+        thermalReported: {
+          required: "Reported value is required.",
+          invalid: "Reported value must be numeric.",
+          alphanumericInvalid:
+            "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          outOfRange: "Reported value must be within specification.",
+        },
         thermalAcemSpec: {
+          required: "Test Result @ ACEM is required.",
           invalid: "Test Result @ ACEM must be numeric.",
+          alphanumericInvalid:
+            "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
           outOfRange: "Test Result @ ACEM must be within specification.",
         },
         postPptUtDate: {
@@ -973,7 +996,14 @@ export const STRINGS = {
           required: "Radiography Plan Name is required.",
           invalid: "Radiography Plan Name is invalid.",
         },
-        radiographyPlanRow: { invalid: "Value must be numeric." },
+        radiographyPlanRows: {
+          required: "At least one radiography plan row is required.",
+        },
+        radiographyPlanRow: {
+          required: "This field is required.",
+          invalid: "Value must be numeric.",
+          detectorRequired: "Type of Detector is required.",
+        },
         visualObservation: {
           required: "Visual observation is required.",
           invalid: "Visual observation must be alphanumeric.",
@@ -1011,8 +1041,8 @@ export const STRINGS = {
           invalid: "Mandrel Identification Number must be alphanumeric.",
         },
         mockTrialBottomCupId: {
-          required: "Bottom Cup Identification Number is required and must be numeric.",
-          invalid: "Bottom Cup Identification Number must be numeric.",
+          required: "Bottom Cup Identification Number is required.",
+          invalid: "Bottom Cup Identification Number must be alphanumeric.",
         },
         mockTrialNumber: {
           required: "Mock trial measurement is required and must be numeric.",
@@ -1324,6 +1354,8 @@ export const STRINGS = {
       FORM_OPENING_TITLE: "Opening Raw Material Preparation",
       FORM_OPENING_MESSAGE:
         "Loading batch details, materials, and form data. This will only take a moment…",
+      SELECT_AT_LEAST_ONE: "No materials are loaded for this premix. Check the identification sheet.",
+      MATERIAL_GRADE_REQUIRED: "Select a grade for every solid material that requires one.",
       SELECT_PREMIX_AND_PROCESS: "Select a premix and process to load the form",
       NO_PROCESS_SELECTED_TITLE: "No process selected",
       NO_PROCESS_SELECTED_SUBTITLE:
@@ -1331,7 +1363,6 @@ export const STRINGS = {
       TYPE_SELECTOR_LABEL: "Raw Material Type",
       TYPE_SELECTOR_NEW_HINT: "(select all that apply)",
       TYPE_SELECTOR_EDIT_HINT: "(locked to original selection)",
-      SELECT_AT_LEAST_ONE: "Select a premix and process to continue",
       LOCK_EXPLANATION: "Delete all sections inside a builder first to change process.",
       NO_TYPE_SELECTED_TITLE: "No process selected",
       NO_TYPE_SELECTED_SUBTITLE: "Select a premix and process above to load the form builder",
@@ -1473,8 +1504,7 @@ export const STRINGS = {
           required: "Premix date is required",
           invalid: "Enter a valid date",
         },
-        validationFailedSnackbar:
-          "Validation Error — Check mandatory fields or wrong input",
+        validationFailedSnackbar: "Validation Error — Check mandatory fields or wrong input",
         lotNumber: {
           required: "Lot number is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
@@ -3740,8 +3770,7 @@ export const STRINGS = {
       MOTOR_STAGE_FILTER_PLACEHOLDER: "All stages",
       DELETE_TOOLTIP: "Delete disabled motor stage",
       DELETE_DIALOG_TITLE: "Delete motor stage?",
-      DELETE_DIALOG_BODY: (name: string) =>
-        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_DIALOG_BODY: (name: string) => `Permanently delete "${name}"? This cannot be undone.`,
       DELETE_CONFIRM: "Delete",
       DELETING: "Deleting…",
     },
@@ -3779,8 +3808,7 @@ export const STRINGS = {
       PARAMETER_ROW_LABEL: (index: number) => `Parameter #${index}`,
       DELETE_TOOLTIP: "Delete disabled parameter",
       DELETE_DIALOG_TITLE: "Delete dimensional parameter?",
-      DELETE_DIALOG_BODY: (name: string) =>
-        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_DIALOG_BODY: (name: string) => `Permanently delete "${name}"? This cannot be undone.`,
       DELETE_CONFIRM: "Delete",
       DELETING: "Deleting…",
     },
@@ -3854,8 +3882,7 @@ export const STRINGS = {
       STEP_DURATION: "Duration (min)",
       DELETE_TOOLTIP: "Delete disabled curing cycle",
       DELETE_DIALOG_TITLE: "Delete curing cycle?",
-      DELETE_DIALOG_BODY: (name: string) =>
-        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_DIALOG_BODY: (name: string) => `Permanently delete "${name}"? This cannot be undone.`,
       DELETE_CONFIRM: "Delete",
       DELETING: "Deleting…",
     },

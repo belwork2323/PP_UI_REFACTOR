@@ -84,7 +84,17 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			analyzedField: {
 				width: "100%",
 				minWidth: 0,
-				"& .MuiOutlinedInput-root": { minHeight: 36, minWidth: 0 },
+				"& .MuiOutlinedInput-root": {
+					minHeight: 36,
+					minWidth: 0,
+					backgroundColor: "#fff",
+					background: "#fff",
+					"&.Mui-focused": { backgroundColor: "#fff", background: "#fff" },
+					"&:hover": { backgroundColor: "#fff", background: "#fff" },
+				},
+				"& .MuiInputBase-input": {
+					backgroundColor: "#fff",
+				},
 				"& input[type=number]": {
 					MozAppearance: "textfield",
 				},
@@ -95,6 +105,7 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			},
 			failedAnalyzedField: {
 				"& .MuiOutlinedInput-root": {
+					backgroundColor: alpha(palette.danger, 0.05),
 					background: alpha(palette.danger, 0.05),
 					"& fieldset": { borderColor: alpha(palette.danger, 0.45) },
 					"&:hover fieldset": { borderColor: palette.danger },
@@ -112,7 +123,17 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			remarksField: {
 				width: "100%",
 				minWidth: 0,
-				"& .MuiOutlinedInput-root": { minHeight: 36, minWidth: 0 },
+				"& .MuiOutlinedInput-root": {
+					minHeight: 36,
+					minWidth: 0,
+					backgroundColor: "#fff",
+					background: "#fff",
+					"&.Mui-focused": { backgroundColor: "#fff", background: "#fff" },
+					"&:hover": { backgroundColor: "#fff", background: "#fff" },
+				},
+				"& .MuiInputBase-input": {
+					backgroundColor: "#fff",
+				},
 			},
 			tableCellCompact: {
 				padding: "8px 10px",
@@ -274,14 +295,11 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			},
 			dataRow: (rowIndex: number, isFailed = false) => ({
 				"&:hover": {
-					background: isFailed ? alpha(palette.danger, 0.09) : alpha(palette.primaryLight, 0.03),
+					background: isFailed ? alpha(palette.danger, 0.09) : alpha(palette.primaryLight, 0.04),
 				},
 				"&:last-child td": { borderBottom: "none" },
-				background: isFailed
-					? alpha(palette.danger, 0.06)
-					: rowIndex % 2 === 0
-						? palette.surface
-						: alpha(palette.surface, 0.6),
+				// Always white so Analyze / ACEM inputs never inherit a grey row tint.
+				background: isFailed ? alpha(palette.danger, 0.06) : "#fff",
 				boxShadow: isFailed ? `inset 3px 0 0 ${palette.danger}` : "none",
 			}),
 		},

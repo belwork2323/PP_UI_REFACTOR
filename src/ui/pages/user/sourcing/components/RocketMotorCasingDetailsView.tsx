@@ -133,9 +133,8 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
   ];
 
   const defaultColumns = [
-    { label: "Section / Parameter" },
-    { label: "Details" },
-    { label: "Remarks" },
+    { key: "specification", label: "Section / Parameter" },
+    { key: "analysedResult", label: "Details" },
   ];
 
   return (
@@ -206,6 +205,16 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                 {blocks.length ? (
                   blocks.map((block, bi) => {
                     const columns = block._columns ?? defaultColumns;
+                    const showRemarks = columns.some(
+                      (col) => col.key === "remarks" || col.label === "Remarks",
+                    );
+                    const nestedTables = block.mockTrialTables?.length
+                      ? block.mockTrialTables
+                      : block.radiographyPlanTables?.length
+                        ? block.radiographyPlanTables
+                        : block.insulationSpecTables?.length
+                          ? block.insulationSpecTables
+                          : [];
                     const isLast = bi === blocks.length - 1;
                     return (
                       <Box key={`${block.material}-${bi}`} sx={dt.blockWrapper(isLast)}>
@@ -222,15 +231,18 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                         </Stack>
                         {block.dimensionalTable?.length ? (
                           <DimensionalInspectionDetailTable rows={block.dimensionalTable} dt={dt} />
-                        ) : block.mockTrialTables?.length || block.radiographyPlanTables?.length ? (
+                        ) : nestedTables.length ? (
                           <>
                             {block.rows.length > 0 ? (
                               <TableContainer sx={dt.tableContainer}>
                                 <Table size="small">
                                   <TableHead>
                                     <TableRow>
-                                      <TableCell sx={dt.tableHeaderCell(true)}>Field</TableCell>
-                                      <TableCell sx={dt.tableHeaderCell(false)}>Value</TableCell>
+                                      {columns.map((col, i) => (
+                                        <TableCell key={col.label} sx={dt.tableHeaderCell(i === 0)}>
+                                          {col.label}
+                                        </TableCell>
+                                      ))}
                                     </TableRow>
                                   </TableHead>
                                   <TableBody>
@@ -242,16 +254,22 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                         <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
                                           {renderResultCell(specRow)}
                                         </TableCell>
+                                        {showRemarks ? (
+                                          <TableCell sx={dt.tableCell}>
+                                            <Typography sx={dt.remarksText}>
+                                              {specRow.remarks?.trim() ? specRow.remarks : "—"}
+                                            </Typography>
+                                          </TableCell>
+                                        ) : null}
                                       </TableRow>
                                     ))}
                                   </TableBody>
                                 </Table>
                               </TableContainer>
                             ) : null}
-                            <MockTrialDetailTables
-                              tables={block.mockTrialTables ?? block.radiographyPlanTables ?? []}
-                              dt={dt}
-                            />
+                            <Box sx={block.rows.length ? dt.nestedTableGap : undefined}>
+                              <MockTrialDetailTables tables={nestedTables} dt={dt} />
+                            </Box>
                           </>
                         ) : (
                           <TableContainer sx={dt.tableContainer}>
@@ -274,11 +292,13 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                     <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
                                       {renderResultCell(specRow)}
                                     </TableCell>
-                                    <TableCell sx={dt.tableCell}>
-                                      <Typography sx={dt.remarksText}>
-                                        {specRow.remarks?.trim() ? specRow.remarks : "—"}
-                                      </Typography>
-                                    </TableCell>
+                                    {showRemarks ? (
+                                      <TableCell sx={dt.tableCell}>
+                                        <Typography sx={dt.remarksText}>
+                                          {specRow.remarks?.trim() ? specRow.remarks : "—"}
+                                        </Typography>
+                                      </TableCell>
+                                    ) : null}
                                   </TableRow>
                                 ))}
                               </TableBody>

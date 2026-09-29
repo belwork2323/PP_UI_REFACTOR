@@ -156,15 +156,17 @@ const MaterialFormGroupCard = ({
           theme={theme}
           required={false}
         >
-          <TextField
-            size="small"
-            fullWidth
-            variant="outlined"
-            value={group.supplyOrderNo}
-            onChange={(e) => onUpdateMaterial(materialIndex, { supplyOrderNo: e.target.value })}
-            error={Boolean(supplyOrderError)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
-          />
+          <Box data-rms-field={blockMetaPath(metaBlockIndex, "supplyOrderNo")}>
+            <TextField
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={group.supplyOrderNo}
+              onChange={(e) => onUpdateMaterial(materialIndex, { supplyOrderNo: e.target.value })}
+              error={Boolean(supplyOrderError)}
+              sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
+            />
+          </Box>
         </MandatoryFormField>
         <MandatoryFormField
           label={formStrings.RECEIPT_DATE_LABEL}
@@ -172,27 +174,31 @@ const MaterialFormGroupCard = ({
           theme={theme}
           required={false}
         >
-          <ReceiptDateField
-            value={group.receiptDate}
-            onChange={(next) => onUpdateMaterial(materialIndex, { receiptDate: next })}
-            theme={theme}
-            error={Boolean(receiptDateError)}
-          />
+          <Box data-rms-field={blockMetaPath(metaBlockIndex, "receiptDate")}>
+            <ReceiptDateField
+              value={group.receiptDate}
+              onChange={(next) => onUpdateMaterial(materialIndex, { receiptDate: next })}
+              theme={theme}
+              error={Boolean(receiptDateError)}
+            />
+          </Box>
         </MandatoryFormField>
         <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={manufacturerError} theme={theme}>
-          <TextField
-            size="small"
-            fullWidth
-            variant="outlined"
-            value={group.manufacturerName}
-            onChange={(e) => onUpdateMaterial(materialIndex, { manufacturerName: e.target.value })}
-            error={Boolean(manufacturerError)}
-            sx={mandatoryFieldInputSx(
-              theme.workflow.formElements.metaRowTextField,
-              Boolean(manufacturerError),
-              theme
-            )}
-          />
+          <Box data-rms-field={blockMetaPath(metaBlockIndex, "manufacturerName")}>
+            <TextField
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={group.manufacturerName}
+              onChange={(e) => onUpdateMaterial(materialIndex, { manufacturerName: e.target.value })}
+              error={Boolean(manufacturerError)}
+              sx={mandatoryFieldInputSx(
+                theme.workflow.formElements.metaRowTextField,
+                Boolean(manufacturerError),
+                theme
+              )}
+            />
+          </Box>
         </MandatoryFormField>
       </Stack>
 

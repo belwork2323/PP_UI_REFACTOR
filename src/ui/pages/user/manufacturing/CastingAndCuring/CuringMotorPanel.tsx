@@ -32,6 +32,35 @@ import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAst
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
+const joinDateTime = (date: string, time: string) => (date && time ? `${date} ${time}` : "");
+
+const splitDateTime = (value: string): { date: string; time: string } => {
+  const match = value.match(/^(\d{1,2}-\d{1,2}-\d{4})\s+(\d{1,2}:\d{2})$/);
+  return match ? { date: match[1], time: match[2] } : { date: "", time: "" };
+};
+
+const elapsedMinutes = (start: string, end: string): string => {
+  const parse = (value: string) => {
+    const match = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    const date = new Date(year, month - 1, day, hour, minute);
+    if (
+      date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day ||
+      date.getHours() !== hour || date.getMinutes() !== minute
+    ) return null;
+    return date.getTime();
+  };
+  const startMs = parse(start);
+  const endMs = parse(end);
+  if (startMs === null || endMs === null || endMs < startMs) return "";
+  return String(Math.floor((endMs - startMs) / 60_000));
+};
+
 type Props = {
   value: CuringMotorData;
   onChange: (next: CuringMotorData) => void;
@@ -138,10 +167,8 @@ const CYCLE_HEADERS = [
   "S.No",
   "Temperature (°C)",
   "Time (min)",
-  "Start Date",
-  "Start Time",
-  "End Date",
-  "End Time",
+  "Start Date & Time",
+  "End Date & Time",
 ] as const;
 
 const CuringMotorPanel = ({
@@ -188,6 +215,8 @@ const CuringMotorPanel = ({
     ...CYCLE_HEADERS,
     "Propellant Pressure (bar)",
     "Status Of Hot Water Circulation",
+    "Duration (min)",
+    "Remarks",
   ];
   return (
     <Box>
@@ -200,7 +229,11 @@ const CuringMotorPanel = ({
                   <TableCell key={label} sx={castingCuringTableHeaderCellSx(idx === 0)}>
                     <FieldLabelWithAsterisk
                       label={label}
-                      required={label !== "Propellant Pressure (bar)" && label !== "S.No"}
+                      required={
+                        label !== "Propellant Pressure (bar)" &&
+                        label !== "S.No" &&
+                        label !== "Remarks"
+                      }
                       sx={castingCuringTableHeaderCellSx(idx === 0)}
                     />
                   </TableCell>
@@ -218,6 +251,12 @@ const CuringMotorPanel = ({
                 const endTimePath = `CURING_CYCLES.CURING_TABLE.${index}.END_TIME`;
                 const pressurePath = `CURING_CYCLES.CURING_TABLE.${index}.PROPELLANT_PRESSURE`;
                 const waterStatusPath = `CURING_CYCLES.CURING_TABLE.${index}.HOT_WATER_STATUS`;
+                const startError =
+                  validationErrors?.[startDatePath] || validationErrors?.[startTimePath];
+                const endError = validationErrors?.[endDatePath] || validationErrors?.[endTimePath];
+                const startDateTime = joinDateTime(row.START_DATE, row.START_TIME);
+                const endDateTime = joinDateTime(row.END_DATE, row.END_TIME);
+                const duration = elapsedMinutes(startDateTime, endDateTime);
 
                 return (
                   <TableRow key={`cycle-${row.srNo || index}`} sx={castingCuringTableRowSx(index)}>
@@ -255,59 +294,35 @@ const CuringMotorPanel = ({
                       />
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
-                      <CompactDate
-                        value={row.START_DATE}
+                      <CompactDateTime
+                        value={startDateTime}
                         onChange={(v) => {
                           clearFieldError?.(startDatePath);
-                          updateCycleRow(index, { START_DATE: v });
-                        }}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        required
-                        error={Boolean(validationErrors?.[startDatePath])}
-                        helperText={validationErrors?.[startDatePath]}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.START_TIME}
-                        onChange={(v) => {
                           clearFieldError?.(startTimePath);
-                          updateCycleRow(index, { START_TIME: v });
+                          const parts = splitDateTime(v);
+                          updateCycleRow(index, { START_DATE: parts.date, START_TIME: parts.time });
                         }}
                         disabled={disabled}
                         readOnly={readOnly}
                         required
-                        error={Boolean(validationErrors?.[startTimePath])}
-                        helperText={validationErrors?.[startTimePath]}
+                        error={Boolean(startError)}
+                        helperText={startError}
                       />
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
-                      <CompactDate
-                        value={row.END_DATE}
+                      <CompactDateTime
+                        value={endDateTime}
                         onChange={(v) => {
                           clearFieldError?.(endDatePath);
-                          updateCycleRow(index, { END_DATE: v });
-                        }}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        required
-                        error={Boolean(validationErrors?.[endDatePath])}
-                        helperText={validationErrors?.[endDatePath]}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.END_TIME}
-                        onChange={(v) => {
                           clearFieldError?.(endTimePath);
-                          updateCycleRow(index, { END_TIME: v });
+                          const parts = splitDateTime(v);
+                          updateCycleRow(index, { END_DATE: parts.date, END_TIME: parts.time });
                         }}
                         disabled={disabled}
                         readOnly={readOnly}
                         required
-                        error={Boolean(validationErrors?.[endTimePath])}
-                        helperText={validationErrors?.[endTimePath]}
+                        error={Boolean(endError)}
+                        helperText={endError}
                       />
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
@@ -337,6 +352,19 @@ const CuringMotorPanel = ({
                         required
                         error={Boolean(validationErrors?.[waterStatusPath])}
                         helperText={validationErrors?.[waterStatusPath]}
+                      />
+                    </TableCell>
+                    <TableCell sx={castingCuringTableCellSx}>
+                      <TableTextInput value={duration} readOnly disabled type="number" />
+                    </TableCell>
+                    <TableCell sx={castingCuringTableCellSx}>
+                      <TableTextInput
+                        value={row.REMARKS}
+                        onChange={(v) => updateCycleRow(index, { REMARKS: v })}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                        multiline
+                        minRows={1}
                       />
                     </TableCell>
                   </TableRow>

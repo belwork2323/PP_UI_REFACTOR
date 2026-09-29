@@ -34,7 +34,7 @@ import type { SystemMasterOption } from "@data/api/common/generalAPI";
 import DateField from "@ui/components/common/DateField";
 import { formatToUiDate } from "@utils/dateUtils";
 import { appDenseControlSx } from "@ui/components/common/fieldStyles";
-import MultiSelect from "@/ui/components/common/MultiSelectCheckbox";
+import MultiSelectWithSearch from "@/ui/components/common/MultiSelectCheckbox";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
@@ -855,7 +855,7 @@ export default function BatchImplementationForm({
                                   sx={[appDenseControlSx, materialsTable?.lotControl]}
                                 /> */}
                                 {/* {console.log(lotOptionsForRow)} */}
-                                <MultiSelect
+                                <MultiSelectWithSearch
                                   value={currentMaterialLotIds ?? []}
                                   onChange={(value) => handleLotIdChange(idx, value)}
                                   disabled={

@@ -113,7 +113,7 @@ const ReportRowFiles = ({
 
   return (
     <>
-      <Stack spacing={0.75} sx={validationErrors[entry.key] ? { border: "1px solid", borderColor: "error.main", borderRadius: 1.5, p: 0.75 } : undefined}>
+      <Stack spacing={0.75} data-rmc-field={entry.key} sx={validationErrors[entry.key] ? { border: "1px solid", borderColor: "error.main", borderRadius: 1.5, p: 0.75 } : undefined}>
         {files.length === 0 ? (
           <Typography sx={{ fontSize: "0.75rem", color: alpha(colors.textSub, 0.85) }}>
             {S.UPLOAD_REPORT_EMPTY}

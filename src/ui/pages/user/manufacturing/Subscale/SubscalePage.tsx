@@ -59,8 +59,7 @@ const SubscalePage = () => {
     intent: "draft" | "submit",
   ) => {
     const firstError = firstSubscaleValidationError(errors);
-    const base =
-      intent === "draft" ? S.DRAFT_VALIDATION_FAILED : S.SUBMIT_VALIDATION_FAILED;
+    const base = intent === "draft" ? S.DRAFT_VALIDATION_FAILED : S.SUBMIT_VALIDATION_FAILED;
     showValidationAlert(firstError ? `${base} (${firstError})` : base);
   };
 
@@ -143,6 +142,7 @@ const SubscalePage = () => {
               onBack={handleBack}
               theme={theme}
             />
+            {console.log(formData)}
             <SubscaleForm
               batch={activeBatch}
               formData={formData}

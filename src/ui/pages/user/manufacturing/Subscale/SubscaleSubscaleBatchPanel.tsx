@@ -56,6 +56,7 @@ import { generalController } from "@/controllers/admin/common/generalController"
 import { operationsController } from "@/controllers/user/operationsController";
 import { isSubscaleProcessingBatch } from "@/hooks/user/manufacturing/subscaleHardwareConfig";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import mixingController from "@/controllers/user/manufacturing/mixingController";
 
 type MotorStageOption = {
   motorStage: string;
@@ -173,6 +174,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   clearFieldError,
 }) => {
   const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
+  console.log(values);
+
   const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
   const mixingCycles = useMemo(
     () => normalizeSubscaleMixingCycles(mixingCyclesRaw),
@@ -226,13 +229,44 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
     const nextBatchSize = String(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ?? "").trim();
     const nextMixerType = String(values.mixerType ?? "").trim();
+    const stage = String(batchDetails?.motorStage);
 
     patchValues({
       [SUBSCALE_BATCH_FIELDS.BATCH_SIZE]: nextBatchSize || batchSize || "",
       mixerType: nextMixerType || mixerType || "",
+      mootrStage: stage || "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchDetails]);
+
+  useEffect(() => {
+    if (isExperimental) return;
+
+    // If mixing cycles already have items, do nothing
+    if (mixingCycles.length > 0 && (mixingCycles[0].stage || mixingCycles[0].mixingCycleCode)) {
+      return;
+    }
+
+    const defaultStage = String(
+      batchDetails?.motorStage ?? batchDetails?.mixingCycle?.motorStage ?? "",
+    ).trim();
+    const defaultCycleCode = String(batchDetails?.mixingCycle?.mixingCycleCode ?? "").trim();
+    const defaultCycleName = String(batchDetails?.mixingCycle?.mixingCycleName ?? "").trim();
+
+    if (defaultStage || defaultCycleCode) {
+      updateMixingCycles([
+        {
+          _key: "default-qualification-cycle",
+          stage: defaultStage,
+          mixingCycleCode: defaultCycleCode,
+          mixingCycleName: defaultCycleName,
+          premixParticulars: [],
+          finalMixParticulars: [],
+          processParticulars: [],
+        },
+      ]);
+    }
+  }, [isExperimental, batchDetails, mixingCycles.length, updateMixingCycles]);
 
   // Load motor stages for Experimental dropdowns (once batchDetails is available)
   useEffect(() => {
@@ -268,12 +302,19 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       const stage = String(motorStage ?? "").trim();
       if (!stage) return;
 
+      // already loaded or in-flight
       if (mixingCycleOptionsByStage[stage]?.length || mixingCyclesLoadingByStage[stage]) return;
 
       setMixingCyclesLoadingByStage((prev) => ({ ...prev, [stage]: true }));
       try {
-        const list = await fetchMixingCyclesForStageDeduped(stage);
+        const projectId = String(
+          batchDetails?.projectId ?? batchDetails?.project?.projectId ?? "",
+        ).trim();
+        const resp = await mixingController.fetchMixingCycle(projectId || undefined, stage);
+        const list = Array.isArray(resp?.data) ? resp.data : Array.isArray(resp) ? resp : [];
         setMixingCycleOptionsByStage((prev) => ({ ...prev, [stage]: list }));
+        // optional: also keep the module-level cache in sync
+        mixingCyclesByStageCache.set(stage, list);
       } catch (error) {
         console.error("Failed to fetch mixing cycles:", error);
         setMixingCycleOptionsByStage((prev) => ({ ...prev, [stage]: [] }));
@@ -281,31 +322,34 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
         setMixingCyclesLoadingByStage((prev) => ({ ...prev, [stage]: false }));
       }
     },
-    [mixingCycleOptionsByStage, mixingCyclesLoadingByStage],
+    // remove the two state objects from deps – they cause unnecessary recreations
+    [batchDetails?.projectId, batchDetails?.project?.projectId],
   );
 
   // Prefetch mixing cycles for stages already selected on Experimental cycles
   useEffect(() => {
-    if (!isExperimental) return;
-    const stages = Array.from(
-      new Set(mixingCycles.map((cycle) => String(cycle.stage ?? "").trim()).filter(Boolean)),
-    );
-    stages.forEach((stage) => {
-      if (mixingCycleOptionsByStage[stage]?.length || mixingCyclesLoadingByStage[stage]) return;
+    if (isExperimental) return;
 
-      const cached = mixingCyclesByStageCache.get(stage);
-      if (cached) {
-        setMixingCycleOptionsByStage((prev) =>
-          prev[stage]?.length ? prev : { ...prev, [stage]: cached },
-        );
-        return;
-      }
+    const stage = String(
+      mixingCycles[0]?.stage ?? batchDetails?.mixingCycle?.motorStage ?? "",
+    ).trim();
 
-      void fetchMixingCyclesForStage(stage);
-    });
+    if (!stage) return;
+    if (mixingCycleOptionsByStage[stage]?.length || mixingCyclesLoadingByStage[stage]) return;
+
+    const cached = mixingCyclesByStageCache.get(stage);
+    if (cached) {
+      setMixingCycleOptionsByStage((prev) =>
+        prev[stage]?.length ? prev : { ...prev, [stage]: cached },
+      );
+      return;
+    }
+
+    void fetchMixingCyclesForStage(stage);
   }, [
     isExperimental,
-    mixingCycles,
+    mixingCycles[0]?.stage,
+    batchDetails?.mixingCycle?.motorStage,
     mixingCycleOptionsByStage,
     mixingCyclesLoadingByStage,
     fetchMixingCyclesForStage,
@@ -740,6 +784,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
           <Stack spacing={2}>
             {mixingCycles.map((cycle, cycleIndex) => {
+              console.log(mixingCycles);
+
               const stage = String(cycle.stage ?? "").trim();
               const cycleOptions = mixingCycleOptionsByStage[stage] ?? [];
               const cyclesLoading = Boolean(mixingCyclesLoadingByStage[stage]);
@@ -870,22 +916,53 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                           <FormInput
                             disabled
                             label={<FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />}
-                            value={
-                              cycle.stage ? `Motor Stage ${cycle.stage}` : qualificationStageLabel
-                            }
+                            value={`stage ${batchDetails?.motorStage}`}
                             sx={{ flex: 1 }}
                           />
                           <FormInput
-                            disabled
+                            select
                             label={
                               <FieldLabelWithAsterisk
                                 label={S.MIXING_CYCLE_SELECT_LABEL}
                                 required
                               />
                             }
-                            value={formatMixingCycleLabel(cycle) || qualificationCycleLabel}
+                            value={cycle.mixingCycleCode ?? ""}
+                            onChange={(event) => {
+                              handleMixingCycleChange(cycleIndex, event.target.value);
+                              clearFieldError?.(
+                                `SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`,
+                              );
+                            }}
+                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
                             sx={{ flex: 1 }}
-                          />
+                            disabled={!stage || cyclesLoading || cycleOptions.length === 0}
+                            helperText={
+                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`] || ""
+                            }
+                          >
+                            <MenuItem value="">
+                              <em
+                                style={
+                                  {
+                                    ...appDropdownPlaceholderSx,
+                                    fontStyle: "normal",
+                                  } as CSSProperties
+                                }
+                              >
+                                {mixingCyclePlaceholder}
+                              </em>
+                            </MenuItem>
+                            {cycleOptions.map((option) => (
+                              <MenuItem
+                                key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
+                                value={option.mixingCycleCode}
+                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                              >
+                                {formatMixingCycleLabel(option)}
+                              </MenuItem>
+                            ))}
+                          </FormInput>
                         </>
                       )}
                     </Stack>

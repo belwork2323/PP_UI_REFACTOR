@@ -18,7 +18,6 @@ import { fileUtils } from "../../../../../utils/FileUtils";
 import CertificateFileInput from "./CertificateFileInput";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
-import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -60,6 +59,7 @@ type CertificateUploadSectionProps = {
       formElements: {
         fieldLabel: object;
         textField: object;
+        cellField?: object;
       };
     };
   };
@@ -69,6 +69,8 @@ type CertificateUploadSectionProps = {
   onRetry?: (certIndex: number) => void;
   onOpen?: (certIndex: number) => void;
   error?: string;
+  certificatesFieldPath?: string;
+  certificateTypeFieldPath?: (certIndex: number) => string;
   certificateTypeError?: (certIndex: number) => string | undefined;
 };
 
@@ -89,27 +91,33 @@ const CertificateUploadSection = ({
   onRetry,
   onOpen,
   error,
+  certificatesFieldPath,
+  certificateTypeFieldPath,
   certificateTypeError,
 }: CertificateUploadSectionProps) => {
   const certFileInputId = useId();
   const primaryLight = theme.palette.primaryLight ?? "#2E86C1";
   const hasCerts = certificates.length > 0;
   const sectionErrorSx = {
-    fontSize: "0.85rem",
+    fontSize: "0.6rem",
     fontWeight: 500,
     color: theme.palette.danger,
-    mt: 0.5,
-    lineHeight: 1.45,
+    mt: 0.35,
+    lineHeight: 1.35,
   };
 
   const uploadBtnSx = {
     textTransform: "none" as const,
-    fontWeight: 700,
+    fontWeight: 600,
+    fontSize: "0.68rem",
     flexShrink: 0,
-    borderRadius: 2,
+    borderRadius: 1,
     borderColor: primaryLight,
     color: primaryLight,
     cursor: "pointer",
+    py: 0.25,
+    px: 1,
+    minHeight: 28,
     "&:hover": { background: alpha(primaryLight, 0.06) },
   };
 
@@ -118,16 +126,17 @@ const CertificateUploadSection = ({
     flexDirection: "column" as const,
     alignItems: "center",
     justifyContent: "center",
-    border: `2px dashed ${alpha(primaryLight, 0.35)}`,
-    borderRadius: 2,
-    py: 3,
-    px: 2,
+    border: `1.5px dashed ${alpha(primaryLight, 0.35)}`,
+    borderRadius: 1,
+    py: 1.5,
+    px: 1.5,
     textAlign: "center" as const,
     cursor: "pointer",
     transition: "all 0.18s",
+    background: "#fff",
     "&:hover": {
       borderColor: alpha(primaryLight, 0.65),
-      background: alpha(primaryLight, 0.04),
+      background: alpha(primaryLight, 0.03),
     },
   };
 
@@ -135,57 +144,78 @@ const CertificateUploadSection = ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 1,
-    px: 1.5,
-    py: 1.1,
-    borderRadius: 2,
+    gap: 0.5,
+    px: 1,
+    py: 0.65,
+    borderRadius: 1,
     cursor: "pointer",
     border: `1.5px dashed ${alpha(primaryLight, 0.35)}`,
     transition: "all 0.18s",
+    background: "#fff",
     "&:hover": {
       borderColor: alpha(primaryLight, 0.65),
-      background: alpha(primaryLight, 0.04),
+      background: alpha(primaryLight, 0.03),
     },
   };
 
   const certCardSx = {
-    px: 1.5,
-    py: 1.25,
-    borderRadius: 2,
-    background: alpha(theme.palette.surface ?? "#fff", theme.palette.mode === "dark" ? 0.35 : 1),
-    border: `1px solid ${alpha(theme.palette.border ?? "#ccc", 0.55)}`,
-    transition: "border-color 0.15s",
-    "&:hover": { borderColor: alpha(primaryLight, 0.45) },
+    px: 1,
+    py: 0.75,
+    borderRadius: 1,
+    background: "#fff",
+    border: `1px solid ${alpha(theme.palette.border ?? "#ccc", 0.85)}`,
+  };
+
+  const certTypeFieldSx = {
+    ...(theme.workflow.formElements.cellField ?? theme.workflow.formElements.textField),
+    "& .MuiOutlinedInput-root": {
+      backgroundColor: "#fff",
+      background: "#fff",
+      minHeight: 32,
+      borderRadius: 1,
+      fontSize: "0.72rem",
+      "&.Mui-focused": { backgroundColor: "#fff", background: "#fff" },
+    },
+    "& .MuiInputBase-input": {
+      fontSize: "0.72rem",
+      fontWeight: 500,
+      padding: "4px 8px",
+      backgroundColor: "#fff",
+    },
   };
 
   return (
     <Box
       sx={{
-        px: 2,
-        py: 1.5,
+        px: 1.5,
+        py: 1,
         borderTop: `1px solid ${alpha(theme.palette.border ?? "#ccc", 0.5)}`,
-        background: alpha(theme.palette.primary ?? "#1B4F72", 0.02),
       }}
     >
       <CertificateFileInput id={certFileInputId} onChange={onFilesSelected} />
 
+      <Box data-rms-field={certificatesFieldPath}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         alignItems={{ sm: "center" }}
         justifyContent="space-between"
-        gap={1}
-        sx={{ mb: hasCerts ? 1.25 : 1.5 }}
+        gap={0.75}
+        sx={{ mb: hasCerts ? 0.85 : 1 }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: 0.5 }}>
-            <FieldLabelWithAsterisk label={formStrings.CERTIFICATES_TITLE} required />
+          <Typography sx={theme.workflow.formElements.fieldLabel}>
+            {formStrings.CERTIFICATES_TITLE}
+            <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+              {" "}
+              *
+            </Box>
           </Typography>
           <Typography
             sx={{
               fontSize: "0.72rem",
               color: theme.palette.textSub,
-              lineHeight: 1.45,
-              maxWidth: 520,
+              lineHeight: 1.4,
+              maxWidth: 480,
             }}
           >
             {formStrings.CERTIFICATES_SUBTITLE}
@@ -198,7 +228,7 @@ const CertificateUploadSection = ({
             htmlFor={certFileInputId}
             variant="outlined"
             size="small"
-            startIcon={<UploadFileRoundedIcon sx={{ fontSize: "17px !important" }} />}
+            startIcon={<UploadFileRoundedIcon sx={{ fontSize: "14px !important" }} />}
             sx={uploadBtnSx}
           >
             {formStrings.UPLOAD_CERTIFICATES}
@@ -208,22 +238,22 @@ const CertificateUploadSection = ({
 
       {!hasCerts ? (
         <Box component="label" htmlFor={certFileInputId} sx={dropZoneSx}>
-          <UploadFileRoundedIcon sx={{ fontSize: 32, color: alpha(primaryLight, 0.45), mb: 1 }} />
-          <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: theme.palette.textSub }}>
+          <UploadFileRoundedIcon sx={{ fontSize: 22, color: alpha(primaryLight, 0.45), mb: 0.5 }} />
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 600, color: theme.palette.textSub }}>
             {formStrings.UPLOAD_CERTIFICATES}
           </Typography>
           <Typography
             sx={{
-              fontSize: "0.7rem",
+              fontSize: "0.72rem",
               color: alpha(theme.palette.textSub ?? "#5D6D7E", 0.85),
-              mt: 0.5,
+              mt: 0.25,
             }}
           >
             {formStrings.CERTIFICATES_SUBTITLE}
           </Typography>
         </Box>
       ) : (
-        <Stack spacing={1}>
+        <Stack spacing={0.65}>
           {certificates.map((cert, ci) => {
             const typeError = certificateTypeError?.(ci);
             return (
@@ -233,43 +263,44 @@ const CertificateUploadSection = ({
               >
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
-                  spacing={1.25}
-                  alignItems={{ sm: "flex-start" }}
+                  spacing={0.85}
+                  alignItems={{ sm: "center" }}
                 >
                   <Stack
                     direction="row"
-                    spacing={1.25}
-                    alignItems="flex-start"
+                    spacing={0.75}
+                    alignItems="center"
                     sx={{ flex: 1, minWidth: 0 }}
                   >
                     <Box
                       sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 1.5,
+                        width: 26,
+                        height: 26,
+                        borderRadius: 0.75,
                         flexShrink: 0,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: alpha(primaryLight, 0.1),
-                        border: `1px solid ${alpha(primaryLight, 0.2)}`,
+                        background: alpha(primaryLight, 0.08),
+                        border: `1px solid ${alpha(primaryLight, 0.18)}`,
                       }}
                     >
                       {cert.status === "uploading" ? (
-                        <UploadFileRoundedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                        <UploadFileRoundedIcon sx={{ fontSize: 15, color: primaryLight }} />
                       ) : (
-                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 15, color: primaryLight }} />
                       )}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         sx={{
-                          fontSize: "0.82rem",
-                          fontWeight: 700,
+                          fontSize: "0.72rem",
+                          fontWeight: 500,
                           color: theme.palette.text,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
+                          lineHeight: 1.3,
                         }}
                       >
                         {cert.fileName || formStrings.CERT_FILE_NAME}
@@ -277,20 +308,21 @@ const CertificateUploadSection = ({
                       <Stack
                         direction="row"
                         alignItems="center"
-                        gap={0.75}
+                        gap={0.5}
                         flexWrap="wrap"
-                        sx={{ mt: 0.75 }}
+                        sx={{ mt: 0.25 }}
                       >
                         <Chip
                           label={fileExtensionLabel(cert.fileName || "file")}
                           size="small"
                           sx={{
-                            height: 20,
-                            fontSize: "0.6rem",
+                            height: 16,
+                            fontSize: "0.55rem",
                             fontWeight: 700,
                             background: alpha(primaryLight, 0.1),
                             color: primaryLight,
                             border: `1px solid ${alpha(primaryLight, 0.22)}`,
+                            "& .MuiChip-label": { px: 0.6 },
                           }}
                         />
                         {cert.status === "failed" ? (
@@ -298,10 +330,11 @@ const CertificateUploadSection = ({
                             label={formStrings.STATUS_FAILED}
                             size="small"
                             sx={{
-                              height: 20,
-                              fontSize: "0.6rem",
+                              height: 16,
+                              fontSize: "0.55rem",
                               fontWeight: 700,
                               color: theme.palette.danger,
+                              "& .MuiChip-label": { px: 0.6 },
                             }}
                           />
                         ) : null}
@@ -311,11 +344,11 @@ const CertificateUploadSection = ({
                             type="button"
                             onClick={() => onOpen(ci)}
                             sx={{
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
+                              fontSize: "0.62rem",
+                              fontWeight: 600,
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: 0.25,
+                              gap: 0.2,
                               cursor: "pointer",
                               color: primaryLight,
                             }}
@@ -323,7 +356,7 @@ const CertificateUploadSection = ({
                             {fileUtils.getFileKind(cert.fileName) === "video"
                               ? "Download"
                               : formStrings.OPEN_CERT_LINK}
-                            <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                            <OpenInNewRoundedIcon sx={{ fontSize: 11 }} />
                           </Link>
                         ) : fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
                           <Link
@@ -331,42 +364,42 @@ const CertificateUploadSection = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             sx={{
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
+                              fontSize: "0.62rem",
+                              fontWeight: 600,
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: 0.25,
+                              gap: 0.2,
                               color: primaryLight,
                             }}
                           >
                             {formStrings.OPEN_CERT_LINK}
-                            <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                            <OpenInNewRoundedIcon sx={{ fontSize: 11 }} />
                           </Link>
                         ) : null}
                       </Stack>
                       {cert.status === "uploading" ? (
-                        <Box sx={{ mt: 0.85 }}>
-                          <Stack direction="row" alignItems="center" spacing={1}>
+                        <Box sx={{ mt: 0.5 }}>
+                          <Stack direction="row" alignItems="center" spacing={0.75}>
                             <LinearProgress
                               variant="determinate"
                               value={cert.uploadProgress ?? 0}
                               sx={{
                                 flex: 1,
-                                height: 6,
-                                borderRadius: 3,
+                                height: 4,
+                                borderRadius: 2,
                                 bgcolor: alpha(primaryLight, 0.12),
                                 "& .MuiLinearProgress-bar": {
-                                  borderRadius: 3,
+                                  borderRadius: 2,
                                   bgcolor: primaryLight,
                                 },
                               }}
                             />
                             <Typography
                               sx={{
-                                fontSize: "0.7rem",
+                                fontSize: "0.62rem",
                                 fontWeight: 700,
                                 color: primaryLight,
-                                minWidth: 34,
+                                minWidth: 28,
                                 textAlign: "right",
                               }}
                             >
@@ -374,7 +407,7 @@ const CertificateUploadSection = ({
                             </Typography>
                           </Stack>
                           <Typography
-                            sx={{ fontSize: "0.68rem", color: theme.palette.textSub, mt: 0.35 }}
+                            sx={{ fontSize: "0.58rem", color: theme.palette.textSub, mt: 0.2 }}
                           >
                             {formStrings.UPLOADING}
                           </Typography>
@@ -383,9 +416,16 @@ const CertificateUploadSection = ({
                     </Box>
                   </Stack>
 
-                  <Box sx={{ width: { xs: "100%", sm: 200 }, flexShrink: 0 }}>
-                    <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: "4px" }}>
-                      <FieldLabelWithAsterisk label={formStrings.CERT_TYPE} required />
+                  <Box
+                    sx={{ width: { xs: "100%", sm: 160 }, flexShrink: 0 }}
+                    data-rms-field={certificateTypeFieldPath?.(ci)}
+                  >
+                    <Typography sx={theme.workflow.formElements.fieldLabel}>
+                      {formStrings.CERT_TYPE}
+                      <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+                        {" "}
+                        *
+                      </Box>
                     </Typography>
                     <TextField
                       size="small"
@@ -394,16 +434,12 @@ const CertificateUploadSection = ({
                       onChange={(e) => onCertChange(ci, "certificateType", e.target.value)}
                       placeholder={formStrings.CERT_TYPE}
                       error={Boolean(typeError)}
-                      sx={mandatoryFieldInputSx(
-                        theme.workflow.formElements.textField,
-                        Boolean(typeError),
-                        theme,
-                      )}
+                      sx={mandatoryFieldInputSx(certTypeFieldSx, Boolean(typeError), theme)}
                     />
                     {typeError ? (
                       <FormHelperText
                         error
-                        sx={{ mx: 0, mt: 0.5, fontSize: "0.85rem", fontWeight: 500 }}
+                        sx={{ mx: 0, mt: 0.25, fontSize: "0.6rem", fontWeight: 500 }}
                       >
                         {typeError}
                       </FormHelperText>
@@ -419,6 +455,7 @@ const CertificateUploadSection = ({
                         sx={{
                           alignSelf: { xs: "flex-end", sm: "center" },
                           flexShrink: 0,
+                          p: 0.5,
                           color: theme.palette.textSub,
                           "&:hover": {
                             color: theme.palette.danger,
@@ -426,7 +463,7 @@ const CertificateUploadSection = ({
                           },
                         }}
                       >
-                        <DeleteOutlineRoundedIcon fontSize="small" />
+                        <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     </span>
                   </Tooltip>
@@ -438,10 +475,11 @@ const CertificateUploadSection = ({
                         sx={{
                           alignSelf: { xs: "flex-end", sm: "center" },
                           flexShrink: 0,
+                          p: 0.5,
                           color: primaryLight,
                         }}
                       >
-                        <RefreshRoundedIcon fontSize="small" />
+                        <RefreshRoundedIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     </Tooltip>
                   ) : null}
@@ -451,13 +489,14 @@ const CertificateUploadSection = ({
           })}
 
           <Box component="label" htmlFor={certFileInputId} sx={addMoreSx}>
-            <UploadFileRoundedIcon sx={{ fontSize: 17, color: alpha(primaryLight, 0.75) }} />
-            <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: primaryLight }}>
+            <UploadFileRoundedIcon sx={{ fontSize: 14, color: alpha(primaryLight, 0.75) }} />
+            <Typography sx={{ fontSize: "0.68rem", fontWeight: 600, color: primaryLight }}>
               {formStrings.ADD_MORE_CERTIFICATES}
             </Typography>
           </Box>
         </Stack>
       )}
+      </Box>
     </Box>
   );
 };

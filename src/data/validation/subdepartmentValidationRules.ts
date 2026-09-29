@@ -31,6 +31,7 @@ export const ROCKET_MOTOR_CASING_VALIDATION_RULES = {
   insulationReportNo: { required: true, valueType: "text" as const, pattern: /^[A-Za-z0-9][A-Za-z0-9 /-]*$/ },
   visualObservation: { required: true, valueType: "text" as const },
   weightWithoutHarness: { required: true, valueType: "number" as const },
+  weightWithHarness: { required: true, valueType: "number" as const },
   weighscaleEquipment: { required: true, valueType: "text" as const },
   calibrationDueDate: { required: true, valueType: "date" as const },
   dimension: { required: true, valueType: "number" as const },

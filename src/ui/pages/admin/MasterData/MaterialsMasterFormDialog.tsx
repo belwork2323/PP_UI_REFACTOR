@@ -538,15 +538,12 @@ const MaterialsMasterFormDialog = ({
                 value={form.materialType}
                 placeholder="Select type"
                 options={MATERIAL_TYPE_OPTIONS}
-                disabled={saving}
+                disabled={saving || isEdit}
                 required
                 width={160}
                 theme={fieldTheme}
                 onChange={(value) => {
                   const materialType = value as "SOLID" | "LIQUID";
-                  if (isEdit && !isRmpFormTemplateAllowed(form.rmpFormTemplate, materialType)) {
-                    return;
-                  }
                   const rmpFormTemplate = isRmpFormTemplateAllowed(
                     form.rmpFormTemplate,
                     materialType,

@@ -1,5 +1,7 @@
 export const ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/;
 export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
+/** Rubber sheet dimension — allows size products like 20*20 / 20x20. */
+export const DIMENSION_ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /*xX_-]*$/;
 
 export type FieldValueType = "text" | "date" | "datetime" | "number" | "file" | "datetime";
 

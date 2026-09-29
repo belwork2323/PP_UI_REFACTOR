@@ -6,6 +6,12 @@ const RMS_CERTIFICATE_EXTENSIONS = [
   ".webp",
   ".gif",
   ".bmp",
+  ".tif",
+  ".tiff",
+  ".heic",
+  ".heif",
+  ".svg",
+  ".mp3",
   ".mp4",
   ".webm",
   ".mov",
@@ -21,7 +27,7 @@ const RMS_CERTIFICATE_EXTENSIONS = [
 export const FILE_PICKER_ACCEPT = {
   IMAGE: ".jpg,.jpeg,.png,.webp,.gif,.bmp",
   IMAGE_VIDEO: ".jpg,.jpeg,.png,.webp,.gif,.bmp,.mp4,.webm,.mov",
-  IMAGE_VIDEO_PDF: ".jpg,.jpeg,.png,.webp,.gif,.bmp,.mp4,.webm,.mov,.pdf",
+  IMAGE_VIDEO_PDF: ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.svg,.mp3,.mp4,.webm,.mov,.pdf",
   IMAGE_PDF: ".jpg,.jpeg,.png,.webp,.pdf",
   PDF: ".pdf",
 } as const;
@@ -62,6 +68,12 @@ export const fileUtils = {
       "image/webp",
       "image/gif",
       "image/bmp",
+      "image/tiff",
+      "image/heic",
+      "image/heif",
+      "image/svg+xml",
+      "audio/mpeg",
+      "audio/mp3",
       "video/mp4",
       "video/webm",
       "video/quicktime",
@@ -138,8 +150,14 @@ export const fileUtils = {
     }
     if (mime === "application/pdf" || ext === "pdf") return "pdf";
     if (
+      mime.startsWith("audio/") ||
+      ["mp3", "wav", "ogg", "m4a"].includes(ext)
+    ) {
+      return "other";
+    }
+    if (
       mime.startsWith("image/") ||
-      ["jpg", "jpeg", "png", "webp", "gif", "bmp"].includes(ext)
+      ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "heic", "heif", "svg"].includes(ext)
     ) {
       return "image";
     }

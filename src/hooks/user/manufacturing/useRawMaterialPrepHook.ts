@@ -494,6 +494,9 @@ export const useRawMaterialPrepHook = () => {
         const hasMaterial = Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
         if (!hasMaterial) return false;
 
+        // AP grades are managed via apGradeSlots — top-level solidGradeCode is optional.
+        if (isApRmpFormTemplate(entry.solidRmpFormTemplate)) return true;
+
         if (
           entry.solidMaterialCode &&
           materialRequiresGradeSelection(availableSolidMaterials, entry.solidMaterialCode)
@@ -1104,31 +1107,16 @@ export const useRawMaterialPrepHook = () => {
         submit: !isDraft,
       });
 
+      // Draft save: no required-field validation (lots / weighment / process optional).
       if (isDraft) {
-        const unitResult = validateRawMaterialPreparation(
-          {
-            premixNo,
-            addedPremixSelections,
-            premixSessions: sessionsForPayload,
-            weightmentSheet,
-            identificationSheetMaterials: identificationSheet?.materials ?? [],
-          },
-          "UNIT",
-        );
         setPremixFieldErrorsByBatch((prev) => ({
           ...prev,
-          [activeFormBatchKey]: unitResult.premixFieldErrors,
+          [activeFormBatchKey]: {},
         }));
         setWeightmentErrorsByBatch((prev) => ({
           ...prev,
           [activeFormBatchKey]: {},
         }));
-        if (
-          Object.values(unitResult.premixFieldErrors).some((errs) => Object.keys(errs).length > 0)
-        ) {
-          emitValidationFocus(unitResult.premixFieldErrors, {});
-          return false;
-        }
       }
 
       if (!isDraft) {
@@ -1142,6 +1130,8 @@ export const useRawMaterialPrepHook = () => {
         const premixHasMaterial = premixSelections.every((entry) => {
           const hasMaterial = Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
           if (!hasMaterial) return false;
+          // AP grades live on apGradeSlots; do not block submit on empty solidGradeCode.
+          if (isApRmpFormTemplate(entry.solidRmpFormTemplate)) return true;
           if (
             entry.solidMaterialCode &&
             materialRequiresGradeSelection(availableSolidMaterials, entry.solidMaterialCode)
@@ -1152,11 +1142,11 @@ export const useRawMaterialPrepHook = () => {
         });
 
         if (!premixHasMaterial) {
-          showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SELECT_AT_LEAST_ONE, "warning");
+          showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.MATERIAL_GRADE_REQUIRED, "warning");
           return false;
         }
 
-        // Lots + weighment — red under fields + snackbar + focus
+        // Lots + weighment — snackbar + focus
         {
           const validationResult = validateRawMaterialPreparation(
             {
@@ -1488,6 +1478,7 @@ export const useRawMaterialPrepHook = () => {
       const premixHasMaterial = premixSelections.every((entry) => {
         const hasMaterial = Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
         if (!hasMaterial) return false;
+        if (isApRmpFormTemplate(entry.solidRmpFormTemplate)) return true;
         if (
           entry.solidMaterialCode &&
           materialRequiresGradeSelection(availableSolidMaterials, entry.solidMaterialCode)

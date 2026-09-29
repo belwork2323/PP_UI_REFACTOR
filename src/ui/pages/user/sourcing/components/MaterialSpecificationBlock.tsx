@@ -50,6 +50,7 @@ import {
   blockLotPath,
   blockMetaPath,
   blockCertTypePath,
+  blockRowPath,
 } from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
 import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
 import useValidationDisplay, {
@@ -278,15 +279,17 @@ const MaterialSpecificationBlock = ({
           theme={theme}
           required={false}
         >
-          <TextField
-            size="small"
-            fullWidth
-            variant="outlined"
-            value={block.supplyOrderNo ?? ""}
-            onChange={(e) => handleBlockMeta("supplyOrderNo", e.target.value)}
-            error={Boolean(supplyOrderError)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
-          />
+          <Box data-rms-field={blockMetaPath(index, "supplyOrderNo")}>
+            <TextField
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={block.supplyOrderNo ?? ""}
+              onChange={(e) => handleBlockMeta("supplyOrderNo", e.target.value)}
+              error={Boolean(supplyOrderError)}
+              sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
+            />
+          </Box>
         </MandatoryFormField>
         <MandatoryFormField
           label={formStrings.RECEIPT_DATE_LABEL}
@@ -294,27 +297,31 @@ const MaterialSpecificationBlock = ({
           theme={theme}
           required={false}
         >
-          <ReceiptDateField
-            value={block.receiptDate ?? ""}
-            onChange={(next) => handleBlockMeta("receiptDate", next)}
-            theme={theme}
-            error={Boolean(receiptDateError)}
-          />
+          <Box data-rms-field={blockMetaPath(index, "receiptDate")}>
+            <ReceiptDateField
+              value={block.receiptDate ?? ""}
+              onChange={(next) => handleBlockMeta("receiptDate", next)}
+              theme={theme}
+              error={Boolean(receiptDateError)}
+            />
+          </Box>
         </MandatoryFormField>
         <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={manufacturerError} theme={theme}>
-          <TextField
-            size="small"
-            fullWidth
-            variant="outlined"
-            value={block.manufacturerName ?? ""}
-            onChange={(e) => handleBlockMeta("manufacturerName", e.target.value)}
-            error={Boolean(manufacturerError)}
-            sx={mandatoryFieldInputSx(
-              theme.workflow.formElements.metaRowTextField,
-              Boolean(manufacturerError),
-              theme
-            )}
-          />
+          <Box data-rms-field={blockMetaPath(index, "manufacturerName")}>
+            <TextField
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={block.manufacturerName ?? ""}
+              onChange={(e) => handleBlockMeta("manufacturerName", e.target.value)}
+              error={Boolean(manufacturerError)}
+              sx={mandatoryFieldInputSx(
+                theme.workflow.formElements.metaRowTextField,
+                Boolean(manufacturerError),
+                theme
+              )}
+            />
+          </Box>
         </MandatoryFormField>
       </Stack>
 
@@ -412,7 +419,7 @@ const MaterialSpecificationBlock = ({
 
                 <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell, verticalAlign: "top" }}>
                   {rowIndex === 0 && (
-                    <Box>
+                    <Box data-rms-field={blockLotPath(index, "lotNo")}>
                       <TextField
                         size="small"
                         fullWidth
@@ -469,24 +476,26 @@ const MaterialSpecificationBlock = ({
                 </TableCell>
 
                 <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    value={row.analysedResult || ""}
-                    onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
-                    placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
-                    inputMode={
-                      isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
-                    }
-                    error={Boolean(analyzedError)}
-                    helperText={analyzedError}
-                    FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
-                    sx={{
-                      ...theme.workflow.formElements.cellField,
-                      ...specStyles.analyzedField,
-                      ...(rowFailed || analyzedError ? specStyles.failedAnalyzedField : {}),
-                    }}
-                  />
+                  <Box data-rms-field={blockRowPath(index, rowIndex, "analysedResult")}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      value={row.analysedResult || ""}
+                      onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
+                      placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
+                      inputMode={
+                        isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
+                      }
+                      error={Boolean(analyzedError)}
+                      helperText={analyzedError}
+                      FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
+                      sx={[
+                        theme.workflow.formElements.cellField,
+                        specStyles.analyzedField,
+                        ...(rowFailed || analyzedError ? [specStyles.failedAnalyzedField] : []),
+                      ]}
+                    />
+                  </Box>
                 </TableCell>
 
                 <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
@@ -496,10 +505,10 @@ const MaterialSpecificationBlock = ({
                     value={row.acemQcResult || ""}
                     onChange={(event) => handleCellChange(rowIndex, "acemQcResult", event.target.value)}
                     placeholder={formStrings.REMARKS_PLACEHOLDER}
-                    sx={{
-                      ...theme.workflow.formElements.cellField,
-                      ...specStyles.remarksField,
-                    }}
+                    sx={[
+                      theme.workflow.formElements.cellField,
+                      specStyles.remarksField,
+                    ]}
                   />
                 </TableCell>
               </TableRow>
@@ -520,6 +529,8 @@ const MaterialSpecificationBlock = ({
         onRetry={handleRetry}
         onOpen={handleOpen}
         error={certificateError}
+        certificatesFieldPath={blockLotPath(index, "certificates")}
+        certificateTypeFieldPath={(ci) => blockCertTypePath(index, ci)}
         certificateTypeError={(ci) => visibleError(blockCertTypePath(index, ci))}
       />
 

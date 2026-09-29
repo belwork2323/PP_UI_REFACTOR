@@ -26,7 +26,9 @@ type SubscaleFormProps = {
   subDepartmentId?: number;
   schemaLoading?: boolean;
   schemaError?: string | null;
-  onFormValuesChange: (values: import("@/data/models/shared/sectionFormTypes").SchemaFormValues) => void;
+  onFormValuesChange: (
+    values: import("@/data/models/shared/sectionFormTypes").SchemaFormValues,
+  ) => void;
   theme: any;
   batchDetails: any;
   actionLoading?: boolean;
@@ -55,6 +57,8 @@ const SubscaleForm = ({
   const processingLabel = getSubscaleProcessingLabel(batch?.batchType);
   const isFormLoaded = Boolean(formData.schemaFormValues?.IS_PROCESS_FORM_LOADED);
   const batchStatus = batch?.ssStatus ?? batch?.status;
+  console.log(formData);
+  console.log(batch);
 
   return (
     <Box>

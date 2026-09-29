@@ -1,81 +1,70 @@
-import { Box } from "@mui/material";
+import React, { useState, useMemo } from "react";
 import {
+  TextField,
+  MenuItem,
   Checkbox,
   ListItemText,
-  MenuItem,
+  Box,
+  Chip,
+  InputAdornment,
+  OutlinedInput,
   SelectChangeEvent,
-  TextField,
-  type SelectProps,
-  type SxProps,
-  type Theme,
+  SxProps,
+  Theme,
+  Typography,
 } from "@mui/material";
-import type { InputProps } from "@ui/components/common/Input";
-import {
-  APP_CONTROL_FONT_SIZE,
-  appDropdownInputProps,
-  appDropdownLabelProps,
-  appDropdownMenuProps,
-  appDropdownPlaceholderSx,
-  appDropdownSx,
-} from "./fieldStyles";
+import SearchIcon from "@mui/icons-material/Search";
 
-export type MultiSelectOption = string | { value: string; label: string };
-
-export interface MultiSelectProps extends Omit<
-  InputProps,
-  "select" | "children" | "value" | "onChange"
-> {
-  options: MultiSelectOption[];
-  value: string[];
-  onChange: (value: string[]) => void;
-  showCheckbox?: boolean;
-  renderChips?: boolean;
-  MenuProps?: SelectProps["MenuProps"];
+export interface DropdownOption {
+  value: string;
+  label: string;
 }
 
-const menuItemSx = {
-  minHeight: 36,
-  py: 0.5,
-  px: 1.25,
-  fontSize: APP_CONTROL_FONT_SIZE,
-  gap: 0.75,
+export interface MultiSelectWithSearchProps {
+  options: DropdownOption[] | string[];
+  value: string[];
+  onChange: (values: string[]) => void;
+  showCheckbox?: boolean;
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  InputLabelProps?: object;
+  SelectProps?: object;
+  MenuProps?: any;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
+
+const normalizeOptions = (options: DropdownOption[] | string[]): DropdownOption[] => {
+  if (!Array.isArray(options)) return [];
+  return options.map((opt) => (typeof opt === "string" ? { value: opt, label: opt } : opt));
 };
 
-const checkboxSx = {
-  p: 0.5,
-  "& .MuiSvgIcon-root": { fontSize: "1.15rem" },
-};
-
-const listItemTextSx = {
-  m: 0,
-  "& .MuiListItemText-primary": {
-    fontSize: APP_CONTROL_FONT_SIZE,
-    lineHeight: 1.4,
-  },
-};
-
-const normalizeOptions = (options: MultiSelectOption[]) =>
-  options.map((option) =>
-    typeof option === "string"
-      ? { value: option, label: option }
-      : { value: String(option.value ?? ""), label: String(option.label ?? option.value ?? "") },
-  );
-
-export default function MultiSelect({
+export default function MultiSelectWithSearch({
   options,
   value,
   onChange,
   showCheckbox = true,
-  renderChips: _renderChips = false,
   label,
   placeholder = "Select",
+  disabled = false,
   InputLabelProps,
   SelectProps,
   MenuProps,
   sx,
   ...props
-}: MultiSelectProps) {
+}: MultiSelectWithSearchProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const normalizedOptions = normalizeOptions(options);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return normalizedOptions;
+    return normalizedOptions.filter((option) =>
+      option.label.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [normalizedOptions, searchQuery]);
+
   const optionValues = normalizedOptions.map((option) => option.value);
   const labelByValue = new Map(normalizedOptions.map((option) => [option.value, option.label]));
   const allSelected = value.length === optionValues.length && optionValues.length > 0;
@@ -91,80 +80,171 @@ export default function MultiSelect({
     onChange(values);
   };
 
+  const handleRemoveItem = (valueToRemove: string) => {
+    if (disabled) return;
+    onChange(value.filter((v) => v !== valueToRemove));
+  };
+
   return (
-    <TextField
-      fullWidth
-      select
-      size="small"
-      variant="outlined"
-      label={label}
-      value={value}
-      {...props}
-      inputProps={appDropdownInputProps}
-      InputLabelProps={{
-        ...appDropdownLabelProps,
-        ...InputLabelProps,
-      }}
-      SelectProps={{
-        multiple: true,
-        displayEmpty: true,
-        MenuProps: {
-          ...appDropdownMenuProps,
-          ...MenuProps,
-          PaperProps: {
-            ...appDropdownMenuProps.PaperProps,
-            ...MenuProps?.PaperProps,
-            sx: {
-              ...appDropdownMenuProps.PaperProps?.sx,
-              ...(typeof MenuProps?.PaperProps?.sx === "object" &&
-              !Array.isArray(MenuProps.PaperProps.sx)
-                ? MenuProps.PaperProps.sx
-                : {}),
-              "& .MuiMenuItem-root": {
-                fontSize: APP_CONTROL_FONT_SIZE,
-                minHeight: 36,
+    <Box sx={{ width: "100%" }}>
+      <TextField
+        fullWidth
+        select
+        size="small"
+        variant="outlined"
+        label={label}
+        value={value}
+        disabled={disabled}
+        {...props}
+        InputLabelProps={{
+          ...InputLabelProps,
+        }}
+        SelectProps={{
+          multiple: true,
+          displayEmpty: true,
+          onClose: () => setSearchQuery(""),
+          MenuProps: {
+            ...MenuProps,
+            PaperProps: {
+              ...MenuProps?.PaperProps,
+              sx: {
+                ...(typeof MenuProps?.PaperProps?.sx === "object" &&
+                !Array.isArray(MenuProps?.PaperProps?.sx)
+                  ? MenuProps.PaperProps.sx
+                  : {}),
+                maxHeight: 320,
               },
             },
           },
-        },
-        ...SelectProps,
-        value,
-        onChange: handleChange,
-        renderValue: (selected) => {
-          const values = selected as string[];
-
-          if (values.length === 0) {
+          ...SelectProps,
+          value,
+          onChange: handleChange,
+          renderValue: () => {
             return (
-              <Box component="span" sx={appDropdownPlaceholderSx}>
+              <Box component="span" sx={{ color: "text.disabled" }}>
                 {placeholder}
               </Box>
             );
-          }
-
-          return values.map((item) => labelByValue.get(item) ?? item).join(", ");
-        },
-      }}
-      sx={[appDropdownSx, sx] as SxProps<Theme>}
-    >
-      <MenuItem value="__select_all__" sx={menuItemSx}>
-        {showCheckbox && (
-          <Checkbox
+          },
+        }}
+        sx={sx}
+      >
+        {/* Sticky Search Input Box inside Dropdown */}
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            position: "sticky",
+            top: 0,
+            bgcolor: "background.paper",
+            zIndex: 1,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <OutlinedInput
             size="small"
-            checked={allSelected}
-            indeterminate={value.length > 0 && !allSelected}
-            sx={checkboxSx}
+            fullWidth
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            startAdornment={
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+              </InputAdornment>
+            }
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            sx={{ fontSize: "0.875rem" }}
           />
+        </Box>
+
+        {/* Select All Option */}
+        {!searchQuery && (
+          <MenuItem value="__select_all__" sx={{ minHeight: 36 }}>
+            {showCheckbox && (
+              <Checkbox
+                size="small"
+                checked={allSelected}
+                indeterminate={value.length > 0 && !allSelected}
+                sx={{ p: 0.5, mr: 1 }}
+              />
+            )}
+            <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: "0.875rem" }} />
+          </MenuItem>
         )}
-        <ListItemText primary="Select All" sx={listItemTextSx} />
-      </MenuItem>
-      {normalizedOptions.map((option) => (
-        <MenuItem key={option.value} value={option.value} sx={menuItemSx}>
-          {showCheckbox && (
-            <Checkbox size="small" checked={value.includes(option.value)} sx={checkboxSx} />
-          )}
-          <ListItemText primary={option.label} sx={listItemTextSx} />
-        </MenuItem>
-      ))}
-    </TextField>
+
+        {/* Filtered Options List */}
+        {filteredOptions.length > 0 ? (
+          filteredOptions.map((option) => (
+            <MenuItem key={option.value} value={option.value} sx={{ minHeight: 36 }}>
+              {showCheckbox && (
+                <Checkbox
+                  size="small"
+                  checked={value.includes(option.value)}
+                  sx={{ p: 0.5, mr: 1 }}
+                />
+              )}
+              <ListItemText
+                primary={option.label}
+                primaryTypographyProps={{ fontSize: "0.875rem" }}
+              />
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled sx={{ minHeight: 36 }}>
+            <ListItemText
+              primary="No results found"
+              primaryTypographyProps={{ fontSize: "0.875rem", fontStyle: "italic" }}
+            />
+          </MenuItem>
+        )}
+      </TextField>
+
+      {/* Selected count info & Tags / Chips Container Below the Input */}
+      {value.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
+            {value.length} {value.length === 1 ? "item" : "items"} selected
+          </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 0.75,
+              alignItems: "center",
+            }}
+          >
+            {value.map((itemValue) => {
+              const itemLabel = labelByValue.get(itemValue) ?? itemValue;
+              return (
+                <Chip
+                  key={itemValue}
+                  label={itemLabel}
+                  size="small"
+                  {...(disabled ? {} : { onDelete: () => handleRemoveItem(itemValue) })}
+                  sx={{
+                    borderRadius: "6px",
+                    backgroundColor: (theme) => theme.palette.action.selected,
+                    ...(!disabled && {
+                      "& .MuiChip-deleteIcon": {
+                        fontSize: "1rem",
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: "error.main",
+                        },
+                      },
+                    }),
+                  }}
+                />
+              );
+            })}
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 }

@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
@@ -14,6 +14,8 @@ import {
   MaterialBlock,
   normalizeRawMaterialLotListStatus,
   serializeMaterialBlocks,
+  serializeMaterialBlocksForDirtyCheck,
+  hasRawMaterialCreateDirtyData,
   hasIncompleteCertificateUploads,
   RawMaterialFormBatch,
   RawMaterialLotDetailsModel,
@@ -41,7 +43,10 @@ export const useRawMaterialProcurementHook = () => {
   const [activeBatch, setActiveBatch] = useState<RawMaterialFormBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formBlocks, setFormBlocks] = useState<MaterialBlock[]>([]);
+  /** Full snapshot for discard temp-file cleanup. */
   const [initialSnapshot, setInitialSnapshot] = useState("[]");
+  /** Field-level dirty baseline from lot-details (edit/fill). */
+  const [dirtyBaseline, setDirtyBaseline] = useState("[]");
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
@@ -66,15 +71,13 @@ export const useRawMaterialProcurementHook = () => {
     [user],
   );
 
-  const isFormDirty = useMemo(
-    () => serializeMaterialBlocks(formBlocks) !== initialSnapshot,
-    [formBlocks, initialSnapshot],
-  );
-
   const formBlocksRef = useRef(formBlocks);
   formBlocksRef.current = formBlocks;
   const initialSnapshotRef = useRef(initialSnapshot);
   initialSnapshotRef.current = initialSnapshot;
+  /** After lot-details load, absorb one form hydrate reshape into the dirty baseline. */
+  const pendingDirtyBaselineSyncRef = useRef(false);
+  const dirtyBaselineSettleUntilRef = useRef(0);
 
   const parseBaselineBlocks = useCallback((): MaterialBlock[] => {
     try {
@@ -85,6 +88,46 @@ export const useRawMaterialProcurementHook = () => {
     }
   }, []);
 
+  const captureLotDetailsBaseline = useCallback((blocks: MaterialBlock[]) => {
+    setInitialSnapshot(serializeMaterialBlocks(blocks));
+    setDirtyBaseline(serializeMaterialBlocksForDirtyCheck(blocks));
+    pendingDirtyBaselineSyncRef.current = true;
+    // Allow one short window for form hydrate reshape; ignore later user edits.
+    dirtyBaselineSettleUntilRef.current = Date.now() + 750;
+  }, []);
+
+  // Lot-details → form can reshape certificates/rows; adopt that once as baseline.
+  useEffect(() => {
+    if (!pendingDirtyBaselineSyncRef.current) return;
+    if (view !== "form" || formEntryMode === "create") return;
+    if (loadingFormDetails || formBlocks.length === 0) return;
+    if (Date.now() > dirtyBaselineSettleUntilRef.current) {
+      pendingDirtyBaselineSyncRef.current = false;
+      return;
+    }
+
+    const current = serializeMaterialBlocksForDirtyCheck(formBlocks);
+    if (current !== dirtyBaseline) {
+      setDirtyBaseline(current);
+    }
+    pendingDirtyBaselineSyncRef.current = false;
+  }, [dirtyBaseline, formBlocks, formEntryMode, loadingFormDetails, view]);
+
+  const isFormDirty = useMemo(() => {
+    if (view !== "form") return false;
+    if (loadingFormDetails) return false;
+    // New lot: alert only after the user entered real values (not empty templates / ACEM default).
+    if (formEntryMode === "create") {
+      return hasRawMaterialCreateDirtyData(formBlocks);
+    }
+    // Fill/edit: wait until lot-details hydrated into the form.
+    if (formBlocks.length === 0) return false;
+    // Still settling hydrate — don't prompt discard yet.
+    if (pendingDirtyBaselineSyncRef.current) return false;
+    // Compare user fields only against lot-details baseline.
+    return serializeMaterialBlocksForDirtyCheck(formBlocks) !== dirtyBaseline;
+  }, [dirtyBaseline, formBlocks, formEntryMode, loadingFormDetails, view]);
+
   const resetFormContext = () => {
     setView("list");
     setActiveBatch(null);
@@ -92,6 +135,9 @@ export const useRawMaterialProcurementHook = () => {
     setFormEntryMode("create");
     setFormBlocks([]);
     setInitialSnapshot("[]");
+    setDirtyBaseline("[]");
+    pendingDirtyBaselineSyncRef.current = false;
+    dirtyBaselineSettleUntilRef.current = 0;
     setLoadingFormDetails(false);
     setActionLoading(false);
     setBackConfirmOpen(false);
@@ -150,7 +196,7 @@ export const useRawMaterialProcurementHook = () => {
       const wf = detailsResponse.data.workflowInsights;
 
       setFormBlocks(blocks);
-      setInitialSnapshot(serializeMaterialBlocks(blocks));
+      captureLotDetailsBaseline(blocks);
       setActiveBatch((prev) =>
         prev
           ? {
@@ -174,6 +220,9 @@ export const useRawMaterialProcurementHook = () => {
     setActiveBatch(createEmptyFormBatch());
     setFormBlocks([]);
     setInitialSnapshot("[]");
+    setDirtyBaseline("[]");
+    pendingDirtyBaselineSyncRef.current = false;
+    dirtyBaselineSettleUntilRef.current = 0;
     setIsEditMode(false);
     setView("form");
   };
@@ -227,7 +276,7 @@ export const useRawMaterialProcurementHook = () => {
     }
 
     setFormBlocks(blocks);
-    setInitialSnapshot(serializeMaterialBlocks(blocks));
+    captureLotDetailsBaseline(blocks);
     setFormEntryMode(mode);
     setIsEditMode(mode === "edit");
     setView("form");
@@ -451,8 +500,10 @@ export const useRawMaterialProcurementHook = () => {
           return false;
         }
 
-        setInitialSnapshot(serializeMaterialBlocks(blocks));
         setFormBlocks(blocks);
+        setInitialSnapshot(serializeMaterialBlocks(blocks));
+        setDirtyBaseline(serializeMaterialBlocksForDirtyCheck(blocks));
+        pendingDirtyBaselineSyncRef.current = false;
         const createdLotId = String(
           response.data?.lotId || response.data?.batchId || blocks[0]?.lotNo || "",
         ).trim();

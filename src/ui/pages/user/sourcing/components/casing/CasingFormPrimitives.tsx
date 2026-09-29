@@ -49,20 +49,52 @@ export const Field = ({
   fullWidth = false,
   theme,
   required,
+  fieldPath,
 }: {
   label: string;
   children: React.ReactNode;
   fullWidth?: boolean;
   theme: any;
   required?: boolean;
+  /** Validation path for `data-rmc-field` focus targets. */
+  fieldPath?: string;
 }) => (
-  <Box sx={fullWidth ? { gridColumn: { xs: "1", md: "1 / -1" } } : undefined}>
+  <Box
+    sx={fullWidth ? { gridColumn: { xs: "1", md: "1 / -1" } } : undefined}
+    {...(fieldPath ? { "data-rmc-field": fieldPath } : {})}
+  >
     <FieldLabel theme={theme} required={required}>
       {label}
     </FieldLabel>
     {children}
   </Box>
 );
+
+/** Force white editable input chrome (overrides surface/stripe bleed-through). */
+export const casingWhiteInputSx = (baseSx: object = {}) => ({
+  ...baseSx,
+  "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
+    ...((baseSx as Record<string, unknown>)["& .MuiOutlinedInput-root"] as object),
+    ...((baseSx as Record<string, unknown>)["& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root"] as object),
+    background: "#fff",
+    backgroundColor: "#fff",
+    "&.Mui-focused": { background: "#fff", backgroundColor: "#fff" },
+    "&:hover": { background: "#fff", backgroundColor: "#fff" },
+  },
+  "& .MuiInputBase-input::placeholder": {
+    color: "#5D6D7E",
+    opacity: 0.45,
+    fontWeight: 400,
+  },
+});
+
+export const casingLightPlaceholderSx = (theme: any) => ({
+  "& .MuiInputBase-input::placeholder": {
+    color: theme.palette.textSub ?? "#5D6D7E",
+    opacity: 0.45,
+    fontWeight: 400,
+  },
+});
 
 type CasingDeferredInputProps = {
   value: string;
@@ -206,6 +238,9 @@ export const TextFieldField = ({
   theme,
   deferred = true,
   required,
+  fieldPath,
+  lightPlaceholder = true,
+  inputSx,
 }: {
   label: string;
   value: string;
@@ -220,8 +255,11 @@ export const TextFieldField = ({
   theme: any;
   deferred?: boolean;
   required?: boolean;
+  fieldPath?: string;
+  lightPlaceholder?: boolean;
+  inputSx?: object;
 }) => (
-  <Field label={label} fullWidth={fullWidth} theme={theme} required={required}>
+  <Field label={label} fullWidth={fullWidth} theme={theme} required={required} fieldPath={fieldPath}>
     <CasingDeferredInput
       size="small"
       fullWidth
@@ -235,11 +273,15 @@ export const TextFieldField = ({
       label={undefined}
       disabled={disabled}
       error={Boolean(error)}
-      sx={
-        multiline
-          ? theme.workflow.formElements.multilineField
-          : theme.workflow.formElements.textField
-      }
+      sx={{
+        ...casingWhiteInputSx(
+          multiline
+            ? theme.workflow.formElements.multilineField
+            : theme.workflow.formElements.textField,
+        ),
+        ...(lightPlaceholder ? casingLightPlaceholderSx(theme) : {}),
+        ...inputSx,
+      }}
     />
     {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
   </Field>
@@ -253,6 +295,7 @@ export const DateField = ({
   disabled,
   error,
   required,
+  fieldPath,
 }: {
   label: string;
   value: string;
@@ -261,8 +304,9 @@ export const DateField = ({
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  fieldPath?: string;
 }) => (
-  <Field label={label} theme={theme} required={required}>
+  <Field label={label} theme={theme} required={required} fieldPath={fieldPath}>
     <AppDateField
       value={formatToUiDate(value)}
       onChange={(next) => onChange(formatToIsoDateInput(next))}
@@ -273,7 +317,7 @@ export const DateField = ({
       sx={{
         mb: 0,
         width: "100%",
-        ...theme.workflow.formElements.metaRowTextField,
+        ...casingWhiteInputSx(theme.workflow.formElements.metaRowTextField),
       }}
     />
   </Field>
@@ -291,6 +335,7 @@ export const ProjectSelectField = ({
   theme,
   cf,
   required,
+  fieldPath,
 }: {
   label: string;
   value: string;
@@ -303,6 +348,7 @@ export const ProjectSelectField = ({
   theme: any;
   cf: any;
   required?: boolean;
+  fieldPath?: string;
 }) => {
   const selectedProject = projects.find((p) => p.projectId === value);
 
@@ -311,7 +357,7 @@ export const ProjectSelectField = ({
       return (
         <Typography
           component="em"
-          sx={{ color: theme.palette.textSub, fontSize: "0.84rem", fontStyle: "italic" }}
+          sx={{ color: theme.palette.textSub, fontSize: "0.84rem", fontStyle: "italic", opacity: 0.45 }}
         >
           {loading ? "Loading projects..." : placeholder}
         </Typography>
@@ -332,12 +378,12 @@ export const ProjectSelectField = ({
   };
 
   return (
-    <Field label={label} theme={theme} required={required}>
+    <Field label={label} theme={theme} required={required} fieldPath={fieldPath}>
       <FormControl
         fullWidth
         size="small"
         disabled={disabled || loading}
-        sx={theme.workflow.formElements.metaRowTextField}
+        sx={casingWhiteInputSx(theme.workflow.formElements.metaRowTextField)}
         error={Boolean(error)}
       >
         <Select
@@ -374,6 +420,7 @@ export const SelectField = ({
   error,
   theme,
   required,
+  fieldPath,
 }: {
   label: string;
   value: string;
@@ -384,13 +431,14 @@ export const SelectField = ({
   error?: string;
   theme: any;
   required?: boolean;
+  fieldPath?: string;
 }) => (
-  <Field label={label} theme={theme} required={required}>
+  <Field label={label} theme={theme} required={required} fieldPath={fieldPath}>
     <FormControl
       fullWidth
       size="small"
       disabled={disabled}
-      sx={theme.workflow.formElements.metaRowTextField}
+      sx={casingWhiteInputSx(theme.workflow.formElements.metaRowTextField)}
       error={Boolean(error)}
     >
       <Select
@@ -400,7 +448,7 @@ export const SelectField = ({
         renderValue={(selected) => {
           if (!selected) {
             return (
-              <Typography sx={{ color: theme.palette.textSub, fontSize: "0.84rem" }}>
+              <Typography sx={{ color: theme.palette.textSub, fontSize: "0.84rem", opacity: 0.45 }}>
                 {placeholder}
               </Typography>
             );
@@ -442,6 +490,7 @@ export const SearchableSelectField = ({
   error,
   theme,
   required,
+  fieldPath,
 }: {
   label: string;
   value: string;
@@ -453,6 +502,7 @@ export const SearchableSelectField = ({
   error?: string;
   theme: any;
   required?: boolean;
+  fieldPath?: string;
 }) => {
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? null,
@@ -460,7 +510,7 @@ export const SearchableSelectField = ({
   );
 
   return (
-    <Field label={label} theme={theme} required={required}>
+    <Field label={label} theme={theme} required={required} fieldPath={fieldPath}>
       <Autocomplete
         size="small"
         fullWidth
@@ -484,7 +534,10 @@ export const SearchableSelectField = ({
             {...params}
             placeholder={loading ? "Loading..." : placeholder}
             error={Boolean(error)}
-            sx={theme.workflow.formElements.metaRowTextField}
+            sx={{
+              ...casingWhiteInputSx(theme.workflow.formElements.metaRowTextField),
+              ...casingLightPlaceholderSx(theme),
+            }}
           />
         )}
         slotProps={{

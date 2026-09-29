@@ -17,7 +17,7 @@ import InsulationSpecMasterPanel from "./InsulationSpecMasterPanel";
 import MixingCycleMasterPanel from "./MixingCycleMasterPanel";
 import CuringCycleMasterPanel from "./CuringCycleMasterPanel";
 import DimensionalParametersMasterPanel from "./DimensionalParametersMasterPanel";
-import { getMasterDataAddButtonLabel, stripMasterTypeSuffix } from "./masterDataLabels";
+import { getMasterDataAddButtonLabel, getMasterTypeDisplayLabel } from "./masterDataLabels";
 import { masterDataStatusFilterChipProps } from "./components/masterDataStatusStyles";
 import useProjectForMotorStageOptions from "@/hooks/admin/MasterData/useProjectForMotorStageOptions";
 
@@ -27,8 +27,8 @@ const TYPE_NOUN: Record<string, string> = {
   mixers: "mixers",
   buildings: "buildings",
   ovens: "ovens",
-  equipment: "equipment",
-  "equipment-types": "equipment types",
+  equipment: "NDT equipments",
+  "equipment-types": "NDT equipment types",
   "beam-energy": "beam energies",
   units: "units",
   "casting-stations": "casting stations",
@@ -87,7 +87,7 @@ const MasterDataPage = () => {
     () =>
       hook.types.map((type) => ({
         value: type.type,
-        label: stripMasterTypeSuffix(type.label),
+        label: getMasterTypeDisplayLabel(type.type, type.label),
       })),
     [hook.types],
   );

@@ -21,13 +21,9 @@ import {
   validateWeightmentRowAgainstSheet,
 } from "@/data/models/user/rawMaterialWeightmentValidation";
 import { getPremixMaterialSessionKey } from "@/hooks/user/manufacturing/rawMaterialPrepFlowConfig";
-import {
-  ALPHA_NUM,
-  isFiniteNumber,
-  isValidUiDateTime,
-  str,
-} from "../fieldValidators";
+import { ALPHA_NUM, isFiniteNumber, isValidUiDateTime, str } from "../fieldValidators";
 import type { ValidationErrors, ValidationTier } from "../submissionIntent";
+import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 const M = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.VALIDATION;
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -125,10 +121,10 @@ export type RmpValidationAttemptFlags = {
   submit: boolean;
 };
 
+/** Submit attempt only — draft/save never gates on required fields. */
 export const resolveRmpPremixValidationIntent = (
   attempt: Pick<RmpValidationAttemptFlags, "submit" | "unit">,
-): MaterialProcessValidationIntent =>
-  attempt.submit || attempt.unit ? "SUBMIT" : "DRAFT";
+): MaterialProcessValidationIntent => (attempt.submit ? "SUBMIT" : "DRAFT");
 
 const prefixApGradeErrors = (
   errors: Record<string, string>,
@@ -165,20 +161,12 @@ const validateSolidProcessErrors = (
         gradeCode: grade,
         rmpFormTemplate: "AP",
       });
-      const cardErrs = validateMaterialProcessForm(
-        uiKey,
-        card.slot.processForm,
-        intent,
-        {
-          materialCode: entry.solidMaterialCode,
-          gradeCode: grade,
-          quantityPerPremix: entry.quantityPerPremix,
-        },
-      );
-      Object.assign(
-        merged,
-        prefixApGradeErrors(cardErrs, card.gradeCode, multiGrade),
-      );
+      const cardErrs = validateMaterialProcessForm(uiKey, card.slot.processForm, intent, {
+        materialCode: entry.solidMaterialCode,
+        gradeCode: grade,
+        quantityPerPremix: entry.quantityPerPremix,
+      });
+      Object.assign(merged, prefixApGradeErrors(cardErrs, card.gradeCode, multiGrade));
     }
     return merged;
   }
@@ -189,16 +177,11 @@ const validateSolidProcessErrors = (
     gradeCode: entry.solidGradeCode,
     rmpFormTemplate: entry.solidRmpFormTemplate,
   });
-  return validateMaterialProcessForm(
-    uiKey,
-    session.solid.processForm,
-    intent,
-    {
-      materialCode: entry.solidMaterialCode,
-      gradeCode: entry.solidGradeCode,
-      quantityPerPremix: entry.quantityPerPremix,
-    },
-  );
+  return validateMaterialProcessForm(uiKey, session.solid.processForm, intent, {
+    materialCode: entry.solidMaterialCode,
+    gradeCode: entry.solidGradeCode,
+    quantityPerPremix: entry.quantityPerPremix,
+  });
 };
 
 const validateLiquidProcessErrors = (
@@ -212,23 +195,26 @@ const validateLiquidProcessErrors = (
     gradeCode: entry.liquidGradeCode,
     rmpFormTemplate: entry.liquidRmpFormTemplate ?? entry.solidRmpFormTemplate,
   });
-  return validateMaterialProcessForm(
-    uiKey,
-    session.liquid.processForm,
-    intent,
-    {
-      materialCode: entry.liquidMaterialCode,
-      gradeCode: entry.liquidGradeCode,
-      quantityPerPremix: entry.quantityPerPremix,
-    },
-  );
+  return validateMaterialProcessForm(uiKey, session.liquid.processForm, intent, {
+    materialCode: entry.liquidMaterialCode,
+    gradeCode: entry.liquidGradeCode,
+    quantityPerPremix: entry.quantityPerPremix,
+  });
 };
 
-/** Process + lot validation for each selected solid/liquid material. */
+/**
+ * Premix material validation:
+ * - DRAFT/save: no required gates
+ * - SUBMIT: lot details only (process fields optional for all templates)
+ */
 function validatePremixProcessSessions(
   input: RawMaterialPrepValidationInput,
   intent: MaterialProcessValidationIntent,
 ): Record<string, Record<string, string>> {
+  if (intent === "DRAFT") {
+    return {};
+  }
+
   const premixFieldErrors: Record<string, Record<string, string>> = {};
   const selections = input.premixNo
     ? input.addedPremixSelections.filter((entry) => entry.premix === input.premixNo)
@@ -238,18 +224,16 @@ function validatePremixProcessSessions(
     const sessionKey = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
     const session = input.premixSessions[sessionKey];
     if (!session) {
-      if (intent === "SUBMIT") {
-        const slot =
-          entry.selectedProcesses.solid && str(entry.solidMaterialCode)
-            ? "solid"
-            : entry.selectedProcesses.liquid && str(entry.liquidMaterialCode)
-              ? "liquid"
-              : null;
-        if (slot) {
-          premixFieldErrors[`${sessionKey}:${slot}`] = {
-            "lotDetails.0.lotId": "At least one lot is required.",
-          };
-        }
+      const slot =
+        entry.selectedProcesses.solid && str(entry.solidMaterialCode)
+          ? "solid"
+          : entry.selectedProcesses.liquid && str(entry.liquidMaterialCode)
+            ? "liquid"
+            : null;
+      if (slot) {
+        premixFieldErrors[`${sessionKey}:${slot}`] = {
+          "lotDetails.0.lotId": "This Field is required",
+        };
       }
       continue;
     }
@@ -272,7 +256,7 @@ function validatePremixProcessSessions(
   return premixFieldErrors;
 }
 
-/** Live revalidation for a single material process slot (or one AP grade card). */
+/** Live revalidation after submit attempt (lot details only). */
 export function validateRmpPremixSlotLive(params: {
   selection: AddedPremixSelection;
   slot: "solid" | "liquid";
@@ -282,6 +266,9 @@ export function validateRmpPremixSlotLive(params: {
   apGradeCount?: number;
 }): Record<string, string> {
   const intent = resolveRmpPremixValidationIntent(params.attempt);
+  if (intent === "DRAFT") {
+    return {};
+  }
   const materialCode =
     params.slot === "solid"
       ? params.selection.solidMaterialCode
@@ -294,7 +281,10 @@ export function validateRmpPremixSlotLive(params: {
       (params.slot === "solid"
         ? params.selection.solidGradeCode
         : params.selection.liquidGradeCode),
-    rmpFormTemplate: params.selection.solidRmpFormTemplate,
+    rmpFormTemplate:
+      params.slot === "solid"
+        ? params.selection.solidRmpFormTemplate
+        : (params.selection.liquidRmpFormTemplate ?? params.selection.solidRmpFormTemplate),
   });
   const errors = validateMaterialProcessForm(uiKey, params.processForm, intent, {
     materialCode,
@@ -468,7 +458,8 @@ export function validateWeightmentForSubmit(
     if (!indices?.length) {
       // Attach missing-material error to first empty row or invent path for snackbar/focus
       const emptyIndex = sheet.weightmentDetails.findIndex((row) => !str(row.materialCode));
-      const rowIndex = emptyIndex >= 0 ? emptyIndex : Math.max(0, sheet.weightmentDetails.length - 1);
+      const rowIndex =
+        emptyIndex >= 0 ? emptyIndex : Math.max(0, sheet.weightmentDetails.length - 1);
       errors[weightmentPath(rowIndex, "materialCode")] =
         M.weightmentMaterialCode.required + ` (${code})`;
       continue;
@@ -517,8 +508,7 @@ export function validateWeightmentForSubmit(
   sheet.weightmentDetails.forEach((row, rowIndex) => {
     const code = str(row.materialCode).toUpperCase();
     if (code && requiredCodes.includes(code)) return;
-    const hasAny =
-      WEIGHTMENT_ROW_CHECKS.some(({ key }) => str(row[key])) || str(row.materialName);
+    const hasAny = WEIGHTMENT_ROW_CHECKS.some(({ key }) => str(row[key])) || str(row.materialName);
     if (!hasAny) return;
     for (const check of WEIGHTMENT_ROW_CHECKS) {
       const text = str(row[check.key]);
@@ -549,11 +539,7 @@ export function validateWeightmentErrorsLive(
   if (!attempt.submit) {
     return formatErrors;
   }
-  const submitErrors = validateWeightmentForSubmit(
-    sheet,
-    selections,
-    identificationMaterials,
-  );
+  const submitErrors = validateWeightmentForSubmit(sheet, selections, identificationMaterials);
   return { ...formatErrors, ...submitErrors };
 }
 
@@ -565,9 +551,14 @@ export function validateRawMaterialPreparation(
     ? input.addedPremixSelections.filter((e) => e.premix === input.premixNo)
     : input.addedPremixSelections;
 
+  // UNIT (draft save): no required-field validation.
+  if (tier === "UNIT") {
+    return { premixFieldErrors: {}, weightmentErrors: {} };
+  }
+
   const premixFieldErrors: Record<string, Record<string, string>> = {};
 
-  if (tier === "UNIT" || tier === "SUBMIT") {
+  if (tier === "SUBMIT") {
     const processErrors = validatePremixProcessSessions(input, "SUBMIT");
     for (const [key, errs] of Object.entries(processErrors)) {
       premixFieldErrors[key] = { ...(premixFieldErrors[key] ?? {}), ...errs };
@@ -649,23 +640,7 @@ export function resolveFirstRmpValidationFocus(
 
 /** Scroll + focus the control tagged with `data-rmp-field`. */
 export function focusRmpField(fieldPath: string, root: ParentNode = document): boolean {
-  if (!fieldPath) return false;
-  const selector = `[data-rmp-field="${fieldPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"]`;
-  const el = root.querySelector<HTMLElement>(selector);
-  if (!el) return false;
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
-  const focusable =
-    el.matches("input, select, textarea, button, [tabindex]")
-      ? el
-      : el.querySelector<HTMLElement>("input, select, textarea, button, [tabindex]");
-  if (focusable) {
-    try {
-      focusable.focus({ preventScroll: true });
-    } catch {
-      focusable.focus?.();
-    }
-  }
-  return true;
+  return focusFieldByDataAttr("rmp-field", fieldPath, root);
 }
 
 export function isWeightmentSubmitComplete(sheet: RawMaterialPrepWeightmentSheet): boolean {
@@ -690,4 +665,3 @@ export function getWeightmentIdentificationError(
     sheet.validation,
   );
 }
-

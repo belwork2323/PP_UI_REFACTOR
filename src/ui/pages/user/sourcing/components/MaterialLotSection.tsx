@@ -41,6 +41,7 @@ import MandatoryFormField, { mandatoryAsteriskSx, mandatoryFieldInputSx } from "
 import {
   blockLotPath,
   blockCertTypePath,
+  blockRowPath,
 } from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
 import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
 import useValidationDisplay, {
@@ -218,15 +219,17 @@ const MaterialLotSection = ({
 
       <Box sx={{ px: 2, py: 1.5, maxWidth: 360 }}>
         <MandatoryFormField label={formStrings.TABLE_HEADERS.LOT_ID} error={lotNoError} theme={theme}>
-          <TextField
-            size="small"
-            fullWidth
-            value={lot.lotNo}
-            onChange={(event) => handleLotNoChange(event.target.value)}
-            placeholder={formStrings.LOT_PLACEHOLDER}
-            error={Boolean(lotNoError)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.textField, Boolean(lotNoError), theme)}
-          />
+          <Box data-rms-field={blockLotPath(blockIndex, "lotNo")}>
+            <TextField
+              size="small"
+              fullWidth
+              value={lot.lotNo}
+              onChange={(event) => handleLotNoChange(event.target.value)}
+              placeholder={formStrings.LOT_PLACEHOLDER}
+              error={Boolean(lotNoError)}
+              sx={mandatoryFieldInputSx(theme.workflow.formElements.textField, Boolean(lotNoError), theme)}
+            />
+          </Box>
         </MandatoryFormField>
       </Box>
 
@@ -320,24 +323,26 @@ const MaterialLotSection = ({
                       <Chip label={row.refRange} size="small" sx={specStyles.refRangeChip} />
                     </TableCell>
                     <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        value={row.analysedResult || ""}
-                        onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
-                        placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
-                        inputMode={
-                          isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
-                        }
-                        error={Boolean(analyzedError)}
-                        helperText={analyzedError}
-                        FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
-                        sx={{
-                          ...theme.workflow.formElements.cellField,
-                          ...specStyles.analyzedField,
-                          ...(rowFailed || analyzedError ? specStyles.failedAnalyzedField : {}),
-                        }}
-                      />
+                      <Box data-rms-field={blockRowPath(blockIndex, rowIndex, "analysedResult")}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          value={row.analysedResult || ""}
+                          onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
+                          placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
+                          inputMode={
+                            isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
+                          }
+                          error={Boolean(analyzedError)}
+                          helperText={analyzedError}
+                          FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
+                          sx={[
+                            theme.workflow.formElements.cellField,
+                            specStyles.analyzedField,
+                            ...(rowFailed || analyzedError ? [specStyles.failedAnalyzedField] : []),
+                          ]}
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
                       <TextField
@@ -346,10 +351,10 @@ const MaterialLotSection = ({
                         value={row.acemQcResult || ""}
                         onChange={(event) => handleCellChange(rowIndex, "acemQcResult", event.target.value)}
                         placeholder={formStrings.REMARKS_PLACEHOLDER}
-                        sx={{
-                          ...theme.workflow.formElements.cellField,
-                          ...specStyles.remarksField,
-                        }}
+                        sx={[
+                          theme.workflow.formElements.cellField,
+                          specStyles.remarksField,
+                        ]}
                       />
                     </TableCell>
                   </TableRow>
@@ -370,6 +375,8 @@ const MaterialLotSection = ({
         onRetry={handleRetry}
         onOpen={handleOpen}
         error={certificateError}
+        certificatesFieldPath={blockLotPath(blockIndex, "certificates")}
+        certificateTypeFieldPath={(ci) => blockCertTypePath(blockIndex, ci)}
         certificateTypeError={(ci) => visibleError(blockCertTypePath(blockIndex, ci))}
       />
 

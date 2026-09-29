@@ -10,6 +10,12 @@ const ATTRIBUTE_FIELD_LABEL_OVERRIDES: Record<string, Record<string, string>> = 
   },
 };
 
+/** Display names for master-type dropdown / add button (API type codes unchanged). */
+const MASTER_TYPE_LABEL_OVERRIDES: Record<string, string> = {
+  "equipment-types": "NDT Equipment Types",
+  equipment: "NDT Equipments",
+};
+
 export const getMasterDataFieldLabel = (
   selectedType: string,
   field: MasterDataFieldDef,
@@ -24,6 +30,9 @@ export const getMasterDataFieldLabel = (
 
 export const stripMasterTypeSuffix = (label: string) => label.replace(/\s+Master$/i, "").trim();
 
+export const getMasterTypeDisplayLabel = (type: string, label: string): string =>
+  MASTER_TYPE_LABEL_OVERRIDES[type] ?? stripMasterTypeSuffix(label);
+
 /** Appends a trailing asterisk for required field labels in master data tables. */
 export const requiredFieldLabel = (label: string, required = false): string =>
   required ? `${label} *` : label;
@@ -34,5 +43,5 @@ export const getMasterDataAddButtonLabel = (
 ): string => {
   const match = types.find((type) => type.type === selectedType);
   if (!match?.label) return S.PAGE.NEW_BUTTON;
-  return S.PAGE.NEW_BUTTON_FOR_TYPE(stripMasterTypeSuffix(match.label));
+  return S.PAGE.NEW_BUTTON_FOR_TYPE(getMasterTypeDisplayLabel(match.type, match.label));
 };

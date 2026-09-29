@@ -2,7 +2,7 @@ import { forwardRef, type ChangeEvent, type Ref } from "react";
 
 import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 
-/** RMS lot certificates: PDF, images, and video only. */
+/** RMS lot certificates: PDF, images, MP3, and video (no zip/Excel/Word). */
 export const CERTIFICATE_FILE_ACCEPT = FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
 
 type CertificateFileInputProps = {

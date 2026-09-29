@@ -289,6 +289,8 @@ export const WeightmentTableInput = ({
         onChange={onChange}
         disabled={disabled}
         compact
+        error={error}
+        helperText={helperText}
       />,
     );
   }

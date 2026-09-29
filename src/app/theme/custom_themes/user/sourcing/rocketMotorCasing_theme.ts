@@ -206,6 +206,36 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 				overflow: "hidden",
 				mt: 1,
 			},
+			propertiesDataRow: (isFailed = false) => ({
+				"&:hover": {
+					background: isFailed
+						? alpha(palette.danger ?? "#C0392B", 0.09)
+						: alpha(palette.primaryLight ?? "#2E86C1", 0.04),
+				},
+				"&:last-child td": { borderBottom: "none" },
+				background: isFailed ? alpha(palette.danger ?? "#C0392B", 0.06) : "#fff",
+				boxShadow: isFailed ? `inset 3px 0 0 ${palette.danger ?? "#C0392B"}` : "none",
+			}),
+			propertiesFailedField: {
+				"& .MuiOutlinedInput-root": {
+					backgroundColor: alpha(palette.danger ?? "#C0392B", 0.05),
+					background: alpha(palette.danger ?? "#C0392B", 0.05),
+					"& fieldset": { borderColor: alpha(palette.danger ?? "#C0392B", 0.45) },
+					"&:hover fieldset": { borderColor: palette.danger ?? "#C0392B" },
+					"&.Mui-focused fieldset": {
+						borderColor: palette.danger ?? "#C0392B",
+						borderWidth: 1.5,
+					},
+				},
+			},
+			propertiesFailedChip: {
+				height: 20,
+				fontSize: "0.62rem",
+				fontWeight: 800,
+				background: alpha(palette.danger ?? "#C0392B", 0.1),
+				color: palette.danger ?? "#C0392B",
+				border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.28)}`,
+			},
 			specChip: {
 				height: 20,
 				fontSize: "0.62rem",
@@ -549,9 +579,16 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 			},
 			metaLabel: { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: palette.textSub },
 			metaValue: { fontSize: "0.88rem", fontWeight: 700, color: palette.text, mt: 0.35 },
-			blockWrapper: (isLast: boolean) => ({ mb: isLast ? 0 : 2.5 }),
+			blockWrapper: (isLast: boolean) => ({
+				mb: isLast ? 0 : 2.5,
+				p: 2,
+				borderRadius: 2,
+				border: `1px solid ${alpha(palette.border ?? "#D5D8DC", 0.85)}`,
+				background: palette.pageBg ?? "#fff",
+			}),
 			blockMeta: { fontSize: "0.72rem", color: palette.textSub },
 			blockMetaStrong: { color: palette.text, fontWeight: 700 },
+			nestedTableGap: { mt: 1.5 },
 			materialChip: {
 				height: 22,
 				fontSize: "0.68rem",

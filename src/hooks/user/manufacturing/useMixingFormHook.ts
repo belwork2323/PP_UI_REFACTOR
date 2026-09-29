@@ -321,70 +321,126 @@ export const useMixingFormHook = (
     [],
   );
 
-  const applyPremixQualityChecks = useCallback((rows: QualityCheckRow[]) => {
+  const applyPremixQualityChecks = useCallback((rows: QualityCheckRow[], targetIndex?: number) => {
     if (!rows.length) return;
 
     setPremixCards((prev) =>
-      prev.map((premix) => ({
-        ...premix,
-        qualityChecks: rows.map((row) => {
-          const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
-          const currentRow = premix.qualityChecks.find(
-            (entry) => entry.parameterId === row.parameterId,
-          );
+      prev.map((premix, index) => {
+        // If a targetIndex is specified, only update that specific card
+        if (targetIndex !== undefined && index !== targetIndex) return premix;
 
-          // Preserve existing specification if available, otherwise use new definition
-          const specification = currentRow?.specification ?? row.specification;
+        return {
+          ...premix,
+          qualityChecks: rows.map((row) => {
+            const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
+            const currentRow = premix.qualityChecks.find(
+              (entry) => entry.parameterId === row.parameterId,
+            );
 
-          // Preserve existing filled entries; fill remaining dynamic slots with empty strings
-          const existingValues = currentRow?.observedValues ?? [];
-          const observedValues = Array.from(
-            { length: sampleCount },
-            (_, index) => existingValues[index] ?? "",
-          );
+            const specification = currentRow?.specification ?? row.specification;
+            const existingValues = currentRow?.observedValues ?? [];
+            const observedValues = Array.from(
+              { length: sampleCount },
+              (_, i) => existingValues[i] ?? "",
+            );
 
-          return {
-            ...row,
-            specification,
-            observedValues,
-          };
-        }),
-      })),
-    );
-  }, []);
-
-  const applyFinalMixQualityChecks = useCallback((rows: QualityCheckRow[]) => {
-    setFinalMixCards((prev) =>
-      prev.map((entry) => {
-        if (!rows.length) return entry;
-
-        const nextRows = rows.map((row) => {
-          const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
-          const currentRow = entry.qualityChecks.find(
-            (item) => item.parameterId === row.parameterId,
-          );
-
-          // Preserve existing specification if available, falling back to fetched row definition
-          const specification = currentRow?.specification ?? row.specification;
-
-          // Preserve existing filled entries; fill remaining dynamic slots with empty strings
-          const existingValues = currentRow?.observedValues ?? [];
-          const observedValues = Array.from(
-            { length: sampleCount },
-            (_, index) => existingValues[index] ?? "",
-          );
-
-          return {
-            ...row,
-            specification,
-            observedValues,
-          };
-        });
-
-        return { ...entry, qualityChecks: nextRows };
+            return {
+              ...row,
+              specification,
+              observedValues,
+            };
+          }),
+        };
       }),
     );
   }, []);
+
+  const applyFinalMixQualityChecks = useCallback(
+    (rows: QualityCheckRow[], targetIndex?: number) => {
+      if (!rows.length) return;
+
+      setFinalMixCards((prev) =>
+        prev.map((entry, index) => {
+          if (targetIndex !== undefined && index !== targetIndex) return entry;
+
+          const nextRows = rows.map((row) => {
+            const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
+            const currentRow = entry.qualityChecks.find(
+              (item) => item.parameterId === row.parameterId,
+            );
+
+            const specification = currentRow?.specification ?? row.specification;
+            const existingValues = currentRow?.observedValues ?? [];
+            const observedValues = Array.from(
+              { length: sampleCount },
+              (_, i) => existingValues[i] ?? "",
+            );
+
+            return {
+              ...row,
+              specification,
+              observedValues,
+            };
+          });
+
+          return { ...entry, qualityChecks: nextRows };
+        }),
+      );
+    },
+    [],
+  );
+
+  const setPremixMixingCycle = useCallback(
+    (
+      premixNo: string | number,
+      value: string,
+      extras?: { mixingCycleCode?: string; mixingCycleName?: string },
+    ) => {
+      setPremixCards((prev) =>
+        prev.map((card) =>
+          String(card.premixNo) === String(premixNo)
+            ? {
+                ...card,
+                mixingCycle: value,
+                ...(extras?.mixingCycleCode != null
+                  ? { mixingCycleCode: extras.mixingCycleCode }
+                  : {}),
+                ...(extras?.mixingCycleName != null
+                  ? { mixingCycleName: extras.mixingCycleName }
+                  : {}),
+              }
+            : card,
+        ),
+      );
+    },
+    [],
+  );
+
+  const setFinalMixMixingCycle = useCallback(
+    (
+      mixNo: string | number,
+      value: string,
+      extras?: { mixingCycleCode?: string; mixingCycleName?: string },
+    ) => {
+      setFinalMixCards((prev) =>
+        prev.map((card) =>
+          String(card.mixNo) === String(mixNo) // use mixNo, not finalMixNo
+            ? {
+                ...card,
+                mixingCycle: value,
+                ...(extras?.mixingCycleCode != null
+                  ? { mixingCycleCode: extras.mixingCycleCode }
+                  : {}),
+                ...(extras?.mixingCycleName != null
+                  ? { mixingCycleName: extras.mixingCycleName }
+                  : {}),
+              }
+            : card,
+        ),
+      );
+    },
+    [],
+  );
 
   const updateFinalMixProcessParticular = useCallback(
     (mixNo: string, rowId: number, field: keyof ProcessParticularRow, value: string | number) => {
@@ -448,9 +504,51 @@ export const useMixingFormHook = (
   );
 
   const updateFinalMixField = useCallback(
-    (mixNo: string, field: keyof Omit<FinalMixEntry, "mixNo" | "qualityChecks">, value: string) => {
+    (
+      mixNo: string | number,
+      field: keyof Omit<FinalMixEntry, "mixNo" | "qualityChecks" | "processParticulars">,
+      value: string,
+    ) => {
       setFinalMixCards((prev) =>
-        prev.map((entry) => (entry.mixNo === mixNo ? { ...entry, [field]: value } : entry)),
+        prev.map((entry) =>
+          String(entry.mixNo) === String(mixNo) ? { ...entry, [field]: value } : entry,
+        ),
+      );
+    },
+    [],
+  );
+
+  const applyPremixOperationsAndQCs = useCallback(
+    (operations: any[], qualityChecks: any[], targetPremixNo: string | number) => {
+      setPremixCards((prev) =>
+        prev.map((card) => {
+          if (targetPremixNo != null && String(card.premixNo) !== String(targetPremixNo)) {
+            return card; // leave other premixes untouched
+          }
+          return {
+            ...card,
+            processParticulars: (operations ?? []).map((op) => ({ ...op })),
+            qualityChecks: (qualityChecks ?? []).map((qc) => ({ ...qc })),
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const applyFinalMixOperationsAndQCs = useCallback(
+    (operations: any[], qualityChecks: any[], targetMixNo: string | number) => {
+      setFinalMixCards((prev) =>
+        prev.map((card) => {
+          if (targetMixNo != null && String(card.mixNo) !== String(targetMixNo)) {
+            return card;
+          }
+          return {
+            ...card,
+            processParticulars: (operations ?? []).map((op) => ({ ...op })),
+            qualityChecks: (qualityChecks ?? []).map((qc) => ({ ...qc })),
+          };
+        }),
       );
     },
     [],
@@ -498,7 +596,10 @@ export const useMixingFormHook = (
     updateFinalMixQualityCheck,
     applyPremixQualityChecks,
     applyFinalMixQualityChecks,
-    applyMixingCycleToAllCards,
+    applyPremixOperationsAndQCs,
+    applyFinalMixOperationsAndQCs,
+    setFinalMixMixingCycle,
+    setPremixMixingCycle,
   };
 };
 

@@ -136,11 +136,14 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
     dialog: {
       paper: {
         borderRadius: 3,
-        maxHeight: "92vh",
+        width: "min(1280px, calc(100vw - 32px))",
+        maxWidth: "1280px !important",
+        maxHeight: "94vh",
+        height: "94vh",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        m: 2,
+        m: 1.5,
       },
       header: {
         p: "14px 20px",
@@ -180,9 +183,10 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         boxShadow: "none",
       },
       content: {
-        p: 2.5,
+        p: { xs: 2, sm: 2.5 },
         overflowY: "auto",
         background: palette.surface,
+        flex: 1,
       },
       loadingContainer: {
         minHeight: 260,
@@ -205,22 +209,69 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         py: 6,
       },
       sectionTitle: {
-        fontSize: "0.72rem",
+        fontSize: "0.78rem",
+        fontWeight: 800,
+        color: palette.text,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.75,
+        mb: 1.25,
+      },
+      sectionCard: {
+        mb: 2.5,
+        p: 2,
+        borderRadius: 2,
+        border: `1px solid ${palette.border}`,
+        background: isDark ? alpha(palette.white, 0.03) : "#fff",
+      },
+      metaGrid: {
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "repeat(2, minmax(0, 1fr))",
+          md: "repeat(3, minmax(0, 1fr))",
+        },
+        gap: 1.25,
+      },
+      metaItem: {
+        p: 1.25,
+        borderRadius: 1.5,
+        border: `1px solid ${alpha(palette.border, 0.9)}`,
+        background: isDark ? alpha(palette.white, 0.02) : alpha(palette.surface, 0.65),
+      },
+      metaLabel: {
+        fontSize: "0.62rem",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
         color: palette.textSub,
+        mb: 0.35,
+      },
+      metaValue: {
+        fontSize: "0.82rem",
+        fontWeight: 700,
+        color: palette.text,
+        wordBreak: "break-word",
       },
       blockWrapper: (isLast: boolean) => ({
         mb: isLast ? 0 : 2.5,
+        p: 2,
+        borderRadius: 2,
+        border: `1px solid ${palette.border}`,
+        background: isDark ? alpha(palette.white, 0.03) : "#fff",
       }),
       blockMeta: {
         fontSize: "0.72rem",
         color: palette.textSub,
       },
-      blockMetaStrong: { color: palette.text },
+      blockMetaStrong: { color: palette.text, fontWeight: 700 },
       innerTableContainer: {
         borderRadius: "6px",
         border: `1px solid ${palette.border}`,
         boxShadow: `0 1px 6px ${alpha(palette.primary, 0.05)}`,
+        overflowX: "auto",
       },
+      nestedTableGap: { mt: 1.5 },
       innerHeaderCell: (_isLead = false) =>
         uniformTableHeaderCellSx(palette.primary, palette.primaryLight, {
           headerFontSize: "0.63rem",

@@ -7,11 +7,13 @@ import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operation
 import {
   buildMockTrialPayload,
   isLooseFlapDimensionalParam,
+  isThermalSpecificationCategory,
   parseSectionsToFormData,
   type RocketMotorCasingFormData,
   type RocketMotorCasingMockTrialData,
   type RocketMotorCasingMockTrialPayload,
 } from "./RocketMotorCasingFormModel";
+import { isReferenceRangeNotApplicable } from "./RawMaterialProcurementModel";
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>
@@ -314,8 +316,8 @@ export function mergeApiSectionsIntoFormData(
     clearanceStatus: String(clear.status ?? "RECEIVED"),
     insulationType: String(ins.type ?? "ROCASIN"),
     insulationReportNo: String(ins.reportNo ?? ""),
-    weightWithoutHarness: wwh.value != null ? String(wwh.value) : "",
-    weightWithHarness: wwh2.value != null ? String(wwh2.value) : "",
+    weightWithoutHarness: wwh.value != null && Number(wwh.value) !== 0 ? String(wwh.value) : "",
+    weightWithHarness: wwh2.value != null && Number(wwh2.value) !== 0 ? String(wwh2.value) : "",
     calibrationRef: String(wm.calibrationRef ?? ""),
     motorIdDetails: String(items.description ?? INITIAL_ROCKET_FORM.motorIdDetails),
     motorIdRemarks: INITIAL_ROCKET_FORM.motorIdRemarks,
@@ -403,8 +405,8 @@ export function buildRocketMotorCasingSectionsPayload(
   const arVal = parseNum(formData.erosionRateDetails) ?? 0;
   const arUnit = (formData.erosionRateRemarks || "mm/s @ 300W/cm2").trim() || "mm/s @ 300W/cm2";
 
-  const w1 = parseNum(formData.weightWithoutHarness) ?? 0;
-  const w2 = parseNum(formData.weightWithHarness) ?? 0;
+  const w1 = parseNum(formData.weightWithoutHarness);
+  const w2 = parseNum(formData.weightWithHarness);
 
   const dimensionalInspection = (formData.dimensionalData ?? []).map((row: any, idx: number) => {
     const param = dimensionalParameters[idx];
@@ -572,6 +574,8 @@ export type CasingDetailBlock = {
   mockTrialTables?: MockTrialDetailTable[];
   /** Radiography plan details table (sections, orientations, SFD, exposures, detector) */
   radiographyPlanTables?: MockTrialDetailTable[];
+  /** Rubber mechanical / thermal specification tables (Parameter, Specification, Reported, ACEM) */
+  insulationSpecTables?: MockTrialDetailTable[];
 };
 
 export type RocketMotorCasingDetailsContext = {
@@ -591,13 +595,23 @@ export type RocketMotorCasingDetailsContext = {
 };
 
 const CASING_DETAIL_COLS: CasingDetailColumn[] = [
+  { key: "specification", label: "Section / Parameter", width: "40%" },
+  { key: "analysedResult", label: "Details", width: "60%" },
+];
+const VISUAL_DETAIL_COLS: CasingDetailColumn[] = [
   { key: "specification", label: "Section / Parameter", width: "35%" },
   { key: "analysedResult", label: "Details", width: "35%" },
   { key: "remarks", label: "Remarks", width: "30%" },
 ];
 const REPORT_COLUMNS: CasingDetailColumn[] = [
   { key: "reportType", label: "Section ", width: "35%" },
-  { key: "files", label: "File", width: "35%" },
+  { key: "files", label: "File", width: "65%" },
+];
+const INSULATION_SPEC_COLUMNS: Array<{ key: string; label: string }> = [
+  { key: "parameter", label: "Parameter" },
+  { key: "specification", label: "Specification" },
+  { key: "reported", label: "Reported" },
+  { key: "acemSpec", label: "Test Result @ ACEM" },
 ];
 const detailRow = (
   specification: string,
@@ -619,12 +633,90 @@ const formatMeasuredValue = (value: unknown, unit?: string) => {
   return unit ? `${text} ${unit}`.trim() : text;
 };
 
-const formatMechDetail = (specification: string, reported: string, acem: string, unit: string) => {
-  const parts: string[] = [];
-  if (specification) parts.push(`Specification: ${specification}${unit ? ` ${unit}` : ""}`.trim());
-  if (reported) parts.push(`Reported: ${reported}${unit ? ` ${unit}` : ""}`.trim());
-  if (acem) parts.push(`Test Result @ ACEM: ${acem}${unit ? ` ${unit}` : ""}`.trim());
-  return parts.join(" · ");
+const buildInsulationSpecTables = (
+  form: RocketMotorCasingFormData,
+): MockTrialDetailTable[] | undefined => {
+  const categories = form.insulationSpecifications?.specifications ?? [];
+  const tables: MockTrialDetailTable[] = [];
+
+  if (categories.length > 0) {
+    categories.forEach((category) => {
+      const thermal = isThermalSpecificationCategory(category.category);
+      const rows = (category.parameters ?? []).map((param) => {
+        const code = param.specificationCode;
+        const data = thermal
+          ? form.thermalProperties[code]
+          : form.mechanicalProperties[code];
+        const unit = String(param.referenceRange?.unit ?? data?.unit ?? "").trim();
+        const rangeLabel = isReferenceRangeNotApplicable(param.referenceRange)
+          ? "N/A"
+          : `${param.referenceRange?.minValue ?? "—"} - ${param.referenceRange?.maxValue ?? "—"}`;
+        const name = String(param.specificationName ?? code ?? "").trim() || code;
+        return {
+          parameter: unit ? `${name} (${unit})` : name,
+          specification: rangeLabel,
+          reported: String(data?.reported ?? "").trim() || "—",
+          acemSpec: String(data?.acemSpec ?? "").trim() || "—",
+        };
+      });
+      if (rows.length > 0) {
+        tables.push({
+          title: category.category,
+          columns: INSULATION_SPEC_COLUMNS,
+          rows,
+        });
+      }
+    });
+  } else {
+    const mechRows = Object.values(form.mechanicalProperties)
+      .map((r) => {
+        const reported = String(r.reported ?? "").trim();
+        const acem = String(r.acemSpec ?? "").trim();
+        const specification = String(r.specification ?? "").trim();
+        if (!specification && !reported && !acem) return null;
+        const name = String(r.paramName || r.paramKey || "").trim() || "—";
+        const unit = String(r.unit ?? "").trim();
+        return {
+          parameter: unit ? `${name} (${unit})` : name,
+          specification: specification || "—",
+          reported: reported || "—",
+          acemSpec: acem || "—",
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    if (mechRows.length > 0) {
+      tables.push({
+        title: "Rubber Mechanical Properties",
+        columns: INSULATION_SPEC_COLUMNS,
+        rows: mechRows,
+      });
+    }
+
+    const thermalRows = Object.entries(form.thermalProperties)
+      .map(([key, r]) => {
+        const reported = String(r.reported ?? "").trim();
+        const acem = String(r.acemSpec ?? "").trim();
+        const specification = String(r.specification ?? "").trim();
+        if (!specification && !reported && !acem) return null;
+        const unit = String(r.unit ?? "").trim();
+        return {
+          parameter: unit ? `${key} (${unit})` : key,
+          specification: specification || "—",
+          reported: reported || "—",
+          acemSpec: acem || "—",
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    if (thermalRows.length > 0) {
+      tables.push({
+        title: "Rubber Thermal Properties",
+        columns: INSULATION_SPEC_COLUMNS,
+        rows: thermalRows,
+      });
+    }
+  }
+
+  return tables.length > 0 ? tables : undefined;
 };
 
 const formatSpecRange = (
@@ -770,35 +862,7 @@ const buildMockTrialDetailContent = (
 export function mapCasingFormDataToDetailBlocks(
   form: RocketMotorCasingFormData,
 ): CasingDetailBlock[] {
-  const mechRows = Object.values(form.mechanicalProperties)
-    .map((r) => {
-      const specification = (r.specification ?? "").trim();
-      const reported = (r.reported ?? "").trim();
-      const acem = (r.acemSpec ?? "").trim();
-      if (!specification && !reported && !acem) return null;
-      return detailRow(
-        r.paramName || r.paramKey,
-        formatMechDetail(specification, reported, acem, r.unit) || "—",
-      );
-    })
-    .filter((r): r is NonNullable<typeof r> => r != null);
-
-  const thermalRows = Object.entries(form.thermalProperties)
-    .map(([key, r]) => {
-      const specification = (r.specification ?? "").trim();
-      const reported = (r.reported ?? "").trim();
-      const acem = (r.acemSpec ?? "").trim();
-      if (!specification && !reported && !acem) return null;
-      const label =
-        form.insulationSpecifications?.specifications
-          .flatMap((category) => category.parameters)
-          .find((param) => param.specificationCode === key)?.specificationName ?? key;
-      return detailRow(
-        label,
-        formatMechDetail(specification, reported, acem, r.unit) || "—",
-      );
-    })
-    .filter((r): r is NonNullable<typeof r> => r != null);
+  const insulationSpecTables = buildInsulationSpecTables(form);
 
   const insulationRows: CasingDetailBlock["rows"] = [
     detailRow("Insulation curing date", form.insulationCuringDate),
@@ -813,8 +877,9 @@ export function mapCasingFormDataToDetailBlocks(
           }),
         ]
       : []),
-    ...mechRows,
-    ...thermalRows,
+    ...(!insulationSpecTables
+      ? [detailRow("No insulation specifications recorded", "—")]
+      : []),
   ];
 
   const visualRows =
@@ -872,7 +937,12 @@ export function mapCasingFormDataToDetailBlocks(
         detailRow("Casing type", form.casingType),
         detailRow("Receiving date", form.receivingDate),
         detailRow("Item type / description", form.itemsDescription),
-        detailRow("Dimension", form.itemsDimension, form.itemsUnit),
+        detailRow(
+          "Dimension",
+          form.itemsDimension
+            ? `${form.itemsDimension}${form.itemsUnit ? ` ${form.itemsUnit}` : ""}`
+            : "—",
+        ),
         detailRow("Receipt status", form.itemsReceiptStatus),
         detailRow("Observations", form.itemsObservations),
       ],
@@ -947,6 +1017,7 @@ export function mapCasingFormDataToDetailBlocks(
       material: "Insulation",
       lotNo: form.insulationReportNo || undefined,
       rows: insulationRows,
+      insulationSpecTables,
       _columns: CASING_DETAIL_COLS,
     },
     {
@@ -964,7 +1035,7 @@ export function mapCasingFormDataToDetailBlocks(
     {
       material: "Visual inspection",
       rows: visualRows,
-      _columns: CASING_DETAIL_COLS,
+      _columns: VISUAL_DETAIL_COLS,
     },
     {
       material: "Weighment",

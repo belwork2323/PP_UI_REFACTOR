@@ -407,9 +407,7 @@ export const useMixingHook = () => {
                           const current = card.qualityChecks.find(
                             (item) => item.parameterId === row.parameterId,
                           );
-                          return current
-                            ? { ...row, observedValues: current.observedValues }
-                            : row;
+                          return current ? { ...row, observedValues: current.observedValues } : row;
                         })
                       : card.qualityChecks,
                   })),
@@ -424,9 +422,7 @@ export const useMixingHook = () => {
                           const current = card.qualityChecks.find(
                             (item) => item.parameterId === row.parameterId,
                           );
-                          return current
-                            ? { ...row, observedValues: current.observedValues }
-                            : row;
+                          return current ? { ...row, observedValues: current.observedValues } : row;
                         })
                       : card.qualityChecks,
                   })),
@@ -631,10 +627,7 @@ export const useMixingHook = () => {
           },
           stageType,
         );
-        showAlert(
-          disabledReason ?? STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
-          "warning",
-        );
+        showAlert(disabledReason ?? STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
         return false;
       }
 
@@ -759,8 +752,7 @@ export const useMixingHook = () => {
                 setActiveBatch(batchToReopen);
                 setPreviousStageGate(
                   resolvePreviousStageApprovedUnits({
-                    stageProgress:
-                      enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
+                    stageProgress: enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
                     currentStage: enrichedStageFields.currentStage ?? batchToReopen.currentStage,
                     currentSlug: "mixing",
                     currentSubDepartmentId: subDepartmentId,

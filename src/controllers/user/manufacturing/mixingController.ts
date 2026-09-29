@@ -5,6 +5,7 @@ import {
 } from "../../../data/models/user/MixingFormModel";
 import {
   createMixingFormApi,
+  fetchMixingCycle,
   fetchMixingFormDetailsApi,
   fetchQualityCheck,
   updateMixingFormApi,
@@ -91,6 +92,25 @@ export const mixingController = {
     const request = (async () => {
       try {
         return await fetchQualityCheck(mixType, motorStage, code || undefined);
+      } catch (error) {
+        console.error("Failed to fetch quality checks:", error);
+        return new ApiResponseModel(error);
+      } finally {
+        qualityChecksInflight.delete(cacheKey);
+      }
+    })();
+
+    qualityChecksInflight.set(cacheKey, request);
+    return request;
+  },
+  fetchMixingCycle: async (projectId: string, motorStage: number) => {
+    const cacheKey = `${String(projectId).toUpperCase()}:${Number(motorStage) || 0}`;
+    const existing = qualityChecksInflight.get(cacheKey);
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        return await fetchMixingCycle(projectId, motorStage);
       } catch (error) {
         console.error("Failed to fetch quality checks:", error);
         return new ApiResponseModel(error);

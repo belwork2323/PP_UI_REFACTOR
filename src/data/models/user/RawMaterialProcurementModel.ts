@@ -506,6 +506,153 @@ export function serializeMaterialBlocks(blocks: MaterialBlock[]): string {
   return JSON.stringify(normalized ?? []);
 }
 
+const strDirty = (value: unknown) => String(value ?? "").trim();
+
+/** Normalize analysed / QC values so API "0" / "0.0" / 0 compare equal. */
+const normalizeResultValueForDirty = (value: unknown): string => {
+  const raw = strDirty(value);
+  if (!raw) return "";
+  if (/^-?\d+(\.\d+)?$/.test(raw)) {
+    const num = Number(raw);
+    if (!Number.isNaN(num)) return String(num);
+  }
+  return raw;
+};
+
+const preparationDetailsHaveUserValues = (
+  details: Record<string, unknown> | null | undefined,
+): boolean => {
+  if (!details) return false;
+  return Object.values(details).some((value) => {
+    if (value == null) return false;
+    if (typeof value === "number") return !Number.isNaN(value);
+    return String(value).trim() !== "";
+  });
+};
+
+const normalizePreparationForDirty = (
+  details: Record<string, unknown> | null | undefined,
+): Record<string, string | number | null> | undefined => {
+  if (!details || !preparationDetailsHaveUserValues(details)) {
+    return undefined;
+  }
+  const out: Record<string, string | number | null> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value == null || value === "") {
+      out[key] = value === null ? null : "";
+      continue;
+    }
+    if (typeof value === "number") {
+      out[key] = Number.isNaN(value) ? null : value;
+      continue;
+    }
+    out[key] = String(value).trim();
+  }
+  return out;
+};
+
+/**
+ * Canonical form for unsaved-change detection vs lot-details API fields.
+ * Compares only user-editable values: meta, analysed/ACEM results, cert fileId+type, prep.
+ */
+export function normalizeMaterialBlocksForDirtyCompare(blocks: MaterialBlock[]): unknown[] {
+  return (blocks ?? [])
+    .map((block) => ({
+      material: strDirty(block.material),
+      gradeCode: strDirty(block.gradeCode),
+      lotNo: strDirty(block.lotNo),
+      supplyOrderNo: strDirty(block.supplyOrderNo),
+      receiptDate: strDirty(block.receiptDate),
+      manufacturerName: strDirty(block.manufacturerName),
+      // fileId + certificateType are the stable API identity; fileName can be display-resolved.
+      certificates: (block.certificates ?? [])
+        .map((cert) => ({
+          fileId: strDirty(cert.fileId),
+          certificateType: strDirty(cert.certificateType),
+        }))
+        .filter((cert) => cert.fileId || cert.certificateType)
+        .sort((a, b) =>
+          `${a.fileId}\0${a.certificateType}`.localeCompare(`${b.fileId}\0${b.certificateType}`),
+        ),
+      rows: (block.rows ?? [])
+        .map((row) => ({
+          specificationCode: strDirty(row.specificationCode),
+          analysedResult: normalizeResultValueForDirty(row.analysedResult),
+          acemQcResult: normalizeResultValueForDirty(row.acemQcResult),
+        }))
+        .filter((row) => row.specificationCode)
+        .sort((a, b) => a.specificationCode.localeCompare(b.specificationCode)),
+      adductPreparation: normalizePreparationForDirty(
+        block.adductPreparation as unknown as Record<string, unknown> | undefined,
+      ),
+      htpbBlendingPreparation: normalizePreparationForDirty(
+        block.htpbBlendingPreparation as unknown as Record<string, unknown> | undefined,
+      ),
+    }))
+    .sort((a, b) =>
+      `${a.material}\0${a.gradeCode}\0${a.lotNo}`.localeCompare(
+        `${b.material}\0${b.gradeCode}\0${b.lotNo}`,
+      ),
+    );
+}
+
+export function serializeMaterialBlocksForDirtyCheck(blocks: MaterialBlock[]): string {
+  return JSON.stringify(normalizeMaterialBlocksForDirtyCompare(blocks));
+}
+
+/**
+ * Create-lot discard: true only when the user typed/uploaded something
+ * (not merely selecting a material / ACEM default manufacturer / empty spec templates).
+ */
+export function hasRawMaterialCreateDirtyData(blocks: MaterialBlock[]): boolean {
+  return (blocks ?? []).some((block) => {
+    const manufacturer = strDirty(block.manufacturerName);
+    const isDefaultAcemManufacturer =
+      String(block.rawMaterialType ?? "")
+        .trim()
+        .toUpperCase() === "ACEM" && manufacturer.toUpperCase() === "ACEM";
+
+    if (strDirty(block.lotNo)) return true;
+    if (strDirty(block.supplyOrderNo)) return true;
+    if (strDirty(block.receiptDate)) return true;
+    if (manufacturer && !isDefaultAcemManufacturer) return true;
+
+    if (
+      (block.certificates ?? []).some(
+        (cert) =>
+          strDirty(cert.fileName) || Boolean(cert.file) || strDirty(cert.fileId),
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      (block.rows ?? []).some(
+        (row) => strDirty(row.analysedResult) || strDirty(row.acemQcResult),
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      preparationDetailsHaveUserValues(
+        block.adductPreparation as unknown as Record<string, unknown> | undefined,
+      )
+    ) {
+      return true;
+    }
+    if (
+      preparationDetailsHaveUserValues(
+        block.htpbBlendingPreparation as unknown as Record<string, unknown> | undefined,
+      )
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
 export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBlock[] {
   return (groups ?? []).flatMap((group) =>
     (group.lots ?? []).map((lot) => ({

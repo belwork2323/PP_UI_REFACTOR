@@ -47,7 +47,7 @@ const CasePrepSelect = ({
   const errorColor = theme.palette?.error?.main ?? "#d32f2f";
   const hasValue = String(value ?? "").trim().length > 0;
   const safeOptions = Array.isArray(options) ? options : [];
-  const showError = Boolean(error);
+  const showError = Boolean(error) && !disabled;
 
   const selectedOption = useMemo(
     () => safeOptions.find((o) => o.value === value),
