@@ -87,7 +87,12 @@ export type CasePrepObservationRow = {
 
 export type CasePrepIngredientRow = {
   srNo: number;
+  /** From materials master when resolved; null when recipe-only. */
+  materialId?: number | null;
+  /** From materials master when resolved; null → Mfg Lot uses Enter Lot No. */
+  materialCode?: string | null;
   materialName: string;
+  /** Display ingredient label from liner recipe (e.g. HTPB). */
   ingredient: string;
   mfgLot: string;
   partsByWeight: string;
@@ -935,10 +940,14 @@ const ingredientRowsForPayload = (rows: CasePrepIngredientRow[]): unknown[] =>
     // Always send totalQuantity as user input only (number, or null when blank — never copy quantityTaken).
     const totalQuantityRaw = str(row.totalQuantity).trim();
     const totalQuantity = totalQuantityRaw ? toApiNumber(totalQuantityRaw) ?? null : null;
+    const materialName = str(row.materialName).trim() || str(row.ingredient).trim();
+    const materialCode = str(row.materialCode ?? "").trim();
+    // Prefer master code in `ingredient` when known; otherwise keep display name.
+    const ingredient = materialCode || str(row.ingredient).trim() || materialName;
     return {
       srNo: row.srNo || index + 1,
-      materialName: str(row.materialName).trim(),
-      ingredient: str(row.ingredient).trim(),
+      materialName,
+      ingredient,
       mfgLot: str(row.mfgLot).trim(),
       ...(partsByWeight !== undefined ? { partsByWeight } : {}),
       ...(quantityTaken !== undefined ? { quantityTaken } : {}),
@@ -1196,10 +1205,24 @@ const parseIngredientRows = (value: unknown): CasePrepIngredientRow[] =>
     .map((item, index) => {
       const row = asRecord(item);
       if (!row) return null;
+      const materialName = str(row.materialName ?? "").trim();
+      const ingredientRaw = str(row.ingredient ?? "").trim();
+      const materialCodeRaw = str(row.materialCode ?? "").trim();
+      // Payload stores master code in `ingredient` when known; keep display name for UI.
+      const materialCode =
+        materialCodeRaw ||
+        (materialName && ingredientRaw && materialName !== ingredientRaw ? ingredientRaw : "") ||
+        null;
+      const displayName = materialName || ingredientRaw;
       return {
         srNo: Number(row.srNo ?? row.SR_NO ?? index + 1) || index + 1,
-        materialName: str(row.materialName ?? ""),
-        ingredient: str(row.ingredient ?? ""),
+        materialId:
+          row.materialId != null && Number.isFinite(Number(row.materialId))
+            ? Number(row.materialId)
+            : null,
+        materialCode: materialCode || null,
+        materialName: displayName,
+        ingredient: displayName,
         mfgLot: str(row.mfgLot ?? ""),
         partsByWeight: str(row.partsByWeight ?? ""),
         quantityTaken: str(row.quantityTaken ?? ""),

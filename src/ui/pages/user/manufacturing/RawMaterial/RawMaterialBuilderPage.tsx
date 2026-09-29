@@ -165,7 +165,7 @@ const RawMaterialBuilderForm = ({
           : document;
       focusRmpField(pendingFocus.fieldPath, root);
       setPendingFocus(null);
-    }, 80);
+    }, 120);
     return () => window.clearTimeout(timer);
   }, [pendingFocus, activePremixGroup, activeMaterialEntry]);
 
@@ -285,18 +285,30 @@ const RawMaterialBuilderForm = ({
   const activeSolidRmpFormTemplate = useMemo(() => {
     if (!activeMaterialEntry?.solidMaterialCode) return null;
     return (
+      activeMaterialEntry.solidRmpFormTemplate ??
       findMaterialByCode(availableSolidMaterials ?? [], activeMaterialEntry.solidMaterialCode)
-        ?.rmpFormTemplate ?? null
+        ?.rmpFormTemplate ??
+      null
     );
-  }, [activeMaterialEntry?.solidMaterialCode, availableSolidMaterials]);
+  }, [
+    activeMaterialEntry?.solidMaterialCode,
+    activeMaterialEntry?.solidRmpFormTemplate,
+    availableSolidMaterials,
+  ]);
 
   const activeLiquidRmpFormTemplate = useMemo(() => {
     if (!activeMaterialEntry?.liquidMaterialCode) return null;
     return (
+      activeMaterialEntry.liquidRmpFormTemplate ??
       findMaterialByCode(availableLiquidMaterials ?? [], activeMaterialEntry.liquidMaterialCode)
-        ?.rmpFormTemplate ?? null
+        ?.rmpFormTemplate ??
+      null
     );
-  }, [activeMaterialEntry?.liquidMaterialCode, availableLiquidMaterials]);
+  }, [
+    activeMaterialEntry?.liquidMaterialCode,
+    activeMaterialEntry?.liquidRmpFormTemplate,
+    availableLiquidMaterials,
+  ]);
 
   const sheetMaterialCount = identificationSheet?.materials?.length ?? 0;
   const statusConfig = rmTheme.details.bannerStatusConfig as Record<

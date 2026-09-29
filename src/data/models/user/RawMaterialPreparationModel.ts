@@ -365,8 +365,10 @@ export type RawMaterialPrepPremixSelection = {
   solidGradeCode: string;
   solidMaterialId?: number;
   solidGradeId?: number;
+  solidRmpFormTemplate?: string | null;
   liquidMaterialCode: string;
   liquidMaterialId?: number;
+  liquidRmpFormTemplate?: string | null;
 };
 
 export type RawMaterialPrepMaterialProcessSlot = {
@@ -654,11 +656,15 @@ export const mapPreparationDetailsPayload = (params: {
     const liquidProcess: PreparationProcessEntry[] = [];
     const weightmentSheet = params.weightmentSheet ?? createEmptyWeightmentSheet();
 
+    const isSubmit = params.premixSubmissionType === "SUBMIT";
+
     entries.forEach((entry) => {
       const sessionKey = `${entry.premix}:${entry.materialKey}`;
       const session = params.premixSessions[sessionKey] ?? createEmptyPremixProcessSession();
       const solidMaterial = findMaterialInList(params.solidMaterials, entry.solidMaterialCode);
       const liquidMaterial = findMaterialInList(params.liquidMaterials, entry.liquidMaterialCode);
+      let solidAdded = 0;
+      let liquidAdded = 0;
 
       if (entry.selectedProcesses.solid) {
         const solidFallback = {
@@ -670,7 +676,9 @@ export const mapPreparationDetailsPayload = (params: {
         };
 
         const apSlots = session.apGradeSlots;
-        const isAp = materialUsesApForm(solidMaterial);
+        const isAp =
+          materialUsesApForm(solidMaterial) ||
+          String(entry.solidRmpFormTemplate ?? "").toUpperCase() === "AP";
 
         if (isAp && Array.isArray(apSlots)) {
           // Host-managed AP grades (may be empty after user deleted all).
@@ -689,21 +697,28 @@ export const mapPreparationDetailsPayload = (params: {
                   gradeId: entry.solidGradeId,
                 },
               }) ??
-              (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+              (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
                 ? buildWeightmentOnlyProcessEntry(
                     { ...solidFallback, gradeCode },
                     uiKeyToProcessType(gradeSlot.slot.uiKey),
                   )
                 : null);
-            if (process) solidProcess.push(process);
+            if (process) {
+              solidProcess.push(process);
+              solidAdded += 1;
+            }
           });
-          // If all grades deleted but weightment exists, keep a weightment-only identity row.
+          // If all grades deleted but weightment exists, keep a weightment-only identity row (draft only).
           if (
+            !isSubmit &&
             apSlots.length === 0 &&
             weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
           ) {
             const process = buildWeightmentOnlyProcessEntry(solidFallback, "DEFAULT_SOLID");
-            if (process) solidProcess.push(process);
+            if (process) {
+              solidProcess.push(process);
+              solidAdded += 1;
+            }
           }
         } else {
           const process =
@@ -724,7 +739,7 @@ export const mapPreparationDetailsPayload = (params: {
               solidFallback,
               uiKeyToProcessType(session.solid.uiKey),
             ) ??
-            (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+            (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
               ? buildWeightmentOnlyProcessEntry(
                   solidFallback,
                   uiKeyToProcessType(session.solid.uiKey),
@@ -733,7 +748,14 @@ export const mapPreparationDetailsPayload = (params: {
 
           if (process) {
             solidProcess.push(process);
+            solidAdded += 1;
           }
+        }
+
+        if (isSubmit && solidAdded === 0) {
+          throw new Error(
+            `Premix ${premixNo} solid material ${entry.solidMaterialCode || entry.materialKey} has no process data to submit.`,
+          );
         }
       }
 
@@ -760,7 +782,7 @@ export const mapPreparationDetailsPayload = (params: {
             liquidFallback,
             uiKeyToProcessType(session.liquid.uiKey),
           ) ??
-          (weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
+          (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
             ? buildWeightmentOnlyProcessEntry(
                 liquidFallback,
                 uiKeyToProcessType(session.liquid.uiKey),
@@ -769,12 +791,31 @@ export const mapPreparationDetailsPayload = (params: {
 
         if (process) {
           liquidProcess.push(process);
+          liquidAdded += 1;
+        }
+
+        if (isSubmit && liquidAdded === 0) {
+          throw new Error(
+            `Premix ${premixNo} liquid material ${entry.liquidMaterialCode || entry.materialKey} has no process data to submit.`,
+          );
         }
       }
     });
 
-    if (solidProcess.length === 0 && liquidProcess.length === 0 && !params.includeEmptyPremixes)
+    if (
+      solidProcess.length === 0 &&
+      liquidProcess.length === 0 &&
+      !params.includeEmptyPremixes
+    ) {
       return;
+    }
+
+    // SUBMIT must not persist a premix shell with zero process rows.
+    if (isSubmit && solidProcess.length === 0 && liquidProcess.length === 0) {
+      throw new Error(
+        `Premix ${premixNo} has no process data to submit. Fill lot/process details and try again.`,
+      );
+    }
 
     const premixDate = String(entries[0]?.premixDate ?? "").trim();
     const hasSolid = entries.some((entry) => entry.selectedProcesses.solid);
@@ -1448,6 +1489,20 @@ export const formatPrepSectionLabel = (sectionId: string): string => {
 
   const knownLabels: Record<string, string> = {
     srNo: "Sr No.",
+    lotDetails: "Lot Details",
+    dryingTrayOven: "Drying",
+    sieving: "Sieving",
+    apEquipment: "AP Equipment",
+    blendingDryingParameters: "Blending / Drying Parameters",
+    dryingOperationRvd: "Drying Operation (RVD)",
+    particleSizeDistribution: "Particle Size Distribution",
+    apFineGrinding: "AP Fine Grinding",
+    apUltraFineGrinding: "AP Ultra Fine Grinding",
+    aluminumProcessing: "Aluminum",
+    trayOvenStorage: "Tray Oven Storage",
+    doaProcessing: "DOA",
+    doa: "DOA",
+    tdi: "TDI",
   };
   if (knownLabels[raw]) return knownLabels[raw];
 
@@ -1563,14 +1618,33 @@ export const collectPrepSectionNestedTableRows = (
 
 const mapProcessSections = (
   process: PreparationProcessEntry,
-): RawMaterialPrepApproverProcessView => ({
-  materialCode: String(process.materialCode ?? ""),
-  materialName: String(process.materialName ?? process.materialCode ?? ""),
-  gradeCode: process.gradeCode ?? null,
-  sections: typedProcessToDisplaySections(process).filter(
+): RawMaterialPrepApproverProcessView => {
+  const typedSections = typedProcessToDisplaySections(process).filter(
     (section) => expandRawMaterialPrepSectionRows(section.sectionData).length > 0,
-  ),
-});
+  );
+  const legacySections =
+    typedSections.length === 0 && Array.isArray(process.sections)
+      ? process.sections
+          .map((section) => ({
+            sectionId: String(section.sectionId ?? ""),
+            sectionData: Array.isArray(section.sectionData)
+              ? (section.sectionData as Record<string, unknown>[])
+              : [],
+          }))
+          .filter(
+            (section) =>
+              section.sectionId &&
+              expandRawMaterialPrepSectionRows(section.sectionData).length > 0,
+          )
+      : [];
+
+  return {
+    materialCode: String(process.materialCode ?? ""),
+    materialName: String(process.materialName ?? process.materialCode ?? ""),
+    gradeCode: process.gradeCode ?? null,
+    sections: typedSections.length > 0 ? typedSections : legacySections,
+  };
+};
 
 export const mapRawMaterialPreparationApproverDetailView = (
   details: RawMaterialPreparationDetails,

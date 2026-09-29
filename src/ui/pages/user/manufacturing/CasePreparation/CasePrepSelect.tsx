@@ -25,6 +25,7 @@ type CasePrepSelectProps = {
   theme: any;
   required?: boolean;
   error?: boolean;
+  helperText?: string | null;
 };
 
 const CasePrepSelect = ({
@@ -39,12 +40,14 @@ const CasePrepSelect = ({
   theme,
   required = false,
   error = false,
+  helperText = null,
 }: CasePrepSelectProps) => {
   const cpTheme = theme.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
-  const accentColor = theme.palette.primaryLight ?? theme.palette.primary;
+  const errorColor = theme.palette?.error?.main ?? "#d32f2f";
   const hasValue = String(value ?? "").trim().length > 0;
   const safeOptions = Array.isArray(options) ? options : [];
+  const showError = Boolean(error);
 
   const selectedOption = useMemo(
     () => safeOptions.find((o) => o.value === value),
@@ -69,9 +72,29 @@ const CasePrepSelect = ({
           value={value}
           disabled={disabled}
           required={required}
-          error={error}
+          error={showError}
+          helperText={helperText ?? undefined}
           onChange={(e) => onChange(String(e.target.value))}
-          sx={flowBar.selectInput?.(hasValue)}
+          sx={{
+            ...flowBar.selectInput?.(hasValue),
+            // Theme selectInput forces borderColor and overrides MUI error styles.
+            ...(showError
+              ? {
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": {
+                      borderColor: errorColor,
+                    },
+                    "&:hover fieldset": {
+                      borderColor: errorColor,
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: errorColor,
+                      borderWidth: 2,
+                    },
+                  },
+                }
+              : null),
+          }}
           SelectProps={{
             displayEmpty: true,
             IconComponent: ExpandMoreRoundedIcon,
@@ -88,7 +111,12 @@ const CasePrepSelect = ({
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <InputRoundedIcon sx={{ color: "rgba(21,101,192,0.55)", fontSize: 16 }} />
+                <InputRoundedIcon
+                  sx={{
+                    color: showError ? errorColor : "rgba(21,101,192,0.55)",
+                    fontSize: 16,
+                  }}
+                />
               </InputAdornment>
             ),
           }}

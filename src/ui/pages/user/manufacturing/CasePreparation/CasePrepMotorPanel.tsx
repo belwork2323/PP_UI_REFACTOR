@@ -1,7 +1,9 @@
-import { Fragment, useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Box,
+  CircularProgress,
   IconButton,
+  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -27,6 +29,14 @@ import {
   type CasePrepParameterRow,
   type CasePrepQualificationParameterRow,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import {
+  buildLinerIngredientTables,
+  CASE_PREP_ENTER_LOT_VALUE,
+  enrichIngredientRowsFromMaterials,
+  isRecipeLinerType,
+  linerRecipeHasFixedParts,
+} from "../../../../../data/models/user/casePrepLinerRecipes";
+import { useCasePrepLinerMaterials } from "../../../../../hooks/user/manufacturing/useCasePrepLinerMaterials";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
@@ -53,21 +63,13 @@ import {
 import type { CasePrepValidationErrors } from "../../../../../data/models/user/casePrepValidation";
 import { casePrepFieldError } from "../../../../../data/models/user/casePrepValidation";
 
-type MaterialInput = {
-  materialCode?: string;
-  materialName?: string;
-  lotId?: string;
-  requiredComposition?: string | number;
-  quantityPerPremix?: string | number;
-};
-
 type Props = {
   value: CasePrepMotorData;
   onChange: (next: CasePrepMotorData) => void;
   motorId: string;
   batchId?: string;
-  /** From batch identification sheet */
-  materials?: MaterialInput[];
+  /** @deprecated Liner mix tables come from liner-type recipes, not the sheet. */
+  materials?: unknown[];
   disabled?: boolean;
   readOnly?: boolean;
   /** Field path → message from validateCasePrepMotorData */
@@ -180,31 +182,6 @@ const resolveAbradingCutAttachments = (
   collect(true);
   collect(false);
   return merged;
-};
-
-const materialsToIngredientRows = (materials: MaterialInput[]): CasePrepIngredientRow[] =>
-  materials.map((material, index) => ({
-    srNo: index + 1,
-    materialName: str(material.materialName),
-    ingredient: str(material.materialCode),
-    mfgLot: str(material.lotId),
-    partsByWeight: str(material.requiredComposition),
-    quantityTaken: str(material.quantityPerPremix),
-    totalQuantity: "",
-  }));
-
-const sumQuantityPerPremix = (materials: MaterialInput[]): string => {
-  let total = 0;
-  let any = false;
-  for (const material of materials) {
-    const raw = str(material.quantityPerPremix).trim().replace(/,/g, "");
-    if (!raw) continue;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) continue;
-    total += n;
-    any = true;
-  }
-  return any ? String(total) : "";
 };
 
 const CompactDateTime = ({
@@ -392,12 +369,129 @@ const ValueByFieldType = ({
   );
 };
 
+type MfgLotCellProps = {
+  row: CasePrepIngredientRow;
+  disabled?: boolean;
+  readOnly?: boolean;
+  onChange: (mfgLot: string) => void;
+  fetchLotsForMaterialCode: (materialCode: string) => Promise<unknown>;
+  getCachedLotOptions: (
+    materialCode: string,
+    currentLot?: string,
+  ) => Array<{ value: string; label: string }>;
+  isLoadingLots: (materialCode: string) => boolean;
+};
+
+const MfgLotCell = ({
+  row,
+  disabled = false,
+  readOnly = false,
+  onChange,
+  fetchLotsForMaterialCode,
+  getCachedLotOptions,
+  isLoadingLots,
+}: MfgLotCellProps) => {
+  const materialCode = str(row.materialCode).trim();
+  const hasCode = Boolean(materialCode);
+  const currentLot = str(row.mfgLot).trim();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  if (readOnly) {
+    return (
+      <WorkflowReadOnlyText
+        value={currentLot || "—"}
+        sx={{ fontSize: "0.78rem", py: 0.5 }}
+      />
+    );
+  }
+
+  if (!hasCode) {
+    return (
+      <Stack spacing={0.75} sx={{ minWidth: 140 }}>
+        <TextField
+          select
+          size="small"
+          fullWidth
+          disabled={disabled}
+          value={CASE_PREP_ENTER_LOT_VALUE}
+          onChange={() => undefined}
+          sx={casePrepTableInputSx}
+        >
+          <MenuItem value={CASE_PREP_ENTER_LOT_VALUE}>Enter Lot No</MenuItem>
+        </TextField>
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Enter lot no"
+          disabled={disabled}
+          value={currentLot}
+          onChange={(e) => onChange(String(e.target.value))}
+          sx={casePrepTableInputSx}
+        />
+      </Stack>
+    );
+  }
+
+  const options = getCachedLotOptions(materialCode, currentLot);
+  const loading = isLoadingLots(materialCode);
+  const selectValue =
+    currentLot && options.some((opt) => opt.value === currentLot) ? currentLot : currentLot || "";
+
+  return (
+    <TextField
+      select
+      size="small"
+      fullWidth
+      disabled={disabled}
+      value={selectValue}
+      onChange={(e) => onChange(String(e.target.value))}
+      sx={casePrepTableInputSx}
+      SelectProps={{
+        displayEmpty: true,
+        onOpen: () => {
+          setMenuOpen(true);
+          void fetchLotsForMaterialCode(materialCode);
+        },
+        onClose: () => setMenuOpen(false),
+        renderValue: (selected) => {
+          const v = String(selected ?? "").trim();
+          if (!v) {
+            return (
+              <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+                Select lot
+              </Typography>
+            );
+          }
+          return v;
+        },
+      }}
+    >
+      <MenuItem value="">
+        <em>Select lot</em>
+      </MenuItem>
+      {loading && menuOpen ? (
+        <MenuItem disabled value="__loading__">
+          <Stack direction="row" alignItems="center" gap={1}>
+            <CircularProgress size={14} />
+            Loading lots…
+          </Stack>
+        </MenuItem>
+      ) : null}
+      {options.map((opt) => (
+        <MenuItem key={opt.value} value={opt.value}>
+          {opt.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+};
+
 const CasePrepMotorPanel = ({
   value,
   onChange,
   motorId: _motorId,
   batchId: _batchId,
-  materials,
+  materials: _materials,
   disabled = false,
   readOnly = false,
   validationErrors,
@@ -408,8 +502,14 @@ const CasePrepMotorPanel = ({
   onChangeRef.current = onChange;
   const valueRef = useRef(value);
   valueRef.current = value;
-  const syncedCasingRef = useRef<string | null>(null);
-  const seededIngredientsRef = useRef(false);
+  const prevLinerTypeRef = useRef<string | null>(null);
+  const lastMaterialsLenRef = useRef(0);
+  const {
+    materials: masterMaterials,
+    fetchLotsForMaterialCode,
+    getCachedLotOptions,
+    isLoadingLots,
+  } = useCasePrepLinerMaterials();
 
   const patchSection = <K extends keyof CasePrepMotorData>(
     sectionKey: K,
@@ -423,60 +523,68 @@ const CasePrepMotorPanel = ({
       },
     });
   };
-  console.log(value);
 
-  // Sync casing / insulation from identification sheet into abrading section
-  // useEffect(() => {
-  //   const nextCasing = str(casingType).trim();
-  //   const nextInsulation = str(insulationType).trim();
-  //   const key = `${nextCasing}::${nextInsulation}`;
-  //   if (syncedCasingRef.current === key) return;
-  //   syncedCasingRef.current = key;
-
-  //   const current = valueRef.current.abradingOperation;
-  //   if (current.typeOfCasing === nextCasing && current.typeOfInsulation === nextInsulation) {
-  //     return;
-  //   }
-
-  //   onChangeRef.current({
-  //     ...valueRef.current,
-  //     abradingOperation: {
-  //       ...current,
-  //       typeOfCasing: nextCasing || current.typeOfCasing,
-  //       typeOfInsulation: nextInsulation || current.typeOfInsulation,
-  //     },
-  //   });
-  // }, [casingType, insulationType]);
-
-  // Seed premix / final-mix ingredient rows from materials when empty
+  // Build / rebuild premix + final mix from liner-type recipe (not identification sheet).
   useEffect(() => {
-    if (seededIngredientsRef.current) return;
-    if (!materials?.length) return;
-
+    const linerType = str(value.linerCoatingOperation.linerType).trim();
+    const prev = prevLinerTypeRef.current;
     const liner = valueRef.current.linerCoatingOperation;
-    const premixEmpty = !liner.premixIngredients?.length;
-    const finalEmpty = !liner.finalMixIngredients?.length;
-    if (!premixEmpty && !finalEmpty) {
-      seededIngredientsRef.current = true;
+    const materialsReady = masterMaterials.length > 0;
+    const materialsJustLoaded = materialsReady && lastMaterialsLenRef.current !== masterMaterials.length;
+
+    const applyTables = (
+      premixIngredients: CasePrepIngredientRow[],
+      finalMixIngredients: CasePrepIngredientRow[],
+    ) => {
+      onChangeRef.current({
+        ...valueRef.current,
+        linerCoatingOperation: {
+          ...valueRef.current.linerCoatingOperation,
+          premixIngredients,
+          finalMixIngredients,
+        },
+      });
+    };
+
+    if (materialsJustLoaded) {
+      lastMaterialsLenRef.current = masterMaterials.length;
+    }
+
+    // User changed liner type → rebuild from recipe (or clear for OTHERS).
+    if (prev !== null && prev !== linerType) {
+      prevLinerTypeRef.current = linerType;
+      if (isRecipeLinerType(linerType)) {
+        const built = buildLinerIngredientTables(linerType, masterMaterials);
+        applyTables(built.premixIngredients, built.finalMixIngredients);
+      } else {
+        applyTables([], []);
+      }
       return;
     }
 
-    seededIngredientsRef.current = true;
-    const rows = materialsToIngredientRows(materials);
-    const batchSize = str(liner.batchSize).trim() || sumQuantityPerPremix(materials);
+    if (prev === null) {
+      prevLinerTypeRef.current = linerType;
+    }
 
-    onChangeRef.current({
-      ...valueRef.current,
-      linerCoatingOperation: {
-        ...liner,
-        premixIngredients: premixEmpty ? rows : liner.premixIngredients,
-        finalMixIngredients: finalEmpty
-          ? rows.map((row) => ({ ...row }))
-          : liner.finalMixIngredients,
-        batchSize,
-      },
-    });
-  }, [materials]);
+    const premix = liner.premixIngredients ?? [];
+    const finalMix = liner.finalMixIngredients ?? [];
+
+    // Empty tables + recipe type → seed (wait for master when possible so codes resolve).
+    if (!premix.length && !finalMix.length && isRecipeLinerType(linerType)) {
+      if (!materialsReady && prev !== null && !materialsJustLoaded) return;
+      const built = buildLinerIngredientTables(linerType, masterMaterials);
+      applyTables(built.premixIngredients, built.finalMixIngredients);
+      return;
+    }
+
+    // Materials master arrived later → attach materialId/code without wiping lots/qty.
+    if (materialsJustLoaded && (premix.length || finalMix.length)) {
+      applyTables(
+        enrichIngredientRowsFromMaterials(premix, masterMaterials),
+        enrichIngredientRowsFromMaterials(finalMix, masterMaterials),
+      );
+    }
+  }, [value.linerCoatingOperation.linerType, masterMaterials]);
 
   const updateAbradingDetails = (rows: CasePrepAbradingDetailsRow[]) => {
     patchSection("abradingOperation", {
@@ -626,6 +734,8 @@ const CasePrepMotorPanel = ({
     />
   );
 
+  const fixedPartsByWeight = linerRecipeHasFixedParts(value.linerCoatingOperation.linerType);
+
   const ingredientTable = (
     title: string,
     listKey: "premixIngredients" | "finalMixIngredients",
@@ -635,32 +745,28 @@ const CasePrepMotorPanel = ({
       <Box sx={{ mb: 2 }}>
         <SubsectionHeading>{title}</SubsectionHeading>
         <TableContainer sx={casePrepTableContainerSx}>
-          <Table size="small" sx={{ minWidth: 860 }}>
+          <Table size="small" sx={{ minWidth: 760 }}>
             <TableHead>
               <TableRow>
-                {[
-                  "Sr No",
-                  "Material Name",
-                  "Ingredient",
-                  "Mfg Lot",
-                  "Parts by Weight",
-                  "Qty Taken",
-                  "Total Qty",
-                ].map((label, idx) => (
-                  <TableCell key={label} sx={casePrepTableHeaderCellSx(idx === 0)}>
-                    {label}
-                  </TableCell>
-                ))}
+                {["Sr No", "Ingredient", "Mfg Lot", "Parts by Wt.", "Qty Taken", "Total Qty"].map(
+                  (label, idx) => (
+                    <TableCell key={label} sx={casePrepTableHeaderCellSx(idx === 0)}>
+                      {label}
+                    </TableCell>
+                  ),
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={6}
                     sx={{ ...casePrepTableCellSx, color: BRAND.textSub, textAlign: "center" }}
                   >
-                    No ingredients
+                    {str(value.linerCoatingOperation.linerType).trim()
+                      ? "No ingredients for this liner type"
+                      : "Select liner type to load ingredients"}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -668,35 +774,28 @@ const CasePrepMotorPanel = ({
                   <TableRow key={`${listKey}-${index}`} sx={casePrepTableRowSx(index)}>
                     <TableCell sx={casePrepTableCellSx}>{row.srNo || index + 1}</TableCell>
                     <TableCell sx={casePrepTableCellSx}>
-                      <TableTextInput
-                        value={row.materialName}
-                        onChange={(v) => updateIngredientRow(listKey, index, { materialName: v })}
-                        disabled={disabled}
-                        readOnly={readOnly}
+                      <WorkflowReadOnlyText
+                        value={row.ingredient || row.materialName || "—"}
+                        sx={{ fontSize: "0.78rem", py: 0.5 }}
                       />
                     </TableCell>
-                    <TableCell sx={casePrepTableCellSx}>
-                      <TableTextInput
-                        value={row.ingredient}
-                        onChange={(v) => updateIngredientRow(listKey, index, { ingredient: v })}
+                    <TableCell sx={{ ...casePrepTableCellSx, minWidth: 160 }}>
+                      <MfgLotCell
+                        row={row}
                         disabled={disabled}
                         readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={casePrepTableCellSx}>
-                      <TableTextInput
-                        value={row.mfgLot}
-                        onChange={(v) => updateIngredientRow(listKey, index, { mfgLot: v })}
-                        disabled={disabled}
-                        readOnly={readOnly}
+                        onChange={(mfgLot) => updateIngredientRow(listKey, index, { mfgLot })}
+                        fetchLotsForMaterialCode={fetchLotsForMaterialCode}
+                        getCachedLotOptions={getCachedLotOptions}
+                        isLoadingLots={isLoadingLots}
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>
                       <TableTextInput
                         value={row.partsByWeight}
                         onChange={(v) => updateIngredientRow(listKey, index, { partsByWeight: v })}
-                        disabled={disabled}
-                        readOnly={readOnly}
+                        disabled={disabled || fixedPartsByWeight}
+                        readOnly={readOnly || fixedPartsByWeight}
                         type="number"
                       />
                     </TableCell>

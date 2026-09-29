@@ -552,8 +552,11 @@ export class BatchListItemModel {
 /** UI / read model — may include display-only fields from lot lookup */
 export interface MaterialItem {
   srNo: number;
+  materialId?: number;
   materialCode: string;
   materialName?: string;
+  materialType?: string;
+  rmpFormTemplate?: string | null;
   gradeCode?: string;
   gradeName?: string;
   lotIds: string[];
@@ -732,8 +735,14 @@ export function parseIdentificationSheetFromApi(
   const materials = Array.isArray(sheet.materials)
     ? sheet.materials.map((m: Record<string, any>) => ({
         srNo: m.srNo ?? 0,
+        materialId:
+          m.materialId != null && Number.isFinite(Number(m.materialId))
+            ? Number(m.materialId)
+            : undefined,
         materialCode: m.materialCode ?? "",
         materialName: m.materialName ?? "",
+        materialType: String(m.materialType ?? "").trim() || undefined,
+        rmpFormTemplate: m.rmpFormTemplate != null ? String(m.rmpFormTemplate).trim() : null,
         gradeCode: String(m.gradeCode ?? m.grade?.gradeCode ?? "").trim() || undefined,
         gradeName: String(m.gradeName ?? m.grade?.gradeName ?? "").trim() || undefined,
         lotIds: m.lotIds ?? [],

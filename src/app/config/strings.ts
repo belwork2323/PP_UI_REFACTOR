@@ -1611,6 +1611,10 @@ export const STRINGS = {
           required: "Mixer building number is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
         },
+        weightmentDeviationMessage: {
+          required: "Deviation message is required when Deviation found is selected",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
         weightmentMaterialCode: {
           required: "Material code is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",

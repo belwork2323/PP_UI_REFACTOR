@@ -122,6 +122,7 @@ const LotDetailsSection = ({
                   theme={theme}
                   required
                   error={Boolean(fieldErrors[`${index}.lotId`])}
+                  helperText={fieldErrors[`${index}.lotId`] ?? null}
                   onChange={(v) => updateRow(index, { lotId: v })}
                 />
               </Box>

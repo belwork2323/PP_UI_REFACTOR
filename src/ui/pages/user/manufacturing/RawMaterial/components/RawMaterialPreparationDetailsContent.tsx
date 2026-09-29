@@ -216,10 +216,19 @@ export const ProcessDetailBlock = ({
         {process.materialName || process.materialCode}
         {process.gradeCode ? ` (${process.gradeCode})` : ""}
       </Typography>
+      {process.materialCode && process.materialName && process.materialName !== process.materialCode ? (
+        <Typography sx={{ fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>
+          {process.materialCode}
+        </Typography>
+      ) : null}
     </Stack>
-    {process.sections.map((section) => (
-      <SchemaSectionTable key={section.sectionId} section={section} dt={dt} />
-    ))}
+    {process.sections.length === 0 ? (
+      <Typography sx={dt.emptyText}>No process section data recorded.</Typography>
+    ) : (
+      process.sections.map((section) => (
+        <SchemaSectionTable key={section.sectionId} section={section} dt={dt} />
+      ))
+    )}
   </Box>
 );
 

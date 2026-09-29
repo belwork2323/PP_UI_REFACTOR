@@ -781,6 +781,14 @@ const RawMaterialWeightmentSheetPanel = ({
                 palette={palette}
                 width={{ xs: "100%", sm: 480 }}
                 disabled={disabled}
+                required
+                fieldPath="weightment.validation.deviationMessage"
+                error={Boolean(
+                  submitVisibleError("weightment.validation.deviationMessage"),
+                )}
+                helperText={
+                  submitVisibleError("weightment.validation.deviationMessage") ?? undefined
+                }
               />
             ) : null}
           </Stack>

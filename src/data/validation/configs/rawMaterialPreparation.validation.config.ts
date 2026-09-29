@@ -332,22 +332,14 @@ export const isFieldRequiredOnSubmit = (
     return isFieldInMaterialSubmitScope(fieldId, context);
   }
 
+  // Material-scoped: only fields listed in materialMandatoryScopes (or allExceptOptional).
+  // Materials with no scope entry → process fields are optional on SUBMIT.
   if (context?.materialCode) {
     return isFieldInMaterialSubmitScope(fieldId, context);
   }
 
-  const t = fieldType.toLowerCase();
-  return (
-    t === "number" ||
-    t === "decimal" ||
-    t === "date" ||
-    t === "time" ||
-    t === "datetime" ||
-    t === "text" ||
-    t === "textarea" ||
-    t === "dropdown" ||
-    t === "string"
-  );
+  // No material context → do not invent requiredness (format checks still apply when filled).
+  return false;
 };
 
 /**

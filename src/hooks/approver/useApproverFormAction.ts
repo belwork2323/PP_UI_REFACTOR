@@ -30,6 +30,10 @@ type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   subDepartment: string;
   statusField?: string;
   buildChangeStatusPayload?: (item: T) => Partial<ApproverChangeStatusRequest>;
+  /** Override dialog prefill. For REJECTED, return "" to avoid stale batch rejectionReason. */
+  getInitialDialogValue?: (item: T, actionType: ApproverFormActionType) => string;
+  /** When true, successful reject/approve does not write remarks/rejectionReason onto list rows. */
+  skipListRemarkMirror?: boolean;
   submitChangeStatus?: (
     payload: ApproverChangeStatusRequest,
   ) => Promise<ApiResponseModel<unknown>>;
@@ -58,6 +62,8 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
   subDepartment,
   statusField = "status",
   buildChangeStatusPayload,
+  getInitialDialogValue,
+  skipListRemarkMirror = false,
   submitChangeStatus,
   onStatusChangeSuccess,
   closeSelectedOnSuccess = true,
@@ -118,7 +124,12 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
 
     setActionType(nextActionType);
     setDialogItem(item);
-    setDialogValue(nextActionType === "REJECTED" ? String(item.rejectionReason ?? "") : String(item.remarks ?? ""));
+    const initialValue = getInitialDialogValue
+      ? getInitialDialogValue(item, nextActionType)
+      : nextActionType === "REJECTED"
+        ? String(item.rejectionReason ?? "")
+        : String(item.remarks ?? "");
+    setDialogValue(initialValue);
     setDialogError("");
   };
 
@@ -185,8 +196,13 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
             ...item,
             status: resolvedStatus,
             ...statusMirrors,
-            remarks: actionType === "APPROVED" ? (trimmedValue || null) : item.remarks ?? null,
-            rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
+            ...(skipListRemarkMirror
+              ? {}
+              : {
+                  remarks:
+                    actionType === "APPROVED" ? trimmedValue || null : item.remarks ?? null,
+                  rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
+                }),
           };
         }),
       );

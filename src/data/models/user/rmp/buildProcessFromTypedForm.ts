@@ -26,9 +26,9 @@ export const buildProcessFromTypedForm = (params: {
 
   const resolvedMaterial: MaterialsListItem | undefined =
     material ??
-    (fallback?.materialId && fallback.materialCode
+    (fallback?.materialCode
       ? {
-          materialId: fallback.materialId,
+          materialId: Number(fallback.materialId ?? 0),
           materialCode: fallback.materialCode,
           materialName: fallback.materialName ?? fallback.materialCode,
           specCount: 0,

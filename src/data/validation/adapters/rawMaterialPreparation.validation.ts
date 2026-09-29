@@ -5,7 +5,17 @@ import type {
   RawMaterialPrepWeightmentDetail,
   RawMaterialPrepWeightmentSheet,
 } from "@/data/models/user/RawMaterialPreparationModel";
-import { validateLotDetailsForPremix } from "@/data/models/user/rmp/validateMaterialProcessForm";
+import type { RmpMaterialProcessForm } from "@/data/models/user/rmp/defaultSolidProcessForm";
+import {
+  validateMaterialProcessForm,
+  type MaterialProcessValidationIntent,
+} from "@/data/models/user/rmp/validateMaterialProcessForm";
+import {
+  isApRmpFormTemplate,
+  normalizeApGradeCode,
+  resolveMaterialUiKey,
+} from "@/data/models/user/rmp/rmpMaterialUiRegistry";
+import { firstValidationError } from "@/data/validation/validationErrors";
 import {
   validateWeightmentSheetAgainstIdentification,
   validateWeightmentRowAgainstSheet,
@@ -30,6 +40,7 @@ export type AddedPremixSelection = {
   solidRmpFormTemplate?: string | null;
   liquidMaterialCode?: string;
   liquidGradeCode?: string;
+  liquidRmpFormTemplate?: string | null;
   quantityPerPremix?: number;
   lotIds?: string[];
   selectedProcesses: { solid?: boolean; liquid?: boolean };
@@ -60,6 +71,9 @@ export const weightmentPath = (rowIndex: number, field: string): string =>
   `weightment.details.${rowIndex}.${field}`;
 
 export const weightmentMixerBuildingPath = (): string => "weightment.mixerBuildingNumber";
+
+export const weightmentDeviationMessagePath = (): string =>
+  "weightment.validation.deviationMessage";
 
 type PremixProcessSlotState = RawMaterialPrepPremixSession["solid"];
 
@@ -105,10 +119,115 @@ const materialCodesForSelections = (selections: AddedPremixSelection[]): string[
   return Array.from(codes);
 };
 
-/** Lots-only for each selected solid/liquid material (no process fields). */
-function validatePremixLotSessions(
+export type RmpValidationAttemptFlags = {
+  format: boolean;
+  unit: boolean;
+  submit: boolean;
+};
+
+export const resolveRmpPremixValidationIntent = (
+  attempt: Pick<RmpValidationAttemptFlags, "submit" | "unit">,
+): MaterialProcessValidationIntent =>
+  attempt.submit || attempt.unit ? "SUBMIT" : "DRAFT";
+
+const prefixApGradeErrors = (
+  errors: Record<string, string>,
+  gradeCode: string,
+  multiGrade: boolean,
+): Record<string, string> => {
+  if (!multiGrade) return errors;
+  const grade = normalizeApGradeCode(gradeCode);
+  const prefixed: Record<string, string> = {};
+  for (const [key, message] of Object.entries(errors)) {
+    prefixed[`${grade}:${key}`] = message;
+  }
+  return prefixed;
+};
+
+const validateSolidProcessErrors = (
+  entry: AddedPremixSelection,
+  session: RawMaterialPrepPremixSession,
+  intent: MaterialProcessValidationIntent,
+): Record<string, string> => {
+  const apSlots = session.apGradeSlots;
+  if (
+    isApRmpFormTemplate(entry.solidRmpFormTemplate) &&
+    Array.isArray(apSlots) &&
+    apSlots.length > 0
+  ) {
+    const merged: Record<string, string> = {};
+    const multiGrade = apSlots.length > 1;
+    for (const card of apSlots) {
+      const grade = normalizeApGradeCode(card.gradeCode);
+      const uiKey = resolveMaterialUiKey({
+        materialCode: entry.solidMaterialCode ?? "",
+        slot: "solid",
+        gradeCode: grade,
+        rmpFormTemplate: "AP",
+      });
+      const cardErrs = validateMaterialProcessForm(
+        uiKey,
+        card.slot.processForm,
+        intent,
+        {
+          materialCode: entry.solidMaterialCode,
+          gradeCode: grade,
+          quantityPerPremix: entry.quantityPerPremix,
+        },
+      );
+      Object.assign(
+        merged,
+        prefixApGradeErrors(cardErrs, card.gradeCode, multiGrade),
+      );
+    }
+    return merged;
+  }
+
+  const uiKey = resolveMaterialUiKey({
+    materialCode: entry.solidMaterialCode ?? "",
+    slot: "solid",
+    gradeCode: entry.solidGradeCode,
+    rmpFormTemplate: entry.solidRmpFormTemplate,
+  });
+  return validateMaterialProcessForm(
+    uiKey,
+    session.solid.processForm,
+    intent,
+    {
+      materialCode: entry.solidMaterialCode,
+      gradeCode: entry.solidGradeCode,
+      quantityPerPremix: entry.quantityPerPremix,
+    },
+  );
+};
+
+const validateLiquidProcessErrors = (
+  entry: AddedPremixSelection,
+  session: RawMaterialPrepPremixSession,
+  intent: MaterialProcessValidationIntent,
+): Record<string, string> => {
+  const uiKey = resolveMaterialUiKey({
+    materialCode: entry.liquidMaterialCode ?? "",
+    slot: "liquid",
+    gradeCode: entry.liquidGradeCode,
+    rmpFormTemplate: entry.liquidRmpFormTemplate ?? entry.solidRmpFormTemplate,
+  });
+  return validateMaterialProcessForm(
+    uiKey,
+    session.liquid.processForm,
+    intent,
+    {
+      materialCode: entry.liquidMaterialCode,
+      gradeCode: entry.liquidGradeCode,
+      quantityPerPremix: entry.quantityPerPremix,
+    },
+  );
+};
+
+/** Process + lot validation for each selected solid/liquid material. */
+function validatePremixProcessSessions(
   input: RawMaterialPrepValidationInput,
-  intent: "DRAFT" | "SUBMIT",
+  intent: MaterialProcessValidationIntent,
 ): Record<string, Record<string, string>> {
   const premixFieldErrors: Record<string, Record<string, string>> = {};
   const selections = input.premixNo
@@ -118,25 +237,32 @@ function validatePremixLotSessions(
   for (const entry of selections) {
     const sessionKey = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
     const session = input.premixSessions[sessionKey];
-    if (!session) continue;
+    if (!session) {
+      if (intent === "SUBMIT") {
+        const slot =
+          entry.selectedProcesses.solid && str(entry.solidMaterialCode)
+            ? "solid"
+            : entry.selectedProcesses.liquid && str(entry.liquidMaterialCode)
+              ? "liquid"
+              : null;
+        if (slot) {
+          premixFieldErrors[`${sessionKey}:${slot}`] = {
+            "lotDetails.0.lotId": "At least one lot is required.",
+          };
+        }
+      }
+      continue;
+    }
 
     if (entry.selectedProcesses.solid && str(entry.solidMaterialCode)) {
-      const errs = validateLotDetailsForPremix(
-        session.solid.processForm.lotDetails,
-        intent,
-        entry.quantityPerPremix,
-      );
+      const errs = validateSolidProcessErrors(entry, session, intent);
       if (Object.keys(errs).length > 0) {
         premixFieldErrors[`${sessionKey}:solid`] = errs;
       }
     }
 
     if (entry.selectedProcesses.liquid && str(entry.liquidMaterialCode)) {
-      const errs = validateLotDetailsForPremix(
-        session.liquid.processForm.lotDetails,
-        intent,
-        entry.quantityPerPremix,
-      );
+      const errs = validateLiquidProcessErrors(entry, session, intent);
       if (Object.keys(errs).length > 0) {
         premixFieldErrors[`${sessionKey}:liquid`] = errs;
       }
@@ -145,6 +271,81 @@ function validatePremixLotSessions(
 
   return premixFieldErrors;
 }
+
+/** Live revalidation for a single material process slot (or one AP grade card). */
+export function validateRmpPremixSlotLive(params: {
+  selection: AddedPremixSelection;
+  slot: "solid" | "liquid";
+  processForm: RmpMaterialProcessForm;
+  attempt: Pick<RmpValidationAttemptFlags, "submit" | "unit">;
+  gradeCode?: string;
+  apGradeCount?: number;
+}): Record<string, string> {
+  const intent = resolveRmpPremixValidationIntent(params.attempt);
+  const materialCode =
+    params.slot === "solid"
+      ? params.selection.solidMaterialCode
+      : params.selection.liquidMaterialCode;
+  const uiKey = resolveMaterialUiKey({
+    materialCode: materialCode ?? "",
+    slot: params.slot,
+    gradeCode:
+      params.gradeCode ??
+      (params.slot === "solid"
+        ? params.selection.solidGradeCode
+        : params.selection.liquidGradeCode),
+    rmpFormTemplate: params.selection.solidRmpFormTemplate,
+  });
+  const errors = validateMaterialProcessForm(uiKey, params.processForm, intent, {
+    materialCode,
+    gradeCode:
+      params.gradeCode ??
+      (params.slot === "solid"
+        ? params.selection.solidGradeCode
+        : params.selection.liquidGradeCode),
+    quantityPerPremix: params.selection.quantityPerPremix,
+  });
+  if (params.gradeCode && (params.apGradeCount ?? 0) > 1) {
+    return prefixApGradeErrors(errors, params.gradeCode, true);
+  }
+  return errors;
+}
+
+export function validateRmpApGradeCardsLive(params: {
+  selection: AddedPremixSelection;
+  cards: Array<{ gradeCode: string; slot: { processForm: RmpMaterialProcessForm } }>;
+  attempt: Pick<RmpValidationAttemptFlags, "submit" | "unit">;
+}): Record<string, string> {
+  const merged: Record<string, string> = {};
+  const count = params.cards.length;
+  for (const card of params.cards) {
+    Object.assign(
+      merged,
+      validateRmpPremixSlotLive({
+        selection: params.selection,
+        slot: "solid",
+        processForm: card.slot.processForm,
+        attempt: params.attempt,
+        gradeCode: card.gradeCode,
+        apGradeCount: count,
+      }),
+    );
+  }
+  return merged;
+}
+
+export const firstRmpValidationErrorMessage = (
+  premixFieldErrors: Record<string, Record<string, string>>,
+  weightmentErrors: ValidationErrors,
+): string | undefined => {
+  for (const slotErrs of Object.values(premixFieldErrors)) {
+    for (const message of Object.values(slotErrs)) {
+      const text = str(message);
+      if (text) return text;
+    }
+  }
+  return firstValidationError(weightmentErrors);
+};
 
 const WEIGHTMENT_ROW_CHECKS: Array<{
   key: keyof RawMaterialPrepWeightmentDetail;
@@ -198,6 +399,13 @@ export function validateWeightmentLiveFormat(
     // Dropdown value — no ALPHA_NUM needed; leave empty unless somehow invalid
   }
 
+  const deviationMessage = str(sheet.validation.deviationMessage);
+  if (deviationMessage && !ALPHA_NUM.test(deviationMessage)) {
+    errors[weightmentDeviationMessagePath()] =
+      M.weightmentDeviationMessage?.invalid ??
+      "Use letters, numbers, spaces, hyphens, underscores, or slashes only";
+  }
+
   sheet.weightmentDetails.forEach((row, rowIndex) => {
     const name = str(row.materialName);
     if (name && !ALPHA_NUM.test(name)) {
@@ -223,7 +431,7 @@ export function validateWeightmentLiveFormat(
   return errors;
 }
 
-function validateWeightmentForSubmit(
+export function validateWeightmentForSubmit(
   sheet: RawMaterialPrepWeightmentSheet,
   selections: AddedPremixSelection[],
   identificationMaterials: MaterialItem[],
@@ -233,6 +441,16 @@ function validateWeightmentForSubmit(
   const mixer = str(sheet.mixerBuildingNumber);
   if (!mixer) {
     errors[weightmentMixerBuildingPath()] = M.mixerBuildingNumber.required;
+  }
+
+  const deviationMessage = str(sheet.validation.deviationMessage);
+  if (sheet.validation.deviationFound === true && !deviationMessage) {
+    errors[weightmentDeviationMessagePath()] =
+      M.weightmentDeviationMessage?.required ?? RM.WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED;
+  } else if (deviationMessage && !ALPHA_NUM.test(deviationMessage)) {
+    errors[weightmentDeviationMessagePath()] =
+      M.weightmentDeviationMessage?.invalid ??
+      "Use letters, numbers, spaces, hyphens, underscores, or slashes only";
   }
 
   const requiredCodes = materialCodesForSelections(selections);
@@ -320,6 +538,25 @@ function validateWeightmentForSubmit(
   return errors;
 }
 
+/** Merge format checks with submit-tier errors when the user has attempted submit. */
+export function validateWeightmentErrorsLive(
+  sheet: RawMaterialPrepWeightmentSheet,
+  selections: AddedPremixSelection[],
+  identificationMaterials: MaterialItem[],
+  attempt: Pick<RmpValidationAttemptFlags, "submit">,
+): ValidationErrors {
+  const formatErrors = validateWeightmentLiveFormat(sheet);
+  if (!attempt.submit) {
+    return formatErrors;
+  }
+  const submitErrors = validateWeightmentForSubmit(
+    sheet,
+    selections,
+    identificationMaterials,
+  );
+  return { ...formatErrors, ...submitErrors };
+}
+
 export function validateRawMaterialPreparation(
   input: RawMaterialPrepValidationInput,
   tier: ValidationTier,
@@ -330,10 +567,9 @@ export function validateRawMaterialPreparation(
 
   const premixFieldErrors: Record<string, Record<string, string>> = {};
 
-  // Draft (UNIT) and submit both require lot details; submit also requires weighment below.
   if (tier === "UNIT" || tier === "SUBMIT") {
-    const lotErrors = validatePremixLotSessions(input, "SUBMIT");
-    for (const [key, errs] of Object.entries(lotErrors)) {
+    const processErrors = validatePremixProcessSessions(input, "SUBMIT");
+    for (const [key, errs] of Object.entries(processErrors)) {
       premixFieldErrors[key] = { ...(premixFieldErrors[key] ?? {}), ...errs };
     }
   }
@@ -377,8 +613,9 @@ export function resolveFirstRmpValidationFocus(
   }
 
   const mixerPath = weightmentMixerBuildingPath();
+  const deviationPath = weightmentDeviationMessagePath();
   const weightPaths = Object.keys(weightmentErrors)
-    .filter((path) => path !== mixerPath)
+    .filter((path) => path !== mixerPath && path !== deviationPath)
     .sort();
   if (weightPaths.length) {
     const fieldPath = weightPaths[0];
@@ -401,6 +638,10 @@ export function resolveFirstRmpValidationFocus(
 
   if (weightmentErrors[mixerPath]) {
     return { premixNo, fieldPath: mixerPath };
+  }
+
+  if (weightmentErrors[deviationPath]) {
+    return { premixNo, fieldPath: deviationPath };
   }
 
   return null;

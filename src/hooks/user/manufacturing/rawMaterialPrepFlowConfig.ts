@@ -94,59 +94,108 @@ export const resolveMaterialProcessType = (
   return { solid: inSolid, liquid: inLiquid };
 };
 
+/** Classify from identification-sheet materialType (preferred over materials-list). */
+export const resolveSheetMaterialProcessType = (
+  materialType: string | null | undefined,
+): { solid: boolean; liquid: boolean } => {
+  const type = String(materialType ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (type === "SOLID") return { solid: true, liquid: false };
+  if (type === "LIQUID") return { solid: false, liquid: true };
+  if (type === "BOTH") return { solid: true, liquid: true };
+  // Prefer solid when type is missing — never default unknown sheet materials to liquid.
+  return { solid: true, liquid: false };
+};
+
+export const sheetMaterialToPrepOption = (
+  row: MaterialItem,
+): RawMaterialPrepMaterialOption => {
+  const materialCode = String(row.materialCode ?? "").trim();
+  const gradeCode = String(row.gradeCode ?? row.gradeName ?? "").trim();
+  const template = String(row.rmpFormTemplate ?? "").trim().toUpperCase();
+  const isAp = template === "AP";
+  return {
+    materialId: Number(row.materialId ?? 0),
+    materialCode,
+    materialName: String(row.materialName ?? materialCode).trim() || materialCode,
+    rawMaterialType: "NORMAL",
+    preparationType: null,
+    rmpFormTemplate: template || "DEFAULT",
+    specCount: 0,
+    grades: isAp
+      ? [
+          { gradeId: 1, gradeCode: "COARSE", gradeName: "AP Coarse" },
+          { gradeId: 2, gradeCode: "FINE", gradeName: "AP Fine" },
+          { gradeId: 3, gradeCode: "ULTRA_FINE", gradeName: "AP Ultra Fine" },
+        ]
+      : gradeCode
+        ? [{ gradeId: 0, gradeCode, gradeName: String(row.gradeName ?? gradeCode) }]
+        : [],
+  };
+};
+
+export const buildSheetDerivedMaterialLists = (
+  sheetMaterials: MaterialItem[],
+): {
+  solidMaterials: RawMaterialPrepMaterialOption[];
+  liquidMaterials: RawMaterialPrepMaterialOption[];
+} => {
+  const solidByCode = new Map<string, RawMaterialPrepMaterialOption>();
+  const liquidByCode = new Map<string, RawMaterialPrepMaterialOption>();
+
+  (sheetMaterials ?? []).forEach((row) => {
+    const code = String(row.materialCode ?? "").trim();
+    if (!code) return;
+    const option = sheetMaterialToPrepOption(row);
+    const { solid, liquid } = resolveSheetMaterialProcessType(row.materialType);
+    const key = code.toUpperCase();
+    if (solid) solidByCode.set(key, option);
+    if (liquid) liquidByCode.set(key, option);
+  });
+
+  return {
+    solidMaterials: Array.from(solidByCode.values()),
+    liquidMaterials: Array.from(liquidByCode.values()),
+  };
+};
+
 export const buildPremixMaterialOptions = (
   sheetMaterials: MaterialItem[],
-  solidMaterials: RawMaterialPrepMaterialOption[],
-  liquidMaterials: RawMaterialPrepMaterialOption[],
+  _solidMaterials?: RawMaterialPrepMaterialOption[],
+  _liquidMaterials?: RawMaterialPrepMaterialOption[],
 ): PremixMaterialOption[] =>
   (() => {
-    const distinctMaterialCodes = Array.from(
-      new Set(
-        (sheetMaterials ?? [])
-          .map((row) => String(row.materialCode ?? "").trim())
-          .filter(Boolean)
-          .map((c) => c.toUpperCase()),
-      ),
-    );
-
     const options: PremixMaterialOption[] = [];
 
-    distinctMaterialCodes.forEach((materialCodeUpper) => {
-      const materialCode = materialCodeUpper; // keep upper for stable matching
+    (sheetMaterials ?? []).forEach((row) => {
+      const materialCode = String(row.materialCode ?? "").trim();
+      if (!materialCode) return;
 
-      const solidMat = findPrepMaterialByCode(solidMaterials, materialCode);
-      const liquidMat = findPrepMaterialByCode(liquidMaterials, materialCode);
-      const listMat = solidMat ?? liquidMat;
-      if (!listMat) return;
-
-      const processType = resolveMaterialProcessType(
-        materialCode,
-        solidMaterials,
-        liquidMaterials,
-      );
+      const { solid, liquid } = resolveSheetMaterialProcessType(row.materialType);
+      if (!solid && !liquid) return;
 
       const resolvedProcessType: PremixMaterialOption["processType"] =
-        processType.solid && processType.liquid
-          ? "both"
-          : processType.solid
-            ? "solid"
-            : "liquid";
+        solid && liquid ? "both" : solid ? "solid" : "liquid";
+      const gradeCode = String(row.gradeCode ?? row.gradeName ?? "").trim();
+      const key = materialSelectionKey(materialCode, gradeCode || undefined) || materialCode;
 
       options.push({
-        key: materialSelectionKey(materialCode, undefined),
+        key,
         materialCode,
-        materialName: listMat.materialName ?? materialCode,
-        gradeCode: "",
-        gradeName: "",
-        materialId: listMat.materialId,
-        gradeId: undefined,
+        materialName: String(row.materialName ?? materialCode).trim() || materialCode,
+        gradeCode,
+        gradeName: String(row.gradeName ?? gradeCode).trim(),
+        materialId: row.materialId,
         processType: resolvedProcessType,
       });
     });
 
-    // De-dupe by key (last write wins, but order is stable enough here)
     const byKey = new Map<string, PremixMaterialOption>();
-    options.forEach((o) => byKey.set(o.key, o));
+    options.forEach((option) => {
+      if (!byKey.has(option.key)) byKey.set(option.key, option);
+    });
     return Array.from(byKey.values());
   })();
 
@@ -164,7 +213,11 @@ export const createEmptyPremixSelection = (premix: number) => ({
   selectedProcesses: { solid: false, liquid: false },
   solidMaterialCode: "",
   solidGradeCode: "",
+  solidMaterialId: undefined as number | undefined,
+  solidRmpFormTemplate: null as string | null,
   liquidMaterialCode: "",
+  liquidMaterialId: undefined as number | undefined,
+  liquidRmpFormTemplate: null as string | null,
 });
 
 export const getSheetMaterialKey = (
@@ -279,8 +332,8 @@ const resolveGradeFromSheetRow = (
 export const buildMaterialSelectionFromSheetRow = (
   row: MaterialItem,
   premix: number,
-  solidMaterials: RawMaterialPrepMaterialOption[],
-  liquidMaterials: RawMaterialPrepMaterialOption[],
+  _solidMaterials?: RawMaterialPrepMaterialOption[],
+  _liquidMaterials?: RawMaterialPrepMaterialOption[],
 ): ReturnType<typeof createEmptyPremixSelection> & {
   materialKey: string;
   sheetSrNo: number;
@@ -295,34 +348,26 @@ export const buildMaterialSelectionFromSheetRow = (
   liquidMaterialId?: number;
 } => {
   const materialCode = String(row.materialCode ?? "").trim();
-  const selectedProcesses = resolvePremixProcessesForMaterial(
-    materialCode,
-    solidMaterials,
-    liquidMaterials,
-  );
-  const solidMaterial = selectedProcesses.solid
-    ? findPrepMaterialByCode(solidMaterials, materialCode)
-    : undefined;
-  const liquidMaterial = selectedProcesses.liquid
-    ? findPrepMaterialByCode(liquidMaterials, materialCode)
-    : undefined;
-  const listMaterial =
-    solidMaterial ??
-    liquidMaterial ??
-    findPrepMaterialByCode(mergeMaterialsLists(solidMaterials, liquidMaterials), materialCode);
-  const grade = resolveGradeFromSheetRow(row, solidMaterial);
+  const selectedProcesses = resolveSheetMaterialProcessType(row.materialType);
+  const sheetOption = sheetMaterialToPrepOption(row);
+  const grade = resolveGradeFromSheetRow(row, sheetOption);
   const materialKey =
     materialSelectionKey(materialCode, grade.gradeCode || undefined) || `sr-${row.srNo}`;
   const lotIds = (row.lotIds ?? [])
     .map((id) => String(id ?? "").trim())
     .filter(Boolean);
+  const template = String(row.rmpFormTemplate ?? "").trim() || "DEFAULT";
+  const materialId =
+    row.materialId != null && Number.isFinite(Number(row.materialId))
+      ? Number(row.materialId)
+      : undefined;
 
   return {
     premix,
     premixDate: "",
     materialKey,
     sheetSrNo: Number(row.srNo ?? 0),
-    materialName: String(row.materialName ?? listMaterial?.materialName ?? materialCode).trim(),
+    materialName: String(row.materialName ?? materialCode).trim(),
     lotId: lotIds.join(", "),
     lotIds,
     make: String(row.make ?? row.manufacturerName ?? "").trim(),
@@ -331,10 +376,12 @@ export const buildMaterialSelectionFromSheetRow = (
     selectedProcesses,
     solidMaterialCode: selectedProcesses.solid ? materialCode : "",
     solidGradeCode: selectedProcesses.solid ? grade.gradeCode : "",
-    solidMaterialId: solidMaterial?.materialId ?? listMaterial?.materialId,
+    solidMaterialId: selectedProcesses.solid ? materialId : undefined,
     solidGradeId: grade.gradeId,
+    solidRmpFormTemplate: selectedProcesses.solid ? template : null,
     liquidMaterialCode: selectedProcesses.liquid ? materialCode : "",
-    liquidMaterialId: liquidMaterial?.materialId ?? listMaterial?.materialId,
+    liquidMaterialId: selectedProcesses.liquid ? materialId : undefined,
+    liquidRmpFormTemplate: selectedProcesses.liquid ? template : null,
   };
 };
 
@@ -372,6 +419,8 @@ export const buildPremixMaterialSessionsFromSelections = (
     solidMaterialCode: string;
     solidGradeCode: string;
     liquidMaterialCode: string;
+    solidRmpFormTemplate?: string | null;
+    liquidRmpFormTemplate?: string | null;
   }>,
   solidMaterials: RawMaterialPrepMaterialOption[],
   existing: Record<string, RawMaterialPrepPremixSession> = {},
@@ -398,14 +447,14 @@ export const buildPremixMaterialSessionsFromSelections = (
       solidMaterialCode: entry.solidMaterialCode,
       solidGradeCode: entry.solidGradeCode,
       liquidMaterialCode: entry.liquidMaterialCode,
-      solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? null,
-      liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? null,
+      solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? entry.solidRmpFormTemplate ?? null,
+      liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? entry.liquidRmpFormTemplate ?? null,
       solid: normalizeMaterialProcessSlot(
         "solid",
         solidMaterialReady ? entry.solidMaterialCode : "",
         null,
         entry.solidGradeCode,
-        solidMaterial?.rmpFormTemplate,
+        solidMaterial?.rmpFormTemplate ?? entry.solidRmpFormTemplate,
       ),
       liquid: entry.selectedProcesses.liquid
         ? normalizeMaterialProcessSlot(
@@ -413,25 +462,27 @@ export const buildPremixMaterialSessionsFromSelections = (
             entry.liquidMaterialCode,
             null,
             "",
-            liquidMaterial?.rmpFormTemplate,
+            liquidMaterial?.rmpFormTemplate ?? entry.liquidRmpFormTemplate,
           )
         : normalizeMaterialProcessSlot("liquid", ""),
-      apGradeSlots: materialUsesApForm(solidMaterial)
-        ? entry.solidGradeCode
-          ? [
-              {
-                gradeCode: entry.solidGradeCode,
-                slot: normalizeMaterialProcessSlot(
-                  "solid",
-                  entry.solidMaterialCode,
-                  null,
-                  entry.solidGradeCode,
-                  solidMaterial?.rmpFormTemplate ?? "AP",
-                ),
-              },
-            ]
-          : []
-        : undefined,
+      apGradeSlots:
+        materialUsesApForm(solidMaterial) ||
+        String(entry.solidRmpFormTemplate ?? "").toUpperCase() === "AP"
+          ? entry.solidGradeCode
+            ? [
+                {
+                  gradeCode: entry.solidGradeCode,
+                  slot: normalizeMaterialProcessSlot(
+                    "solid",
+                    entry.solidMaterialCode,
+                    null,
+                    entry.solidGradeCode,
+                    solidMaterial?.rmpFormTemplate ?? entry.solidRmpFormTemplate ?? "AP",
+                  ),
+                },
+              ]
+            : []
+          : undefined,
     };
   });
 
@@ -701,8 +752,12 @@ export const resolvePremixProcessesForMaterial = (
   materialCode: string,
   solidMaterials: RawMaterialPrepMaterialOption[],
   liquidMaterials: RawMaterialPrepMaterialOption[],
-  fallbackProcessType: PremixMaterialOption["processType"] = "liquid",
+  fallbackProcessType: PremixMaterialOption["processType"] = "solid",
+  sheetMaterialType?: string | null,
 ) => {
+  if (sheetMaterialType != null && String(sheetMaterialType).trim()) {
+    return resolveSheetMaterialProcessType(sheetMaterialType);
+  }
   const processType = resolveMaterialProcessType(materialCode, solidMaterials, liquidMaterials);
   if (processType.solid && processType.liquid) {
     return { solid: true, liquid: true };

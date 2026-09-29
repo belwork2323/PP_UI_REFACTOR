@@ -104,6 +104,8 @@ export const useRawMaterialPreparationApproverHook = () => {
     buildChangeStatusPayload: () => ({
       premixNo: activePremixNo ?? undefined,
     }),
+    getInitialDialogValue: () => "",
+    skipListRemarkMirror: true,
     onStatusChangeSuccess: async (item, response) => {
       const formId = String(item.formId ?? "").trim();
       if (!formId) return;
@@ -215,6 +217,8 @@ export const useRawMaterialPreparationApproverHook = () => {
       formId: detailView?.formId || formId,
       batchId: detailView?.batchId || row.batchId,
       status: detailView?.status ?? getRawMaterialPrepBatchStatusLabel(response.data.status) ?? row.status,
+      // Premix rejection reasons live on detailView.premixes — don't carry batch-level stale text.
+      rejectionReason: null,
       detailView,
       weightmentSheet,
     });

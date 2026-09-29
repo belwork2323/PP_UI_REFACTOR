@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
-import { operationsController } from "../../../controllers/user/operationsController";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
@@ -39,25 +38,27 @@ import {
   buildPremixMaterialOptions,
   buildPremixMaterialSelectionsFromSheet,
   buildPremixMaterialSessionsFromSelections,
+  buildSheetDerivedMaterialLists,
   normalizePremixSessionKeys,
   getPremixMaterialSessionKey,
   groupPremixSelectionsByPremix,
   materialRequiresGradeSelection,
   mergeMaterialsLists,
   mergePremixMaterialSelections,
-  normalizeMaterialsList,
   type PremixMaterialOption,
   type RawMaterialPrepMaterialOption,
 } from "./rawMaterialPrepFlowConfig";
 import { processFormHasUserData } from "../../../data/models/user/rmp/defaultSolidProcessForm";
-import { validateLotDetailsForPremix } from "../../../data/models/user/rmp/validateMaterialProcessForm";
 import {
+  firstRmpValidationErrorMessage,
   getWeightmentIdentificationError,
   isPremixSelectionProcessReady,
   resolveFirstRmpValidationFocus,
   type RmpValidationFocusTarget,
   validateRawMaterialPreparation,
-  validateWeightmentLiveFormat,
+  validateRmpApGradeCardsLive,
+  validateRmpPremixSlotLive,
+  validateWeightmentErrorsLive,
 } from "@/data/validation/adapters/rawMaterialPreparation.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
 import type { ValidationAttemptFlags } from "@/ui/components/validation/useValidationDisplay";
@@ -241,7 +242,9 @@ const mergePremixSessionsPreservingLocalInput = (
         processForm: cloneValue(
           processFormHasUserData(session.solid.processForm)
             ? session.solid.processForm
-            : prev.solid.processForm,
+            : processFormHasUserData(prev.solid.processForm)
+              ? prev.solid.processForm
+              : session.solid.processForm,
         ),
       },
       liquid: {
@@ -249,7 +252,9 @@ const mergePremixSessionsPreservingLocalInput = (
         processForm: cloneValue(
           processFormHasUserData(session.liquid.processForm)
             ? session.liquid.processForm
-            : prev.liquid.processForm,
+            : processFormHasUserData(prev.liquid.processForm)
+              ? prev.liquid.processForm
+              : session.liquid.processForm,
         ),
       },
     };
@@ -266,6 +271,7 @@ const mergePremixSessionsPreservingLocalInput = (
 export const useRawMaterialPrepHook = () => {
   const listParams = useSubdepartmentBatches("raw-material-prep");
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
@@ -293,22 +299,17 @@ export const useRawMaterialPrepHook = () => {
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formHydrationKey, setFormHydrationKey] = useState(0);
   const skipSessionRebuildRef = useRef(false);
+  /** Premix last validated on save/submit — scopes live weighment revalidation. */
+  const validationContextPremixRef = useRef<number | null>(null);
   const [numberOfPremix, setNumberOfPremix] = useState(0);
   const [identificationSheet, setIdentificationSheet] = useState<IdentificationSheet | null>(null);
 
-  const [availableSolidMaterials, setAvailableSolidMaterials] = useState<
-    RawMaterialPrepMaterialOption[]
-  >([]);
-  const [availableLiquidMaterials, setAvailableLiquidMaterials] = useState<
-    RawMaterialPrepMaterialOption[]
-  >([]);
-  const [solidMaterialsCacheByBatchKey, setSolidMaterialsCacheByBatchKey] = useState<
-    Record<string, RawMaterialPrepMaterialOption[]>
-  >({});
-  const [liquidMaterialsCacheByBatchKey, setLiquidMaterialsCacheByBatchKey] = useState<
-    Record<string, RawMaterialPrepMaterialOption[]>
-  >({});
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const { solidMaterials: availableSolidMaterials, liquidMaterials: availableLiquidMaterials } =
+    useMemo(
+      () => buildSheetDerivedMaterialLists(identificationSheet?.materials ?? []),
+      [identificationSheet],
+    );
+  const loadingMaterials = false;
   const [completedPremixesByBatch, setCompletedPremixesByBatch] = useState<
     Record<string, number[]>
   >({});
@@ -343,53 +344,29 @@ export const useRawMaterialPrepHook = () => {
   const [previousStageGate, setPreviousStageGate] =
     useState<PreviousStageApprovedUnits | null>(null);
 
+  const notifyRmpValidationErrors = useCallback(
+    (
+      premixFieldErrors: Record<string, Record<string, string>>,
+      weightmentErrors: Record<string, string>,
+    ) => {
+      const firstError = firstRmpValidationErrorMessage(premixFieldErrors, weightmentErrors);
+      const base = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.VALIDATION.validationFailedSnackbar;
+      showValidationAlert(firstError ? `${base} (${firstError})` : base);
+    },
+    [showValidationAlert],
+  );
+
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
   const premixMaterialOptions = useMemo<PremixMaterialOption[]>(
-    () =>
-      buildPremixMaterialOptions(
-        identificationSheet?.materials ?? [],
-        availableSolidMaterials,
-        availableLiquidMaterials,
-      ),
-    [identificationSheet, availableSolidMaterials, availableLiquidMaterials],
+    () => buildPremixMaterialOptions(identificationSheet?.materials ?? []),
+    [identificationSheet],
   );
 
   const allMaterials = useMemo(
     () => mergeMaterialsLists(availableSolidMaterials, availableLiquidMaterials),
     [availableSolidMaterials, availableLiquidMaterials],
   );
-
-  const loadMaterialsByType = useCallback(
-    async (materialType: "SOLID" | "LIQUID", options?: { silent?: boolean }) => {
-      const response = await operationsController.fetchMaterialsList({ materialType });
-      if (response?.success && response?.data) {
-        return normalizeMaterialsList(response.data);
-      }
-      if (!options?.silent) {
-        showAlert(
-          response?.message || STRINGS.SOURCING.SPECIFICATION_FORM.MATERIALS_LOAD_FAILED,
-          "error",
-        );
-      }
-      return [];
-    },
-    [showAlert],
-  );
-
-  const materialsLoadCountRef = useRef(0);
-
-  const beginMaterialsLoad = useCallback(() => {
-    materialsLoadCountRef.current += 1;
-    setLoadingMaterials(true);
-  }, []);
-
-  const endMaterialsLoad = useCallback(() => {
-    materialsLoadCountRef.current = Math.max(0, materialsLoadCountRef.current - 1);
-    if (materialsLoadCountRef.current === 0) {
-      setLoadingMaterials(false);
-    }
-  }, []);
 
   const activeBatchId = activeBatch?.batchId ?? "";
   const activeFormBatchKey = activeBatchId || "__form__";
@@ -399,96 +376,7 @@ export const useRawMaterialPrepHook = () => {
   );
 
   useEffect(() => {
-    if (view !== "form") {
-      setAvailableSolidMaterials([]);
-      return;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(solidMaterialsCacheByBatchKey, activeFormBatchKey)) {
-      setAvailableSolidMaterials(solidMaterialsCacheByBatchKey[activeFormBatchKey] ?? []);
-      return;
-    }
-
-    let cancelled = false;
-    const run = async () => {
-      beginMaterialsLoad();
-      try {
-        const list = await loadMaterialsByType("SOLID", { silent: true });
-        if (!cancelled) {
-          setAvailableSolidMaterials(list);
-          setSolidMaterialsCacheByBatchKey((prev) => ({ ...prev, [activeFormBatchKey]: list }));
-        }
-      } catch {
-        if (!cancelled) {
-          setAvailableSolidMaterials([]);
-          showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.MATERIALS_FETCH_ERROR, "error");
-        }
-      } finally {
-        if (!cancelled) endMaterialsLoad();
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    view,
-    loadMaterialsByType,
-    showAlert,
-    beginMaterialsLoad,
-    endMaterialsLoad,
-    solidMaterialsCacheByBatchKey,
-    activeFormBatchKey,
-  ]);
-
-  useEffect(() => {
-    if (view !== "form") {
-      setAvailableLiquidMaterials([]);
-      return;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(liquidMaterialsCacheByBatchKey, activeFormBatchKey)) {
-      setAvailableLiquidMaterials(liquidMaterialsCacheByBatchKey[activeFormBatchKey] ?? []);
-      return;
-    }
-
-    let cancelled = false;
-    const run = async () => {
-      beginMaterialsLoad();
-      try {
-        const list = await loadMaterialsByType("LIQUID", { silent: true });
-        if (!cancelled) {
-          setAvailableLiquidMaterials(list);
-          setLiquidMaterialsCacheByBatchKey((prev) => ({ ...prev, [activeFormBatchKey]: list }));
-        }
-      } catch {
-        if (!cancelled) {
-          setAvailableLiquidMaterials([]);
-          showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.MATERIALS_FETCH_ERROR, "error");
-        }
-      } finally {
-        if (!cancelled) endMaterialsLoad();
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    view,
-    loadMaterialsByType,
-    showAlert,
-    beginMaterialsLoad,
-    endMaterialsLoad,
-    liquidMaterialsCacheByBatchKey,
-    activeFormBatchKey,
-  ]);
-
-  useEffect(() => {
     if (view !== "form" || !identificationSheet || numberOfPremix < 1) return;
-    if (availableSolidMaterials.length === 0 && availableLiquidMaterials.length === 0) return;
 
     setAddedPremixSelectionsByBatch((prev) => {
       const current = prev[activeFormBatchKey] ?? [];
@@ -682,12 +570,6 @@ export const useRawMaterialPrepHook = () => {
     setHasSavedDraft(false);
     setNumberOfPremix(0);
     setIdentificationSheet(null);
-    setAvailableSolidMaterials([]);
-    setAvailableLiquidMaterials([]);
-    setSolidMaterialsCacheByBatchKey({});
-    setLiquidMaterialsCacheByBatchKey({});
-    materialsLoadCountRef.current = 0;
-    setLoadingMaterials(false);
     setAddedPremixSelectionsByBatch({});
     setPremixSessionsByBatch({});
     setCompletedPremixesByBatch({});
@@ -766,10 +648,8 @@ export const useRawMaterialPrepHook = () => {
         }
 
         const batchKey = batch.batchId || "__form__";
-        const [resolvedSolidMaterials, resolvedLiquidMaterials] = await Promise.all([
-          loadMaterialsByType("SOLID", { silent: true }),
-          loadMaterialsByType("LIQUID", { silent: true }),
-        ]);
+        const { solidMaterials: resolvedSolidMaterials, liquidMaterials: resolvedLiquidMaterials } =
+          buildSheetDerivedMaterialLists(sheet.materials ?? []);
 
         let nextBatch = enrichedBatch;
         let nextAddedPremixSelections: AddedPremixSelection[] = [];
@@ -882,16 +762,6 @@ export const useRawMaterialPrepHook = () => {
         setIsEditMode(editMode);
         setNumberOfPremix(premixCount);
         setIdentificationSheet(sheet);
-        setAvailableSolidMaterials(resolvedSolidMaterials);
-        setAvailableLiquidMaterials(resolvedLiquidMaterials);
-        setSolidMaterialsCacheByBatchKey((prev) => ({
-          ...prev,
-          [batchKey]: resolvedSolidMaterials,
-        }));
-        setLiquidMaterialsCacheByBatchKey((prev) => ({
-          ...prev,
-          [batchKey]: resolvedLiquidMaterials,
-        }));
         setAddedPremixSelectionsByBatch((prev) => ({
           ...prev,
           [batchKey]: nextAddedPremixSelections,
@@ -920,7 +790,7 @@ export const useRawMaterialPrepHook = () => {
         if (!silent) setLoadingFormDetails(false);
       }
     },
-    [loadMaterialsByType, showAlert, subDepartmentId, user?.allSubDepartments],
+    [showAlert, subDepartmentId, user?.allSubDepartments],
   );
 
   const handleFillForm = useCallback(
@@ -1023,26 +893,28 @@ export const useRawMaterialPrepHook = () => {
         };
       });
 
-      // Soft lot FORMAT only (no process-field gates)
       if (checkPremixEditable(premix)) {
         setValidationAttempt((prev) => ({ ...prev, format: true }));
         const selection = addedPremixSelections.find(
           (entry) => entry.premix === premix && entry.materialKey === materialKey,
         );
-        const errs = validateLotDetailsForPremix(
-          isolatedSlot.processForm.lotDetails,
-          "DRAFT",
-          selection?.quantityPerPremix,
-        );
-        setPremixFieldErrorsByBatch((prev) => {
-          const batchErrors = { ...(prev[activeFormBatchKey] ?? {}) };
-          if (Object.keys(errs).length === 0) {
-            delete batchErrors[errorKey];
-          } else {
-            batchErrors[errorKey] = errs;
-          }
-          return { ...prev, [activeFormBatchKey]: batchErrors };
-        });
+        if (selection) {
+          const errs = validateRmpPremixSlotLive({
+            selection,
+            slot,
+            processForm: isolatedSlot.processForm,
+            attempt: validationAttempt,
+          });
+          setPremixFieldErrorsByBatch((prev) => {
+            const batchErrors = { ...(prev[activeFormBatchKey] ?? {}) };
+            if (Object.keys(errs).length === 0) {
+              delete batchErrors[errorKey];
+            } else {
+              batchErrors[errorKey] = errs;
+            }
+            return { ...prev, [activeFormBatchKey]: batchErrors };
+          });
+        }
       }
 
       if (!checkPremixEditable(premix)) return;
@@ -1058,6 +930,7 @@ export const useRawMaterialPrepHook = () => {
       checkPremixEditable,
       markPremixComplete,
       premixSessions,
+      validationAttempt,
     ],
   );
 
@@ -1069,6 +942,7 @@ export const useRawMaterialPrepHook = () => {
     ) => {
       if (!premix || !materialKey) return;
       const sessionKey = getPremixMaterialSessionKey(premix, materialKey);
+      const errorKey = `${sessionKey}:solid`;
       setPremixSessionsByBatch((prev) => {
         const batchSessions = prev[activeFormBatchKey] ?? {};
         const current = normalizePremixSession(batchSessions[sessionKey]);
@@ -1104,8 +978,36 @@ export const useRawMaterialPrepHook = () => {
           },
         };
       });
+
+      if (checkPremixEditable(premix)) {
+        setValidationAttempt((prev) => ({ ...prev, format: true }));
+        const selection = addedPremixSelections.find(
+          (entry) => entry.premix === premix && entry.materialKey === materialKey,
+        );
+        if (selection) {
+          const errs = validateRmpApGradeCardsLive({
+            selection,
+            cards,
+            attempt: validationAttempt,
+          });
+          setPremixFieldErrorsByBatch((prev) => {
+            const batchErrors = { ...(prev[activeFormBatchKey] ?? {}) };
+            if (Object.keys(errs).length === 0) {
+              delete batchErrors[errorKey];
+            } else {
+              batchErrors[errorKey] = errs;
+            }
+            return { ...prev, [activeFormBatchKey]: batchErrors };
+          });
+        }
+      }
     },
-    [activeFormBatchKey],
+    [
+      activeFormBatchKey,
+      addedPremixSelections,
+      checkPremixEditable,
+      validationAttempt,
+    ],
   );
 
   const handleWeightmentSheetChange = useCallback(
@@ -1121,12 +1023,28 @@ export const useRawMaterialPrepHook = () => {
         [activeFormBatchKey]: next,
       }));
       setValidationAttempt((flags) => ({ ...flags, format: true }));
+      const premixNo = validationContextPremixRef.current;
+      const selections =
+        premixNo != null
+          ? addedPremixSelections.filter((entry) => entry.premix === premixNo)
+          : addedPremixSelections;
       setWeightmentErrorsByBatch((prev) => ({
         ...prev,
-        [activeFormBatchKey]: validateWeightmentLiveFormat(next),
+        [activeFormBatchKey]: validateWeightmentErrorsLive(
+          next,
+          selections,
+          identificationSheet?.materials ?? [],
+          validationAttempt,
+        ),
       }));
     },
-    [activeFormBatchKey, weightmentSheet],
+    [
+      activeFormBatchKey,
+      addedPremixSelections,
+      identificationSheet?.materials,
+      validationAttempt,
+      weightmentSheet,
+    ],
   );
 
   const submitPremix = useCallback(
@@ -1158,14 +1076,12 @@ export const useRawMaterialPrepHook = () => {
 
       const isDraft = intent === "draft";
       const sessionsForPayload = premixSessions;
-      const validationSnackbar =
-        STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.VALIDATION.validationFailedSnackbar;
+      validationContextPremixRef.current = premixNo;
 
       const emitValidationFocus = (
         premixFieldErrors: Record<string, Record<string, string>>,
         weightmentErrors: Record<string, string>,
       ) => {
-        showAlert(validationSnackbar, "warning");
         const focus = resolveFirstRmpValidationFocus(
           premixNo,
           addedPremixSelections,
@@ -1177,6 +1093,9 @@ export const useRawMaterialPrepHook = () => {
           id: (prev?.id ?? 0) + 1,
           target: focus,
         }));
+        requestAnimationFrame(() => {
+          notifyRmpValidationErrors(premixFieldErrors, weightmentErrors);
+        });
       };
 
       setValidationAttempt({
@@ -1288,16 +1207,27 @@ export const useRawMaterialPrepHook = () => {
       const premixSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
       const formSubmissionType = "DRAFT" as const;
 
-      const payloadBody = mapPreparationDetailsPayload({
-        addedPremixSelections,
-        premixSessions: sessionsForPayload,
-        solidMaterials: availableSolidMaterials as MaterialsListItem[],
-        liquidMaterials: availableLiquidMaterials as MaterialsListItem[],
-        weightmentSheet,
-        targetPremixNos: [premixNo],
-        premixSubmissionType,
-        includeEmptyPremixes: true,
-      });
+      let payloadBody: ReturnType<typeof mapPreparationDetailsPayload>;
+      try {
+        payloadBody = mapPreparationDetailsPayload({
+          addedPremixSelections,
+          premixSessions: sessionsForPayload,
+          solidMaterials: availableSolidMaterials as MaterialsListItem[],
+          liquidMaterials: availableLiquidMaterials as MaterialsListItem[],
+          weightmentSheet,
+          targetPremixNos: [premixNo],
+          premixSubmissionType,
+          includeEmptyPremixes: true,
+        });
+      } catch (error) {
+        showAlert(
+          error instanceof Error
+            ? error.message
+            : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.VALIDATION.validationFailedSnackbar,
+          "warning",
+        );
+        return false;
+      }
 
       setActionLoading(true);
       try {
@@ -1449,6 +1379,7 @@ export const useRawMaterialPrepHook = () => {
       identificationSheet,
       isEditMode,
       listParams,
+      notifyRmpValidationErrors,
       openFormWithResolvedData,
       orderedPremixNos,
       premixSessions,
