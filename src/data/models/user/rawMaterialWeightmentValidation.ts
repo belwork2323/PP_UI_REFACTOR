@@ -44,10 +44,11 @@ export const weightmentRowHasCompleteData = (row: RawMaterialPrepWeightmentDetai
   });
 };
 
-/** True when the shared weightment sheet has a complete row for the material code. */
+/** True when the weightment sheet has a complete row for the material code (optionally scoped to a premix). */
 export const weightmentHasMaterialData = (
   sheet: RawMaterialPrepWeightmentDetail[] | { weightmentDetails?: RawMaterialPrepWeightmentDetail[] },
   materialCode: string,
+  premixNo?: number | null,
 ): boolean => {
   const code = str(materialCode).toUpperCase();
   if (!code) return false;
@@ -56,9 +57,19 @@ export const weightmentHasMaterialData = (
     : Array.isArray(sheet.weightmentDetails)
       ? sheet.weightmentDetails
       : [];
-  return rows.some(
-    (row) => str(row.materialCode).toUpperCase() === code && weightmentRowHasCompleteData(row),
-  );
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  return rows.some((row) => {
+    if (str(row.materialCode).toUpperCase() !== code) return false;
+    if (premix != null) {
+      const rowPremix =
+        row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+          ? null
+          : Number(row.premixNo);
+      if (rowPremix != null && rowPremix !== premix) return false;
+    }
+    return weightmentRowHasCompleteData(row);
+  });
 };
 
 export const numbersApproximatelyEqual = (
@@ -108,6 +119,12 @@ export const normalizeSheetMaterialsForWeightmentCompare = (
       if (!materialCode) return null;
       return {
         srNo: Number(m.srNo ?? m.sr_no ?? index + 1) || index + 1,
+        materialId:
+          m.materialId != null && Number.isFinite(Number(m.materialId))
+            ? Number(m.materialId)
+            : m.material_id != null && Number.isFinite(Number(m.material_id))
+              ? Number(m.material_id)
+              : undefined,
         materialCode,
         materialName: String(m.materialName ?? m.material_name ?? materialCode).trim(),
         gradeCode: String(m.gradeCode ?? m.grade_code ?? "").trim() || undefined,
@@ -130,6 +147,16 @@ export const getExpectedWeightmentForSheetMaterial = (material: MaterialItem) =>
   const expectedWeightKg = Number(unwrapSheetNumber(material.quantityPerPremix).toFixed(3));
 
   return { percentage, expectedWeightKg };
+};
+
+/** Stable unique key for ID-sheet materials — srNo alone can duplicate across rows. */
+export const getSheetMaterialSelectKey = (material: MaterialItem): string => {
+  const code = String(material.materialCode ?? "").trim().toUpperCase();
+  if (material.materialId != null && Number.isFinite(Number(material.materialId))) {
+    return `${Number(material.materialId)}:${code}`;
+  }
+  const sr = Number(material.srNo);
+  return Number.isFinite(sr) && sr > 0 ? `${sr}:${code}` : code;
 };
 
 export const findSheetMaterialForWeightmentRow = (
@@ -172,7 +199,7 @@ export const getWeightmentRowSheetKey = (
   sheetMaterials: MaterialItem[],
 ): string => {
   const material = findSheetMaterialForWeightmentRow(row, sheetMaterials);
-  return material ? String(material.srNo) : "";
+  return material ? getSheetMaterialSelectKey(material) : "";
 };
 
 export const validateWeightmentRowAgainstSheet = (

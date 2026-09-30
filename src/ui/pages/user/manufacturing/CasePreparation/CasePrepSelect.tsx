@@ -26,6 +26,8 @@ type CasePrepSelectProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string | null;
+  /** Validation focus target (`data-cp-field`). */
+  dataCpField?: string;
 };
 
 const CasePrepSelect = ({
@@ -41,6 +43,7 @@ const CasePrepSelect = ({
   required = false,
   error = false,
   helperText = null,
+  dataCpField,
 }: CasePrepSelectProps) => {
   const cpTheme = theme.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
@@ -55,7 +58,7 @@ const CasePrepSelect = ({
   );
 
   return (
-    <Box sx={flowBar.selectField?.(width)}>
+    <Box sx={flowBar.selectField?.(width)} {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
       <Typography component="label" sx={flowBar.selectLabel}>
         {required ? <FieldLabelWithAsterisk label={label} required /> : label}
       </Typography>

@@ -1183,6 +1183,7 @@ export const useRawMaterialPrepHook = () => {
         const identificationError = getWeightmentIdentificationError(
           weightmentSheet,
           identificationSheet?.materials ?? [],
+          premixNo,
         );
 
         if (identificationError) {
@@ -1505,7 +1506,7 @@ export const useRawMaterialPrepHook = () => {
       );
       if (hasProcessFieldErrors) return false;
       if (hasValidationErrors(validationResult.weightmentErrors)) return false;
-      if (getWeightmentIdentificationError(weightmentSheet, identificationSheet?.materials ?? [])) {
+      if (getWeightmentIdentificationError(weightmentSheet, identificationSheet?.materials ?? [], premixNo)) {
         return false;
       }
 

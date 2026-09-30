@@ -630,17 +630,20 @@ export const getFinalMixPremixesFromSheet = (
   return (finalMixStage?.premixes ?? []).filter((premix) => Number(premix.premixNo) > 0);
 };
 
-function serializeMaterialForApi(material: Record<string, any>): Record<string, unknown> {
+function serializeMaterialForApi(
+  material: Record<string, any>,
+  index: number,
+): Record<string, unknown> {
   const fromDate = formatToIsoDateInput(
     material.revalidationFromDate ?? material.revalidationDate ?? "",
   );
   const toDate = formatToIsoDateInput(
     material.revalidationToDate ?? material.revalidationDate ?? fromDate,
   );
-  console.log(material);
 
   return {
-    srNo: material.srNo,
+    // Sequential srNo — never trust client gaps/duplicates after delete+add.
+    srNo: index + 1,
     materialCode: material.materialCode,
     lotIds: material.lotIds ?? [],
     make: String(material.make ?? material.manufacturerName ?? "").trim(),
@@ -733,8 +736,8 @@ export function parseIdentificationSheetFromApi(
   }
 
   const materials = Array.isArray(sheet.materials)
-    ? sheet.materials.map((m: Record<string, any>) => ({
-        srNo: m.srNo ?? 0,
+    ? sheet.materials.map((m: Record<string, any>, index: number) => ({
+        srNo: index + 1,
         materialId:
           m.materialId != null && Number.isFinite(Number(m.materialId))
             ? Number(m.materialId)

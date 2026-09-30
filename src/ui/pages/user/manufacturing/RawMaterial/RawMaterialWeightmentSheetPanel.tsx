@@ -31,6 +31,7 @@ import {
   findSheetMaterialForWeightmentRow,
   formatSheetMaterialLabel,
   getExpectedWeightmentForSheetMaterial,
+  getSheetMaterialSelectKey,
   getWeightmentRowSheetKey,
   normalizeSheetMaterialsForWeightmentCompare,
   validateWeightmentRowAgainstSheet,
@@ -71,13 +72,13 @@ const validationMessages = {
 };
 
 const TABLE_COLUMNS = [
-  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_CODE, required: true },
-  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_NAME, required: false },
-  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_TYPE, required: true },
-  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_NO, required: true },
-  { label: RM.WEIGHTMENT_TABLE_COL_WEIGH_SCALE, required: true },
-  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHT, required: true },
-  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHING_TIME, required: true },
+  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_CODE, required: true, minWidth: 190 },
+  { label: RM.WEIGHTMENT_TABLE_COL_MATERIAL_NAME, required: false, minWidth: 240 },
+  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_TYPE, required: true, minWidth: 140 },
+  { label: RM.WEIGHTMENT_TABLE_COL_CONTAINER_NO, required: true, minWidth: 130 },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGH_SCALE, required: true, minWidth: 130 },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHT, required: true, minWidth: 150 },
+  { label: RM.WEIGHTMENT_TABLE_COL_WEIGHING_TIME, required: true, minWidth: 155 },
 ] as const;
 
 type RawMaterialWeightmentSheetPanelProps = {
@@ -97,7 +98,9 @@ type RawMaterialWeightmentSheetPanelProps = {
   theme: any;
   batchId?: string;
   identificationSheet?: IdentificationSheet | null;
-  /** Shared across premixes — false when any premix is waiting for approval / approved. */
+  /** Active premix — stamped onto new weighment rows. */
+  premixNo?: number | null;
+  /** False when the active premix is waiting for approval / approved. */
   disabled?: boolean;
   /**
    * QC mode: compare only highlights mismatches.
@@ -122,6 +125,7 @@ const RawMaterialWeightmentSheetPanel = ({
   theme,
   batchId = "",
   identificationSheet = null,
+  premixNo = null,
   disabled = false,
   compareHighlightOnly = false,
   allowAddRemoveRows = true,
@@ -188,10 +192,9 @@ const RawMaterialWeightmentSheetPanel = ({
     }
   }, [identificationSheet]);
 
-  // Load identification materials for compare validation when prop is missing
-  // (QC often only has batchId; collapsible already fetches for display).
+  // Load identification materials for the material dropdown (and compare validation)
+  // when the prop is missing (QC often only has batchId).
   useEffect(() => {
-    if (!compareEnabled) return;
     if (normalizeSheetMaterialsForWeightmentCompare(identificationSheet?.materials).length > 0) {
       setResolvedIdentificationSheet(identificationSheet);
       return;
@@ -200,16 +203,17 @@ const RawMaterialWeightmentSheetPanel = ({
     if (!id) return;
 
     let cancelled = false;
-    void (async () => {
+    (async () => {
       const batch = await batchManagementController.getBatchById(id);
       if (cancelled || !batch?.identificationSheet) return;
       setResolvedIdentificationSheet(batch.identificationSheet);
-    })();
-
+    })().catch(() => {
+      /* keep prior sheet */
+    });
     return () => {
       cancelled = true;
     };
-  }, [batchId, compareEnabled, identificationSheet]);
+  }, [batchId, identificationSheet]);
 
   useEffect(() => {
     if (!compareEnabled) {
@@ -306,64 +310,78 @@ const RawMaterialWeightmentSheetPanel = ({
   };
 
   const addRow = () => {
-    updateSheet((prev) => {
-      const seedFrom = prev.weightmentDetails[0];
-      return {
-        weightmentDetails: [
-          ...prev.weightmentDetails,
-          createEmptyWeightmentDetail(
-            seedFrom
-              ? {
-                  materialCode: seedFrom.materialCode,
-                  materialName: seedFrom.materialName,
-                  premixNo: seedFrom.premixNo,
-                  scopeMaterialCode: seedFrom.scopeMaterialCode ?? seedFrom.materialCode,
-                  percentage: seedFrom.percentage,
-                }
-              : undefined,
-          ),
-        ],
-      };
-    });
+    updateSheet((prev) => ({
+      weightmentDetails: [
+        ...prev.weightmentDetails,
+        createEmptyWeightmentDetail({
+          premixNo:
+            premixNo != null && Number.isFinite(Number(premixNo)) ? Number(premixNo) : null,
+          fromIdentificationSheet: false,
+        }),
+      ],
+    }));
   };
 
-  const handleMaterialSelect = (index: number, srNo: string) => {
-    const material = sheetMaterials.find((entry) => String(entry.srNo) === srNo);
+  const handleMaterialSelect = (index: number, selectKey: string) => {
+    const material = sheetMaterials.find(
+      (entry) => getSheetMaterialSelectKey(entry) === selectKey,
+    );
     if (!material) {
-      updateRow(index, { materialCode: "", materialName: "", percentage: "", weightTransferred: "" });
+      updateRow(index, {
+        materialCode: "",
+        materialName: "",
+        scopeMaterialCode: null,
+      });
       return;
     }
 
-    const { percentage, expectedWeightKg } = getExpectedWeightmentForSheetMaterial(material);
-
+    const code = String(material.materialCode ?? "").trim();
     updateRow(index, {
-      materialCode: material.materialCode,
-      materialName: material.materialName || material.materialCode,
-      percentage: String(percentage),
-      weightTransferred: String(expectedWeightKg),
+      materialCode: code,
+      materialName: String(material.materialName ?? code).trim() || code,
+      scopeMaterialCode: code,
+      // Weight is user-entered — never auto-fill from identification sheet.
+      premixNo:
+        premixNo != null && Number.isFinite(Number(premixNo))
+          ? Number(premixNo)
+          : value.weightmentDetails[index]?.premixNo ?? null,
+      fromIdentificationSheet: false,
     });
   };
 
   const getMaterialSelectOptionsForRow = (_rowIndex: number) =>
-    sheetMaterials.map((material) => {
-      const sheetKey = String(material.srNo);
-      return {
-        value: sheetKey,
-        label: formatSheetMaterialLabel(material),
-        // Same material may appear on multiple bin/container rows.
-        disabled: false,
-      };
-    });
+    sheetMaterials.map((material) => ({
+      value: getSheetMaterialSelectKey(material),
+      label: formatSheetMaterialLabel(material),
+      disabled: false,
+    }));
 
   const containerOptions = CONTAINER_TYPES.map((type) => ({ value: type, label: type }));
 
   const renderMaterialCodeField = (row: RawMaterialPrepWeightmentDetail, index: number) => {
     const materialCodeError = getRowFieldError(index, "materialCode");
     const fieldPath = weightmentPath(resolveErrorRowIndex(index), "materialCode");
+    const lockedFromSheet = row.fromIdentificationSheet === true;
 
-    // QC (compareHighlightOnly): always free-text; compare only highlights mismatches.
-    // RMP: when compare is on, use identification-sheet dropdown + auto-fill.
-    if (compareHighlightOnly !== true && compareEnabled === true && sheetMaterials.length > 0) {
+    // Identification-sheet seeded rows: fixed code (no dropdown).
+    // Add Row / QC free-text: dropdown when sheet materials exist.
+    if (lockedFromSheet) {
+      return (
+        <WeightmentTableInput
+          value={row.materialCode}
+          onChange={() => undefined}
+          placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
+          error={Boolean(materialCodeError)}
+          helperText={materialCodeError}
+          palette={palette}
+          disabled={disabled}
+          readOnly
+          fieldPath={fieldPath}
+        />
+      );
+    }
+
+    if (compareHighlightOnly !== true && sheetMaterials.length > 0) {
       return (
         <WeightmentTableInput
           value={getWeightmentRowSheetKey(row, sheetMaterials)}
@@ -508,8 +526,9 @@ const RawMaterialWeightmentSheetPanel = ({
                   {TABLE_COLUMNS.map((col) => (
                     <TableCell
                       key={col.label}
-                      sx={
-                        dt.tableHeaderCell
+                      sx={{
+                        minWidth: col.minWidth,
+                        ...(dt.tableHeaderCell
                           ? dt.tableHeaderCell()
                           : {
                               fontWeight: 800,
@@ -524,8 +543,8 @@ const RawMaterialWeightmentSheetPanel = ({
                               py: 1.15,
                               px: 1.5,
                               "&:last-of-type": { borderRight: "none" },
-                            }
-                      }
+                            }),
+                      }}
                     >
                       {col.label}
                       {col.required ? (
@@ -558,14 +577,16 @@ const RawMaterialWeightmentSheetPanel = ({
                         {renderMaterialCodeField(row, index)}
                         {renderExpectedHint(row)}
                       </TableCell>
-                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 170, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 240, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.materialName}
                           onChange={(next) => updateRow(index, { materialName: next })}
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_NAME}
-                          // QC highlight-only: keep name editable when compare is on.
-                          // RMP compare mode: lock name when selecting from identification sheet.
-                          readOnly={compareEnabled && !compareHighlightOnly}
+                          // Seeded ID-sheet rows: name is fixed. Add-row / QC: editable.
+                          readOnly={
+                            row.fromIdentificationSheet === true ||
+                            (compareEnabled && !compareHighlightOnly)
+                          }
                           disabled={disabled}
                           error={Boolean(getRowFieldError(index, "materialName"))}
                           helperText={getRowFieldError(index, "materialName")}
@@ -623,7 +644,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           fieldPath={weightmentPath(resolveErrorRowIndex(index), "weightTransferred")}
                         />
                       </TableCell>
-                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 200, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 155, maxWidth: 170, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           type="datetime"
                           value={row.weighingDateTime}

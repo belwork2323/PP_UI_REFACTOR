@@ -30,6 +30,8 @@ import {
   validateCasePrepMotorData,
   validateCasePrepMotorSession,
   firstCasePrepValidationError,
+  resolveFirstCasePrepValidationFocus,
+  focusCasePrepField,
   type CasePrepValidationErrors,
 } from "../../../data/models/user/casePrepValidation";
 import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
@@ -230,6 +232,10 @@ export const useCasePreparationHook = () => {
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, CasePrepValidationErrors>
   >({});
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    fieldPath: string | null;
+  } | null>(null);
 
   const resetFlowDraft = useCallback(() => {
     setAddedMotors([]);
@@ -251,6 +257,7 @@ export const useCasePreparationHook = () => {
     setIsFormDirty(false);
     setFormData(defaults);
     setMotorValidationErrors({});
+    setValidationFocusRequest(null);
     setPreviousStageGate(null);
     resetFlowDraft();
   }, [resetFlowDraft]);
@@ -270,6 +277,19 @@ export const useCasePreparationHook = () => {
     if (response?.error?.details) return String(response.error.details);
     if (response?.message) return String(response.message);
     return fallbackMessage;
+  };
+
+  const emitCasePrepValidationFocus = (fieldErrors: CasePrepValidationErrors) => {
+    const fieldPath = resolveFirstCasePrepValidationFocus(fieldErrors);
+    setValidationFocusRequest((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      fieldPath,
+    }));
+    if (fieldPath) {
+      requestAnimationFrame(() => {
+        focusCasePrepField(fieldPath);
+      });
+    }
   };
 
   const notifyCasePrepValidationErrors = (
@@ -602,6 +622,9 @@ export const useCasePreparationHook = () => {
       if (Object.keys(fieldErrors).length > 0) {
         setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
         notifyCasePrepValidationErrors(fieldErrors, intent);
+        if (intent === "submit") {
+          emitCasePrepValidationFocus(fieldErrors);
+        }
         return false;
       }
       setMotorValidationErrors((prev) => {
@@ -903,6 +926,9 @@ export const useCasePreparationHook = () => {
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, SUBSCALE: fieldErrors }));
           notifyCasePrepValidationErrors(fieldErrors, intent);
+          if (intent === "submit") {
+            emitCasePrepValidationFocus(fieldErrors);
+          }
           return false;
         }
         setMotorValidationErrors((prev) => {
@@ -1075,6 +1101,7 @@ export const useCasePreparationHook = () => {
     handleSubmit,
     hasSavedDraft,
     motorValidationErrors,
+    validationFocusRequest,
   };
 };
 

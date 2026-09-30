@@ -306,7 +306,10 @@ export const formatMasterDataLabel = (value: {
   return String(value.mixerType ?? value.mixerDetails ?? "").trim();
 };
 
-function serializeMaterialForApi(material: Record<string, any>): Record<string, unknown> {
+function serializeMaterialForApi(
+  material: Record<string, any>,
+  index: number,
+): Record<string, unknown> {
   const fromDate = formatToIsoDateInput(
     material.revalidationFromDate ?? material.revalidationDate ?? "",
   );
@@ -315,7 +318,7 @@ function serializeMaterialForApi(material: Record<string, any>): Record<string, 
   );
 
   return {
-    srNo: material.srNo,
+    srNo: index + 1,
     materialCode: material.materialCode,
     lotId: material.lotId ?? "",
     make: String(material.make ?? material.manufacturerName ?? "").trim(),

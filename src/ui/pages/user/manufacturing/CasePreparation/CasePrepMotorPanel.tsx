@@ -191,6 +191,7 @@ const CompactDateTime = ({
   placeholder = "DD-MM-YYYY HH:mm",
   readOnly,
   required = false,
+  dataCpField,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -198,17 +199,20 @@ const CompactDateTime = ({
   readOnly?: boolean;
   placeholder?: string;
   required?: boolean;
+  dataCpField?: string;
 }) => (
-  <DateTimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    placeholder={placeholder}
-    required={required}
-    inputSx={casePrepTableInputSx}
-  />
+  <Box {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
+    <DateTimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      placeholder={placeholder}
+      required={required}
+      inputSx={casePrepTableInputSx}
+    />
+  </Box>
 );
 
 const CompactTime = ({
@@ -266,6 +270,7 @@ const MultilineNoteField = ({
   placeholder,
   minRows = 2,
   required = false,
+  dataCpField,
 }: {
   label: string;
   value: string;
@@ -275,8 +280,12 @@ const MultilineNoteField = ({
   placeholder?: string;
   minRows?: number;
   required?: boolean;
+  dataCpField?: string;
 }) => (
-  <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
+  <Box
+    sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}
+    {...(dataCpField ? { "data-cp-field": dataCpField } : {})}
+  >
     <FieldLabel required={required}>{label}</FieldLabel>
     {readOnly ? (
       <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
@@ -303,6 +312,7 @@ const ValueByFieldType = ({
   disabled,
   theme,
   readOnly,
+  dataCpField,
 }: {
   value: string;
   valueFieldType?: string;
@@ -310,15 +320,13 @@ const ValueByFieldType = ({
   disabled?: boolean;
   readOnly?: boolean;
   theme: any;
+  dataCpField?: string;
 }) => {
   const type = String(valueFieldType ?? "text").toLowerCase();
-  if (type === "datetime") {
-    return (
+  const control =
+    type === "datetime" ? (
       <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
-    );
-  }
-  if (type === "date") {
-    return (
+    ) : type === "date" ? (
       <CompactDate
         value={value}
         onChange={onChange}
@@ -326,15 +334,9 @@ const ValueByFieldType = ({
         readOnly={readOnly}
         theme={theme}
       />
-    );
-  }
-  if (type === "time") {
-    return (
+    ) : type === "time" ? (
       <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
-    );
-  }
-  if (type === "textarea") {
-    return (
+    ) : type === "textarea" ? (
       <TableTextInput
         value={value}
         onChange={onChange}
@@ -344,10 +346,7 @@ const ValueByFieldType = ({
         minRows={2}
         placeholder="Enter value"
       />
-    );
-  }
-  if (type === "number") {
-    return (
+    ) : type === "number" ? (
       <TableTextInput
         value={value}
         onChange={onChange}
@@ -356,17 +355,18 @@ const ValueByFieldType = ({
         type="number"
         placeholder="0"
       />
+    ) : (
+      <TableTextInput
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        placeholder="Enter value"
+      />
     );
-  }
-  return (
-    <TableTextInput
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      readOnly={readOnly}
-      placeholder="Enter value"
-    />
-  );
+
+  if (!dataCpField) return control;
+  return <Box data-cp-field={dataCpField}>{control}</Box>;
 };
 
 type MfgLotCellProps = {
@@ -837,7 +837,6 @@ const CasePrepMotorPanel = ({
   const showVacuumApplied = str(preHeating.vacuumBaggingApplied).toUpperCase() === "YES";
   const showOtherRecipe = str(preHeating.preHeatingRecipe).toUpperCase() === "OTHERS";
   const showOtherLiner = str(liner.linerType).toUpperCase() === "OTHERS";
-  console.log(value, " val");
 
   return (
     <Box>
@@ -845,7 +844,6 @@ const CasePrepMotorPanel = ({
       <SectionCard title="Abrading Operation" theme={theme}>
         <SubsectionHeading>Abrading Configuration</SubsectionHeading>
         <FieldGrid columns={3}>
-          {console.log(abrading)}
           <ReadOnlyField
             label="Type of Casing"
             value={abrading.typeOfCasing}
@@ -868,6 +866,7 @@ const CasePrepMotorPanel = ({
               required
               theme={theme}
               error={Boolean(err("abradingOperation.abradingWheelType"))}
+              dataCpField="abradingOperation.abradingWheelType"
             />
             <FieldErrorText message={err("abradingOperation.abradingWheelType")} />
           </Box>
@@ -928,6 +927,7 @@ const CasePrepMotorPanel = ({
                               disabled={disabled}
                               readOnly={readOnly}
                               theme={theme}
+                              dataCpField={`abradingOperation.abradingDetails.${index}.value`}
                             />
                             <FieldErrorText
                               message={err(`abradingOperation.abradingDetails.${index}.value`)}
@@ -1032,6 +1032,7 @@ const CasePrepMotorPanel = ({
               theme={theme}
               width="100%"
               required
+              dataCpField="bellowBonding.numberOfSpacers"
             />
             <FieldErrorText message={err("bellowBonding.numberOfSpacers")} />
           </Box>
@@ -1045,6 +1046,7 @@ const CasePrepMotorPanel = ({
               theme={theme}
               width="100%"
               required
+              dataCpField="bellowBonding.heBellowDimension"
             />
             <FieldErrorText message={err("bellowBonding.heBellowDimension")} />
           </Box>
@@ -1056,6 +1058,7 @@ const CasePrepMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              dataCpField="bellowBonding.heMotorPastingDateTime"
             />
             <FieldErrorText message={err("bellowBonding.heMotorPastingDateTime")} />
           </Box>
@@ -1069,6 +1072,7 @@ const CasePrepMotorPanel = ({
               theme={theme}
               width="100%"
               required
+              dataCpField="bellowBonding.neBellowDimension"
             />
             <FieldErrorText message={err("bellowBonding.neBellowDimension")} />
           </Box>
@@ -1080,6 +1084,7 @@ const CasePrepMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              dataCpField="bellowBonding.neMotorPastingDateTime"
             />
             <FieldErrorText message={err("bellowBonding.neMotorPastingDateTime")} />
           </Box>
@@ -1115,6 +1120,7 @@ const CasePrepMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              dataCpField="tceCleaning.tceCleaningDateTime"
             />
             <FieldErrorText message={err("tceCleaning.tceCleaningDateTime")} />
           </Box>
@@ -1129,6 +1135,7 @@ const CasePrepMotorPanel = ({
               width="100%"
               placeholder="0"
               required
+              dataCpField="tceCleaning.solventUsedQtyKg"
             />
             <FieldErrorText message={err("tceCleaning.solventUsedQtyKg")} />
           </Box>
@@ -1142,6 +1149,7 @@ const CasePrepMotorPanel = ({
               placeholder="Observation"
               minRows={3}
               required
+              dataCpField="tceCleaning.observation"
             />
             <FieldErrorText message={err("tceCleaning.observation")} />
           </Box>
@@ -1176,6 +1184,7 @@ const CasePrepMotorPanel = ({
               readOnly={readOnly}
               required
               theme={theme}
+              dataCpField="preHeating.vacuumBaggingApplied"
             />
             <FieldErrorText message={err("preHeating.vacuumBaggingApplied")} />
           </Box>
@@ -1190,6 +1199,7 @@ const CasePrepMotorPanel = ({
                 theme={theme}
                 width="100%"
                 required
+                dataCpField="preHeating.vacuumApplied"
               />
               <FieldErrorText message={err("preHeating.vacuumApplied")} />
             </Box>
@@ -1212,6 +1222,7 @@ const CasePrepMotorPanel = ({
               readOnly={readOnly}
               required
               theme={theme}
+              dataCpField="preHeating.preHeatingRecipe"
             />
             <FieldErrorText message={err("preHeating.preHeatingRecipe")} />
           </Box>
@@ -1313,6 +1324,7 @@ const CasePrepMotorPanel = ({
               readOnly={readOnly}
               required
               theme={theme}
+              dataCpField="linerCoatingOperation.linerType"
             />
             <FieldErrorText message={err("linerCoatingOperation.linerType")} />
           </Box>
@@ -1327,6 +1339,7 @@ const CasePrepMotorPanel = ({
                 theme={theme}
                 width="100%"
                 required
+                dataCpField="linerCoatingOperation.otherLinerType"
               />
               <FieldErrorText message={err("linerCoatingOperation.otherLinerType")} />
             </Box>
@@ -1341,6 +1354,7 @@ const CasePrepMotorPanel = ({
               theme={theme}
               width="100%"
               required
+              dataCpField="linerCoatingOperation.batchNo"
             />
             <FieldErrorText message={err("linerCoatingOperation.batchNo")} />
           </Box>
@@ -1357,6 +1371,7 @@ const CasePrepMotorPanel = ({
               theme={theme}
               width="100%"
               required
+              dataCpField="linerCoatingOperation.qualifyingSubscaleBatchNo"
             />
             <FieldErrorText message={err("linerCoatingOperation.qualifyingSubscaleBatchNo")} />
           </Box>

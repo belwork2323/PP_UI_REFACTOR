@@ -24,6 +24,7 @@ import {
   type CasePrepMotorData,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
 import type { CasePrepValidationErrors } from "../../../../../data/models/user/casePrepValidation";
+import { focusCasePrepField } from "../../../../../data/models/user/casePrepValidation";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
@@ -82,6 +83,8 @@ type CasePreparationFormProps = {
   onSubmitMotor?: (motorId: string) => void;
   /** Per-motor field validation errors (motorId → path → message). */
   motorValidationErrors?: Record<string, CasePrepValidationErrors>;
+  /** Focus request after failed SUBMIT (RMS/RMP/RMC parity). */
+  validationFocusRequest?: { id: number; fieldPath: string | null } | null;
   theme: any;
 };
 
@@ -102,10 +105,21 @@ const CasePreparationForm = ({
   onSaveMotorDraft,
   onSubmitMotor,
   motorValidationErrors = {},
+  validationFocusRequest = null,
   theme,
 }: CasePreparationFormProps) => {
   const BRAND = CASE_PREP_BRAND;
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const path = validationFocusRequest.fieldPath;
+    const timer = window.setTimeout(() => {
+      focusCasePrepField(path);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
+
   const motorNavGate = useMemo(() => {
     const resolveMotorStatus = (motorId: string) =>
       getMotorStatus?.(motorId) ??
@@ -438,7 +452,7 @@ const CasePreparationForm = ({
                 </Box>
               ) : null}
 
-              <Box sx={{ mb: 1.5 }}>
+              <Box sx={{ mb: 1.5 }} data-cp-field="prrcClearanceDate">
                 <CasePrepDateField
                   label={`${S.PRRC_CLEARANCE_DATE_LABEL}:`}
                   value={activeMotorSession.prrcClearanceDate || ""}
@@ -451,6 +465,9 @@ const CasePreparationForm = ({
                   disabled={activeMotorLocked}
                   placeholder={S.PRRC_CLEARANCE_DATE_PLACEHOLDER}
                   theme={theme}
+                  required
+                  error={Boolean(motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate)}
+                  dataCpField="prrcClearanceDate"
                 />
                 {motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate ? (
                   <Typography sx={{ fontSize: "0.7rem", color: "error.main", mt: 0.5 }}>

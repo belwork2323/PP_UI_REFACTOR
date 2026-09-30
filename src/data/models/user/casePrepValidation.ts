@@ -6,6 +6,7 @@ import type {
   CasePrepParameterRow,
   CasePrepQualificationParameterRow,
 } from "./CasePrepMotorDataModel";
+import { focusFieldByDataAttr } from "../validation/utils/focusFieldByDataAttr";
 
 export type CasePrepSubmissionIntent = "DRAFT" | "SUBMIT";
 export type CasePrepValidationErrors = Record<string, string>;
@@ -286,7 +287,6 @@ export function validateCasePrepMotorData(
   const preHeating = data.preHeating ?? ({} as CasePrepMotorData["preHeating"]);
   const liner = data.linerCoatingOperation ?? ({} as CasePrepMotorData["linerCoatingOperation"]);
   const dispatch = data.dispatchToCasting ?? ({} as CasePrepMotorData["dispatchToCasting"]);
-  console.log(data);
 
   h.addText("abradingOperation.typeOfCasing", abrading.typeOfCasing, "Type of Casing", true);
   h.addText(
@@ -440,8 +440,44 @@ export function validateCasePrepMotorData(
 }
 
 export function firstCasePrepValidationError(errors: CasePrepValidationErrors): string | null {
-  const values = Object.values(errors);
-  return values.length ? values[0] : null;
+  const focusPath = resolveFirstCasePrepValidationFocus(errors);
+  if (!focusPath) return null;
+  return errors[focusPath] ?? Object.values(errors)[0] ?? null;
+}
+
+/** Preferred section order for scroll/focus after failed SUBMIT. */
+const CASE_PREP_FOCUS_PREFIX_ORDER = [
+  "prrcClearanceDate",
+  "abradingOperation.",
+  "bellowBonding.",
+  "tceCleaning.",
+  "preHeating.",
+  "linerCoatingOperation.",
+  "dispatchToCasting.",
+  "data",
+] as const;
+
+/** First error field path for Case Prep focus/scroll (stable section order). */
+export function resolveFirstCasePrepValidationFocus(
+  errors: CasePrepValidationErrors | null | undefined,
+): string | null {
+  if (!errors) return null;
+  const keys = Object.keys(errors);
+  if (!keys.length) return null;
+
+  for (const prefix of CASE_PREP_FOCUS_PREFIX_ORDER) {
+    const match = keys
+      .filter((key) => key === prefix || key.startsWith(prefix))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0];
+    if (match) return match;
+  }
+
+  return keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0] ?? null;
+}
+
+/** Scroll + focus the control tagged with `data-cp-field`. */
+export function focusCasePrepField(fieldPath: string, root: ParentNode = document): boolean {
+  return focusFieldByDataAttr("cp-field", fieldPath, root);
 }
 
 export function validateCasePrepMotorSession(

@@ -1383,9 +1383,9 @@ export const STRINGS = {
       DELETE_PREMIX_TOOLTIP: "Remove this premix",
       WEIGHTMENT_SHEET_TITLE: "Weightment Sheet for Dispatch of Material to Mixing Station",
       WEIGHTMENT_SHEET_SUBTITLE:
-        "Common for all premixes — record transferred weights before dispatch",
+        "All materials for this premix — select from identification sheet; use Add Row for extra containers",
       WEIGHTMENT_SHEET_LOCKED_HINT:
-        "Weightment is locked because at least one premix is waiting for approval or already approved.",
+        "Weightment is locked because this premix is waiting for approval or already approved.",
       WEIGHTMENT_MIXER_BUILDING: "Mixer Building Number",
       WEIGHTMENT_ADD_ROW: "Add Row",
       WEIGHTMENT_ALL_MATERIALS_ADDED: "All identification sheet materials are already added.",

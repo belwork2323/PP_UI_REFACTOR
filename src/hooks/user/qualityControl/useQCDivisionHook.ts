@@ -3295,7 +3295,7 @@ export const useQCDivisionHook = () => {
             },
             POST_CURE: { kind: "POST_CURE_MOTOR", division: "POST_CURE", subType: null },
             NDT: { kind: "NDT_MOTOR", division: "NDT", subType: null },
-            QC: { kind: "PROPELLANT_MOTOR", division: "PROPELLANT_PROPERTIES", subType: null },
+            QC: { kind: "PROPELLANT_MOTOR", division: "QC", subType: null },
             WEIGHTMENT: { kind: "WEIGHTMENT_MOTOR", division: "WEIGHTMENT", subType: null },
           };
 
@@ -3656,7 +3656,7 @@ export const useQCDivisionHook = () => {
             return;
           }
 
-          if (loader.division === "PROPELLANT_PROPERTIES") {
+          if (loader.division === "PROPELLANT_PROPERTIES" || loader.division === "QC") {
             let initialValues = createInitialPropellantValues(resolvePropellantFmCount());
             if (shouldUseQcFormDetailsData(item.status)) {
               const seedPayload = await resolveSeedPayloadForUnit();
@@ -6409,9 +6409,33 @@ export const useQCDivisionHook = () => {
     );
   }, [activeDivisionTabKey, divisionGroupStatusByFlowKey, selectedDivision]);
 
-  const isDivisionNavTabEnabled = useCallback((_tabKey: string) => true, []);
+  const isDivisionNavTabEnabled = useCallback(
+    (tabKey: string) => {
+      const status = normalizePartialItemStatus(
+        divisionGroupStatusByFlowKey[tabKey] ??
+          divisionStatusByFlowKey[tabKey] ??
+          "YET_TO_START",
+      );
+      // Backend seeds unlocked divisions as TO_BE_INITIATED; locked as YET_TO_START.
+      if (status === "YET_TO_START") {
+        // Legacy batches without YET_TO_START may omit the key — keep open if unknown and not experimental motor.
+        const hasExplicit =
+          tabKey in divisionGroupStatusByFlowKey || tabKey in divisionStatusByFlowKey;
+        if (!hasExplicit) return true;
+        return false;
+      }
+      return true;
+    },
+    [divisionGroupStatusByFlowKey, divisionStatusByFlowKey],
+  );
 
-  const getDivisionNavTabDisabledReason = useCallback((_tabKey: string) => undefined, []);
+  const getDivisionNavTabDisabledReason = useCallback(
+    (tabKey: string) => {
+      if (isDivisionNavTabEnabled(tabKey)) return undefined;
+      return "This QC division is locked until the corresponding manufacturing unit is approved.";
+    },
+    [isDivisionNavTabEnabled],
+  );
 
   // Division-level lock applies only to Raw Material Revalidation (no unit nav).
   const isRevalidationDivisionActive =

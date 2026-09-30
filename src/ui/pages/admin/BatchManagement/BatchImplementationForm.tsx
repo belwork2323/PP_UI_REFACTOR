@@ -297,6 +297,9 @@ export default function BatchImplementationForm({
     });
   };
 
+  const renumberMaterials = (materials: Material[]): Material[] =>
+    materials.map((material, index) => ({ ...material, srNo: index + 1 }));
+
   const handleAddMaterial = () => {
     if (!canAddMaterial || !selectedMaterialOption) return;
 
@@ -304,8 +307,9 @@ export default function BatchImplementationForm({
       ? selectableGrades.find((item) => item.gradeCode === selectedGradeCode)
       : undefined;
 
+    const current = form.identificationSheet?.materials ?? [];
     const newMaterial: Material = {
-      srNo: (form.identificationSheet?.materials?.length ?? 0) + 1,
+      srNo: current.length + 1,
       materialCode: selectedMaterialOption.materialCode,
       materialName: selectedMaterialOption.materialName,
       gradeCode: grade?.gradeCode,
@@ -316,7 +320,7 @@ export default function BatchImplementationForm({
       revalidationFromDate: "",
       revalidationToDate: "",
     };
-    onMaterialsChange([...(form.identificationSheet?.materials ?? []), newMaterial]);
+    onMaterialsChange(renumberMaterials([...current, newMaterial]));
     setSelectedMaterialCode("");
     setSelectedGradeCode("");
   };
@@ -326,7 +330,7 @@ export default function BatchImplementationForm({
     if (material && isBaselineMaterial(material)) return;
     const newMaterials =
       form.identificationSheet?.materials?.filter((_: any, i: number) => i !== index) ?? [];
-    onMaterialsChange(newMaterials);
+    onMaterialsChange(renumberMaterials(newMaterials as Material[]));
   };
 
   const handleMaterialChange = (index: number, field: string, value: any) => {

@@ -48,7 +48,7 @@ export const QC_DIVISION_DEFINITIONS: QcDivisionDefinition[] = [
   { flowKey: "TRIMMING", label: "Trimming", panelType: "TRIMMING", apiDivision: "TRIMMING" },
   { flowKey: "POST_CURE", label: "Post Cure", panelType: "POST_CURE", apiDivision: "POST_CURE" },
   { flowKey: "NDT", label: "NDT", panelType: "NDT", apiDivision: "NDT" },
-  { flowKey: "QC", label: "QC", panelType: "PROPELLANT", apiDivision: "PROPELLANT_PROPERTIES" },
+  { flowKey: "QC", label: "QC", panelType: "PROPELLANT", apiDivision: "QC" },
   {
     flowKey: "WEIGHTMENT",
     label: "Weighment",
@@ -75,7 +75,7 @@ export const resolveQcApiDivisionForTabKey = (tabKey: string): string => {
     .toUpperCase();
   if (!key) return "";
   if (key === "RAW_MATERIAL_PROCESSING" || key === "RAW_MATERIAL_REVALIDATION") return key;
-  if (key === "PROPELLANT_PROPERTIES" || key === "PROPELLANT") return "PROPELLANT_PROPERTIES";
+  if (key === "PROPELLANT_PROPERTIES" || key === "PROPELLANT") return "QC";
   if (key === "WEIGHMENT") return "WEIGHTMENT";
   const flowKey = key === "POST_CURE_OPERATION" ? "POST_CURE" : key;
   return getQcDivisionDefinition(flowKey)?.apiDivision ?? key;

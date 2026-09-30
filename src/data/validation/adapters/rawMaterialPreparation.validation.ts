@@ -5,6 +5,10 @@ import type {
   RawMaterialPrepWeightmentDetail,
   RawMaterialPrepWeightmentSheet,
 } from "@/data/models/user/RawMaterialPreparationModel";
+import {
+  createEmptyWeightmentValidation,
+  resolveWeightmentPremixMeta,
+} from "@/data/models/user/RawMaterialPreparationModel";
 import type { RmpMaterialProcessForm } from "@/data/models/user/rmp/defaultSolidProcessForm";
 import {
   validateMaterialProcessForm,
@@ -113,6 +117,36 @@ const materialCodesForSelections = (selections: AddedPremixSelection[]): string[
     }
   }
   return Array.from(codes);
+};
+
+/** Premix numbers represented in the current validation selection set. */
+const premixNosForSelections = (selections: AddedPremixSelection[]): Set<number> => {
+  const nos = new Set<number>();
+  for (const entry of selections) {
+    const n = Number(entry.premix);
+    if (Number.isFinite(n) && n > 0) nos.add(n);
+  }
+  return nos;
+};
+
+/**
+ * Weightment rows are per premix × material. When validating a single premix submit,
+ * only that premix's rows are required — other premixes may still be empty/in progress.
+ * Legacy rows without premixNo are included when validating a single premix.
+ */
+const rowBelongsToPremixScope = (
+  row: RawMaterialPrepWeightmentDetail,
+  targetPremixNos: Set<number>,
+): boolean => {
+  if (targetPremixNos.size === 0) return true;
+  const rowPremix =
+    row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+      ? null
+      : Number(row.premixNo);
+  if (rowPremix == null) {
+    return targetPremixNos.size === 1;
+  }
+  return targetPremixNos.has(rowPremix);
 };
 
 export type RmpValidationAttemptFlags = {
@@ -427,14 +461,23 @@ export function validateWeightmentForSubmit(
   identificationMaterials: MaterialItem[],
 ): ValidationErrors {
   const errors: ValidationErrors = {};
+  const targetPremixNos = premixNosForSelections(selections);
 
-  const mixer = str(sheet.mixerBuildingNumber);
+  // Use this premix's mixer / deviation — never another premix's shared header.
+  let mixer = str(sheet.mixerBuildingNumber);
+  let validation = sheet.validation ?? createEmptyWeightmentValidation();
+  if (targetPremixNos.size === 1) {
+    const meta = resolveWeightmentPremixMeta(sheet, [...targetPremixNos][0]);
+    mixer = str(meta.mixerBuildingNumber);
+    validation = meta.validation;
+  }
+
   if (!mixer) {
     errors[weightmentMixerBuildingPath()] = M.mixerBuildingNumber.required;
   }
 
-  const deviationMessage = str(sheet.validation.deviationMessage);
-  if (sheet.validation.deviationFound === true && !deviationMessage) {
+  const deviationMessage = str(validation.deviationMessage);
+  if (validation.deviationFound === true && !deviationMessage) {
     errors[weightmentDeviationMessagePath()] =
       M.weightmentDeviationMessage?.required ?? RM.WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED;
   } else if (deviationMessage && !ALPHA_NUM.test(deviationMessage)) {
@@ -446,6 +489,7 @@ export function validateWeightmentForSubmit(
   const requiredCodes = materialCodesForSelections(selections);
   const rowsByCode = new Map<string, number[]>();
   sheet.weightmentDetails.forEach((row, index) => {
+    if (!rowBelongsToPremixScope(row, targetPremixNos)) return;
     const code = str(row.materialCode).toUpperCase();
     if (!code) return;
     const list = rowsByCode.get(code) ?? [];
@@ -456,10 +500,19 @@ export function validateWeightmentForSubmit(
   for (const code of requiredCodes) {
     const indices = rowsByCode.get(code);
     if (!indices?.length) {
-      // Attach missing-material error to first empty row or invent path for snackbar/focus
-      const emptyIndex = sheet.weightmentDetails.findIndex((row) => !str(row.materialCode));
+      // Attach missing-material error to first empty in-scope row or invent path for snackbar/focus
+      const emptyIndex = sheet.weightmentDetails.findIndex(
+        (row) => rowBelongsToPremixScope(row, targetPremixNos) && !str(row.materialCode),
+      );
+      const scopedIndices = sheet.weightmentDetails
+        .map((row, index) => (rowBelongsToPremixScope(row, targetPremixNos) ? index : -1))
+        .filter((index) => index >= 0);
       const rowIndex =
-        emptyIndex >= 0 ? emptyIndex : Math.max(0, sheet.weightmentDetails.length - 1);
+        emptyIndex >= 0
+          ? emptyIndex
+          : scopedIndices.length
+            ? scopedIndices[scopedIndices.length - 1]
+            : Math.max(0, sheet.weightmentDetails.length - 1);
       errors[weightmentPath(rowIndex, "materialCode")] =
         M.weightmentMaterialCode.required + ` (${code})`;
       continue;
@@ -488,7 +541,7 @@ export function validateWeightmentForSubmit(
           "Use letters, numbers, spaces, hyphens, underscores, or slashes only";
       }
 
-      if (sheet.validation.compareWithIdentificationSheet) {
+      if (validation.compareWithIdentificationSheet) {
         const sheetErrors = validateWeightmentRowAgainstSheet(row, identificationMaterials, {
           materialNotInSheet: RM.WEIGHTMENT_MATERIAL_NOT_IN_SHEET,
           percentageMismatch: RM.WEIGHTMENT_PERCENTAGE_MISMATCH,
@@ -504,8 +557,9 @@ export function validateWeightmentForSubmit(
     }
   }
 
-  // Also validate any extra started rows not in required set
+  // Also validate any extra started in-scope rows not in required set
   sheet.weightmentDetails.forEach((row, rowIndex) => {
+    if (!rowBelongsToPremixScope(row, targetPremixNos)) return;
     const code = str(row.materialCode).toUpperCase();
     if (code && requiredCodes.includes(code)) return;
     const hasAny = WEIGHTMENT_ROW_CHECKS.some(({ key }) => str(row[key])) || str(row.materialName);
@@ -650,11 +704,31 @@ export function isWeightmentSubmitComplete(sheet: RawMaterialPrepWeightmentSheet
 export function getWeightmentIdentificationError(
   sheet: RawMaterialPrepWeightmentSheet,
   identificationMaterials: MaterialItem[],
+  premixNo?: number | null,
 ): string | null {
+  const scoped =
+    premixNo != null && Number.isFinite(Number(premixNo)) && Number(premixNo) > 0
+      ? (() => {
+          const meta = resolveWeightmentPremixMeta(sheet, Number(premixNo));
+          return {
+            ...sheet,
+            mixerBuildingNumber: meta.mixerBuildingNumber,
+            validation: meta.validation,
+            weightmentDetails: (sheet.weightmentDetails ?? []).filter((row) => {
+              const rowPremix =
+                row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+                  ? null
+                  : Number(row.premixNo);
+              return rowPremix === Number(premixNo);
+            }),
+          };
+        })()
+      : sheet;
+
   return validateWeightmentSheetAgainstIdentification(
-    sheet.weightmentDetails,
+    scoped.weightmentDetails,
     identificationMaterials,
-    sheet.validation.compareWithIdentificationSheet === true,
+    scoped.validation.compareWithIdentificationSheet === true,
     {
       materialNotInSheet: RM.WEIGHTMENT_MATERIAL_NOT_IN_SHEET,
       percentageMismatch: RM.WEIGHTMENT_PERCENTAGE_MISMATCH,
@@ -662,6 +736,6 @@ export function getWeightmentIdentificationError(
       deviationMessageRequired: RM.WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED,
       incompleteRow: RM.WEIGHTMENT_INCOMPLETE_ROW,
     },
-    sheet.validation,
+    scoped.validation,
   );
 }

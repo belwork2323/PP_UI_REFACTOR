@@ -31,9 +31,9 @@ import {
 } from "../../../../../data/validation/adapters/rawMaterialPreparation.validation";
 import { getPremixMaterialSessionKey } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import {
-  ensureWeightmentRowForMaterialPremix,
-  filterWeightmentSheetForMaterial,
-  mergeWeightmentSheetForMaterial,
+  ensureWeightmentRowsForPremixMaterials,
+  filterWeightmentSheetForPremix,
+  mergeWeightmentSheetForPremix,
 } from "../../../../../hooks/user/qualityControl/qcProcessingMaterials";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -178,55 +178,42 @@ const RawMaterialBuilderForm = ({
     ).trim();
   }, [activeMaterialEntry]);
 
-  const { activeMaterialWeightmentSheet, activeWeightmentRowSourceIndices } = useMemo(() => {
-    if (!activeMaterialEntry || !activeMaterialCode) {
+  const activePremixNoForWeightment = activePremixGroup?.premix ?? 0;
+
+  const { activePremixWeightmentSheet, activeWeightmentRowSourceIndices } = useMemo(() => {
+    if (!activePremixNoForWeightment) {
       return {
-        activeMaterialWeightmentSheet: null as RawMaterialPrepWeightmentSheet | null,
+        activePremixWeightmentSheet: null as RawMaterialPrepWeightmentSheet | null,
         activeWeightmentRowSourceIndices: undefined as number[] | undefined,
       };
     }
-    const ensured = ensureWeightmentRowForMaterialPremix(weightmentSheet, {
-      materialCode: activeMaterialCode,
-      materialName: activeMaterialEntry.materialName,
-      premixNo: activeMaterialEntry.premix,
-    });
-    const code = activeMaterialCode.trim().toUpperCase();
-    const premix = Number(activeMaterialEntry.premix);
+    const scoped = filterWeightmentSheetForPremix(
+      weightmentSheet,
+      activePremixNoForWeightment,
+    );
     const rowSourceIndices: number[] = [];
-    const filteredDetails = (ensured.weightmentDetails ?? []).filter((row, idx) => {
-      const scopeCode = String(row.scopeMaterialCode ?? row.materialCode ?? "")
-        .trim()
-        .toUpperCase();
-      if (scopeCode && scopeCode !== code) return false;
-      if (!scopeCode) {
-        rowSourceIndices.push(idx);
-        return true;
-      }
+    (weightmentSheet.weightmentDetails ?? []).forEach((row, idx) => {
       const rowPremix =
         row.premixNo == null || !Number.isFinite(Number(row.premixNo))
           ? null
           : Number(row.premixNo);
-      if (rowPremix == null || rowPremix === premix) {
+      if (rowPremix === activePremixNoForWeightment) {
         rowSourceIndices.push(idx);
-        return true;
       }
-      return false;
     });
     return {
-      activeMaterialWeightmentSheet: {
-        ...ensured,
-        weightmentDetails: filteredDetails,
-      } as RawMaterialPrepWeightmentSheet,
-      activeWeightmentRowSourceIndices: rowSourceIndices,
+      activePremixWeightmentSheet: scoped,
+      activeWeightmentRowSourceIndices: rowSourceIndices.length
+        ? rowSourceIndices
+        : undefined,
     };
-  }, [activeMaterialCode, activeMaterialEntry, weightmentSheet]);
+  }, [activePremixNoForWeightment, weightmentSheet]);
 
   useEffect(() => {
-    if (!activeMaterialEntry || !activeMaterialCode || !onWeightmentSheetChange) return;
-    const ensured = ensureWeightmentRowForMaterialPremix(weightmentSheet, {
-      materialCode: activeMaterialCode,
-      materialName: activeMaterialEntry.materialName,
-      premixNo: activeMaterialEntry.premix,
+    if (!activePremixNoForWeightment || !onWeightmentSheetChange) return;
+    const ensured = ensureWeightmentRowsForPremixMaterials(weightmentSheet, {
+      premixNo: activePremixNoForWeightment,
+      materials: identificationSheet?.materials ?? [],
     });
     if (
       JSON.stringify(ensured.weightmentDetails) ===
@@ -236,42 +223,38 @@ const RawMaterialBuilderForm = ({
     }
     onWeightmentSheetChange(ensured);
   }, [
-    activeMaterialCode,
-    activeMaterialEntry,
+    activePremixNoForWeightment,
+    identificationSheet?.materials,
     onWeightmentSheetChange,
     weightmentSheet,
   ]);
 
-  const handleMaterialWeightmentChange = (
+  const handlePremixWeightmentChange = (
     next:
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => {
-    if (!activeMaterialEntry || !activeMaterialCode || !onWeightmentSheetChange) return;
+    if (!activePremixNoForWeightment || !onWeightmentSheetChange) return;
     onWeightmentSheetChange((prevFull) => {
-      const currentFiltered = filterWeightmentSheetForMaterial(
+      const currentFiltered = filterWeightmentSheetForPremix(
         prevFull,
-        activeMaterialCode,
-        activeMaterialEntry.premix,
+        activePremixNoForWeightment,
       );
       const resolvedFiltered = typeof next === "function" ? next(currentFiltered) : next;
-      return mergeWeightmentSheetForMaterial(
+      return mergeWeightmentSheetForPremix(
         prevFull,
-        activeMaterialCode,
         {
           ...resolvedFiltered,
           weightmentDetails: (resolvedFiltered.weightmentDetails ?? []).map((row) => ({
             ...row,
-            materialCode: String(row.materialCode ?? "").trim() || activeMaterialCode,
-            materialName:
-              String(row.materialName ?? "").trim() ||
-              String(activeMaterialEntry.materialName ?? activeMaterialCode),
+            premixNo: row.premixNo ?? activePremixNoForWeightment,
             scopeMaterialCode:
-              String(row.scopeMaterialCode ?? "").trim() || activeMaterialCode,
-            premixNo: row.premixNo ?? activeMaterialEntry.premix,
+              String(row.scopeMaterialCode ?? "").trim() ||
+              String(row.materialCode ?? "").trim() ||
+              null,
           })),
         },
-        activeMaterialEntry.premix,
+        activePremixNoForWeightment,
       );
     });
   };
@@ -362,8 +345,8 @@ const RawMaterialBuilderForm = ({
   const activePremixStatus = (premixStatusByNo as Record<number, PremixStatusMeta>)?.[activePremixNo]
     ?.premixSubmissionStatus;
   const weightmentSheetEditable = useMemo(
-    () => isWeightmentSheetEditable(premixStatusByNo),
-    [premixStatusByNo],
+    () => isWeightmentSheetEditable(premixStatusByNo, activePremixNo),
+    [premixStatusByNo, activePremixNo],
   );
 
   const finalApprovalRows = useMemo(
@@ -644,15 +627,16 @@ const RawMaterialBuilderForm = ({
             )}
           </Box>
 
-          {activeMaterialWeightmentSheet ? (
+          {activePremixWeightmentSheet ? (
             <RawMaterialWeightmentSheetPanel
-              key={`weightment-${activeMaterialEntry.premix}-${activeMaterialCode}`}
-              value={activeMaterialWeightmentSheet}
-              onChange={handleMaterialWeightmentChange}
+              key={`weightment-premix-${activePremixNoForWeightment}`}
+              value={activePremixWeightmentSheet}
+              onChange={handlePremixWeightmentChange}
               theme={theme}
               batchId={activeBatch?.batchId ?? ""}
               identificationSheet={identificationSheet}
-              disabled={!weightmentSheetEditable || activePremixLocked}
+              premixNo={activePremixNoForWeightment}
+              disabled={!weightmentSheetEditable}
               allowAddRemoveRows={true}
               weightmentErrors={weightmentErrors}
               validationAttempt={validationAttempt}

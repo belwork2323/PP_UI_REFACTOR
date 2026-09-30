@@ -61,6 +61,7 @@ const CasePreparationPage = () => {
     handleSaveDraft,
     handleSubmit,
     motorValidationErrors,
+    validationFocusRequest,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -125,6 +126,7 @@ const CasePreparationPage = () => {
             subDepartmentId={subDepartmentId}
             actionLoading={actionLoading}
             motorValidationErrors={motorValidationErrors}
+            validationFocusRequest={validationFocusRequest}
             onMotorSessionChange={handleMotorSessionChange}
             onSubscaleValuesChange={handleSubscaleValuesChange}
             onSaveMotorDraft={(motorId) => {

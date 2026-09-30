@@ -378,12 +378,8 @@ const resolvePreviousSubDepartmentMotorGate = (params: {
 };
 
 /**
- * QC combines premix and motor work. Each unit is enabled only when the
- * immediate previous subdepartment approved it:
- * - Premix / final mix ← Mixing
- * - Motors ← NDT
- * Case Preparation / Raw Material Preparation are starters (all units open there).
- * There is no walk-back and no all-prior-stage chain.
+ * QC unit tabs: prefer locks from QC stageProgress.divisionStatuses unit lists.
+ * Fallback: legacy manufacturing previous-stage gate for older batches without unit rows.
  */
 export const resolveQcPreviousDivisionApprovedUnits = (params: {
   currentDivisionKey: string;
@@ -408,6 +404,11 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
     return emptyGate(null, true);
   }
 
+  const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
+  if (fromDivisionStatuses) {
+    return fromDivisionStatuses;
+  }
+
   if (currentKey === "RAW_MATERIAL_PROCESSING") {
     return resolvePreviousSubDepartmentRmpProcessingGate(params);
   }
@@ -421,6 +422,148 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   }
 
   return emptyGate(null, true);
+};
+
+const findQcStageEntry = (
+  stageProgress?: unknown,
+  currentStage?: unknown,
+): StageProgressEntry | null => {
+  const stages = mergeStageProgress(stageProgress, currentStage);
+  return (
+    stages.find((stage) => {
+      const id = Number(stage.subDepartmentId ?? stage.sub_department_id);
+      if (id === 11) return true;
+      return isQcDivisionStageName(String(stage.subDepartmentName ?? ""));
+    }) ?? null
+  );
+};
+
+const isQcDivisionStageName = (subDepartmentName: string) => {
+  const name = normalizeNameKey(subDepartmentName);
+  return name === "qualitycontrol" || name === "qcdivision" || name === "qc";
+};
+
+const matchDivisionRow = (
+  row: Record<string, unknown>,
+  currentKey: string,
+): boolean => {
+  const name = normalizeQcDivisionKey(
+    pickString(row.divisionName, row.division, row.name),
+  );
+  const id = pickNumber(row.divisionId, row.division_id);
+  if (name === currentKey || (name === "PROPELLANT_PROPERTIES" && currentKey === "QC")) {
+    return true;
+  }
+  if (currentKey === "QC" && (id === 10 || name === "PROPELLANT_PROPERTIES")) return true;
+  if (currentKey === "RAW_MATERIAL_REVALIDATION" && id === 101) return true;
+  if (currentKey === "RAW_MATERIAL_PROCESSING" && id === 102) return true;
+  return false;
+};
+
+const isUnitUnlockedStatus = (status: unknown): boolean => {
+  const upper = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return upper !== "" && upper !== "YET_TO_START";
+};
+
+const resolveGateFromQcDivisionStatuses = (
+  params: {
+    stageProgress?: unknown;
+    currentStage?: unknown;
+    candidatePremixNos?: Array<number | string>;
+    candidateMotorIds?: string[];
+  },
+  currentKey: string,
+): PreviousStageApprovedUnits | null => {
+  const qcStage = findQcStageEntry(params.stageProgress, params.currentStage);
+  if (!qcStage) return null;
+  const rows = asArray(qcStage.divisionStatuses)
+    .map((entry) => asRecord(entry))
+    .filter((rec): rec is Record<string, unknown> => Boolean(rec));
+  const divisionRow = rows.find((row) => matchDivisionRow(row, currentKey));
+  if (!divisionRow) return null;
+
+  const divisionStatus = String(divisionRow.status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (divisionStatus === "YET_TO_START") {
+    return emptyGate("QC divisionStatuses", false);
+  }
+
+  if (currentKey === "RAW_MATERIAL_PROCESSING" || currentKey === "MIXING") {
+    const approvedPremixNos = new Set<number>();
+    const approvedFinalMixNos = new Set<number>();
+    asArray(divisionRow.premixStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const premixNo = premixNoFromRow(rec);
+      if (premixNo == null) return;
+      if (isUnitUnlockedStatus(premixStatusFromRow(rec))) approvedPremixNos.add(premixNo);
+    });
+    asArray(divisionRow.finalMixStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const premixNo = premixNoFromRow(rec);
+      if (premixNo == null) return;
+      if (isUnitUnlockedStatus(premixStatusFromRow(rec))) approvedFinalMixNos.add(premixNo);
+    });
+    // Also treat PREMIX rows tagged FINAL_MIX in premixStatuses.
+    asArray(divisionRow.premixStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const stageType = String(rec.stageType ?? "")
+        .trim()
+        .toUpperCase();
+      if (stageType !== "FINAL_MIX") return;
+      const premixNo = premixNoFromRow(rec);
+      if (premixNo == null) return;
+      if (isUnitUnlockedStatus(premixStatusFromRow(rec))) approvedFinalMixNos.add(premixNo);
+    });
+
+    const hasUnitRows =
+      asArray(divisionRow.premixStatuses).length > 0 ||
+      asArray(divisionRow.finalMixStatuses).length > 0;
+    if (!hasUnitRows) {
+      return emptyGate("QC divisionStatuses", true);
+    }
+
+    return {
+      enableAll: false,
+      kind: "premix",
+      previousSubDepartmentId: 11,
+      previousSubDepartmentName: "QC divisionStatuses",
+      approvedPremixNos,
+      approvedFinalMixNos: currentKey === "MIXING" ? approvedFinalMixNos : undefined,
+      approvedMotorIds: new Set<string>(),
+    };
+  }
+
+  if (MOTOR_QC_DIVISIONS.has(currentKey)) {
+    const approvedMotorIds = new Set<string>();
+    asArray(divisionRow.motorStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const motorId = motorIdFromRow(rec);
+      if (!motorId) return;
+      if (isUnitUnlockedStatus(motorStatusFromRow(rec))) approvedMotorIds.add(motorId);
+    });
+    if (asArray(divisionRow.motorStatuses).length === 0) {
+      return emptyGate("QC divisionStatuses", true);
+    }
+    return {
+      enableAll: false,
+      kind: "motor",
+      previousSubDepartmentId: 11,
+      previousSubDepartmentName: "QC divisionStatuses",
+      approvedPremixNos: new Set<number>(),
+      approvedMotorIds,
+    };
+  }
+
+  return emptyGate("QC divisionStatuses", true);
 };
 
 export const isQcPartialItemEnabledByPreviousDivision = (

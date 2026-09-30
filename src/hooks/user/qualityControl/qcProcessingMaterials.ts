@@ -14,9 +14,14 @@ import {
 import {
   createEmptyWeightmentDetail,
   createEmptyWeightmentSheet,
+  createEmptyWeightmentValidation,
   mapWeightmentSheetFromApi,
+  resolveWeightmentPremixMeta,
   type RawMaterialPrepWeightmentSheet,
 } from "../../../data/models/user/RawMaterialPreparationModel";
+import {
+  normalizeSheetMaterialsForWeightmentCompare,
+} from "../../../data/models/user/rawMaterialWeightmentValidation";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { operationsController } from "../../../controllers/user/operationsController";
@@ -390,6 +395,7 @@ export const mergeWeightmentSheetForMaterial = (
     mixerBuildingNumber: stamped.mixerBuildingNumber,
     weightmentDetails: [...otherRows, ...(stamped.weightmentDetails ?? [])],
     validation: stamped.validation,
+    premixSheets: full.premixSheets,
   };
 };
 
@@ -444,6 +450,208 @@ export const ensureWeightmentRowForMaterialPremix = (
           premixNo: premix,
         }),
       ],
+    },
+    premix,
+  );
+};
+
+/** Filter weighment sheet to rows for one premix (all materials). */
+export const filterWeightmentSheetForPremix = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  premixNo?: number | null,
+): RawMaterialPrepWeightmentSheet => {
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  if (premix == null) return sheet;
+
+  const details = sheet.weightmentDetails ?? [];
+  const scoped = details.filter((row) => {
+    const rowPremix =
+      row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+        ? null
+        : Number(row.premixNo);
+    return rowPremix === premix;
+  });
+  const meta = resolveWeightmentPremixMeta(sheet, premix);
+  const baseDetails =
+    scoped.length > 0
+      ? scoped
+      : details
+          .filter(
+            (row) => row.premixNo == null || !Number.isFinite(Number(row.premixNo)),
+          )
+          .map((row) => ({ ...row, premixNo: premix }));
+
+  return {
+    ...sheet,
+    mixerBuildingNumber: meta.mixerBuildingNumber,
+    validation: { ...createEmptyWeightmentValidation(), ...meta.validation },
+    weightmentDetails: baseDetails,
+    premixSheets: sheet.premixSheets,
+  };
+};
+
+/** Merge a premix-scoped weighment edit back into the full sheet. */
+export const mergeWeightmentSheetForPremix = (
+  full: RawMaterialPrepWeightmentSheet,
+  nextFiltered: RawMaterialPrepWeightmentSheet,
+  premixNo?: number | null,
+): RawMaterialPrepWeightmentSheet => {
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  const stampedDetails = (nextFiltered.weightmentDetails ?? []).map((row) => ({
+    ...row,
+    premixNo: row.premixNo ?? premix,
+  }));
+  const otherRows = (full.weightmentDetails ?? []).filter((row) => {
+    if (premix == null) return false;
+    const rowPremix =
+      row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+        ? null
+        : Number(row.premixNo);
+    // Drop legacy null-premix rows once this premix takes ownership.
+    return rowPremix != null && rowPremix !== premix;
+  });
+
+  const nextMeta = {
+    premixNo: premix ?? 0,
+    mixerBuildingNumber: String(nextFiltered.mixerBuildingNumber ?? ""),
+    validation: {
+      ...createEmptyWeightmentValidation(),
+      ...nextFiltered.validation,
+    },
+  };
+  const otherPremixSheets = (full.premixSheets ?? []).filter(
+    (entry) => Number(entry.premixNo) !== premix,
+  );
+  const premixSheets =
+    premix != null && premix > 0
+      ? [...otherPremixSheets, nextMeta].sort((a, b) => Number(a.premixNo) - Number(b.premixNo))
+      : full.premixSheets ?? [];
+
+  return {
+    // Keep top-level as last-edited premix for legacy readers.
+    mixerBuildingNumber: nextMeta.mixerBuildingNumber,
+    weightmentDetails: [...otherRows, ...stampedDetails],
+    validation: nextMeta.validation,
+    premixSheets,
+  };
+};
+
+/**
+ * Ensure the active premix has one weighment row per identification-sheet material.
+ * Extra user-added rows (same material / extra containers) are preserved.
+ */
+export const ensureWeightmentRowsForPremixMaterials = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  params: {
+    premixNo: number;
+    materials: MaterialItem[];
+  },
+): RawMaterialPrepWeightmentSheet => {
+  const premix = Number(params.premixNo);
+  if (!Number.isFinite(premix) || premix <= 0) return sheet;
+
+  const sheetMaterials = normalizeSheetMaterialsForWeightmentCompare(params.materials ?? []);
+  if (sheetMaterials.length === 0) return sheet;
+
+  const filtered = filterWeightmentSheetForPremix(sheet, premix);
+  const existing = filtered.weightmentDetails ?? [];
+  const presentCodes = new Set(
+    existing
+      .map((row) => String(row.materialCode ?? "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+
+  const toSeed =
+    existing.length === 0
+      ? sheetMaterials
+      : sheetMaterials.filter(
+          (material) => !presentCodes.has(String(material.materialCode ?? "").trim().toUpperCase()),
+        );
+
+  const stampIdentificationLocks = (
+    rows: typeof existing,
+  ): typeof existing => {
+    const sheetCodes = new Set(
+      sheetMaterials.map((m) => String(m.materialCode ?? "").trim().toUpperCase()).filter(Boolean),
+    );
+    const lockedOnce = new Set<string>();
+    return rows.map((row) => {
+      const code = String(row.materialCode ?? "").trim().toUpperCase();
+      if (!code || !sheetCodes.has(code) || lockedOnce.has(code)) {
+        return {
+          ...row,
+          fromIdentificationSheet: row.fromIdentificationSheet === true,
+        };
+      }
+      lockedOnce.add(code);
+      const sheetMaterial = sheetMaterials.find(
+        (m) => String(m.materialCode ?? "").trim().toUpperCase() === code,
+      );
+      const expectedWeight = Number(sheetMaterial?.quantityPerPremix ?? NaN);
+      const expectedPct = Number(sheetMaterial?.requiredComposition ?? NaN);
+      const currentWeight = Number(String(row.weightTransferred ?? "").replace(/,/g, ""));
+      const currentPct = Number(String(row.percentage ?? "").replace(/,/g, ""));
+      // Drop values that were previously auto-filled from the identification sheet.
+      const wasAutoWeight =
+        Number.isFinite(expectedWeight) &&
+        Number.isFinite(currentWeight) &&
+        Math.abs(currentWeight - expectedWeight) < 0.001;
+      const wasAutoPct =
+        Number.isFinite(expectedPct) &&
+        Number.isFinite(currentPct) &&
+        Math.abs(currentPct - expectedPct) < 0.001;
+      return {
+        ...row,
+        fromIdentificationSheet: true,
+        materialCode: String(sheetMaterial?.materialCode ?? row.materialCode).trim() || code,
+        materialName:
+          String(sheetMaterial?.materialName ?? "").trim() ||
+          String(row.materialName ?? "").trim() ||
+          code,
+        scopeMaterialCode: String(row.scopeMaterialCode ?? "").trim() || code,
+        weightTransferred: wasAutoWeight ? "" : row.weightTransferred,
+        percentage: wasAutoPct ? "" : row.percentage,
+      };
+    });
+  };
+
+  if (toSeed.length === 0) {
+    const stamped = stampIdentificationLocks(existing);
+    if (
+      JSON.stringify(stamped) === JSON.stringify(sheet.weightmentDetails) &&
+      stamped.every((row) => Number(row.premixNo) === premix)
+    ) {
+      return sheet;
+    }
+    return mergeWeightmentSheetForPremix(
+      sheet,
+      { ...filtered, weightmentDetails: stamped },
+      premix,
+    );
+  }
+
+  const seededRows = toSeed.map((material) => {
+    const code = String(material.materialCode ?? "").trim();
+    const name = String(material.materialName ?? code).trim() || code;
+    return createEmptyWeightmentDetail({
+      materialCode: code,
+      materialName: name,
+      premixNo: premix,
+      scopeMaterialCode: code,
+      fromIdentificationSheet: true,
+      // Weight / % are user-entered — do not auto-fill from identification sheet.
+      percentage: "",
+      weightTransferred: "",
+    });
+  });
+
+  return mergeWeightmentSheetForPremix(
+    sheet,
+    {
+      ...filtered,
+      weightmentDetails: [...stampIdentificationLocks(existing), ...seededRows],
     },
     premix,
   );

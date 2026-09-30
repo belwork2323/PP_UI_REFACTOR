@@ -1,6 +1,7 @@
 /**
  * Shared DOM focus/scroll for validation error targets.
- * Used by RMS (`data-rms-field`), RMP (`data-rmp-field`), RMC (`data-rmc-field`).
+ * Used by RMS (`data-rms-field`), RMP (`data-rmp-field`), RMC (`data-rmc-field`),
+ * Case Prep (`data-cp-field`).
  */
 
 const escapeAttrValue = (value: string) =>

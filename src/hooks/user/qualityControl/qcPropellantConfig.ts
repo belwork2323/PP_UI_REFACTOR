@@ -6,7 +6,7 @@ import { buildDivisionEntryDedupKey } from "./qcDivisionEntries";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
-export const QC_PROPELLANT_API_DIVISION = "PROPELLANT_PROPERTIES" as const satisfies QcApiDivision;
+export const QC_PROPELLANT_API_DIVISION = "QC" as const satisfies QcApiDivision;
 
 export const QC_PROPELLANT_PROCESS_OPTIONS = [
   { value: "MECHANICAL_PROPERTIES", label: S.PROPELLANT_PROCESS_MECHANICAL },

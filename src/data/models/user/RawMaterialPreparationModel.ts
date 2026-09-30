@@ -51,15 +51,19 @@ export const isPremixEditable = (status: PremixSubmissionStatus | undefined): bo
   !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 /**
- * Weightment is shared across premixes. Lock it once any premix is submitted for
- * approval or already approved; keep editable while all are still draftable.
+ * Weightment is per premix × material. A premix's weighment rows are editable
+ * whenever that premix itself is editable (draft / in progress / rejected).
  */
 export const isWeightmentSheetEditable = (
   premixStatusByNo: Record<number, PremixStatusMeta> | undefined | null,
+  premixNo?: number | null,
 ): boolean => {
+  if (premixNo != null && Number.isFinite(Number(premixNo)) && Number(premixNo) > 0) {
+    return isPremixEditable(premixStatusByNo?.[Number(premixNo)]?.premixSubmissionStatus);
+  }
   const statuses = Object.values(premixStatusByNo ?? {});
   if (statuses.length === 0) return true;
-  return statuses.every((meta) => isPremixEditable(meta?.premixSubmissionStatus));
+  return statuses.some((meta) => isPremixEditable(meta?.premixSubmissionStatus));
 };
 
 /** True once any premix has been saved (draft/submit) — list `formId` may exist earlier. */
@@ -176,6 +180,11 @@ export type RawMaterialPrepWeightmentDetail = {
    * the row disappearing from the active material filter. Not sent to API.
    */
   scopeMaterialCode?: string | null;
+  /**
+   * Seeded from batch identification sheet — material code/name are fixed (no dropdown).
+   * Add Row entries stay editable via dropdown. UI-only; not sent to API.
+   */
+  fromIdentificationSheet?: boolean;
   percentage: string;
   weightTransferred: string;
   containerType: string;
@@ -184,15 +193,34 @@ export type RawMaterialPrepWeightmentDetail = {
   weighingDateTime: string;
 };
 
+export type RawMaterialPrepWeightmentValidation = {
+  compareWithIdentificationSheet: boolean;
+  deviationFound: boolean;
+  deviationMessage: string;
+};
+
+/** Per-premix mixer + deviation — not shared across premixes. */
+export type RawMaterialPrepWeightmentPremixSheet = {
+  premixNo: number;
+  mixerBuildingNumber: string;
+  validation: RawMaterialPrepWeightmentValidation;
+};
+
 export type RawMaterialPrepWeightmentSheet = {
+  /** Legacy / last-edited mixer — prefer premixSheets for per-premix values. */
   mixerBuildingNumber: string;
   weightmentDetails: RawMaterialPrepWeightmentDetail[];
-  validation: {
-    compareWithIdentificationSheet: boolean;
-    deviationFound: boolean;
-    deviationMessage: string;
-  };
+  /** Legacy / last-edited validation — prefer premixSheets for per-premix values. */
+  validation: RawMaterialPrepWeightmentValidation;
+  /** Per-premix mixer building + deviation/validation. */
+  premixSheets?: RawMaterialPrepWeightmentPremixSheet[];
 };
+
+export const createEmptyWeightmentValidation = (): RawMaterialPrepWeightmentValidation => ({
+  compareWithIdentificationSheet: false,
+  deviationFound: false,
+  deviationMessage: "",
+});
 
 export const createEmptyWeightmentDetail = (
   seed?: Partial<RawMaterialPrepWeightmentDetail>,
@@ -201,6 +229,7 @@ export const createEmptyWeightmentDetail = (
   materialName: "",
   premixNo: null,
   scopeMaterialCode: null,
+  fromIdentificationSheet: false,
   percentage: "",
   weightTransferred: "",
   containerType: "",
@@ -213,12 +242,72 @@ export const createEmptyWeightmentDetail = (
 export const createEmptyWeightmentSheet = (): RawMaterialPrepWeightmentSheet => ({
   mixerBuildingNumber: "",
   weightmentDetails: [],
-  validation: {
-    compareWithIdentificationSheet: false,
-    deviationFound: false,
-    deviationMessage: "",
-  },
+  validation: createEmptyWeightmentValidation(),
+  premixSheets: [],
 });
+
+const mapWeightmentValidationFromApi = (
+  value: unknown,
+): RawMaterialPrepWeightmentValidation => {
+  const validation = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return {
+    compareWithIdentificationSheet: parseOptInFlag(validation.compareWithIdentificationSheet),
+    deviationFound: parseOptInFlag(validation.deviationFound),
+    deviationMessage: String(validation.deviationMessage ?? ""),
+  };
+};
+
+const mapWeightmentValidationToApi = (validation: RawMaterialPrepWeightmentValidation) => ({
+  compareWithIdentificationSheet: validation.compareWithIdentificationSheet === true,
+  deviationFound: validation.deviationFound === true,
+  deviationMessage: String(validation.deviationMessage ?? "").trim() || null,
+});
+
+/** Resolve mixer + validation for one premix without leaking another premix's deviation. */
+export const resolveWeightmentPremixMeta = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  premixNo: number,
+): RawMaterialPrepWeightmentPremixSheet => {
+  const premix = Number(premixNo);
+  const found = (sheet.premixSheets ?? []).find((entry) => Number(entry.premixNo) === premix);
+  if (found) {
+    return {
+      premixNo: premix,
+      mixerBuildingNumber: String(found.mixerBuildingNumber ?? ""),
+      validation: {
+        ...createEmptyWeightmentValidation(),
+        ...found.validation,
+      },
+    };
+  }
+
+  const hasPremixSheets = (sheet.premixSheets ?? []).length > 0;
+  const hasOtherPremixRows = (sheet.weightmentDetails ?? []).some((row) => {
+    const rowPremix =
+      row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+        ? null
+        : Number(row.premixNo);
+    return rowPremix != null && rowPremix !== premix;
+  });
+
+  // Legacy single-sheet drafts: reuse top-level only when nothing is premix-scoped yet.
+  if (!hasPremixSheets && !hasOtherPremixRows) {
+    return {
+      premixNo: premix,
+      mixerBuildingNumber: String(sheet.mixerBuildingNumber ?? ""),
+      validation: {
+        ...createEmptyWeightmentValidation(),
+        ...sheet.validation,
+      },
+    };
+  }
+
+  return {
+    premixNo: premix,
+    mixerBuildingNumber: "",
+    validation: createEmptyWeightmentValidation(),
+  };
+};
 
 const formatDateTimeLocal = (value: unknown): string => {
   const raw = String(value ?? "").trim();
@@ -289,19 +378,23 @@ export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeight
   if (!value || typeof value !== "object") return createEmptyWeightmentSheet();
 
   const sheet = value as Record<string, unknown>;
-  const validation = (sheet.validation ?? {}) as Record<string, unknown>;
   const rows = Array.isArray(sheet.weightmentDetails) ? sheet.weightmentDetails : [];
+  const premixSheetsRaw = Array.isArray(sheet.premixSheets) ? sheet.premixSheets : [];
 
   return {
     mixerBuildingNumber: String(sheet.mixerBuildingNumber ?? ""),
     weightmentDetails: rows.map((row) =>
       mapWeightmentDetailFromApi(row as Record<string, unknown>),
     ),
-    validation: {
-      compareWithIdentificationSheet: parseOptInFlag(validation.compareWithIdentificationSheet),
-      deviationFound: parseOptInFlag(validation.deviationFound),
-      deviationMessage: String(validation.deviationMessage ?? ""),
-    },
+    validation: mapWeightmentValidationFromApi(sheet.validation),
+    premixSheets: premixSheetsRaw.map((entry) => {
+      const rec = (entry && typeof entry === "object" ? entry : {}) as Record<string, unknown>;
+      return {
+        premixNo: Number(rec.premixNo) || 0,
+        mixerBuildingNumber: String(rec.mixerBuildingNumber ?? ""),
+        validation: mapWeightmentValidationFromApi(rec.validation),
+      };
+    }).filter((entry) => entry.premixNo > 0),
   };
 };
 
@@ -318,8 +411,18 @@ export const mapWeightmentSheetToApi = (
     return Boolean(code || name || weight || percentage);
   });
 
+  const premixSheets = (sheet.premixSheets ?? [])
+    .filter((entry) => Number(entry.premixNo) > 0)
+    .map((entry) => ({
+      premixNo: Number(entry.premixNo),
+      mixerBuildingNumber: String(entry.mixerBuildingNumber ?? "").trim() || null,
+      validation: mapWeightmentValidationToApi(
+        entry.validation ?? createEmptyWeightmentValidation(),
+      ),
+    }));
+
   const mixer = String(sheet.mixerBuildingNumber ?? "").trim();
-  if (!mixer && rows.length === 0) {
+  if (!mixer && rows.length === 0 && premixSheets.length === 0) {
     return {};
   }
 
@@ -341,11 +444,8 @@ export const mapWeightmentSheetToApi = (
       weighingDateTime: formatDateTimeForApi(row.weighingDateTime),
       // scopeMaterialCode is UI-only — intentionally omitted from API payload
     })),
-    validation: {
-      compareWithIdentificationSheet: sheet.validation.compareWithIdentificationSheet === true,
-      deviationFound: sheet.validation.deviationFound === true,
-      deviationMessage: String(sheet.validation.deviationMessage ?? "").trim() || null,
-    },
+    validation: mapWeightmentValidationToApi(sheet.validation ?? createEmptyWeightmentValidation()),
+    premixSheets,
   };
 };
 
@@ -697,7 +797,7 @@ export const mapPreparationDetailsPayload = (params: {
                   gradeId: entry.solidGradeId,
                 },
               }) ??
-              (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+              (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
                 ? buildWeightmentOnlyProcessEntry(
                     { ...solidFallback, gradeCode },
                     uiKeyToProcessType(gradeSlot.slot.uiKey),
@@ -712,7 +812,7 @@ export const mapPreparationDetailsPayload = (params: {
           if (
             !isSubmit &&
             apSlots.length === 0 &&
-            weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+            weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
           ) {
             const process = buildWeightmentOnlyProcessEntry(solidFallback, "DEFAULT_SOLID");
             if (process) {
@@ -739,7 +839,7 @@ export const mapPreparationDetailsPayload = (params: {
               solidFallback,
               uiKeyToProcessType(session.solid.uiKey),
             ) ??
-            (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+            (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
               ? buildWeightmentOnlyProcessEntry(
                   solidFallback,
                   uiKeyToProcessType(session.solid.uiKey),
@@ -782,7 +882,7 @@ export const mapPreparationDetailsPayload = (params: {
             liquidFallback,
             uiKeyToProcessType(session.liquid.uiKey),
           ) ??
-          (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
+          (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode, premixNo)
             ? buildWeightmentOnlyProcessEntry(
                 liquidFallback,
                 uiKeyToProcessType(session.liquid.uiKey),

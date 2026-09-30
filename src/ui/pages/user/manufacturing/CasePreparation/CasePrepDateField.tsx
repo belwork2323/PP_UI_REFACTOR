@@ -14,6 +14,8 @@ type CasePrepDateFieldProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string;
+  /** Validation focus target (`data-cp-field`). */
+  dataCpField?: string;
 };
 
 const CasePrepDateField = ({
@@ -27,12 +29,16 @@ const CasePrepDateField = ({
   required = false,
   error = false,
   helperText,
+  dataCpField,
 }: CasePrepDateFieldProps) => {
   const accentColor = theme?.palette?.primaryLight ?? theme?.palette?.primary ?? "#2E86C1";
   const labelSx = theme?.manufacturing?.casePreparation?.flowBar?.selectLabel;
 
   return (
-    <Box sx={{ minWidth: 220, maxWidth: 280 }}>
+    <Box
+      sx={{ minWidth: 220, maxWidth: 280 }}
+      {...(dataCpField ? { "data-cp-field": dataCpField } : {})}
+    >
       {label ? (
         <Typography
           sx={{
