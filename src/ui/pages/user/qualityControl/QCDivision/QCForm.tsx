@@ -119,6 +119,8 @@ type QCFormProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  weightmentErrors?: Record<string, string>;
+  weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
   onRemoveDivisionEntry: (entryId: string) => void;
   navApprovalActions?: QCDivisionNavApprovalActions | null;
   unitActions?: QCDivisionEntryUnitActions | null;
@@ -202,6 +204,8 @@ const QCForm = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onProcessingWeightmentSheetChange,
+  weightmentErrors = {},
+  weightmentValidationAttempt = { format: false, unit: false, submit: false },
   onRemoveDivisionEntry,
   navApprovalActions = null,
   unitActions = null,
@@ -439,7 +443,11 @@ const QCForm = ({
 
       {showFormBody ? (
       divisionAutoPopulateLoading ? (
-        <QCDivisionInlineLoader />
+        <QCDivisionInlineLoader
+          label={
+            isRevalidationDivision ? S.REVALIDATION_LOADING_TITLE : S.SCHEMA_LOADING_TITLE
+          }
+        />
       ) : (
       <Box
         sx={{
@@ -486,6 +494,8 @@ const QCForm = ({
           onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
           onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
           onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
+          weightmentErrors={weightmentErrors}
+          weightmentValidationAttempt={weightmentValidationAttempt}
           onRemoveDivisionEntry={onRemoveDivisionEntry}
           activePartialItem={activePartialItem}
           unitActions={unitActions}

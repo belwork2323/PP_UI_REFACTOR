@@ -233,10 +233,41 @@ const mergePremixSessionsPreservingLocalInput = (
       pendingLiquidSections: session.pendingLiquidSections?.length
         ? session.pendingLiquidSections
         : prev.pendingLiquidSections,
-      // Prefer local AP grade cards (including intentional empty after delete-all).
-      apGradeSlots: Array.isArray(prev.apGradeSlots)
-        ? prev.apGradeSlots
-        : session.apGradeSlots,
+      // Prefer API/next AP grade cards when present so hydrate is not wiped by an empty local [].
+      // Keep local cards only when next has no grades yet (unsaved local add).
+      apGradeSlots: (() => {
+        const prevSlots = Array.isArray(prev.apGradeSlots) ? prev.apGradeSlots : null;
+        const nextSlots = Array.isArray(session.apGradeSlots) ? session.apGradeSlots : null;
+        if (nextSlots && nextSlots.length > 0) {
+          if (!prevSlots?.length) return nextSlots;
+          return nextSlots.map((nextCard) => {
+            const prevCard = prevSlots.find(
+              (card) =>
+                String(card.gradeCode ?? "")
+                  .trim()
+                  .toUpperCase() ===
+                String(nextCard.gradeCode ?? "")
+                  .trim()
+                  .toUpperCase(),
+            );
+            if (!prevCard) return nextCard;
+            const preferLocal =
+              processFormHasUserData(prevCard.slot.processForm) &&
+              !processFormHasUserData(nextCard.slot.processForm);
+            return {
+              gradeCode: nextCard.gradeCode,
+              slot: {
+                uiKey: nextCard.slot.uiKey ?? prevCard.slot.uiKey,
+                processForm: cloneValue(
+                  preferLocal ? prevCard.slot.processForm : nextCard.slot.processForm,
+                ),
+              },
+            };
+          });
+        }
+        if (prevSlots && prevSlots.length > 0) return prevSlots;
+        return nextSlots ?? prev.apGradeSlots;
+      })(),
       solid: {
         uiKey: session.solid.uiKey ?? prev.solid.uiKey,
         processForm: cloneValue(

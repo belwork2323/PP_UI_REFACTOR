@@ -25,6 +25,7 @@ import {
   validateTrimmingMotorSession,
   type ValidationErrors as TrimmingValidationErrors,
 } from "../../../data/validation/adapters/trimming.validation";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import {
   isManufacturingContinueFillingStatus,
 } from "../../operationStatus";
@@ -561,15 +562,17 @@ export const useTrimmingHook = () => {
       ...prev,
       motors: (prev.motors ?? []).map((motor) => (motor.motorId === motorId ? next : motor)),
     }));
-    const live = validateTrimmingMotorSession(next, "FORMAT");
+    const liveFormat = validateTrimmingMotorSession(next, "FORMAT");
+    const liveFull = validateTrimmingMotorSession(next, "SUBMIT");
     setMotorValidationErrors((errs) => {
-      if (Object.keys(live).length === 0) {
+      const merged = reconcileLiveValidationErrors(errs[motorId], liveFormat, liveFull);
+      if (Object.keys(merged).length === 0) {
         if (!errs[motorId]) return errs;
         const copy = { ...errs };
         delete copy[motorId];
         return copy;
       }
-      return { ...errs, [motorId]: live };
+      return { ...errs, [motorId]: merged };
     });
   }, []);
 

@@ -70,8 +70,17 @@ const NDTFlowBar = ({
         {ndtFormLoaded ? L.setupHintLoaded : L.setupHint}
       </Typography>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2.25 }}>
-        <Box sx={flowBar.topRow}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "flex-end",
+          gap: 2, // small gap between the two dropdowns
+          width: "100%",
+        }}
+      >
+        {/* Left group - keep dropdowns together */}
+        <Box sx={{ display: "flex", gap: 2, flexShrink: 0 }}>
           <MultiSelect
             label={L.equipment}
             placeholder={equipmentLoading ? "Loading equipment..." : L.equipmentPlaceholder}
@@ -82,6 +91,7 @@ const NDTFlowBar = ({
             disabled={equipmentLoading}
             sx={{ width: 260 }}
           />
+
           <MultiSelect
             label={L.beamEnergies}
             placeholder={beamEnergyLoading ? "Loading beam energies..." : L.beamEnergiesPlaceholder}
@@ -92,18 +102,19 @@ const NDTFlowBar = ({
             disabled={beamEnergyLoading}
             sx={{ width: 260 }}
           />
+        </Box>
 
-          <Box sx={{ ...flowBar.actionRow, ml: { sm: "auto" }, width: { xs: "100%", sm: "auto" } }}>
-            <Button
-              variant="contained"
-              size="medium"
-              onClick={onLoadNDTForm}
-              disabled={!canLoad || lookupsLoading}
-              sx={flowBar.primaryAction}
-            >
-              {L.loadForm}
-            </Button>
-          </Box>
+        {/* Button pushed to the right */}
+        <Box sx={{ ml: "auto" }}>
+          <Button
+            variant="contained"
+            size="medium"
+            onClick={onLoadNDTForm}
+            disabled={!canLoad || lookupsLoading}
+            sx={flowBar.primaryAction}
+          >
+            {L.loadForm}
+          </Button>
         </Box>
       </Box>
     </Box>

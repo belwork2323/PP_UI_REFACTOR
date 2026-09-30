@@ -51,10 +51,12 @@ const CasePrepSelect = ({
   const hasValue = String(value ?? "").trim().length > 0;
   const safeOptions = Array.isArray(options) ? options : [];
   const showError = Boolean(error) && !disabled;
+  // Always control with a string so MUI never falls back to the first option (e.g. Others).
+  const selectValue = String(value ?? "").trim();
 
   const selectedOption = useMemo(
-    () => safeOptions.find((o) => o.value === value),
-    [safeOptions, value],
+    () => safeOptions.find((o) => o.value === selectValue),
+    [safeOptions, selectValue],
   );
 
   return (
@@ -64,7 +66,7 @@ const CasePrepSelect = ({
       </Typography>
       {readOnly ? (
         <WorkflowReadOnlyText
-          value={selectedOption?.label ?? value}
+          value={selectedOption?.label ?? selectValue}
           sx={{ fontSize: "0.82rem", py: 0.75 }}
         />
       ) : (
@@ -72,7 +74,7 @@ const CasePrepSelect = ({
           select
           fullWidth
           size="small"
-          value={value}
+          value={selectValue}
           disabled={disabled}
           required={required}
           error={showError}
@@ -102,10 +104,12 @@ const CasePrepSelect = ({
             displayEmpty: true,
             IconComponent: ExpandMoreRoundedIcon,
             renderValue: (selected) => {
-              if (!selected) {
+              const current = String(selected ?? "").trim();
+              if (!current) {
                 return <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>;
               }
-              return selectedOption?.label ?? String(selected);
+              const match = safeOptions.find((o) => o.value === current);
+              return match?.label ?? current;
             },
             MenuProps: {
               PaperProps: { sx: flowBar.selectMenuPaper },
@@ -124,7 +128,7 @@ const CasePrepSelect = ({
             ),
           }}
         >
-          <MenuItem value="" disabled>
+          <MenuItem value="">
             <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>
           </MenuItem>
           {safeOptions.map((option) => (
@@ -132,7 +136,7 @@ const CasePrepSelect = ({
               key={option.value}
               value={option.value}
               disabled={option.disabled}
-              sx={flowBar.menuItem?.(option.value === value)}
+              sx={flowBar.menuItem?.(option.value === selectValue)}
             >
               {option.label}
             </MenuItem>

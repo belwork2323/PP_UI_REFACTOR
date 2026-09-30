@@ -311,6 +311,7 @@ export const USER_CASE_PREPARATION_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/case-preparation/form/create`,
   FORM_DETAILS: `${API_BASE}/user/case-preparation/form/details`,
   UPDATE_FORM: `${API_BASE}/user/case-preparation/form/update`,
+  LINER_INGREDIENTS: `${API_BASE}/user/case-preparation/liner-ingredients`,
 };
 
 export const USER_MIXING_FORM_ENDPOINTS = {

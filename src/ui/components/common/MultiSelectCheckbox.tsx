@@ -33,6 +33,7 @@ export interface MultiSelectWithSearchProps {
   MenuProps?: any;
   sx?: SxProps<Theme>;
   [key: string]: any;
+  hideSelectWhenDisabled?: boolean;
 }
 
 const normalizeOptions = (options: DropdownOption[] | string[]): DropdownOption[] => {
@@ -52,6 +53,7 @@ export default function MultiSelectWithSearch({
   SelectProps,
   MenuProps,
   sx,
+  hideSelectWhenDisabled = false,
   ...props
 }: MultiSelectWithSearchProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,128 +89,136 @@ export default function MultiSelectWithSearch({
 
   return (
     <Box sx={{ width: "100%" }}>
-      <TextField
-        fullWidth
-        select
-        size="small"
-        variant="outlined"
-        label={label}
-        value={value}
-        disabled={disabled}
-        {...props}
-        InputLabelProps={{
-          ...InputLabelProps,
-        }}
-        SelectProps={{
-          multiple: true,
-          displayEmpty: true,
-          onClose: () => setSearchQuery(""),
-          MenuProps: {
-            ...MenuProps,
-            PaperProps: {
-              ...MenuProps?.PaperProps,
-              sx: {
-                ...(typeof MenuProps?.PaperProps?.sx === "object" &&
-                !Array.isArray(MenuProps?.PaperProps?.sx)
-                  ? MenuProps.PaperProps.sx
-                  : {}),
-                maxHeight: 320,
+      {!(disabled && hideSelectWhenDisabled) && (
+        <TextField
+          fullWidth
+          select
+          size="small"
+          variant="outlined"
+          label={label}
+          value={value}
+          disabled={disabled}
+          {...props}
+          InputLabelProps={{
+            shrink: true, // ← forces label to stay on top
+            ...InputLabelProps,
+          }}
+          SelectProps={{
+            multiple: true,
+            displayEmpty: true,
+            onClose: () => setSearchQuery(""),
+            MenuProps: {
+              ...MenuProps,
+              PaperProps: {
+                ...MenuProps?.PaperProps,
+                sx: {
+                  ...(typeof MenuProps?.PaperProps?.sx === "object" &&
+                  !Array.isArray(MenuProps?.PaperProps?.sx)
+                    ? MenuProps.PaperProps.sx
+                    : {}),
+                  maxHeight: 320,
+                },
               },
             },
-          },
-          ...SelectProps,
-          value,
-          onChange: handleChange,
-          renderValue: () => {
-            return (
-              <Box component="span" sx={{ color: "text.disabled" }}>
-                {placeholder}
-              </Box>
-            );
-          },
-        }}
-        sx={sx}
-      >
-        {/* Sticky Search Input Box inside Dropdown */}
-        <Box
-          sx={{
-            px: 2,
-            py: 1.5,
-            position: "sticky",
-            top: 0,
-            bgcolor: "background.paper",
-            zIndex: 1,
-            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            ...SelectProps,
+            value,
+            onChange: handleChange,
+            renderValue: () => {
+              return (
+                <Box component="span" sx={{ color: "text.disabled" }}>
+                  {placeholder}
+                </Box>
+              );
+            },
           }}
-          onKeyDown={(e) => e.stopPropagation()}
-          onKeyUp={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
+          sx={sx}
         >
-          <OutlinedInput
-            size="small"
-            fullWidth
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
-              </InputAdornment>
-            }
+          {/* Sticky Search Input Box inside Dropdown */}
+          <Box
+            sx={{
+              px: 2,
+              py: 1.5,
+              position: "sticky",
+              top: 0,
+              bgcolor: "background.paper",
+              zIndex: 1,
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            onKeyUp={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            sx={{ fontSize: "0.875rem" }}
-          />
-        </Box>
+          >
+            <OutlinedInput
+              size="small"
+              fullWidth
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              startAdornment={
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+                </InputAdornment>
+              }
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              sx={{ fontSize: "0.875rem" }}
+            />
+          </Box>
 
-        {/* Select All Option */}
-        {!searchQuery && (
-          <MenuItem value="__select_all__" sx={{ minHeight: 36 }}>
-            {showCheckbox && (
-              <Checkbox
-                size="small"
-                checked={allSelected}
-                indeterminate={value.length > 0 && !allSelected}
-                sx={{ p: 0.5, mr: 1 }}
-              />
-            )}
-            <ListItemText primary="Select All" primaryTypographyProps={{ fontSize: "0.875rem" }} />
-          </MenuItem>
-        )}
-
-        {/* Filtered Options List */}
-        {filteredOptions.length > 0 ? (
-          filteredOptions.map((option) => (
-            <MenuItem key={option.value} value={option.value} sx={{ minHeight: 36 }}>
+          {/* Select All Option */}
+          {!searchQuery && (
+            <MenuItem value="__select_all__" sx={{ minHeight: 36 }}>
               {showCheckbox && (
                 <Checkbox
                   size="small"
-                  checked={value.includes(option.value)}
+                  checked={allSelected}
+                  indeterminate={value.length > 0 && !allSelected}
                   sx={{ p: 0.5, mr: 1 }}
                 />
               )}
               <ListItemText
-                primary={option.label}
+                primary="Select All"
                 primaryTypographyProps={{ fontSize: "0.875rem" }}
               />
             </MenuItem>
-          ))
-        ) : (
-          <MenuItem disabled sx={{ minHeight: 36 }}>
-            <ListItemText
-              primary="No results found"
-              primaryTypographyProps={{ fontSize: "0.875rem", fontStyle: "italic" }}
-            />
-          </MenuItem>
-        )}
-      </TextField>
+          )}
 
-      {/* Selected count info & Tags / Chips Container Below the Input */}
+          {/* Filtered Options List */}
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value} sx={{ minHeight: 36 }}>
+                {showCheckbox && (
+                  <Checkbox
+                    size="small"
+                    checked={value.includes(option.value)}
+                    sx={{ p: 0.5, mr: 1 }}
+                  />
+                )}
+                <ListItemText
+                  primary={option.label}
+                  primaryTypographyProps={{ fontSize: "0.875rem" }}
+                />
+              </MenuItem>
+            ))
+          ) : (
+            <MenuItem disabled sx={{ minHeight: 36 }}>
+              <ListItemText
+                primary="No results found"
+                primaryTypographyProps={{ fontSize: "0.875rem", fontStyle: "italic" }}
+              />
+            </MenuItem>
+          )}
+        </TextField>
+      )}
       {value.length > 0 && (
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: disabled && hideSelectWhenDisabled ? 0 : 1 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
-            {value.length} {value.length === 1 ? "item" : "items"} selected
+            {!hideSelectWhenDisabled && (
+              <>
+                {value.length} {value.length === 1 ? "item" : "items"} selected
+              </>
+            )}
           </Typography>
           <Box
             sx={{

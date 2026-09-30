@@ -25,25 +25,14 @@ const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
-  valueType: "date",
-  requiredIn,
-  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-});
-
 const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
+
 const file = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "file",
-  requiredIn,
-  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-});
-
-const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
-  valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
@@ -340,12 +329,7 @@ const resolveMainFields = (
     push(fields, `SENSOR_CONFIGURATION.${i}.FILTER_HZ`, row.FILTER_HZ, "filterHz");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_NO`, row.IA_NO, "iaNo");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_GAIN`, row.IA_GAIN, "iaGain");
-    push(
-      fields,
-      `SENSOR_CONFIGURATION.${i}.EXT_VOLTAGE`,
-      row.EXT_VOLTAGE ?? row.EXT_V,
-      "extV",
-    );
+    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_VOLTAGE`, row.EXT_VOLTAGE ?? row.EXT_V, "extV");
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
   });

@@ -30,12 +30,10 @@ import {
   type CasePrepQualificationParameterRow,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
 import {
-  buildLinerIngredientTables,
-  CASE_PREP_ENTER_LOT_VALUE,
-  enrichIngredientRowsFromMaterials,
+  buildLinerIngredientTablesFromApi,
   isRecipeLinerType,
-  linerRecipeHasFixedParts,
 } from "../../../../../data/models/user/casePrepLinerRecipes";
+import casePreparationController from "../../../../../controllers/user/manufacturing/casePreparationController";
 import { useCasePrepLinerMaterials } from "../../../../../hooks/user/manufacturing/useCasePrepLinerMaterials";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateTimeField, TimeField } from "../../../../components/common/DateField";
@@ -192,6 +190,7 @@ const CompactDateTime = ({
   readOnly,
   required = false,
   dataCpField,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -200,6 +199,7 @@ const CompactDateTime = ({
   placeholder?: string;
   required?: boolean;
   dataCpField?: string;
+  error?: boolean;
 }) => (
   <Box {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
     <DateTimeField
@@ -210,6 +210,7 @@ const CompactDateTime = ({
       compact
       placeholder={placeholder}
       required={required}
+      error={error}
       inputSx={casePrepTableInputSx}
     />
   </Box>
@@ -220,11 +221,13 @@ const CompactTime = ({
   onChange,
   disabled,
   readOnly,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  error?: boolean;
 }) => (
   <TimeField
     value={value}
@@ -232,6 +235,7 @@ const CompactTime = ({
     disabled={disabled}
     readOnly={readOnly}
     compact
+    error={error}
     inputSx={casePrepTableInputSx}
   />
 );
@@ -242,12 +246,14 @@ const CompactDate = ({
   disabled,
   theme,
   readOnly,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
   theme: any;
+  error?: boolean;
 }) => (
   <Box sx={{ minWidth: 0, "& > .MuiBox-root": { minWidth: 0, maxWidth: "100%" } }}>
     <CasePrepDateField
@@ -257,6 +263,7 @@ const CompactDate = ({
       disabled={disabled}
       readOnly={readOnly}
       theme={theme}
+      error={error}
     />
   </Box>
 );
@@ -313,6 +320,7 @@ const ValueByFieldType = ({
   theme,
   readOnly,
   dataCpField,
+  error = false,
 }: {
   value: string;
   valueFieldType?: string;
@@ -321,11 +329,18 @@ const ValueByFieldType = ({
   readOnly?: boolean;
   theme: any;
   dataCpField?: string;
+  error?: boolean;
 }) => {
   const type = String(valueFieldType ?? "text").toLowerCase();
   const control =
     type === "datetime" ? (
-      <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+      <CompactDateTime
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        error={error}
+      />
     ) : type === "date" ? (
       <CompactDate
         value={value}
@@ -333,9 +348,16 @@ const ValueByFieldType = ({
         disabled={disabled}
         readOnly={readOnly}
         theme={theme}
+        error={error}
       />
     ) : type === "time" ? (
-      <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+      <CompactTime
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        error={error}
+      />
     ) : type === "textarea" ? (
       <TableTextInput
         value={value}
@@ -345,6 +367,7 @@ const ValueByFieldType = ({
         multiline
         minRows={2}
         placeholder="Enter value"
+        error={error}
       />
     ) : type === "number" ? (
       <TableTextInput
@@ -352,8 +375,10 @@ const ValueByFieldType = ({
         onChange={onChange}
         disabled={disabled}
         readOnly={readOnly}
-        type="number"
+        type="text"
+        inputMode="decimal"
         placeholder="0"
+        error={error}
       />
     ) : (
       <TableTextInput
@@ -362,6 +387,7 @@ const ValueByFieldType = ({
         disabled={disabled}
         readOnly={readOnly}
         placeholder="Enter value"
+        error={error}
       />
     );
 
@@ -379,8 +405,30 @@ type MfgLotCellProps = {
     materialCode: string,
     currentLot?: string,
   ) => Array<{ value: string; label: string }>;
+  getApiLotCount: (materialCode: string) => number;
+  hasFetchedLots: (materialCode: string) => boolean;
   isLoadingLots: (materialCode: string) => boolean;
 };
+
+const MfgLotTextField = ({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  onChange: (mfgLot: string) => void;
+}) => (
+  <TextField
+    size="small"
+    fullWidth
+    placeholder="Enter lot no"
+    disabled={disabled}
+    value={value}
+    onChange={(e) => onChange(String(e.target.value))}
+    sx={casePrepTableInputSx}
+  />
+);
 
 const MfgLotCell = ({
   row,
@@ -389,12 +437,22 @@ const MfgLotCell = ({
   onChange,
   fetchLotsForMaterialCode,
   getCachedLotOptions,
+  getApiLotCount,
+  hasFetchedLots,
   isLoadingLots,
 }: MfgLotCellProps) => {
   const materialCode = str(row.materialCode).trim();
   const hasCode = Boolean(materialCode);
   const currentLot = str(row.mfgLot).trim();
   const [menuOpen, setMenuOpen] = useState(false);
+  const loading = hasCode && isLoadingLots(materialCode);
+  const fetched = hasCode && hasFetchedLots(materialCode);
+  const apiLotCount = hasCode ? getApiLotCount(materialCode) : 0;
+
+  useEffect(() => {
+    if (!hasCode || fetched || loading) return;
+    void fetchLotsForMaterialCode(materialCode);
+  }, [fetched, fetchLotsForMaterialCode, hasCode, loading, materialCode]);
 
   if (readOnly) {
     return (
@@ -405,35 +463,12 @@ const MfgLotCell = ({
     );
   }
 
-  if (!hasCode) {
-    return (
-      <Stack spacing={0.75} sx={{ minWidth: 140 }}>
-        <TextField
-          select
-          size="small"
-          fullWidth
-          disabled={disabled}
-          value={CASE_PREP_ENTER_LOT_VALUE}
-          onChange={() => undefined}
-          sx={casePrepTableInputSx}
-        >
-          <MenuItem value={CASE_PREP_ENTER_LOT_VALUE}>Enter Lot No</MenuItem>
-        </TextField>
-        <TextField
-          size="small"
-          fullWidth
-          placeholder="Enter lot no"
-          disabled={disabled}
-          value={currentLot}
-          onChange={(e) => onChange(String(e.target.value))}
-          sx={casePrepTableInputSx}
-        />
-      </Stack>
-    );
+  // No material code, or fetch finished with zero approved lots → text only (never both).
+  if (!hasCode || (fetched && !loading && apiLotCount === 0)) {
+    return <MfgLotTextField value={currentLot} disabled={disabled} onChange={onChange} />;
   }
 
   const options = getCachedLotOptions(materialCode, currentLot);
-  const loading = isLoadingLots(materialCode);
   const selectValue =
     currentLot && options.some((opt) => opt.value === currentLot) ? currentLot : currentLot || "";
 
@@ -458,7 +493,7 @@ const MfgLotCell = ({
           if (!v) {
             return (
               <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
-                Select lot
+                {loading ? "Loading lots…" : "Select lot"}
               </Typography>
             );
           }
@@ -503,11 +538,14 @@ const CasePrepMotorPanel = ({
   const valueRef = useRef(value);
   valueRef.current = value;
   const prevLinerTypeRef = useRef<string | null>(null);
-  const lastMaterialsLenRef = useRef(0);
+  const ingredientsFetchGenRef = useRef(0);
+  const fixedPartsSyncedForTypeRef = useRef<string | null>(null);
+  const [fixedPartsFromApi, setFixedPartsFromApi] = useState<boolean | null>(null);
   const {
-    materials: masterMaterials,
     fetchLotsForMaterialCode,
     getCachedLotOptions,
+    getApiLotCount,
+    hasFetchedLots,
     isLoadingLots,
   } = useCasePrepLinerMaterials();
 
@@ -524,13 +562,11 @@ const CasePrepMotorPanel = ({
     });
   };
 
-  // Build / rebuild premix + final mix from liner-type recipe (not identification sheet).
+  // Build / rebuild premix + final mix from liner-ingredients API.
   useEffect(() => {
     const linerType = str(value.linerCoatingOperation.linerType).trim();
     const prev = prevLinerTypeRef.current;
     const liner = valueRef.current.linerCoatingOperation;
-    const materialsReady = masterMaterials.length > 0;
-    const materialsJustLoaded = materialsReady && lastMaterialsLenRef.current !== masterMaterials.length;
 
     const applyTables = (
       premixIngredients: CasePrepIngredientRow[],
@@ -546,19 +582,36 @@ const CasePrepMotorPanel = ({
       });
     };
 
-    if (materialsJustLoaded) {
-      lastMaterialsLenRef.current = masterMaterials.length;
-    }
+    const loadFromApi = async (type: string, replaceTables: boolean) => {
+      const gen = ++ingredientsFetchGenRef.current;
+      if (!isRecipeLinerType(type)) {
+        setFixedPartsFromApi(false);
+        fixedPartsSyncedForTypeRef.current = type;
+        if (replaceTables) applyTables([], []);
+        return;
+      }
+      const result = await casePreparationController.fetchLinerIngredients(type);
+      if (gen !== ingredientsFetchGenRef.current) return;
+      if (!result.success || !result.data) {
+        setFixedPartsFromApi(false);
+        fixedPartsSyncedForTypeRef.current = type;
+        if (replaceTables) applyTables([], []);
+        return;
+      }
+      setFixedPartsFromApi(Boolean(result.data.fixedPartsByWeight));
+      fixedPartsSyncedForTypeRef.current = type;
+      if (replaceTables) {
+        const built = buildLinerIngredientTablesFromApi(result.data);
+        applyTables(built.premixIngredients, built.finalMixIngredients);
+      }
+    };
 
-    // User changed liner type → rebuild from recipe (or clear for OTHERS).
+    // User changed liner type → rebuild from API (or clear for OTHERS).
     if (prev !== null && prev !== linerType) {
       prevLinerTypeRef.current = linerType;
-      if (isRecipeLinerType(linerType)) {
-        const built = buildLinerIngredientTables(linerType, masterMaterials);
-        applyTables(built.premixIngredients, built.finalMixIngredients);
-      } else {
-        applyTables([], []);
-      }
+      setFixedPartsFromApi(null);
+      fixedPartsSyncedForTypeRef.current = null;
+      void loadFromApi(linerType, true);
       return;
     }
 
@@ -569,22 +622,21 @@ const CasePrepMotorPanel = ({
     const premix = liner.premixIngredients ?? [];
     const finalMix = liner.finalMixIngredients ?? [];
 
-    // Empty tables + recipe type → seed (wait for master when possible so codes resolve).
+    // Empty tables + recipe type → seed from API.
     if (!premix.length && !finalMix.length && isRecipeLinerType(linerType)) {
-      if (!materialsReady && prev !== null && !materialsJustLoaded) return;
-      const built = buildLinerIngredientTables(linerType, masterMaterials);
-      applyTables(built.premixIngredients, built.finalMixIngredients);
+      void loadFromApi(linerType, true);
       return;
     }
 
-    // Materials master arrived later → attach materialId/code without wiping lots/qty.
-    if (materialsJustLoaded && (premix.length || finalMix.length)) {
-      applyTables(
-        enrichIngredientRowsFromMaterials(premix, masterMaterials),
-        enrichIngredientRowsFromMaterials(finalMix, masterMaterials),
-      );
+    // Existing rows (e.g. hydrated form) → sync fixedParts flag without wiping lots/qty.
+    if (
+      isRecipeLinerType(linerType) &&
+      (premix.length || finalMix.length) &&
+      fixedPartsSyncedForTypeRef.current !== linerType
+    ) {
+      void loadFromApi(linerType, false);
     }
-  }, [value.linerCoatingOperation.linerType, masterMaterials]);
+  }, [value.linerCoatingOperation.linerType]);
 
   const updateAbradingDetails = (rows: CasePrepAbradingDetailsRow[]) => {
     patchSection("abradingOperation", {
@@ -723,18 +775,27 @@ const CasePrepMotorPanel = ({
   const renderParamValue = (
     row: { value?: string; valueFieldType?: string },
     onValue: (v: string) => void,
-  ) => (
-    <ValueByFieldType
-      value={row.value ?? ""}
-      valueFieldType={row.valueFieldType}
-      onChange={onValue}
-      disabled={disabled}
-      readOnly={readOnly}
-      theme={theme}
-    />
-  );
+    fieldPath: string,
+  ) => {
+    const message = err(fieldPath);
+    return (
+      <>
+        <ValueByFieldType
+          value={row.value ?? ""}
+          valueFieldType={row.valueFieldType}
+          onChange={onValue}
+          disabled={disabled}
+          readOnly={readOnly}
+          theme={theme}
+          dataCpField={fieldPath}
+          error={Boolean(message)}
+        />
+        <FieldErrorText message={message} />
+      </>
+    );
+  };
 
-  const fixedPartsByWeight = linerRecipeHasFixedParts(value.linerCoatingOperation.linerType);
+  const fixedPartsByWeight = Boolean(fixedPartsFromApi);
 
   const ingredientTable = (
     title: string,
@@ -787,6 +848,8 @@ const CasePrepMotorPanel = ({
                         onChange={(mfgLot) => updateIngredientRow(listKey, index, { mfgLot })}
                         fetchLotsForMaterialCode={fetchLotsForMaterialCode}
                         getCachedLotOptions={getCachedLotOptions}
+                        getApiLotCount={getApiLotCount}
+                        hasFetchedLots={hasFetchedLots}
                         isLoadingLots={isLoadingLots}
                       />
                     </TableCell>
@@ -879,7 +942,16 @@ const CasePrepMotorPanel = ({
               <TableRow>
                 {["Operation", "Value", "Observations", "Attachments"].map((label, idx) => (
                   <TableCell key={label} sx={casePrepTableHeaderCellSx(idx === 0)}>
-                    {label}
+                    {label === "Value" ? (
+                      <>
+                        {label}
+                        <Typography component="span" color="error.main" sx={{ ml: 0.5 }}>
+                          *
+                        </Typography>
+                      </>
+                    ) : (
+                      label
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
@@ -928,6 +1000,9 @@ const CasePrepMotorPanel = ({
                               readOnly={readOnly}
                               theme={theme}
                               dataCpField={`abradingOperation.abradingDetails.${index}.value`}
+                              error={Boolean(
+                                err(`abradingOperation.abradingDetails.${index}.value`),
+                              )}
                             />
                             <FieldErrorText
                               message={err(`abradingOperation.abradingDetails.${index}.value`)}
@@ -1276,8 +1351,11 @@ const CasePrepMotorPanel = ({
               updateParameterRow("preHeating", "temperatureDuration", index, { remarks: v })
             }
             renderValue={(row, index) =>
-              renderParamValue(row, (v) =>
-                updateParameterRow("preHeating", "temperatureDuration", index, { value: v }),
+              renderParamValue(
+                row,
+                (v) =>
+                  updateParameterRow("preHeating", "temperatureDuration", index, { value: v }),
+                `preHeating.temperatureDuration.${index}.value`,
               )
             }
           />
@@ -1297,8 +1375,11 @@ const CasePrepMotorPanel = ({
               updateParameterRow("preHeating", "preHeatingMonitoring", index, { remarks: v })
             }
             renderValue={(row, index) =>
-              renderParamValue(row, (v) =>
-                updateParameterRow("preHeating", "preHeatingMonitoring", index, { value: v }),
+              renderParamValue(
+                row,
+                (v) =>
+                  updateParameterRow("preHeating", "preHeatingMonitoring", index, { value: v }),
+                `preHeating.preHeatingMonitoring.${index}.value`,
               )
             }
           />
@@ -1311,7 +1392,7 @@ const CasePrepMotorPanel = ({
           <Box>
             <CasePrepSelect
               label="Liner Type"
-              value={liner.linerType}
+              value={str(liner.linerType).trim()}
               placeholder="Select liner type"
               options={[...LINER_TYPE_OPTIONS]}
               onChange={(v) =>
@@ -1420,7 +1501,16 @@ const CasePrepMotorPanel = ({
                 <TableRow>
                   {["Sr No", "Parameter", "Specification", "Result", ""].map((label, idx) => (
                     <TableCell key={`${label}-${idx}`} sx={casePrepTableHeaderCellSx(idx === 0)}>
-                      {label}
+                      {label === "Result" ? (
+                        <>
+                          {label}
+                          <Typography component="span" color="error.main" sx={{ ml: 0.5 }}>
+                            *
+                          </Typography>
+                        </>
+                      ) : (
+                        label
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -1440,6 +1530,7 @@ const CasePrepMotorPanel = ({
                           onChange={(v) => updateQualificationRow(index, { parameter: v })}
                           disabled={disabled}
                           readOnly={readOnly}
+                          dataCpField={`linerCoatingOperation.qualificationParameters.${index}.parameter`}
                         />
                       )}
                     </TableCell>
@@ -1452,6 +1543,7 @@ const CasePrepMotorPanel = ({
                           onChange={(v) => updateQualificationRow(index, { specification: v })}
                           disabled={disabled}
                           readOnly={readOnly}
+                          dataCpField={`linerCoatingOperation.qualificationParameters.${index}.specification`}
                         />
                       )}
                     </TableCell>
@@ -1462,6 +1554,7 @@ const CasePrepMotorPanel = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         placeholder="Result"
+                        dataCpField={`linerCoatingOperation.qualificationParameters.${index}.result`}
                       />
                       <FieldErrorText
                         message={err(
@@ -1506,10 +1599,13 @@ const CasePrepMotorPanel = ({
               })
             }
             renderValue={(row, index) =>
-              renderParamValue(row, (v) =>
-                updateParameterRow("linerCoatingOperation", "linerApplicationLog", index, {
-                  value: v,
-                }),
+              renderParamValue(
+                row,
+                (v) =>
+                  updateParameterRow("linerCoatingOperation", "linerApplicationLog", index, {
+                    value: v,
+                  }),
+                `linerCoatingOperation.linerApplicationLog.${index}.value`,
               )
             }
           />
@@ -1542,6 +1638,12 @@ const CasePrepMotorPanel = ({
               );
               patchSection("dispatchToCasting", { dispatchVisualObservations: rows });
             }}
+            getObservationsFieldPath={(index) =>
+              `dispatchToCasting.dispatchVisualObservations.${index}.observations`
+            }
+            getObservationsError={(index) =>
+              err(`dispatchToCasting.dispatchVisualObservations.${index}.observations`)
+            }
           />
         </Box>
 
@@ -1563,10 +1665,13 @@ const CasePrepMotorPanel = ({
               })
             }
             renderValue={(row, index) =>
-              renderParamValue(row, (v) =>
-                updateParameterRow("dispatchToCasting", "dispatchToCastingDetails", index, {
-                  value: v,
-                }),
+              renderParamValue(
+                row,
+                (v) =>
+                  updateParameterRow("dispatchToCasting", "dispatchToCastingDetails", index, {
+                    value: v,
+                  }),
+                `dispatchToCasting.dispatchToCastingDetails.${index}.value`,
               )
             }
           />

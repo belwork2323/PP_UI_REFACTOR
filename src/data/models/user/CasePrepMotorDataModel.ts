@@ -42,6 +42,29 @@ export const LINER_TYPE_OPTIONS: readonly CasePrepOption[] = [
   { value: "OTHERS", label: "Others" },
 ] as const;
 
+const LINER_TYPE_VALUE_SET = new Set(
+  LINER_TYPE_OPTIONS.map((option) => option.value),
+);
+
+/** Map API linerType ↔ UI select (empty stays empty; free-text → OTHERS + otherLinerType). */
+export const resolveLinerTypeForUi = (
+  linerType: unknown,
+  otherLinerType: unknown = "",
+): { linerType: LinerTypeValue | string; otherLinerType: string } => {
+  const raw = str(linerType).trim();
+  const other = str(otherLinerType).trim();
+  if (!raw) {
+    return { linerType: "", otherLinerType: "" };
+  }
+  if (LINER_TYPE_VALUE_SET.has(raw as LinerTypeValue)) {
+    return {
+      linerType: raw,
+      otherLinerType: raw.toUpperCase() === "OTHERS" ? other : "",
+    };
+  }
+  return { linerType: "OTHERS", otherLinerType: other || raw };
+};
+
 export type PreHeatingRecipeValue =
   | "85_90C_6HR_10HR_VACUUM"
   | "105C_8HR"
@@ -1336,8 +1359,13 @@ export const parseCasePrepMotorDataFromApi = (
       ),
     },
     linerCoatingOperation: {
-      linerType: str(liner.linerType ?? ""),
-      otherLinerType: str(liner.otherLinerType ?? ""),
+      ...(() => {
+        const resolved = resolveLinerTypeForUi(liner.linerType, liner.otherLinerType);
+        return {
+          linerType: resolved.linerType,
+          otherLinerType: resolved.otherLinerType,
+        };
+      })(),
       batchNo: str(liner.batchNo ?? ""),
       batchSize: str(liner.batchSize ?? ""),
       premixIngredients: parseIngredientRows(liner.premixIngredients),

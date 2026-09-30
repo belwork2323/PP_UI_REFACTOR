@@ -10,10 +10,10 @@ import type {
 } from "../../../../../data/models/user/QualityControlFormModel";
 import { getSchemaForDivisionEntry } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
 import {
-  ensureWeightmentRowForMaterialPremix,
-  filterWeightmentSheetForMaterial,
+  ensureWeightmentRowsForPremixMaterials,
+  filterWeightmentSheetForPremix,
   hydrateProcessingMaterialValues,
-  mergeWeightmentSheetForMaterial,
+  mergeWeightmentSheetForPremix,
   resolveQcProcessingWeightmentSheet,
 } from "../../../../../hooks/user/qualityControl/qcProcessingMaterials";
 import { normalizeSheetMaterialsForWeightmentCompare } from "../../../../../data/models/user/rawMaterialWeightmentValidation";
@@ -33,6 +33,8 @@ import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
 import { hydratePremixProcessSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import { rmpUiKeyShowsProcessPanel } from "../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
 import RawMaterialMaterialProcessPanel from "../../manufacturing/RawMaterial/materialProcess/RawMaterialMaterialProcessPanel";
+import type { ValidationAttemptFlags } from "../../../../components/validation/useValidationDisplay";
+import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -57,6 +59,9 @@ type QCProcessingMaterialsPanelProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  /** RMP-parity weighment field errors (paths under weightment.*). */
+  weightmentErrors?: ValidationErrors;
+  validationAttempt?: ValidationAttemptFlags;
   unitActions?: QCDivisionEntryUnitActions | null;
 };
 
@@ -74,6 +79,8 @@ const QCProcessingMaterialsPanel = ({
   schemaError: _schemaError = null,
   onEntryValuesChange,
   onProcessingWeightmentSheetChange,
+  weightmentErrors = {},
+  validationAttempt = { format: false, unit: false, submit: false },
   unitActions = null,
 }: QCProcessingMaterialsPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -101,8 +108,19 @@ const QCProcessingMaterialsPanel = ({
   const activeSchema = activeEntry ? getSchemaForDivisionEntry(formData, activeEntry) : null;
   const schemaUnavailable = Boolean(activeEntry?.schemaUnavailable);
 
+  const showWeightment = Boolean(
+    schemaUnavailable || materialEntries.some((entry) => entry.schemaUnavailable),
+  );
+
+  const activePremixNoForWeightment = useMemo(() => {
+    const fromActive = Number(activeEntry?.premixNo);
+    if (Number.isFinite(fromActive) && fromActive > 0) return fromActive;
+    const fromPanel = Number(materialEntries[0]?.premixNo);
+    return Number.isFinite(fromPanel) && fromPanel > 0 ? fromPanel : 0;
+  }, [activeEntry?.premixNo, materialEntries]);
+
   const fullWeightmentSheet = useMemo(() => {
-    if (!schemaUnavailable) return null;
+    if (!showWeightment) return null;
     const manufacturing =
       (divisionAutoPopulateData as { __manufacturingDivisionData?: unknown } | null)
         ?.__manufacturingDivisionData ?? divisionAutoPopulateData;
@@ -115,83 +133,8 @@ const QCProcessingMaterialsPanel = ({
     batchPayload,
     divisionAutoPopulateData,
     formData.processingWeightmentSheet,
-    schemaUnavailable,
+    showWeightment,
   ]);
-
-  // Seed QC-owned weighment from autopopulate/batch once — table shows API rows first;
-  // compare stays off until the user checks it (no auto rewrite of entered values).
-  useEffect(() => {
-    if (!schemaUnavailable || !onProcessingWeightmentSheetChange) return;
-    if (formData.processingWeightmentSheet != null) return;
-    if (!fullWeightmentSheet) return;
-    // Stamp each row's own scope from its code so later code edits don't drop the row.
-    const stampedDetails = (fullWeightmentSheet.weightmentDetails ?? []).map((row) => ({
-      ...row,
-      scopeMaterialCode:
-        String(row.scopeMaterialCode ?? "").trim() ||
-        String(row.materialCode ?? "").trim() ||
-        null,
-    }));
-    onProcessingWeightmentSheetChange((prev) => {
-      // Another effect / edit may have seeded while this was scheduled — keep it.
-      if ((prev.weightmentDetails?.length ?? 0) > 0) return prev;
-      return {
-        ...fullWeightmentSheet,
-        weightmentDetails: stampedDetails,
-        validation: {
-          ...fullWeightmentSheet.validation,
-          compareWithIdentificationSheet: false,
-          deviationFound: false,
-          deviationMessage: "",
-        },
-      };
-    });
-  }, [
-    formData.processingWeightmentSheet,
-    fullWeightmentSheet,
-    onProcessingWeightmentSheetChange,
-    schemaUnavailable,
-  ]);
-
-  // Ensure one weighment row for the active material × premix (no free-form Add Row).
-  useEffect(() => {
-    if (!schemaUnavailable || !onProcessingWeightmentSheetChange || !activeEntry) return;
-    const code = String(activeEntry.materialCode ?? "").trim();
-    if (!code || !fullWeightmentSheet) return;
-    const materialName = String(activeEntry.materialName ?? code);
-    const premixNo = activeEntry.premixNo;
-    onProcessingWeightmentSheetChange((prev) => {
-      const prevHasRows = (prev.weightmentDetails?.length ?? 0) > 0;
-      const base = prevHasRows ? prev : fullWeightmentSheet;
-      const ensured = ensureWeightmentRowForMaterialPremix(base, {
-        materialCode: code,
-        materialName,
-        premixNo,
-      });
-      if (
-        JSON.stringify(ensured.weightmentDetails) ===
-        JSON.stringify(base.weightmentDetails)
-      ) {
-        // Unchanged: keep user sheet, or adopt API base when still empty.
-        return prevHasRows ? prev : ensured;
-      }
-      return ensured;
-    });
-  }, [
-    activeEntry,
-    fullWeightmentSheet,
-    onProcessingWeightmentSheetChange,
-    schemaUnavailable,
-  ]);
-
-  const weightmentSheet = useMemo(() => {
-    if (!activeEntry || !fullWeightmentSheet) return null;
-    return filterWeightmentSheetForMaterial(
-      fullWeightmentSheet,
-      activeEntry.materialCode,
-      activeEntry.premixNo,
-    );
-  }, [activeEntry, fullWeightmentSheet]);
 
   const identificationSheet = useMemo((): IdentificationSheet | null => {
     const root =
@@ -221,59 +164,142 @@ const QCProcessingMaterialsPanel = ({
     };
   }, [batchPayload, divisionAutoPopulateData]);
 
+  // Seed QC-owned weighment from autopopulate/batch once — table shows API rows first;
+  // compare stays off until the user checks it (no auto rewrite of entered values).
+  useEffect(() => {
+    if (!showWeightment || !onProcessingWeightmentSheetChange) return;
+    if (formData.processingWeightmentSheet != null) return;
+    if (!fullWeightmentSheet) return;
+    const stampedDetails = (fullWeightmentSheet.weightmentDetails ?? []).map((row) => ({
+      ...row,
+      scopeMaterialCode:
+        String(row.scopeMaterialCode ?? "").trim() ||
+        String(row.materialCode ?? "").trim() ||
+        null,
+    }));
+    onProcessingWeightmentSheetChange((prev) => {
+      if ((prev.weightmentDetails?.length ?? 0) > 0) return prev;
+      return {
+        ...fullWeightmentSheet,
+        weightmentDetails: stampedDetails,
+        validation: {
+          ...fullWeightmentSheet.validation,
+          compareWithIdentificationSheet: false,
+          deviationFound: false,
+          deviationMessage: "",
+        },
+      };
+    });
+  }, [
+    formData.processingWeightmentSheet,
+    fullWeightmentSheet,
+    onProcessingWeightmentSheetChange,
+    showWeightment,
+  ]);
+
+  // RMP parity: ensure one row per identification-sheet material for the active premix.
+  useEffect(() => {
+    if (!showWeightment || !onProcessingWeightmentSheetChange) return;
+    if (!activePremixNoForWeightment || !fullWeightmentSheet) return;
+    const materials =
+      identificationSheet?.materials?.length
+        ? identificationSheet.materials
+        : normalizeSheetMaterialsForWeightmentCompare(
+            materialEntries
+              .filter((entry) => Number(entry.premixNo) === activePremixNoForWeightment)
+              .map((entry, index) => ({
+                srNo: index + 1,
+                materialCode: String(entry.materialCode ?? "").trim(),
+                materialName: String(entry.materialName ?? entry.materialCode ?? "").trim(),
+                lotIds: [],
+                make: "",
+                requiredComposition: 0,
+                quantityPerPremix: 0,
+              })),
+          );
+    if (!materials.length) return;
+
+    onProcessingWeightmentSheetChange((prev) => {
+      const prevHasRows = (prev.weightmentDetails?.length ?? 0) > 0;
+      const base = prevHasRows ? prev : fullWeightmentSheet;
+      const ensured = ensureWeightmentRowsForPremixMaterials(base, {
+        premixNo: activePremixNoForWeightment,
+        materials,
+      });
+      if (
+        JSON.stringify(ensured.weightmentDetails) ===
+        JSON.stringify(base.weightmentDetails)
+      ) {
+        return prevHasRows ? prev : ensured;
+      }
+      return ensured;
+    });
+  }, [
+    activePremixNoForWeightment,
+    fullWeightmentSheet,
+    identificationSheet?.materials,
+    materialEntries,
+    onProcessingWeightmentSheetChange,
+    showWeightment,
+  ]);
+
+  const { weightmentSheet, weightmentRowSourceIndices } = useMemo(() => {
+    if (!activePremixNoForWeightment || !fullWeightmentSheet) {
+      return {
+        weightmentSheet: null as RawMaterialPrepWeightmentSheet | null,
+        weightmentRowSourceIndices: undefined as number[] | undefined,
+      };
+    }
+    const scoped = filterWeightmentSheetForPremix(
+      fullWeightmentSheet,
+      activePremixNoForWeightment,
+    );
+    const rowSourceIndices: number[] = [];
+    (fullWeightmentSheet.weightmentDetails ?? []).forEach((row, idx) => {
+      const rowPremix =
+        row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+          ? null
+          : Number(row.premixNo);
+      if (rowPremix === activePremixNoForWeightment) {
+        rowSourceIndices.push(idx);
+      }
+    });
+    return {
+      weightmentSheet: scoped,
+      weightmentRowSourceIndices: rowSourceIndices.length ? rowSourceIndices : undefined,
+    };
+  }, [activePremixNoForWeightment, fullWeightmentSheet]);
+
   const handleWeightmentChange = (
     next:
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => {
-    if (!onProcessingWeightmentSheetChange || !activeEntry || !fullWeightmentSheet) return;
+    if (!onProcessingWeightmentSheetChange || !activePremixNoForWeightment || !fullWeightmentSheet) {
+      return;
+    }
     onProcessingWeightmentSheetChange((prevFull) => {
       const prevHasRows = (prevFull?.weightmentDetails?.length ?? 0) > 0;
       const base = prevHasRows ? (prevFull as RawMaterialPrepWeightmentSheet) : fullWeightmentSheet;
-      const currentFiltered = filterWeightmentSheetForMaterial(
+      const currentFiltered = filterWeightmentSheetForPremix(
         base,
-        activeEntry.materialCode,
-        activeEntry.premixNo,
+        activePremixNoForWeightment,
       );
-
-      const patched =
-        typeof next === "function" ? next(currentFiltered) : next;
-
-      // Compare checkbox / deviation flags only touch validation — never rewrite rows.
-      const detailsUnchanged =
-        patched.weightmentDetails === currentFiltered.weightmentDetails ||
-        JSON.stringify(patched.weightmentDetails ?? []) ===
-          JSON.stringify(currentFiltered.weightmentDetails ?? []);
-      if (detailsUnchanged) {
-        return {
-          ...base,
-          mixerBuildingNumber:
-            patched.mixerBuildingNumber ?? base.mixerBuildingNumber,
-          validation: patched.validation ?? base.validation,
-        };
-      }
-
-      return mergeWeightmentSheetForMaterial(
+      const resolvedFiltered = typeof next === "function" ? next(currentFiltered) : next;
+      return mergeWeightmentSheetForPremix(
         base,
-        activeEntry.materialCode,
         {
-          ...patched,
-          weightmentDetails: (patched.weightmentDetails ?? []).map((row) => ({
+          ...resolvedFiltered,
+          weightmentDetails: (resolvedFiltered.weightmentDetails ?? []).map((row) => ({
             ...row,
-            // Keep user-edited code/name; only fill blanks from the active material tab.
-            materialCode:
-              String(row.materialCode ?? "").trim() ||
-              String(activeEntry.materialCode ?? ""),
-            materialName:
-              String(row.materialName ?? "").trim() ||
-              String(activeEntry.materialName ?? activeEntry.materialCode ?? ""),
+            premixNo: row.premixNo ?? activePremixNoForWeightment,
             scopeMaterialCode:
               String(row.scopeMaterialCode ?? "").trim() ||
-              String(activeEntry.materialCode ?? ""),
-            premixNo: row.premixNo ?? activeEntry.premixNo ?? null,
+              String(row.materialCode ?? "").trim() ||
+              null,
           })),
         },
-        activeEntry.premixNo,
+        activePremixNoForWeightment,
       );
     });
   };
@@ -282,34 +308,67 @@ const QCProcessingMaterialsPanel = ({
   const handleWeightmentValidationChange = (
     patch: Partial<RawMaterialPrepWeightmentSheet["validation"]>,
   ) => {
-    if (!onProcessingWeightmentSheetChange || !fullWeightmentSheet) return;
+    if (!onProcessingWeightmentSheetChange || !fullWeightmentSheet || !activePremixNoForWeightment) {
+      return;
+    }
     onProcessingWeightmentSheetChange((prevFull) => {
       const prevHasRows = (prevFull?.weightmentDetails?.length ?? 0) > 0;
       const base = prevHasRows ? (prevFull as RawMaterialPrepWeightmentSheet) : fullWeightmentSheet;
-      return {
-        ...base,
-        validation: {
-          ...base.validation,
-          ...patch,
+      const currentFiltered = filterWeightmentSheetForPremix(
+        base,
+        activePremixNoForWeightment,
+      );
+      return mergeWeightmentSheetForPremix(
+        base,
+        {
+          ...currentFiltered,
+          validation: {
+            ...currentFiltered.validation,
+            ...patch,
+          },
         },
-      };
+        activePremixNoForWeightment,
+      );
     });
   };
 
   const activeReadOnlyProcessSlot = useMemo(() => {
-    if (!activeEntry?.savedSections?.length) return null;
-    const materialCode = String(activeEntry.materialCode ?? "").trim();
+    const hasTypedProcess =
+      Boolean(activeEntry?.savedProcess?.processType) ||
+      Boolean(activeEntry?.savedProcess?.lotDetails?.length) ||
+      Boolean(activeEntry?.savedProcess?.doa) ||
+      Boolean(activeEntry?.savedProcess?.aluminum) ||
+      Boolean(activeEntry?.savedProcess?.apCoarse) ||
+      Boolean(activeEntry?.savedProcess?.apFine) ||
+      Boolean(activeEntry?.savedProcess?.apUltraFine) ||
+      Boolean(activeEntry?.savedProcess?.drying) ||
+      Boolean(activeEntry?.savedProcess?.sieving) ||
+      Boolean(activeEntry?.savedSections?.length);
+    if (!activeEntry || !hasTypedProcess) return null;
+    const materialCode = String(
+      activeEntry.savedProcess?.materialCode ?? activeEntry.materialCode ?? "",
+    ).trim();
     if (!materialCode) return null;
     const slot = activeEntry.processSlot === "liquid" ? "liquid" : "solid";
-    return hydratePremixProcessSlot(slot, materialCode, {
-      materialId: 0,
+    const fallbackProcess = {
+      materialId: Number(activeEntry.savedProcess?.materialId ?? activeEntry.materialId ?? 0),
       materialCode,
-      materialName: materialCode,
-      gradeId: null,
-      gradeCode: String(activeEntry.gradeCode ?? "").trim() || null,
-      lotDetails: [],
+      materialName:
+        String(
+          activeEntry.savedProcess?.materialName ?? activeEntry.materialName ?? materialCode,
+        ).trim() || materialCode,
+      gradeId: activeEntry.savedProcess?.gradeId ?? activeEntry.gradeId ?? null,
+      gradeCode:
+        String(activeEntry.savedProcess?.gradeCode ?? activeEntry.gradeCode ?? "").trim() || null,
+      lotDetails: activeEntry.savedProcess?.lotDetails ?? [],
       sections: activeEntry.savedSections,
-    });
+    };
+    return hydratePremixProcessSlot(
+      slot,
+      materialCode,
+      activeEntry.savedProcess ?? fallbackProcess,
+      fallbackProcess.gradeCode ?? undefined,
+    );
   }, [activeEntry]);
 
   const savedSectionsSignature = useMemo(() => {
@@ -490,6 +549,13 @@ const QCProcessingMaterialsPanel = ({
                 <RawMaterialMaterialProcessPanel
                   slotState={activeReadOnlyProcessSlot}
                   onSlotChange={() => undefined}
+                  materialCode={String(activeEntry.materialCode ?? "")}
+                  lotOptions={
+                    (activeEntry.savedProcess?.lotDetails ?? [])
+                      .map((lot) => String(lot.lotId ?? "").trim())
+                      .filter(Boolean)
+                  }
+                  quantityPerPremix={0}
                   readOnly
                   theme={manufacturingTheme}
                 />
@@ -498,15 +564,19 @@ const QCProcessingMaterialsPanel = ({
               ) : null}
               {weightmentSheet ? (
                 <RawMaterialWeightmentSheetPanel
+                  key={`weightment-premix-${activePremixNoForWeightment}`}
                   value={weightmentSheet}
                   onChange={handleWeightmentChange}
                   onValidationChange={handleWeightmentValidationChange}
                   theme={manufacturingTheme}
                   batchId={batchId}
                   identificationSheet={identificationSheet}
+                  premixNo={activePremixNoForWeightment}
                   disabled={inputsLocked}
-                  compareHighlightOnly
-                  allowAddRemoveRows={false}
+                  allowAddRemoveRows
+                  weightmentErrors={weightmentErrors}
+                  validationAttempt={validationAttempt}
+                  rowSourceIndices={weightmentRowSourceIndices}
                 />
               ) : (
                 <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>

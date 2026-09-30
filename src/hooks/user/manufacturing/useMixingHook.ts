@@ -54,6 +54,7 @@ type WorkflowView = "list" | "form" | "details";
 
 type MixingBatch = BatchStageContext & {
   batchId: string;
+  projectId?: string | null;
   mxStatus?: string;
   formId?: string | null;
   [key: string]: any;
@@ -368,70 +369,89 @@ export const useMixingHook = () => {
           setFormHydrationKey((value) => value + 1);
         }
 
-        // Enrich process particulars with operation names from the mixing cycle, preserving saved values.
+        // Enrich process particulars per card from that card's mixing cycle (not Premix 1 only).
         try {
-          const mixingCycleCode = String(
-            nextFormData.premixCards[0]?.mixingCycleCode ??
-              nextFormData.finalMixCards[0]?.mixingCycleCode ??
-              "",
-          ).trim();
+          const uniqueCycleCodes = [
+            ...new Set(
+              [
+                ...(nextFormData.premixCards ?? []).map((card) =>
+                  String(card.mixingCycleCode ?? "").trim(),
+                ),
+                ...(nextFormData.finalMixCards ?? []).map((card) =>
+                  String(card.mixingCycleCode ?? "").trim(),
+                ),
+              ].filter(Boolean),
+            ),
+          ];
 
-          if (mixingCycleCode) {
-            const res = await mixingController.fetchMixingCycleDetails(mixingCycleCode);
+          if (uniqueCycleCodes.length) {
+            const cycleDetailsByCode = new Map<string, Record<string, unknown>>();
+            await Promise.all(
+              uniqueCycleCodes.map(async (code) => {
+                try {
+                  const res = await mixingController.fetchMixingCycleDetails(code);
+                  if (res?.success && res?.data) {
+                    cycleDetailsByCode.set(code, res.data as Record<string, unknown>);
+                  }
+                } catch (err) {
+                  console.warn(`Failed to fetch mixing cycle details for ${code}`, err);
+                }
+              }),
+            );
 
-            if (res?.success && res?.data) {
-              const { premixOperations, finalMixOperations } = resolveMixingCycleOperations(
-                res.data as Record<string, unknown>,
-              );
-              const { premixQualityChecks, finalMixQualityChecks } =
-                resolveMixingCycleQualityChecks(res.data as Record<string, unknown>);
+            const mergeQcRows = (
+              template: ReturnType<typeof mapBackendQualityChecksToRows>,
+              current: PremixEntry["qualityChecks"] | FinalMixEntry["qualityChecks"],
+            ) => {
+              if (!template.length) return current;
+              return template.map((row) => {
+                const existing = current.find((item) => item.parameterId === row.parameterId);
+                return existing ? { ...row, observedValues: existing.observedValues } : row;
+              });
+            };
 
-              if (
-                premixOperations.length ||
-                finalMixOperations.length ||
-                premixQualityChecks.length ||
-                finalMixQualityChecks.length
-              ) {
+            const updated: MixingFormState = {
+              ...nextFormData,
+              premixCards: nextFormData.premixCards.map((card) => {
+                const code = String(card.mixingCycleCode ?? "").trim();
+                const details = code ? cycleDetailsByCode.get(code) : undefined;
+                if (!details) return card;
+                const { premixOperations } = resolveMixingCycleOperations(details);
+                const { premixQualityChecks } = resolveMixingCycleQualityChecks(details);
                 const premixQcRows = mapBackendQualityChecksToRows(premixQualityChecks);
-                const finalQcRows = mapBackendQualityChecksToRows(finalMixQualityChecks);
-                const updated = {
-                  ...nextFormData,
-                  premixCards: nextFormData.premixCards.map((card) => ({
-                    ...card,
-                    processParticulars: mergeProcessParticularsWithOperations(
-                      premixOperations,
-                      card.processParticulars,
-                    ),
-                    qualityChecks: premixQcRows.length
-                      ? premixQcRows.map((row) => {
-                          const current = card.qualityChecks.find(
-                            (item) => item.parameterId === row.parameterId,
-                          );
-                          return current ? { ...row, observedValues: current.observedValues } : row;
-                        })
-                      : card.qualityChecks,
-                  })),
-                  finalMixCards: nextFormData.finalMixCards.map((card) => ({
-                    ...card,
-                    processParticulars: mergeProcessParticularsWithOperations(
-                      finalMixOperations,
-                      card.processParticulars,
-                    ),
-                    qualityChecks: finalQcRows.length
-                      ? finalQcRows.map((row) => {
-                          const current = card.qualityChecks.find(
-                            (item) => item.parameterId === row.parameterId,
-                          );
-                          return current ? { ...row, observedValues: current.observedValues } : row;
-                        })
-                      : card.qualityChecks,
-                  })),
+                return {
+                  ...card,
+                  processParticulars: premixOperations.length
+                    ? mergeProcessParticularsWithOperations(
+                        premixOperations,
+                        card.processParticulars,
+                      )
+                    : card.processParticulars,
+                  qualityChecks: mergeQcRows(premixQcRows, card.qualityChecks),
                 };
+              }),
+              finalMixCards: nextFormData.finalMixCards.map((card) => {
+                const code = String(card.mixingCycleCode ?? "").trim();
+                const details = code ? cycleDetailsByCode.get(code) : undefined;
+                if (!details) return card;
+                const { finalMixOperations } = resolveMixingCycleOperations(details);
+                const { finalMixQualityChecks } = resolveMixingCycleQualityChecks(details);
+                const finalQcRows = mapBackendQualityChecksToRows(finalMixQualityChecks);
+                return {
+                  ...card,
+                  processParticulars: finalMixOperations.length
+                    ? mergeProcessParticularsWithOperations(
+                        finalMixOperations,
+                        card.processParticulars,
+                      )
+                    : card.processParticulars,
+                  qualityChecks: mergeQcRows(finalQcRows, card.qualityChecks),
+                };
+              }),
+            };
 
-                setFormData(updated);
-                setInitialSnapshot(JSON.stringify(updated));
-              }
-            }
+            setFormData(updated);
+            setInitialSnapshot(JSON.stringify(updated));
           }
         } catch (err) {
           console.warn("Failed to fetch mixing cycle details", err);

@@ -232,63 +232,184 @@ export const ProcessDetailBlock = ({
   </Box>
 );
 
+type MaterialTab = {
+  key: string;
+  label: string;
+  slot: "solid" | "liquid";
+  process: RawMaterialPrepApproverProcessView;
+};
+
+export const buildRawMaterialPrepMaterialTabs = (
+  solidProcesses: RawMaterialPrepApproverProcessView[],
+  liquidProcesses: RawMaterialPrepApproverProcessView[],
+  premixNo?: number,
+): MaterialTab[] => [
+  ...solidProcesses.map((process, index) => ({
+    key: `solid-${process.materialCode}-${index}`,
+    label: premixNo
+      ? `Premix-${premixNo} ${process.materialCode}${process.gradeCode ? ` (${process.gradeCode})` : ""}`
+      : `Premix-${process.materialCode}${process.gradeCode ? ` (${process.gradeCode})` : ""}`,
+    slot: "solid" as const,
+    process,
+  })),
+  ...liquidProcesses.map((process, index) => ({
+    key: `liquid-${process.materialCode}-${index}`,
+    label: premixNo
+      ? `Premix-${premixNo} ${process.materialCode}`
+      : `Premix-${process.materialCode}`,
+    slot: "liquid" as const,
+    process,
+  })),
+];
+
 export const PremixDetailPanel = ({
   premix,
   dt,
   palette,
   statusConfig,
+  navPalette,
+  showMaterialNav = true,
 }: {
   premix: RawMaterialPrepApproverPremixView;
   dt: RawMaterialPrepDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
   statusConfig?: Record<string, { color: string; bg: string; border: string }>;
-}) => (
-  <Box>
-    <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
-      <Chip label={`Premix ${premix.premixNo}`} size="small" sx={dt.materialChip} />
-      {statusConfig ? (
-        <PremixStatusChip
-          status={premix.premixSubmissionStatus}
-          statusConfig={statusConfig}
+  navPalette?: {
+    primary?: string;
+    primaryLight?: string;
+    border?: string;
+    surface?: string;
+    textSub?: string;
+    text?: string;
+  };
+  /** When true (default), show Premix Material Navigation and one process at a time (form parity). */
+  showMaterialNav?: boolean;
+}) => {
+  const [activeMaterialIndex, setActiveMaterialIndex] = useState(0);
+
+  const materialTabs = useMemo(
+    () =>
+      buildRawMaterialPrepMaterialTabs(
+        premix.solidProcesses,
+        premix.liquidProcesses,
+        premix.premixNo,
+      ),
+    [premix.liquidProcesses, premix.premixNo, premix.solidProcesses],
+  );
+
+  const activeMaterialIndexSafe =
+    materialTabs.length > 0 ? Math.min(activeMaterialIndex, materialTabs.length - 1) : 0;
+  const activeMaterial = materialTabs[activeMaterialIndexSafe] ?? null;
+
+  useEffect(() => {
+    setActiveMaterialIndex(0);
+  }, [premix.premixNo]);
+
+  const materialNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      materialTabs.map((entry) => ({
+        id: entry.key,
+        label: entry.label,
+      })),
+    [materialTabs],
+  );
+
+  const resolvedNavPalette = navPalette ?? {
+    primary: palette.primary,
+    primaryLight: palette.primaryLight,
+    border: palette.border,
+    surface: palette.surface,
+    textSub: palette.textSub,
+    text: palette.text,
+  };
+
+  return (
+    <Box>
+      <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
+        <Chip
+          label={
+            activeMaterial
+              ? `Premix ${premix.premixNo} · ${activeMaterial.process.materialCode}${
+                  activeMaterial.process.gradeCode
+                    ? ` (${activeMaterial.process.gradeCode})`
+                    : ""
+                }`
+              : `Premix ${premix.premixNo}`
+          }
+          size="small"
+          sx={dt.materialChip}
         />
+        {statusConfig ? (
+          <PremixStatusChip
+            status={premix.premixSubmissionStatus}
+            statusConfig={statusConfig}
+          />
+        ) : null}
+        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, fontWeight: 700 }}>
+          {premix.materialType}
+        </Typography>
+      </Stack>
+
+      {premix.premixSubmissionStatus === "REJECTED" && premix.rejectionReason ? (
+        <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.5 }}>
+          Rejection reason: {premix.rejectionReason}
+        </Typography>
       ) : null}
-      <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, fontWeight: 700 }}>
-        {premix.materialType}
-      </Typography>
-    </Stack>
 
-    {premix.premixSubmissionStatus === "REJECTED" && premix.rejectionReason ? (
-      <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.5 }}>
-        Rejection reason: {premix.rejectionReason}
-      </Typography>
-    ) : null}
+      {showMaterialNav && materialNavTabs.length > 0 ? (
+        <Box sx={{ mb: 2 }}>
+          <UserWorkflowTabNav
+            title={RM.MATERIAL_NAV_TITLE}
+            tabs={materialNavTabs}
+            activeIndex={activeMaterialIndexSafe}
+            onActiveIndexChange={setActiveMaterialIndex}
+            palette={resolvedNavPalette}
+            showStepArrows
+          />
+        </Box>
+      ) : null}
 
-    {premix.solidProcesses.length === 0 && premix.liquidProcesses.length === 0 ? (
-      <Typography sx={dt.emptyText}>No process data recorded for this premix.</Typography>
-    ) : null}
-
-    {premix.solidProcesses.map((process, index) => (
-      <ProcessDetailBlock
-        key={`solid-${process.materialCode}-${index}`}
-        process={process}
-        slotLabel="Solid"
-        slotIcon={GrainRoundedIcon}
-        slotColor={palette.primary ?? "#1565C0"}
-        dt={dt}
-      />
-    ))}
-    {premix.liquidProcesses.map((process, index) => (
-      <ProcessDetailBlock
-        key={`liquid-${process.materialCode}-${index}`}
-        process={process}
-        slotLabel="Liquid"
-        slotIcon={OpacityRoundedIcon}
-        slotColor={palette.primaryLight ?? "#2E86C1"}
-        dt={dt}
-      />
-    ))}
-  </Box>
-);
+      {materialTabs.length === 0 ? (
+        <Typography sx={dt.emptyText}>No process data recorded for this premix.</Typography>
+      ) : showMaterialNav && activeMaterial ? (
+        <ProcessDetailBlock
+          process={activeMaterial.process}
+          slotLabel={activeMaterial.slot === "solid" ? "Solid" : "Liquid"}
+          slotIcon={activeMaterial.slot === "solid" ? GrainRoundedIcon : OpacityRoundedIcon}
+          slotColor={
+            activeMaterial.slot === "solid"
+              ? palette.primary ?? "#1565C0"
+              : palette.primaryLight ?? "#2E86C1"
+          }
+          dt={dt}
+        />
+      ) : (
+        <>
+          {premix.solidProcesses.map((process, index) => (
+            <ProcessDetailBlock
+              key={`solid-${process.materialCode}-${index}`}
+              process={process}
+              slotLabel="Solid"
+              slotIcon={GrainRoundedIcon}
+              slotColor={palette.primary ?? "#1565C0"}
+              dt={dt}
+            />
+          ))}
+          {premix.liquidProcesses.map((process, index) => (
+            <ProcessDetailBlock
+              key={`liquid-${process.materialCode}-${index}`}
+              process={process}
+              slotLabel="Liquid"
+              slotIcon={OpacityRoundedIcon}
+              slotColor={palette.primaryLight ?? "#2E86C1"}
+              dt={dt}
+            />
+          ))}
+        </>
+      )}
+    </Box>
+  );
+};
 
 export const WeightmentSheetDetailBlock = ({
   weightmentSheet,
@@ -410,6 +531,7 @@ const RawMaterialPreparationDetailsContent = ({
     { color: string; bg: string; border: string }
   >;
   const [activePremixIndex, setActivePremixIndex] = useState(0);
+  const [activeMaterialIndex, setActiveMaterialIndex] = useState(0);
 
   const allPremixes = detailView?.premixes ?? [];
   const premixes = useMemo(() => {
@@ -420,19 +542,38 @@ const RawMaterialPreparationDetailsContent = ({
     premixes.length > 0 ? Math.min(activePremixIndex, premixes.length - 1) : 0;
   const activePremix = premixes[activePremixIndexSafe] ?? null;
 
+  const materialTabs = useMemo(
+    () =>
+      activePremix
+        ? buildRawMaterialPrepMaterialTabs(
+            activePremix.solidProcesses,
+            activePremix.liquidProcesses,
+            activePremix.premixNo,
+          )
+        : [],
+    [activePremix],
+  );
+  const activeMaterialIndexSafe =
+    materialTabs.length > 0 ? Math.min(activeMaterialIndex, materialTabs.length - 1) : 0;
+  const activeMaterial = materialTabs[activeMaterialIndexSafe] ?? null;
+
   const hasWeightment =
     Boolean(weightmentSheet.mixerBuildingNumber) || weightmentSheet.weightmentDetails.length > 0;
 
   useEffect(() => {
     setActivePremixIndex(0);
+    setActiveMaterialIndex(0);
   }, [resetPremixOnFormId, filterPremixStatus]);
 
   useEffect(() => {
-    const activePremix = premixes[activePremixIndexSafe];
+    setActiveMaterialIndex(0);
+  }, [activePremixIndexSafe, activePremix?.premixNo]);
+
+  useEffect(() => {
     if (activePremix?.premixNo) {
       onActivePremixChange?.(activePremix.premixNo);
     }
-  }, [activePremixIndexSafe, premixes, onActivePremixChange]);
+  }, [activePremix, onActivePremixChange]);
 
   const resolvedPremixCounts = premixCounts ?? detailView?.premixCounts;
 
@@ -461,6 +602,15 @@ const RawMaterialPreparationDetailsContent = ({
         ),
       })),
     [activePremixIndexSafe, premixes, statusConfig],
+  );
+
+  const materialNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      materialTabs.map((entry) => ({
+        id: entry.key,
+        label: entry.label,
+      })),
+    [materialTabs],
   );
 
   const metaFields = [
@@ -534,28 +684,92 @@ const RawMaterialPreparationDetailsContent = ({
             {BL.CASING_DETAILS_SECTIONS}
           </Typography>
 
-          {showPremixTabs && premixes.length > 1 ? (
+          {showPremixTabs ? (
             <Box sx={{ mb: 2 }}>
               <UserWorkflowNavPanel palette={navPalette}>
                 <UserWorkflowTabNav
-                  title="Premix Navigation"
+                  title={RM.PREMIX_NAV_TITLE}
                   tabs={premixTabs}
                   activeIndex={activePremixIndexSafe}
                   onActiveIndexChange={setActivePremixIndex}
                   palette={navPalette}
                   showStepArrows
+                  mb={materialNavTabs.length > 0 ? 1 : 0}
                 />
+                {materialNavTabs.length > 0 ? (
+                  <UserWorkflowTabNav
+                    title={RM.MATERIAL_NAV_TITLE}
+                    tabs={materialNavTabs}
+                    activeIndex={activeMaterialIndexSafe}
+                    onActiveIndexChange={setActiveMaterialIndex}
+                    palette={navPalette}
+                    showStepArrows
+                  />
+                ) : null}
               </UserWorkflowNavPanel>
             </Box>
           ) : null}
 
           {activePremix ? (
-            <PremixDetailPanel
-              premix={activePremix}
-              dt={dt}
-              palette={theme.palette}
-              statusConfig={statusConfig}
-            />
+            <Box>
+              <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
+                <Chip
+                  label={
+                    activeMaterial
+                      ? `Premix ${activePremix.premixNo} · ${activeMaterial.process.materialCode}${
+                          activeMaterial.process.gradeCode
+                            ? ` (${activeMaterial.process.gradeCode})`
+                            : ""
+                        }`
+                      : `Premix ${activePremix.premixNo}`
+                  }
+                  size="small"
+                  sx={dt.materialChip}
+                />
+                <PremixStatusChip
+                  status={activePremix.premixSubmissionStatus}
+                  statusConfig={statusConfig}
+                />
+                <Typography
+                  sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 700 }}
+                >
+                  {activePremix.materialType}
+                </Typography>
+              </Stack>
+
+              {activePremix.premixSubmissionStatus === "REJECTED" &&
+              activePremix.rejectionReason ? (
+                <Typography
+                  sx={{
+                    fontSize: "0.72rem",
+                    color: theme.palette.danger ?? "#C0392B",
+                    mb: 1.5,
+                  }}
+                >
+                  Rejection reason: {activePremix.rejectionReason}
+                </Typography>
+              ) : null}
+
+              {activeMaterial ? (
+                <ProcessDetailBlock
+                  process={activeMaterial.process}
+                  slotLabel={activeMaterial.slot === "solid" ? "Solid" : "Liquid"}
+                  slotIcon={
+                    activeMaterial.slot === "solid" ? GrainRoundedIcon : OpacityRoundedIcon
+                  }
+                  slotColor={
+                    activeMaterial.slot === "solid"
+                      ? theme.palette.primary ?? "#1565C0"
+                      : theme.palette.primaryLight ?? "#2E86C1"
+                  }
+                  dt={dt}
+                />
+              ) : (
+                <Typography sx={dt.emptyText}>
+                  No process data recorded for this premix.
+                </Typography>
+              )}
+            </Box>
           ) : null}
         </Box>
       )}

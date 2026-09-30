@@ -1,3 +1,4 @@
+import { Box } from "@mui/material";
 import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { mixingFieldSx } from "./MixingFormFields";
@@ -12,6 +13,8 @@ export interface MixingDateFieldProps {
   error?: boolean;
   helperText?: string;
   required?: boolean;
+  /** Validation focus path — sets `data-mix-field` on the wrapper. */
+  fieldPath?: string;
 }
 
 export const MixingDateField = ({
@@ -24,36 +27,39 @@ export const MixingDateField = ({
   error = false,
   helperText,
   required = false,
+  fieldPath,
 }: MixingDateFieldProps) => (
-  <FlowBarDateField
-    label={label}
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    placeholder={placeholder}
-    accentColor={MIXING_BRAND.primaryLight}
-    width={fullWidth ?? 220}
-    error={error}
-    helperText={helperText}
-    required={required}
-    inputSx={{
-      ...mixingFieldSx,
-      "& .MuiFormLabel-root": {
-        fontWeight: 700,
-        fontSize: "0.72rem",
-        color: MIXING_BRAND.textSub,
-        mb: 0.6,
-      },
-    }}
-    flowBar={{
-      selectLabel: {
-        fontWeight: 700,
-        fontSize: "0.72rem",
-        color: MIXING_BRAND.textSub,
-        mb: 0.6,
-      },
-    }}
-  />
+  <Box data-mix-field={fieldPath || undefined} sx={{ width: fullWidth ?? 220 }}>
+    <FlowBarDateField
+      label={label}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder}
+      accentColor={MIXING_BRAND.primaryLight}
+      width="100%"
+      error={error}
+      helperText={helperText}
+      required={required}
+      inputSx={{
+        ...mixingFieldSx,
+        "& .MuiFormLabel-root": {
+          fontWeight: 700,
+          fontSize: "0.72rem",
+          color: MIXING_BRAND.textSub,
+          mb: 0.6,
+        },
+      }}
+      flowBar={{
+        selectLabel: {
+          fontWeight: 700,
+          fontSize: "0.72rem",
+          color: MIXING_BRAND.textSub,
+          mb: 0.6,
+        },
+      }}
+    />
+  </Box>
 );
 
 export default MixingDateField;

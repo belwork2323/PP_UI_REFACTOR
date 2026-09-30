@@ -121,7 +121,7 @@ const ApMaterialHostPanel = ({
         <Box
           sx={{
             border: "1px dashed",
-            borderColor: "divider",
+            borderColor: validationErrors?.apGrade ? "error.main" : "divider",
             borderRadius: 1,
             p: 1.5,
             mb: 1.5,
@@ -131,7 +131,7 @@ const ApMaterialHostPanel = ({
             Select AP grade to begin
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end">
-            <Box sx={{ minWidth: 220, flex: 1 }}>
+            <Box sx={{ minWidth: 220, flex: 1 }} data-rmp-field="apGrade">
               <CasePrepSelect
                 label="AP Grade"
                 value={pendingGrade}
@@ -140,6 +140,9 @@ const ApMaterialHostPanel = ({
                 disabled={readOnly}
                 width="100%"
                 theme={theme}
+                required
+                error={Boolean(validationErrors?.apGrade)}
+                helperText={validationErrors?.apGrade ?? null}
                 onChange={setPendingGrade}
               />
             </Box>

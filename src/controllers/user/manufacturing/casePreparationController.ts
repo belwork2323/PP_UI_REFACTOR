@@ -2,13 +2,14 @@ import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import {
   CasePreparationDetailsModel,
   CasePreparationSubmitResponseModel,
-  type CasePreparationFormBody,
 } from "../../../data/models/user/CasePreparationFormModel";
 import {
   createCasePreparationFormApi,
   fetchCasePreparationFormDetailsApi,
+  fetchCasePrepLinerIngredientsApi,
   updateCasePreparationFormApi,
 } from "../../../data/api/users/manufacturing/casePreparationFormApi";
+import type { CasePrepLinerIngredientsApiResponse } from "../../../data/models/user/casePrepLinerRecipes";
 
 export type CasePreparationCreatePayload = {
   batchId: string;
@@ -16,8 +17,6 @@ export type CasePreparationCreatePayload = {
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
   casePreparationDetails: any;
-  // generalActivities: Record<string, { m1: string; m2: string }>;
-  // linearCoatingOperation: Record<string, { m1: string; m2: string }>;
 };
 
 export type CasePreparationUpdatePayload = {
@@ -67,6 +66,19 @@ export const casePreparationController = {
       );
     } catch (error) {
       console.error("Failed to update case preparation form:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  fetchLinerIngredients: async (linerType: string) => {
+    try {
+      const response = await fetchCasePrepLinerIngredientsApi({ linerType });
+      return new ApiResponseModel<CasePrepLinerIngredientsApiResponse>(response, (res) => {
+        const data = (res as { data?: CasePrepLinerIngredientsApiResponse })?.data ?? res;
+        return data as CasePrepLinerIngredientsApiResponse;
+      });
+    } catch (error) {
+      console.error("Failed to fetch case preparation liner ingredients:", error);
       return new ApiResponseModel(error);
     }
   },

@@ -836,29 +836,6 @@ export default function BatchImplementationForm({
                                 </Typography>
                               </TableCell>
                               <TableCell sx={{ ...cellSx, width: 150 }}>
-                                {/* <AppDropdown
-                                  value={material.lotId ?? ""}
-                                  onChange={(value) => handleLotIdChange(idx, value)}
-                                  disabled={
-                                    fieldDisabled ||
-                                    rowLocked ||
-                                    loadingLots ||
-                                    !material.materialCode
-                                  }
-                                  loading={loadingLots}
-                                  placeholder={lotPlaceholder}
-                                  compact
-                                  options={lotOptionsForRow.map((lot) => ({
-                                    value: lot.lotId,
-                                    label:
-                                      lot.grade?.gradeName || lot.grade?.gradeCode
-                                        ? `${lot.lotId} · ${lot.grade?.gradeName || lot.grade?.gradeCode}`
-                                        : lot.lotId,
-                                  }))}
-                                  MenuProps={t.menuPaper}
-                                  sx={[appDenseControlSx, materialsTable?.lotControl]}
-                                /> */}
-                                {/* {console.log(lotOptionsForRow)} */}
                                 <MultiSelectWithSearch
                                   value={currentMaterialLotIds ?? []}
                                   onChange={(value) => handleLotIdChange(idx, value)}
@@ -875,6 +852,12 @@ export default function BatchImplementationForm({
                                   }))}
                                   MenuProps={t.menuPaper}
                                   sx={[appDenseControlSx, materialsTable?.lotControl]}
+                                  hideSelectWhenDisabled={
+                                    fieldDisabled ||
+                                    rowLocked ||
+                                    loadingLots ||
+                                    !material.materialCode
+                                  }
                                 />
                               </TableCell>
                               <TableCell sx={{ ...cellSx, minWidth: 110 }}>

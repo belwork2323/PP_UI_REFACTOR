@@ -2,6 +2,9 @@ import { createInitialValues, hydrateValuesFromProcess } from "@/data/models/sha
 import {
   RMP_SCHEMA_TYPE,
   RMP_SCHEMA_VERSION,
+  gradeCodeFromApProcessType,
+  type LotDetailDto,
+  type PreparationProcessEntry,
   type SchemaProcessSubmission,
 } from "../../../data/models/user/rmp/rmpProcessTypes";
 import { toSectionSubmissions } from "@/data/models/shared/sectionFormTypes";
@@ -76,6 +79,8 @@ export type QcProcessingMaterialSeed = {
   gradeId: number | null;
   gradeCode: string | null;
   sections: SchemaSectionSubmission[];
+  /** Typed RMP process (processType + nested blocks). Prefer over sections for UI. */
+  process?: PreparationProcessEntry;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -127,6 +132,76 @@ const normalizeCertificateList = (value: unknown): string[] => {
   return single ? [single] : [];
 };
 
+const unwrapLotQuantity = (value: unknown): number | null => {
+  if (value == null || value === "") return null;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (obj.parsedValue !== undefined && obj.parsedValue !== null && obj.parsedValue !== "") {
+      const n = Number(obj.parsedValue);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (obj.source !== undefined && obj.source !== null && obj.source !== "") {
+      const n = Number(obj.source);
+      return Number.isFinite(n) ? n : null;
+    }
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const normalizeLotDetails = (value: unknown): LotDetailDto[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      const lotId = pickString(rec.lotId, rec.lot_id);
+      const quantity = unwrapLotQuantity(rec.quantity);
+      if (!lotId && quantity == null) return null;
+      return { lotId, quantity } as LotDetailDto;
+    })
+    .filter((row): row is LotDetailDto => Boolean(row));
+};
+
+/** Map RMP API solid/liquid process row → typed PreparationProcessEntry. */
+const processEntryFromApiRecord = (
+  rec: Record<string, unknown>,
+  identity: {
+    materialId: number;
+    materialCode: string;
+    materialName: string;
+    gradeId: number | null;
+    gradeCode: string | null;
+  },
+): PreparationProcessEntry => {
+  const processType = pickString(rec.processType, rec.process_type) || undefined;
+  const derivedGrade =
+    identity.gradeCode ||
+    (processType ? gradeCodeFromApProcessType(processType) : "") ||
+    null;
+  const sections = normalizeSections(rec.sections);
+
+  return {
+    materialId: identity.materialId,
+    materialCode: identity.materialCode,
+    materialName: identity.materialName,
+    gradeId: identity.gradeId,
+    gradeCode: derivedGrade,
+    processType,
+    lotDetails: normalizeLotDetails(rec.lotDetails ?? rec.lot_details),
+    drying: (asRecord(rec.drying) as PreparationProcessEntry["drying"]) ?? null,
+    sieving: (asRecord(rec.sieving) as PreparationProcessEntry["sieving"]) ?? null,
+    apCoarse: (asRecord(rec.apCoarse ?? rec.ap_coarse) as PreparationProcessEntry["apCoarse"]) ?? null,
+    apFine: (asRecord(rec.apFine ?? rec.ap_fine) as PreparationProcessEntry["apFine"]) ?? null,
+    apUltraFine:
+      (asRecord(rec.apUltraFine ?? rec.ap_ultra_fine) as PreparationProcessEntry["apUltraFine"]) ??
+      null,
+    aluminum: (asRecord(rec.aluminum) as PreparationProcessEntry["aluminum"]) ?? null,
+    doa: (asRecord(rec.doa) as PreparationProcessEntry["doa"]) ?? null,
+    ...(sections.length ? { sections } : {}),
+  };
+};
+
 const sectionsFromProcessingDetail = (detail: Record<string, unknown>): SchemaSectionSubmission[] => {
   const existing = normalizeSections(detail.sections);
   if (existing.length) return existing;
@@ -173,26 +248,35 @@ const parseProcessMaterials = (
     const rec = asRecord(row);
     if (!rec) return;
 
-    // New API shape: RMP-style process with sections
+    // New API shape: RMP-style typed process (processType + nested blocks / sections)
     // Legacy shape: { srNo, rawMaterial, grade, operation, parameters }
     const rawMaterial = pickString(rec.rawMaterial, rec.raw_material, rec.materialCode, rec.material_code);
     const hasDomainShape = Boolean(rawMaterial) || Array.isArray(rec.parameters);
     const hasSections = normalizeSections(rec.sections).length > 0;
+    const hasTypedProcess = Boolean(pickString(rec.processType, rec.process_type));
     const materialIdEarly = pickNumber(rec.materialId, rec.material_id);
 
-    if (hasDomainShape && !materialIdEarly && !hasSections) {
+    if (hasDomainShape && !materialIdEarly && !hasSections && !hasTypedProcess) {
       const materialCode = rawMaterial || `MATERIAL_${index + 1}`;
+      const materialId = pickNumber(rec.materialId, rec.material_id) ?? index + 1;
+      const materialName = pickString(rec.materialName, rec.material_name) || materialCode;
+      const gradeCode = pickString(rec.grade, rec.gradeCode, rec.grade_code) || null;
+      const sections = sectionsFromProcessingDetail(rec);
+      const identity = {
+        materialId,
+        materialCode,
+        materialName,
+        gradeId: null as number | null,
+        gradeCode,
+      };
       rows.push({
         premixNo,
         premixDate,
         materialType,
         processSlot,
-        materialId: pickNumber(rec.materialId, rec.material_id) ?? index + 1,
-        materialCode,
-        materialName: pickString(rec.materialName, rec.material_name) || materialCode,
-        gradeId: null,
-        gradeCode: pickString(rec.grade, rec.gradeCode, rec.grade_code) || null,
-        sections: sectionsFromProcessingDetail(rec),
+        ...identity,
+        sections,
+        process: processEntryFromApiRecord(rec, identity),
       });
       return;
     }
@@ -207,18 +291,28 @@ const parseProcessMaterials = (
         : Number.isFinite(Number(gradeIdRaw))
           ? Number(gradeIdRaw)
           : null;
-    const gradeCodeRaw = pickString(rec.gradeCode, rec.grade_code, rec.grade);
+    const processType = pickString(rec.processType, rec.process_type);
+    const gradeCodeRaw =
+      pickString(rec.gradeCode, rec.grade_code, rec.grade) ||
+      gradeCodeFromApProcessType(processType) ||
+      null;
+    const materialName = pickString(rec.materialName, rec.material_name) || materialCode;
+    const sections = sectionsFromProcessingDetail(rec);
+    const identity = {
+      materialId,
+      materialCode,
+      materialName,
+      gradeId,
+      gradeCode: gradeCodeRaw,
+    };
     rows.push({
       premixNo,
       premixDate,
       materialType,
       processSlot,
-      materialId,
-      materialCode,
-      materialName: pickString(rec.materialName, rec.material_name) || materialCode,
-      gradeId,
-      gradeCode: gradeCodeRaw || null,
-      sections: sectionsFromProcessingDetail(rec),
+      ...identity,
+      sections,
+      process: processEntryFromApiRecord(rec, identity),
     });
   });
   return rows;
@@ -792,6 +886,7 @@ export const mergeProcessingMaterialSeeds = (
             ...sheetSeed,
             ...detail,
             sections: detail.sections.length ? detail.sections : sheetSeed.sections,
+            process: detail.process ?? sheetSeed.process,
             premixDate: detail.premixDate ?? sheetSeed.premixDate,
             materialType: detail.materialType ?? sheetSeed.materialType,
           }
@@ -987,6 +1082,7 @@ export const buildProcessingMaterialEntry = (
     schemaUnavailable: options?.schemaUnavailable === true,
     // Keep API-flat sections; normalize at hydrate time (same as RMP).
     savedSections: seed.sections,
+    savedProcess: seed.process,
   };
 };
 
@@ -1134,4 +1230,55 @@ export const buildProcessingPremixesPayload = (
         liquidProcess,
       };
     });
+};
+
+/** Build RMP-style weighment selections from QC processing material entries. */
+export const buildWeightmentSelectionsFromProcessingEntries = (
+  entries: QcDivisionEntry[],
+  premixNo?: number | null,
+): Array<{
+  premix: number;
+  materialKey: string;
+  solidMaterialCode?: string;
+  liquidMaterialCode?: string;
+  selectedProcesses: { solid?: boolean; liquid?: boolean };
+}> => {
+  const targetPremix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) || Number(premixNo) <= 0
+      ? null
+      : Number(premixNo);
+
+  return entries
+    .filter((entry) => {
+      if (entry.kind !== "PROCESSING_MATERIAL") return false;
+      if (!entry.schemaUnavailable) return false;
+      const code = String(entry.materialCode ?? "").trim();
+      if (!code) return false;
+      if (targetPremix == null) return true;
+      return Number(entry.premixNo) === targetPremix;
+    })
+    .map((entry) => {
+      const code = String(entry.materialCode ?? "").trim();
+      const premix = Number(entry.premixNo);
+      const isLiquid = entry.processSlot === "liquid";
+      return {
+        premix: Number.isFinite(premix) && premix > 0 ? premix : 0,
+        materialKey: code || entry.entryId,
+        solidMaterialCode: isLiquid ? undefined : code,
+        liquidMaterialCode: isLiquid ? code : undefined,
+        selectedProcesses: { solid: !isLiquid, liquid: isLiquid },
+      };
+    });
+};
+
+/** Resolve identification-sheet materials from batch / autopopulate payloads. */
+export const resolveQcIdentificationMaterials = (payload: unknown): MaterialItem[] => {
+  const root = asRecord(payload);
+  if (!root) return [];
+  const nestedBatch = asRecord(root.batch);
+  const sheetRaw = root.identificationSheet ?? nestedBatch?.identificationSheet ?? null;
+  if (!sheetRaw || typeof sheetRaw !== "object") return [];
+  return normalizeSheetMaterialsForWeightmentCompare(
+    (sheetRaw as { materials?: unknown }).materials,
+  );
 };

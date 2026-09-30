@@ -14,8 +14,8 @@ import { sanitizeMasterDataDecimalInput } from "../../../../../../data/models/ad
 type Props = {
   value: LotDetailFormRow[];
   onChange: (next: LotDetailFormRow[]) => void;
-  lotOptions: string[];
-  quantityPerPremix: number;
+  lotOptions?: string[];
+  quantityPerPremix?: number;
   disabled?: boolean;
   theme: any;
   fieldErrors?: Record<string, string>;
@@ -24,7 +24,7 @@ type Props = {
 const LotDetailsSection = ({
   value,
   onChange,
-  lotOptions,
+  lotOptions = [],
   quantityPerPremix,
   disabled,
   theme,
@@ -35,6 +35,7 @@ const LotDetailsSection = ({
   const limit = Number(quantityPerPremix) || 0;
   const overLimit = limit > 0 && sum > limit + 1e-9;
   const sumError = fieldErrors.sum;
+  const safeLotOptions = Array.isArray(lotOptions) ? lotOptions : [];
 
   const selectedLots = useMemo(
     () => new Set(rows.map((r) => String(r.lotId ?? "").trim()).filter(Boolean)),
@@ -76,7 +77,7 @@ const LotDetailsSection = ({
           size="small"
           startIcon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
           onClick={addRow}
-          disabled={disabled || lotOptions.length === 0}
+          disabled={disabled || safeLotOptions.length === 0}
           sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700 }}
         >
           Add lot
@@ -95,7 +96,7 @@ const LotDetailsSection = ({
         }}
       >
         {rows.map((row, index) => {
-          const options = lotOptions
+          const options = safeLotOptions
             .map((lotId) => String(lotId ?? "").trim())
             .filter(Boolean)
             .filter((lotId) => lotId === row.lotId || !selectedLots.has(lotId))

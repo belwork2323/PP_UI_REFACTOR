@@ -15,3 +15,7 @@ export const fetchCasePreparationFormDetailsApi = async (payload: {
 export const updateCasePreparationFormApi = async (payload: any) => {
   return await put(USER_CASE_PREPARATION_ENDPOINTS.UPDATE_FORM, payload);
 };
+
+export const fetchCasePrepLinerIngredientsApi = async (payload: { linerType: string }) => {
+  return await post(USER_CASE_PREPARATION_ENDPOINTS.LINER_INGREDIENTS, payload);
+};

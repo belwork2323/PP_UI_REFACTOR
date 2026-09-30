@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../../app/store/authStore";
-import { operationsController } from "../../../controllers/user/operationsController";
 import { rawMaterialProcurementController } from "../../../controllers/user/sourcing/rawMaterialProcurementController";
-import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
 import {
   mapLotListApiRow,
   toRawMaterialLotListApiStatus,
@@ -17,8 +15,8 @@ const normalizeLotId = (lot: RawMaterialLotListRow): string => {
 };
 
 /**
- * Loads materials master for Case Prep liner recipes and fetches approved lots
- * by material code on demand (lot-list API).
+ * Fetches approved lots by material code for Case Prep liner MFG Lot dropdowns.
+ * materialId/code come from the liner-ingredients API (not materials-list enrichment).
  */
 export function useCasePrepLinerMaterials() {
   const user = useAuthStore((s) => s.user);
@@ -31,44 +29,23 @@ export function useCasePrepLinerMaterials() {
     );
   }, [user]);
 
-  const [materials, setMaterials] = useState<MaterialsListItem[]>([]);
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
   const lotsCacheRef = useRef<Record<string, RawMaterialLotListRow[]>>({});
   const [lotsVersion, setLotsVersion] = useState(0);
   const [loadingLotsByCode, setLoadingLotsByCode] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    let active = true;
-    setLoadingMaterials(true);
-    void (async () => {
-      try {
-        const response = await operationsController.fetchAllMaterialsList();
-        if (!active) return;
-        if (response?.success && Array.isArray(response.data)) {
-          setMaterials(response.data as MaterialsListItem[]);
-        } else {
-          setMaterials([]);
-        }
-      } catch {
-        if (active) setMaterials([]);
-      } finally {
-        if (active) setLoadingMaterials(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const fetchLotsForMaterialCode = useCallback(
     async (materialCode: string): Promise<RawMaterialLotListRow[]> => {
       const code = String(materialCode ?? "").trim();
       if (!code) return [];
       const cacheKey = code.toUpperCase();
-      if (lotsCacheRef.current[cacheKey]) {
-        return lotsCacheRef.current[cacheKey];
+      if (Object.prototype.hasOwnProperty.call(lotsCacheRef.current, cacheKey)) {
+        return lotsCacheRef.current[cacheKey] ?? [];
       }
-      if (!subDepartmentId) return [];
+      if (!subDepartmentId) {
+        lotsCacheRef.current[cacheKey] = [];
+        setLotsVersion((v) => v + 1);
+        return [];
+      }
 
       setLoadingLotsByCode((prev) => ({ ...prev, [cacheKey]: true }));
       try {
@@ -95,6 +72,25 @@ export function useCasePrepLinerMaterials() {
     [subDepartmentId],
   );
 
+  const hasFetchedLots = useCallback(
+    (materialCode: string) => {
+      const key = String(materialCode ?? "").trim().toUpperCase();
+      return Boolean(key && Object.prototype.hasOwnProperty.call(lotsCacheRef.current, key));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lotsVersion],
+  );
+
+  const getApiLotCount = useCallback(
+    (materialCode: string) => {
+      const key = String(materialCode ?? "").trim().toUpperCase();
+      if (!key || !Object.prototype.hasOwnProperty.call(lotsCacheRef.current, key)) return 0;
+      return (lotsCacheRef.current[key] ?? []).filter((lot) => Boolean(normalizeLotId(lot))).length;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lotsVersion],
+  );
+
   const getCachedLotOptions = useCallback(
     (materialCode: string, currentLot?: string): Array<{ value: string; label: string }> => {
       const code = String(materialCode ?? "").trim().toUpperCase();
@@ -112,7 +108,6 @@ export function useCasePrepLinerMaterials() {
       }
       return options;
     },
-    // lotsVersion invalidates when cache fills
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lotsVersion],
   );
@@ -126,10 +121,10 @@ export function useCasePrepLinerMaterials() {
   );
 
   return {
-    materials,
-    loadingMaterials,
     fetchLotsForMaterialCode,
     getCachedLotOptions,
+    getApiLotCount,
+    hasFetchedLots,
     isLoadingLots,
   };
 }

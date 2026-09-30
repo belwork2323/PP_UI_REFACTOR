@@ -1,5 +1,6 @@
 import type { QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import type { PreparationProcessEntry } from "@/data/models/user/rmp/rmpProcessTypes";
 
 export type QcDivisionEntryKind =
   | "SIMPLE"
@@ -52,6 +53,8 @@ export type QcDivisionEntry = {
   schemaUnavailable?: boolean;
   /** Sections from the details API grouped into this entry (used for hydration). */
   savedSections?: SchemaSectionSubmission[];
+  /** Typed RMP process from division-details / form details (preferred over sections). */
+  savedProcess?: PreparationProcessEntry;
 };
 
 export type QcDivisionEntryValues = {

@@ -216,11 +216,79 @@ const isMixingStage = (stage: StageProgressEntry): boolean =>
 
 const isRawMaterialPrepStage = (stage: StageProgressEntry): boolean => {
   const sub = normalizeNameKey(stage.subDepartmentName);
-  return sub === "rawmaterialpreparation" || sub === "rawmaterialprep" || sub.includes("rawmaterialprep");
+  return (
+    sub === "rawmaterialpreparation" ||
+    sub === "rawmaterialprep" ||
+    sub.includes("rawmaterialprep")
+  );
 };
 
 const isNdtStage = (stage: StageProgressEntry): boolean =>
   normalizeNameKey(stage.subDepartmentName) === "ndt";
+
+const isCasePrepStage = (stage: StageProgressEntry): boolean => {
+  const sub = normalizeNameKey(stage.subDepartmentName);
+  return sub === "casepreparation" || sub.includes("caseprep");
+};
+
+const isCastingCuringStage = (stage: StageProgressEntry): boolean => {
+  const sub = normalizeNameKey(stage.subDepartmentName);
+  return sub === "castingandcuring" || (sub.includes("casting") && sub.includes("curing"));
+};
+
+const isPostCureStage = (stage: StageProgressEntry): boolean => {
+  const sub = normalizeNameKey(stage.subDepartmentName);
+  return sub === "postcureoperations" || sub === "postcure" || sub.includes("postcure");
+};
+
+const isTrimmingStage = (stage: StageProgressEntry): boolean =>
+  normalizeNameKey(stage.subDepartmentName) === "trimming";
+
+const isStageCompletelyApproved = (stage: StageProgressEntry | null): boolean => {
+  if (!stage) return false;
+  const upper = String(stage.status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return upper === "COMPLETELY_APPROVED" || upper === "APPROVED";
+};
+
+/** Manufacturing predecessor stage matcher + label for a QC division key. */
+const manufacturingPredecessorForQcDivision = (
+  currentKey: string,
+): {
+  match: (stage: StageProgressEntry) => boolean;
+  label: string;
+  kind: PartialFlowUnitKind;
+} | null => {
+  if (currentKey === "RAW_MATERIAL_PROCESSING") {
+    return { match: isRawMaterialPrepStage, label: "Raw Material Preparation", kind: "premix" };
+  }
+  if (currentKey === "MIXING") {
+    return { match: isMixingStage, label: "Mixing", kind: "premix" };
+  }
+  if (currentKey === "HARDWARE") {
+    return { match: isCasePrepStage, label: "Case Preparation", kind: "motor" };
+  }
+  if (
+    currentKey === "CASTING" ||
+    currentKey === "CURING" ||
+    currentKey === "DE_CORING"
+  ) {
+    return { match: isCastingCuringStage, label: "Casting and Curing", kind: "motor" };
+  }
+  if (currentKey === "POST_CURE") {
+    return { match: isPostCureStage, label: "Post Cure Operations", kind: "motor" };
+  }
+  if (currentKey === "TRIMMING") {
+    return { match: isTrimmingStage, label: "Trimming", kind: "motor" };
+  }
+  // NDT, QC, WEIGHTMENT — manufacturing NDT motors unlock these QC divisions.
+  if (currentKey === "NDT" || currentKey === "QC" || currentKey === "WEIGHTMENT") {
+    return { match: isNdtStage, label: "NDT", kind: "motor" };
+  }
+  return null;
+};
 
 const untaggedPremixRows = (
   stage: StageProgressEntry,
@@ -296,6 +364,29 @@ const collectApprovedMotorIds = (stage: StageProgressEntry | null): Set<string> 
   return ids;
 };
 
+const collectAllPremixNos = (
+  stage: StageProgressEntry | null,
+  finalMix: boolean,
+): Set<number> => {
+  const ids = new Set<number>();
+  if (!stage) return ids;
+  untaggedPremixRows(stage, { finalMix }).forEach((rec) => {
+    const premixNo = premixNoFromRow(rec);
+    if (premixNo != null) ids.add(premixNo);
+  });
+  return ids;
+};
+
+const collectAllMotorIds = (stage: StageProgressEntry | null): Set<string> => {
+  const ids = new Set<string>();
+  if (!stage) return ids;
+  untaggedMotorRows(stage).forEach((rec) => {
+    const motorId = motorIdFromRow(rec);
+    if (motorId) ids.add(motorId);
+  });
+  return ids;
+};
+
 const priorStages = (stages: StageProgressEntry[]): StageProgressEntry[] =>
   stages.filter((stage) => !isQcQualityControlStage(stage));
 
@@ -322,64 +413,83 @@ const gateFromPredecessor = (
   approvedFinalMixNos: extras.approvedFinalMixNos,
 });
 
-/** Premix QC for Mixing: previous subdepartment is Mixing manufacturing. */
-const resolvePreviousSubDepartmentPremixGate = (params: {
+/**
+ * Build manufacturing unlock gate for a QC division from stageProgress.
+ * COMPLETELY_APPROVED / stage APPROVED unlocks all units present on that stage
+ * (plus any candidate ids passed in).
+ */
+export const resolveManufacturingGateForQcDivision = (params: {
+  currentDivisionKey: string;
   stageProgress?: unknown;
   currentStage?: unknown;
-}): PreviousStageApprovedUnits => {
-  const stages = mergeStageProgress(params.stageProgress, params.currentStage);
-  const mixing = findRequiredStage(stages, isMixingStage);
-  return gateFromPredecessor(
-    "premix",
-    mixing,
-    {
-      approvedPremixNos: collectApprovedPremixNos(mixing, false),
-      approvedMotorIds: new Set(),
-      approvedFinalMixNos: collectApprovedPremixNos(mixing, true),
-    },
-    "Mixing",
-  );
-};
+  candidatePremixNos?: Array<number | string>;
+  candidateMotorIds?: string[];
+}): PreviousStageApprovedUnits | null => {
+  const currentKey = normalizeQcDivisionKey(params.currentDivisionKey);
+  if (!currentKey || currentKey === "RAW_MATERIAL_REVALIDATION") {
+    return emptyGate(null, true);
+  }
 
-/** Raw Material Processing QC: previous subdepartment is Raw Material Preparation. */
-const resolvePreviousSubDepartmentRmpProcessingGate = (params: {
-  stageProgress?: unknown;
-  currentStage?: unknown;
-}): PreviousStageApprovedUnits => {
-  const stages = mergeStageProgress(params.stageProgress, params.currentStage);
-  const rmp = findRequiredStage(stages, isRawMaterialPrepStage);
-  return gateFromPredecessor(
-    "premix",
-    rmp,
-    {
-      approvedPremixNos: collectApprovedPremixNos(rmp, false),
-      approvedMotorIds: new Set(),
-    },
-    "Raw Material Preparation",
-  );
-};
+  const predecessor = manufacturingPredecessorForQcDivision(currentKey);
+  if (!predecessor) return null;
 
-/** Motors: previous subdepartment is NDT only (Case Preparation is the starter). */
-const resolvePreviousSubDepartmentMotorGate = (params: {
-  stageProgress?: unknown;
-  currentStage?: unknown;
-}): PreviousStageApprovedUnits => {
   const stages = mergeStageProgress(params.stageProgress, params.currentStage);
-  const ndt = findRequiredStage(stages, isNdtStage);
+  const stage = findRequiredStage(stages, predecessor.match);
+  if (!stage) return null;
+
+  const stageDone = isStageCompletelyApproved(stage);
+  const candidatePremixNos = new Set<number>();
+  (params.candidatePremixNos ?? []).forEach((value) => {
+    const n = Number(value);
+    if (Number.isFinite(n) && n > 0) candidatePremixNos.add(n);
+  });
+  const candidateMotorIds = new Set(
+    (params.candidateMotorIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean),
+  );
+
+  if (predecessor.kind === "premix") {
+    const approvedPremixNos = collectApprovedPremixNos(stage, false);
+    const approvedFinalMixNos =
+      currentKey === "MIXING" ? collectApprovedPremixNos(stage, true) : undefined;
+    if (stageDone) {
+      collectAllPremixNos(stage, false).forEach((n) => approvedPremixNos.add(n));
+      candidatePremixNos.forEach((n) => approvedPremixNos.add(n));
+      if (approvedFinalMixNos) {
+        collectAllPremixNos(stage, true).forEach((n) => approvedFinalMixNos.add(n));
+        candidatePremixNos.forEach((n) => approvedFinalMixNos.add(n));
+      }
+    }
+    return gateFromPredecessor(
+      "premix",
+      stage,
+      {
+        approvedPremixNos,
+        approvedMotorIds: new Set(),
+        approvedFinalMixNos,
+      },
+      predecessor.label,
+    );
+  }
+
+  const approvedMotorIds = collectApprovedMotorIds(stage);
+  if (stageDone) {
+    collectAllMotorIds(stage).forEach((id) => approvedMotorIds.add(id));
+    candidateMotorIds.forEach((id) => approvedMotorIds.add(id));
+  }
   return gateFromPredecessor(
     "motor",
-    ndt,
+    stage,
     {
       approvedPremixNos: new Set(),
-      approvedMotorIds: collectApprovedMotorIds(ndt),
+      approvedMotorIds,
     },
-    "NDT",
+    predecessor.label,
   );
 };
 
 /**
- * QC unit tabs: prefer locks from QC stageProgress.divisionStatuses unit lists.
- * Fallback: legacy manufacturing previous-stage gate for older batches without unit rows.
+ * QC unit tabs: prefer manufacturing stageProgress APPROVED / COMPLETELY_APPROVED.
+ * Fall back to QC divisionStatuses only when the manufacturing stage row is missing.
  */
 export const resolveQcPreviousDivisionApprovedUnits = (params: {
   currentDivisionKey: string;
@@ -404,24 +514,75 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
     return emptyGate(null, true);
   }
 
+  const fromManufacturing = resolveManufacturingGateForQcDivision({
+    currentDivisionKey: currentKey,
+    stageProgress: params.stageProgress,
+    currentStage: params.currentStage,
+    candidatePremixNos: params.candidatePremixNos,
+    candidateMotorIds: params.candidateMotorIds,
+  });
+  if (fromManufacturing) {
+    return fromManufacturing;
+  }
+
   const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
   if (fromDivisionStatuses) {
     return fromDivisionStatuses;
   }
 
-  if (currentKey === "RAW_MATERIAL_PROCESSING") {
-    return resolvePreviousSubDepartmentRmpProcessingGate(params);
+  // Manufacturing stage missing and no QC divisionStatuses — keep locked (not enableAll).
+  const predecessor = manufacturingPredecessorForQcDivision(currentKey);
+  if (predecessor) {
+    return emptyGate(predecessor.kind, false, predecessor.label);
   }
 
-  if (currentKey === "MIXING") {
-    return resolvePreviousSubDepartmentPremixGate(params);
+  return emptyGate(null, false);
+};
+
+/** Division tab: enabled when manufacturing gate has any approved unit or enableAll. */
+export const isQcDivisionEnabledByManufacturing = (params: {
+  divisionKey: string;
+  stageProgress?: unknown;
+  currentStage?: unknown;
+  batchType?: string | null;
+  subBatchType?: string | null;
+}): { enabled: boolean; reason?: string } => {
+  const key = normalizeQcDivisionKey(params.divisionKey);
+  if (!key || key === "RAW_MATERIAL_REVALIDATION" || key === "RAW_MATERIAL") {
+    return { enabled: true };
   }
 
-  if (MOTOR_QC_DIVISIONS.has(currentKey)) {
-    return resolvePreviousSubDepartmentMotorGate(params);
+  if (
+    shouldSkipQcManufacturingUnitPrerequisiteGate(params.batchType, params.subBatchType)
+  ) {
+    return { enabled: true };
   }
 
-  return emptyGate(null, true);
+  const gate = resolveQcPreviousDivisionApprovedUnits({
+    currentDivisionKey: key,
+    stageProgress: params.stageProgress,
+    currentStage: params.currentStage,
+    batchType: params.batchType,
+    subBatchType: params.subBatchType,
+  });
+
+  if (gate.enableAll) return { enabled: true };
+
+  const hasApproved =
+    gate.approvedPremixNos.size > 0 ||
+    (gate.approvedFinalMixNos?.size ?? 0) > 0 ||
+    gate.approvedMotorIds.size > 0;
+
+  if (hasApproved) return { enabled: true };
+
+  const previousLabel = formatQcDivisionGateLabel(
+    gate.previousSubDepartmentName ?? manufacturingPredecessorForQcDivision(key)?.label,
+  );
+  const currentLabel = formatQcDivisionGateLabel(key);
+  return {
+    enabled: false,
+    reason: `Approve at least one unit in ${previousLabel} to enable ${currentLabel}.`,
+  };
 };
 
 const findQcStageEntry = (
@@ -490,7 +651,7 @@ const resolveGateFromQcDivisionStatuses = (
     .toUpperCase()
     .replace(/\s+/g, "_");
   if (divisionStatus === "YET_TO_START") {
-    return emptyGate("QC divisionStatuses", false);
+    return emptyGate(null, false, "QC divisionStatuses");
   }
 
   if (currentKey === "RAW_MATERIAL_PROCESSING" || currentKey === "MIXING") {
@@ -527,7 +688,7 @@ const resolveGateFromQcDivisionStatuses = (
       asArray(divisionRow.premixStatuses).length > 0 ||
       asArray(divisionRow.finalMixStatuses).length > 0;
     if (!hasUnitRows) {
-      return emptyGate("QC divisionStatuses", true);
+      return emptyGate("premix", false, "QC divisionStatuses");
     }
 
     return {
@@ -551,7 +712,7 @@ const resolveGateFromQcDivisionStatuses = (
       if (isUnitUnlockedStatus(motorStatusFromRow(rec))) approvedMotorIds.add(motorId);
     });
     if (asArray(divisionRow.motorStatuses).length === 0) {
-      return emptyGate("QC divisionStatuses", true);
+      return emptyGate("motor", false, "QC divisionStatuses");
     }
     return {
       enableAll: false,
@@ -563,7 +724,7 @@ const resolveGateFromQcDivisionStatuses = (
     };
   }
 
-  return emptyGate("QC divisionStatuses", true);
+  return emptyGate(null, false, "QC divisionStatuses");
 };
 
 export const isQcPartialItemEnabledByPreviousDivision = (

@@ -25,8 +25,8 @@ type Props = {
   materialCode?: string;
   /** From material master; preferred over material-code heuristics. */
   rmpFormTemplate?: string | null;
-  lotOptions: string[];
-  quantityPerPremix: number;
+  lotOptions?: string[];
+  quantityPerPremix?: number;
   readOnly?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
@@ -39,8 +39,8 @@ const RawMaterialMaterialProcessPanel = ({
   onApGradeSlotsChange,
   materialCode = "",
   rmpFormTemplate,
-  lotOptions,
-  quantityPerPremix,
+  lotOptions = [],
+  quantityPerPremix = 0,
   readOnly = false,
   theme,
   validationErrors,

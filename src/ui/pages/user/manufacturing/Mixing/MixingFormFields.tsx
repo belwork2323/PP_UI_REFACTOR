@@ -92,6 +92,8 @@ export interface MixingSelectFieldProps {
   error?: boolean;
   helperText?: string;
   required?: boolean;
+  /** Validation focus path — sets `data-mix-field` on the control wrapper. */
+  fieldPath?: string;
 }
 
 export const MixingSelectField = ({
@@ -104,13 +106,14 @@ export const MixingSelectField = ({
   error = false,
   helperText,
   required = false,
+  fieldPath,
 }: MixingSelectFieldProps) => {
   const normalized = options.map((option) =>
     typeof option === "string" ? { value: option, label: option } : option,
   );
 
   return (
-    <Box>
+    <Box data-mix-field={fieldPath || undefined}>
       {label ? <MixingFieldLabel required={required}>{label}</MixingFieldLabel> : null}
       <AppDropdown
         value={value}
@@ -161,6 +164,8 @@ export type MixingTextFieldProps = {
   error?: boolean;
   helperText?: string;
   required?: boolean;
+  /** Validation focus path — sets `data-mix-field` on the control. */
+  fieldPath?: string;
 };
 
 export const MixingTextField = ({
@@ -175,8 +180,9 @@ export const MixingTextField = ({
   error = false,
   helperText,
   required = false,
+  fieldPath,
 }: MixingTextFieldProps) => (
-  <Box>
+  <Box data-mix-field={fieldPath || undefined}>
     {label ? <MixingFieldLabel required={required}>{label}</MixingFieldLabel> : null}
     <TextField
       size="small"
@@ -204,6 +210,7 @@ export const MixingTableInput = ({
   error = false,
   helperText,
   required = false,
+  fieldPath,
 }: {
   inputRef?: React.Ref<HTMLInputElement>;
   value: string | number;
@@ -213,6 +220,7 @@ export const MixingTableInput = ({
   error?: boolean;
   helperText?: string;
   required?: boolean;
+  fieldPath?: string;
 }) => (
   <TextField
     size="small"
@@ -226,5 +234,6 @@ export const MixingTableInput = ({
     sx={mixingTableInputSx}
     required={required}
     inputRef={inputRef}
+    inputProps={fieldPath ? { "data-mix-field": fieldPath } : undefined}
   />
 );

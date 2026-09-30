@@ -33,6 +33,7 @@ import {
   validateDispatchMotorSession,
   type ValidationErrors as DispatchValidationErrors,
 } from "../../../data/validation/adapters/dispatch.validation";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
 import {
   type DispatchAddedMotor,
@@ -302,15 +303,17 @@ export const useDispatchHook = () => {
       );
       const motor = nextMotors.find((m) => m.motorId === motorId);
       if (motor) {
-        const live = validateDispatchMotorSession(motor, "FORMAT");
+        const liveFormat = validateDispatchMotorSession(motor, "FORMAT");
+        const liveFull = validateDispatchMotorSession(motor, "SUBMIT");
         setMotorValidationErrors((errs) => {
-          if (Object.keys(live).length === 0) {
+          const merged = reconcileLiveValidationErrors(errs[motorId], liveFormat, liveFull);
+          if (Object.keys(merged).length === 0) {
             if (!errs[motorId]) return errs;
             const next = { ...errs };
             delete next[motorId];
             return next;
           }
-          return { ...errs, [motorId]: live };
+          return { ...errs, [motorId]: merged };
         });
       }
       return { ...prev, motors: nextMotors };

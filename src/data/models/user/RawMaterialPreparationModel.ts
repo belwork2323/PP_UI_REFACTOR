@@ -2,6 +2,7 @@ import { materialSelectionKey, materialUsesApForm, type MaterialsListItem } from
 import {
   findGradeInMaterial,
   findMaterialInList,
+  gradeCodeFromApProcessType,
   processTypeToUiKey,
   uiKeyToProcessType,
   type PreparationPremixEntry,
@@ -19,6 +20,7 @@ import {
 } from "./rmp/processFormMapper";
 import {
   resolveMaterialUiKey,
+  normalizeApGradeCode,
   type RmpMaterialUiKey,
   type RmpProcessSlot,
 } from "./rmp/rmpMaterialUiRegistry";
@@ -775,18 +777,39 @@ export const mapPreparationDetailsPayload = (params: {
           gradeCode: entry.solidGradeCode,
         };
 
-        const apSlots = session.apGradeSlots;
+        // Prefer session template — selection may omit solidRmpFormTemplate.
         const isAp =
           materialUsesApForm(solidMaterial) ||
-          String(entry.solidRmpFormTemplate ?? "").toUpperCase() === "AP";
+          String(
+            session.solidRmpFormTemplate ?? entry.solidRmpFormTemplate ?? "",
+          ).toUpperCase() === "AP";
+        // Treat missing apGradeSlots as [] so AP never falls through to DEFAULT_SOLID.
+        const apSlots = Array.isArray(session.apGradeSlots) ? session.apGradeSlots : [];
 
-        if (isAp && Array.isArray(apSlots)) {
+        if (isAp) {
           // Host-managed AP grades (may be empty after user deleted all).
+          // Backend only allows AP_COARSE | AP_FINE | AP_ULTRA_FINE — never DEFAULT_SOLID.
           apSlots.forEach((gradeSlot) => {
             const gradeCode = String(gradeSlot.gradeCode ?? "").trim();
+            if (!gradeCode) return;
+            const apUiKey = resolveMaterialUiKey({
+              materialCode: entry.solidMaterialCode,
+              slot: "solid",
+              gradeCode,
+              rmpFormTemplate: "AP",
+            });
+            // Guard: AP without a recognized grade must not emit DEFAULT_SOLID.
+            const processType = uiKeyToProcessType(apUiKey);
+            if (
+              processType !== "AP_COARSE" &&
+              processType !== "AP_FINE" &&
+              processType !== "AP_ULTRA_FINE"
+            ) {
+              return;
+            }
             const process =
               buildProcessFromTypedForm({
-                uiKey: gradeSlot.slot.uiKey,
+                uiKey: apUiKey,
                 processForm: gradeSlot.slot.processForm,
                 material: solidMaterial,
                 gradeCode,
@@ -797,29 +820,21 @@ export const mapPreparationDetailsPayload = (params: {
                   gradeId: entry.solidGradeId,
                 },
               }) ??
-              (!isSubmit && weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
+              (!isSubmit &&
+              weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
                 ? buildWeightmentOnlyProcessEntry(
                     { ...solidFallback, gradeCode },
-                    uiKeyToProcessType(gradeSlot.slot.uiKey),
+                    processType,
                   )
                 : null);
             if (process) {
+              // Force allowed AP processType even if typed form carried a stale DEFAULT_SOLID.
+              process.processType = processType;
               solidProcess.push(process);
               solidAdded += 1;
             }
           });
-          // If all grades deleted but weightment exists, keep a weightment-only identity row (draft only).
-          if (
-            !isSubmit &&
-            apSlots.length === 0 &&
-            weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
-          ) {
-            const process = buildWeightmentOnlyProcessEntry(solidFallback, "DEFAULT_SOLID");
-            if (process) {
-              solidProcess.push(process);
-              solidAdded += 1;
-            }
-          }
+          // Empty AP grades: omit solidProcess row (weightment sheet still keeps AP identity).
         } else {
           const process =
             buildProcessFromTypedForm({
@@ -1146,21 +1161,30 @@ export const mapPreparationDetailsFromApi = (
 
       let apGradeSlots:
         Array<{ gradeCode: string; slot: RawMaterialPrepMaterialProcessSlot }> | undefined;
-      if (materialUsesApForm(solidMaterial)) {
-        const apCode = String(selection.solidMaterialCode ?? "")
-          .trim()
-          .toUpperCase();
-        const apProcesses = (apiPremix?.solidProcess ?? []).filter(
-          (process) =>
-            String(process.materialCode ?? "")
-              .trim()
-              .toUpperCase() === apCode,
-        );
+      const apCode = String(selection.solidMaterialCode ?? "")
+        .trim()
+        .toUpperCase();
+      const apProcesses = (apiPremix?.solidProcess ?? []).filter(
+        (process) =>
+          String(process.materialCode ?? "")
+            .trim()
+            .toUpperCase() === apCode,
+      );
+      const isApMaterial =
+        materialUsesApForm(solidMaterial) ||
+        String(selection.solidRmpFormTemplate ?? "").toUpperCase() === "AP" ||
+        apProcesses.some((process) => Boolean(gradeCodeFromApProcessType(process.processType)));
+
+      if (isApMaterial) {
         if (apProcesses.length > 0) {
           apGradeSlots = apProcesses.map((process) => {
-            const gradeCode = String(
-              process.gradeCode ?? selection.solidGradeCode ?? "COARSE",
-            ).trim();
+            const gradeCode =
+              normalizeApGradeCode(
+                process.gradeCode ||
+                  gradeCodeFromApProcessType(process.processType) ||
+                  selection.solidGradeCode ||
+                  "",
+              ) || "COARSE";
             return {
               gradeCode,
               slot: hydratePremixProcessSlot(
@@ -1168,7 +1192,7 @@ export const mapPreparationDetailsFromApi = (
                 selection.solidMaterialCode,
                 process,
                 gradeCode,
-                solidMaterial?.rmpFormTemplate ?? "AP",
+                solidMaterial?.rmpFormTemplate ?? selection.solidRmpFormTemplate ?? "AP",
               ),
             };
           });
@@ -1179,6 +1203,8 @@ export const mapPreparationDetailsFromApi = (
               slot: solidSlot,
             },
           ];
+        } else {
+          apGradeSlots = [];
         }
       }
 
@@ -1188,7 +1214,8 @@ export const mapPreparationDetailsFromApi = (
         solidMaterialCode: selection.solidMaterialCode,
         solidGradeCode: apGradeSlots?.[0]?.gradeCode ?? selection.solidGradeCode,
         liquidMaterialCode: selection.liquidMaterialCode,
-        solidRmpFormTemplate: solidMaterial?.rmpFormTemplate ?? null,
+        solidRmpFormTemplate:
+          solidMaterial?.rmpFormTemplate ?? selection.solidRmpFormTemplate ?? (isApMaterial ? "AP" : null),
         liquidRmpFormTemplate: liquidMaterial?.rmpFormTemplate ?? null,
         solid: apGradeSlots?.[0]?.slot ?? solidSlot,
         liquid: hydratePremixProcessSlot(

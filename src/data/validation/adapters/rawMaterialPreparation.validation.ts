@@ -179,16 +179,20 @@ const validateSolidProcessErrors = (
   session: RawMaterialPrepPremixSession,
   intent: MaterialProcessValidationIntent,
 ): Record<string, string> => {
-  const apSlots = session.apGradeSlots;
-  if (
-    isApRmpFormTemplate(entry.solidRmpFormTemplate) &&
-    Array.isArray(apSlots) &&
-    apSlots.length > 0
-  ) {
+  const isAp = isApRmpFormTemplate(
+    session.solidRmpFormTemplate ?? entry.solidRmpFormTemplate,
+  );
+  const apSlots = Array.isArray(session.apGradeSlots) ? session.apGradeSlots : [];
+
+  if (isAp) {
+    if (apSlots.length === 0) {
+      return { apGrade: "This Field is required" };
+    }
     const merged: Record<string, string> = {};
     const multiGrade = apSlots.length > 1;
     for (const card of apSlots) {
       const grade = normalizeApGradeCode(card.gradeCode);
+      if (!grade) continue;
       const uiKey = resolveMaterialUiKey({
         materialCode: entry.solidMaterialCode ?? "",
         slot: "solid",

@@ -86,6 +86,8 @@ export type QCDivisionFormBodyProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  weightmentErrors?: Record<string, string>;
+  weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
   onRemoveDivisionEntry: (entryId: string) => void;
   /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
   hideEntryGroupNav?: boolean;
@@ -118,6 +120,8 @@ const QCDivisionFormBody = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onProcessingWeightmentSheetChange,
+  weightmentErrors = {},
+  weightmentValidationAttempt = { format: false, unit: false, submit: false },
   onRemoveDivisionEntry,
   unitActions = null,
   canResetPostCureSetup = false,
@@ -458,6 +462,8 @@ const QCDivisionFormBody = ({
               schemaError={schemaError}
               onEntryValuesChange={onDivisionEntryValuesChange}
               onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
+              weightmentErrors={weightmentErrors}
+              validationAttempt={weightmentValidationAttempt}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
             />
         ) : (

@@ -4,8 +4,7 @@
  * Case Prep (`data-cp-field`).
  */
 
-const escapeAttrValue = (value: string) =>
-  value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+const escapeAttrValue = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 /**
  * Scroll to and focus the control tagged with `data-{attrName}="{fieldPath}"`.
@@ -21,9 +20,13 @@ export function focusFieldByDataAttr(
   const el = root.querySelector<HTMLElement>(selector);
   if (!el) return false;
   el.scrollIntoView({ behavior: "smooth", block: "center" });
-  const focusable = el.matches("input, select, textarea, button, [tabindex]")
+  const focusable = el.matches(
+    "input, select, textarea, button, [tabindex], [role='combobox'], [role='button']",
+  )
     ? el
-    : el.querySelector<HTMLElement>("input, select, textarea, button, [tabindex]");
+    : el.querySelector<HTMLElement>(
+        "input, select, textarea, button, [tabindex], [role='combobox'], [role='button']",
+      );
   if (focusable) {
     try {
       focusable.focus({ preventScroll: true });

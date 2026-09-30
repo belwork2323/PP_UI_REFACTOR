@@ -35,6 +35,7 @@ import {
   type CasePrepValidationErrors,
 } from "../../../data/models/user/casePrepValidation";
 import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import {
   isMainMotorBatch,
   isSubscaleBatch,
@@ -523,31 +524,35 @@ export const useCasePreparationHook = () => {
       });
       return changed ? next : prev;
     });
-    // Live type/format validation only (no required) — red messages under fields, no popup
-    const liveErrors = validateCasePrepMotorSession(nextMotor, "DRAFT");
+    // Live format errors always; keep prior submit highlights until each path is fixed.
+    const liveFormat = validateCasePrepMotorSession(nextMotor, "DRAFT");
+    const liveFull = validateCasePrepMotorSession(nextMotor, "SUBMIT");
     setMotorValidationErrors((prev) => {
-      if (Object.keys(liveErrors).length === 0) {
+      const merged = reconcileLiveValidationErrors(prev[motorId], liveFormat, liveFull);
+      if (Object.keys(merged).length === 0) {
         if (!prev[motorId]) return prev;
         const next = { ...prev };
         delete next[motorId];
         return next;
       }
-      return { ...prev, [motorId]: liveErrors };
+      return { ...prev, [motorId]: merged };
     });
     setIsFormDirty(true);
   }, []);
 
   const handleSubscaleValuesChange = useCallback((data: CasePrepMotorData) => {
     setFormData((prev) => ({ ...prev, subscaleData: data }));
-    const liveErrors = validateCasePrepMotorData(data, "DRAFT");
+    const liveFormat = validateCasePrepMotorData(data, "DRAFT");
+    const liveFull = validateCasePrepMotorData(data, "SUBMIT");
     setMotorValidationErrors((prev) => {
-      if (Object.keys(liveErrors).length === 0) {
+      const merged = reconcileLiveValidationErrors(prev.SUBSCALE, liveFormat, liveFull);
+      if (Object.keys(merged).length === 0) {
         if (!prev.SUBSCALE) return prev;
         const next = { ...prev };
         delete next.SUBSCALE;
         return next;
       }
-      return { ...prev, SUBSCALE: liveErrors };
+      return { ...prev, SUBSCALE: merged };
     });
     setIsFormDirty(true);
   }, []);

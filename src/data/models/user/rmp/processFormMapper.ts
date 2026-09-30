@@ -93,11 +93,27 @@ const sectionRows = (
 };
 
 const toLotFormRows = (lots: LotDetailDto[] | undefined): LotDetailFormRow[] => {
+  const unwrapQuantity = (value: unknown): string => {
+    if (value == null) return "";
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      if (obj.parsedValue !== undefined && obj.parsedValue !== null && obj.parsedValue !== "") {
+        const n = Number(obj.parsedValue);
+        return Number.isFinite(n) ? String(n) : String(obj.parsedValue);
+      }
+      if (obj.source !== undefined && obj.source !== null && obj.source !== "") {
+        const n = Number(obj.source);
+        return Number.isFinite(n) ? String(n) : String(obj.source);
+      }
+    }
+    const n = Number(value);
+    return Number.isFinite(n) && !Number.isNaN(n) ? String(n) : "";
+  };
+
   const rows = (lots ?? [])
     .map((lot) => ({
       lotId: str(lot?.lotId),
-      quantity:
-        lot?.quantity == null || Number.isNaN(Number(lot.quantity)) ? "" : String(lot.quantity),
+      quantity: unwrapQuantity(lot?.quantity as unknown),
     }))
     .filter((row) => row.lotId || row.quantity);
   return rows.length > 0 ? rows : [createEmptyLotDetailRow()];

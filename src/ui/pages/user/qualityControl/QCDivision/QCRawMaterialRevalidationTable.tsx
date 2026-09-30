@@ -182,15 +182,19 @@ const QCRawMaterialRevalidationTable = ({
     value: string,
     onValueChange: (next: string) => void,
     placeholder: string,
-    disabled?: boolean,
+    options?: { fieldPath?: string; errorMessage?: string; disabled?: boolean },
   ) => (
     <TextField
       size="small"
       fullWidth
       value={value}
-      disabled={disabled || readOnly}
+      disabled={options?.disabled || readOnly}
       placeholder={placeholder}
       onChange={(event) => onValueChange(event.target.value)}
+      error={Boolean(options?.errorMessage)}
+      inputProps={
+        options?.fieldPath ? { "data-qc-field": options.fieldPath } : undefined
+      }
       sx={{ ...uniformInputSx, minWidth: 90 }}
     />
   );
@@ -309,8 +313,10 @@ const QCRawMaterialRevalidationTable = ({
                 <ReadOnlyValue value={group.ingredient} />
               </MetaField>
               <MetaField label="Lot Number" minWidth={{ xs: "100%", sm: 220 }} required>
-                <ReadOnlyValue value={group.lotBatchNumber} />
-                <FieldErrorText message={lotError} />
+                <Box data-qc-field={`rows.${firstIdx}.LOT_BATCH_NUMBER`}>
+                  <ReadOnlyValue value={group.lotBatchNumber} />
+                  <FieldErrorText message={lotError} />
+                </Box>
               </MetaField>
             </Stack>
 
@@ -386,6 +392,10 @@ const QCRawMaterialRevalidationTable = ({
                                   String(row.RESULT ?? ""),
                                   (next) => updateRow(rowIndex, { RESULT: next }),
                                   "Analysed Result",
+                                  {
+                                    fieldPath: `rows.${rowIndex}.RESULT`,
+                                    errorMessage: err(`rows.${rowIndex}.RESULT`),
+                                  },
                                 )}
                                 <FieldErrorText message={err(`rows.${rowIndex}.RESULT`)} />
                               </Box>
@@ -402,6 +412,10 @@ const QCRawMaterialRevalidationTable = ({
                                   String(row.ACEM_QC_RESULT ?? ""),
                                   (next) => updateRow(rowIndex, { ACEM_QC_RESULT: next }),
                                   "ACEM QC Result",
+                                  {
+                                    fieldPath: `rows.${rowIndex}.ACEM_QC_RESULT`,
+                                    errorMessage: err(`rows.${rowIndex}.ACEM_QC_RESULT`),
+                                  },
                                 )}
                                 <FieldErrorText message={err(`rows.${rowIndex}.ACEM_QC_RESULT`)} />
                               </Box>
@@ -413,7 +427,7 @@ const QCRawMaterialRevalidationTable = ({
                             readOnly ? (
                               <ReadOnlyValue value={row.VALIDITY} />
                             ) : (
-                              <Box>
+                              <Box data-qc-field={`rows.${rowIndex}.VALIDITY`}>
                                 <DateField
                                   value={String(row.VALIDITY ?? "")}
                                   onChange={(next) => updateRow(rowIndex, { VALIDITY: next })}
@@ -437,6 +451,10 @@ const QCRawMaterialRevalidationTable = ({
                                   String(row.REMARKS ?? ""),
                                   (next) => updateRow(rowIndex, { REMARKS: next }),
                                   "Remarks",
+                                  {
+                                    fieldPath: `rows.${rowIndex}.REMARKS`,
+                                    errorMessage: err(`rows.${rowIndex}.REMARKS`),
+                                  },
                                 )}
                                 <FieldErrorText message={err(`rows.${rowIndex}.REMARKS`)} />
                               </Box>
@@ -474,7 +492,10 @@ const QCRawMaterialRevalidationTable = ({
                         >
                           {readOnly ? "QC Certificate" : "Upload QC Certificate"}
                         </Typography>
-                        <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
+                        <Box
+                          data-qc-field={`rows.${firstIdx}.QC_CERTIFICATE`}
+                          sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}
+                        >
                           <QCDivisionFileField
                             files={groupCertificate}
                             onChange={

@@ -76,8 +76,15 @@ import FinalApprovalMixCardDialog, {
   areAllMixCardsApproved,
   buildFinalApprovalMixCardRows,
 } from "./components/FinalApprovalMixCardDialog";
-import validateMixing from "@/data/validation/adapters/mixing.validation";
+import validateMixing, {
+  focusMixField,
+  resolveFirstMixingValidationFocus,
+} from "@/data/validation/adapters/mixing.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
+import { useAlertStore } from "@/app/store/alertStore";
+import type { ValidationAttemptFlags } from "@/ui/components/validation/useValidationDisplay";
+import useValidationDisplay from "@/ui/components/validation/useValidationDisplay";
+import type { ValidationTier } from "@/data/validation/submissionIntent";
 
 import mixingController from "@/controllers/user/manufacturing/mixingController";
 
@@ -175,6 +182,7 @@ type PremixStageCardProps = {
   ) => void;
   onClearFieldError?: (path: string) => void;
   errors: Record<string, string> | null;
+  validationAttempt?: ValidationAttemptFlags;
   isEditMode?: boolean;
 };
 
@@ -199,11 +207,12 @@ const PremixStageCard = ({
   onQualityChange,
   onClearFieldError,
   errors = {},
+  validationAttempt = { format: false, unit: false, submit: false },
   isEditMode = false,
 }: PremixStageCardProps) => {
   const processParticularsList = premix.processParticulars || [];
-  const getFieldError = (fieldPath: string) => errors[fieldPath];
-  console.log(premix);
+  const { visibleError } = useValidationDisplay(errors ?? {}, validationAttempt);
+  const getFieldError = (fieldPath: string) => visibleError(fieldPath);
 
   const handleQualityCheckChange = (parameterId: string | number, index: number, value: string) => {
     onQualityChange(premix.premixNo, parameterId, index, value);
@@ -238,7 +247,7 @@ const PremixStageCard = ({
             <ChecklistRoundedIcon sx={{ color: "#fff", fontSize: 18 }} />
           </Box>
           <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            {S.SECTION_PREMIX_STAGE} — {getPremixNoLabel(Number(premix.premixNo))}[cite: 2]
+            {S.SECTION_PREMIX_STAGE} — {getPremixNoLabel(Number(premix.premixNo))}
           </Typography>
           {statusChip ?? null}
         </Stack>
@@ -279,6 +288,9 @@ const PremixStageCard = ({
               disabled
               onChange={() => undefined}
               required
+              fieldPath={`premixes.${cardIdx}.mixerType`}
+              error={Boolean(getFieldError(`premixes.${cardIdx}.mixerType`))}
+              helperText={getFieldError(`premixes.${cardIdx}.mixerType`)}
             />
             <MixingSelectField
               label="Building No"
@@ -297,6 +309,7 @@ const PremixStageCard = ({
                 onPremixFieldChange(premix.premixNo, "bldgNo", value);
               }}
               required
+              fieldPath={`premixes.${cardIdx}.bldgNo`}
               error={Boolean(getFieldError(`premixes.${cardIdx}.bldgNo`))}
               helperText={getFieldError(`premixes.${cardIdx}.bldgNo`)}
             />
@@ -308,6 +321,9 @@ const PremixStageCard = ({
               disabled
               fullWidth="100%"
               required
+              fieldPath={`premixes.${cardIdx}.premixDate`}
+              error={Boolean(getFieldError(`premixes.${cardIdx}.premixDate`))}
+              helperText={getFieldError(`premixes.${cardIdx}.premixDate`)}
             />
             <MixingTextField
               label={S.LABEL_PREMIX_QTY}
@@ -317,6 +333,9 @@ const PremixStageCard = ({
               disabled
               onChange={() => undefined}
               required
+              fieldPath={`premixes.${cardIdx}.premixQuantity`}
+              error={Boolean(getFieldError(`premixes.${cardIdx}.premixQuantity`))}
+              helperText={getFieldError(`premixes.${cardIdx}.premixQuantity`)}
             />
             <MixingSelectField
               label={S.LABEL_MIXING_CYCLE}
@@ -335,6 +354,7 @@ const PremixStageCard = ({
                 onMixingCycleChange(premix.premixNo, value);
               }}
               required
+              fieldPath={`premixes.${cardIdx}.mixingCycleCode`}
               error={Boolean(getFieldError(`premixes.${cardIdx}.mixingCycleCode`))}
               helperText={getFieldError(`premixes.${cardIdx}.mixingCycleCode`)}
             />
@@ -359,6 +379,7 @@ const PremixStageCard = ({
                   disabled={readOnly}
                   error={!!errorMsg}
                   helperText={errorMsg}
+                  fieldPath={bowlIdPath}
                   onChange={(value) => {
                     onPremixFieldChange(premix.premixNo, "bowlId", value);
                     onClearFieldError?.(bowlIdPath);
@@ -380,6 +401,7 @@ const PremixStageCard = ({
                   disabled={readOnly}
                   error={!!errorMsg}
                   helperText={errorMsg}
+                  fieldPath={bowlTrialDatePath}
                   onChange={(value) => {
                     onPremixFieldChange(premix.premixNo, "bowlTrialDate", value);
                     onClearFieldError?.(bowlTrialDatePath);
@@ -402,6 +424,7 @@ const PremixStageCard = ({
                   disabled={readOnly}
                   error={!!errorMsg}
                   helperText={errorMsg}
+                  fieldPath={bowlTrialObsPath}
                   onChange={(value) => {
                     onPremixFieldChange(premix.premixNo, "bowlTrialObservations", value);
                     onClearFieldError?.(bowlTrialObsPath);
@@ -481,6 +504,7 @@ const PremixStageCard = ({
                             disabled={readOnly}
                             error={!!errorMsg}
                             helperText={errorMsg}
+                            fieldPath={fieldPath}
                             onChange={(newValue: string) => {
                               onProcessChange(
                                 premix.premixNo,
@@ -529,8 +553,10 @@ const PremixStageCard = ({
           rows={premix.qualityChecks || []}
           readOnly={readOnly}
           onChange={handleQualityCheckChange}
+          onClearFieldError={onClearFieldError}
           arrayName={`premixes.${cardIdx}.qualityChecks`}
           errors={errors}
+          validationAttempt={validationAttempt}
         />
       </Box>
     </SectionCard>
@@ -571,6 +597,7 @@ type FinalMixStageCardProps = {
   ) => void;
   onClearFieldError?: (path: string) => void;
   errors: Record<string, string> | null;
+  validationAttempt?: ValidationAttemptFlags;
   isEditMode?: boolean;
 };
 
@@ -589,10 +616,12 @@ const FinalMixStageCard = ({
   onQualityChange,
   onClearFieldError,
   errors = {},
+  validationAttempt = { format: false, unit: false, submit: false },
   isEditMode = false,
 }: FinalMixStageCardProps) => {
   const processParticularsList = entry.processParticulars || [];
-  const getFieldError = (fieldPath: string) => errors[fieldPath];
+  const { visibleError } = useValidationDisplay(errors ?? {}, validationAttempt);
+  const getFieldError = (fieldPath: string) => visibleError(fieldPath);
 
   return (
     <SectionCard>
@@ -614,7 +643,7 @@ const FinalMixStageCard = ({
             <BlenderRoundedIcon sx={{ color: "#fff", fontSize: 18 }} />
           </Box>
           <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            {S.SECTION_FINAL_MIX_STAGE} — {getFinalMixNoLabel(Number(entry.mixNo))}[cite: 2]
+            {S.SECTION_FINAL_MIX_STAGE} — {getFinalMixNoLabel(Number(entry.mixNo))}
           </Typography>
           {statusChip ?? null}
         </Stack>
@@ -663,6 +692,9 @@ const FinalMixStageCard = ({
             disabled
             onChange={() => undefined}
             required
+            fieldPath={`finalMixes.${cardIdx}.mixerType`}
+            error={Boolean(getFieldError(`finalMixes.${cardIdx}.mixerType`))}
+            helperText={getFieldError(`finalMixes.${cardIdx}.mixerType`)}
           />
           <MixingSelectField
             label="Building No"
@@ -681,6 +713,7 @@ const FinalMixStageCard = ({
               onFieldChange(entry.mixNo, "bldgNo", value);
             }}
             required
+            fieldPath={`finalMixes.${cardIdx}.bldgNo`}
             error={Boolean(getFieldError(`finalMixes.${cardIdx}.bldgNo`))}
             helperText={getFieldError(`finalMixes.${cardIdx}.bldgNo`)}
           />
@@ -692,6 +725,9 @@ const FinalMixStageCard = ({
             disabled
             onChange={() => undefined}
             required
+            fieldPath={`finalMixes.${cardIdx}.mixingCycleCode`}
+            error={Boolean(getFieldError(`finalMixes.${cardIdx}.mixingCycleCode`))}
+            helperText={getFieldError(`finalMixes.${cardIdx}.mixingCycleCode`)}
           />
           {(() => {
             const bowlIdPath = `finalMixes.${cardIdx}.bowlId`;
@@ -705,6 +741,7 @@ const FinalMixStageCard = ({
                 disabled={readOnly}
                 error={!!errorMsg}
                 helperText={errorMsg}
+                fieldPath={bowlIdPath}
                 onChange={(value) => {
                   onFieldChange(entry.mixNo, "bowlId", value);
                   onClearFieldError?.(bowlIdPath);
@@ -783,6 +820,7 @@ const FinalMixStageCard = ({
                             disabled={readOnly}
                             error={!!errorMsg}
                             helperText={errorMsg}
+                            fieldPath={fieldPath}
                             onChange={(newValue: string) => {
                               onProcessChange(
                                 entry.mixNo,
@@ -817,11 +855,21 @@ const FinalMixStageCard = ({
         <MixingQualityChecksTable
           rows={entry.qualityChecks || []}
           readOnly={readOnly}
-          onChange={(parameterId, index, value) =>
-            onQualityChange(entry.mixNo, parameterId, index, value)
-          }
+          onChange={(parameterId, index, value) => {
+            onQualityChange(entry.mixNo, parameterId, index, value);
+            const qcIdx = (entry.qualityChecks || []).findIndex(
+              (r) => String(r.parameterId) === String(parameterId),
+            );
+            if (qcIdx >= 0) {
+              onClearFieldError?.(
+                `finalMixes.${cardIdx}.qualityChecks.${qcIdx}.observedValues.${index}`,
+              );
+            }
+          }}
+          onClearFieldError={onClearFieldError}
           arrayName={`finalMixes.${cardIdx}.qualityChecks`}
           errors={errors}
+          validationAttempt={validationAttempt}
         />
       </Box>
     </SectionCard>
@@ -848,6 +896,7 @@ type MixingFormProps = {
   isMixCardEditable?: (mixCardId: string) => boolean;
   previousStageGate?: PreviousStageApprovedUnits | null;
   batchStageContext?: BatchStageContext | null;
+  projectId?: string | null;
   actionLoading?: boolean;
   onSaveMixCardDraft?: (stageType: MixCardStageType, cardNo: string) => void;
   onSubmitMixCard?: (stageType: MixCardStageType, cardNo: string) => void;
@@ -865,6 +914,7 @@ const MixingForm = ({
   isMixCardEditable: checkMixCardEditable,
   previousStageGate = null,
   batchStageContext = null,
+  projectId = null,
   actionLoading = false,
   onSaveMixCardDraft,
   onSubmitMixCard,
@@ -892,7 +942,6 @@ const MixingForm = ({
     numberOfPremix,
     identificationSheet,
   );
-  console.log(initialData);
 
   const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
   const [mixingCycleOptions, setMixingCycleOptions] = useState<{ value: string; label: string }[]>(
@@ -910,6 +959,17 @@ const MixingForm = ({
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationAttempt, setValidationAttempt] = useState<ValidationAttemptFlags>({
+    format: false,
+    unit: false,
+    submit: false,
+  });
+  const validationAttemptRef = React.useRef(validationAttempt);
+  validationAttemptRef.current = validationAttempt;
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    fieldPath: string;
+  } | null>(null);
 
   const mapAndSetErrors = (errors: Record<string, string>, indexMap: (p: string) => string) => {
     const mapped: Record<string, string> = {};
@@ -917,10 +977,23 @@ const MixingForm = ({
       const mappedPath = indexMap(path);
       mapped[mappedPath] = message;
     }
-    setValidationErrors((prev) => ({ ...prev, ...mapped }));
+    // Replace (do not merge) so highlights match the latest gate result.
+    setValidationErrors(mapped);
+    return mapped;
   };
 
+  const remapPremixErrorPath = (activeIndex: number) => (path: string) =>
+    path
+      .replace(/^premixes\.0\./, `premixes.${activeIndex}.`)
+      .replace(/^premixes\.0$/, `premixes.${activeIndex}`);
+
+  const remapFinalMixErrorPath = (activeIndex: number) => (path: string) =>
+    path
+      .replace(/^finalMixes\.0\./, `finalMixes.${activeIndex}.`)
+      .replace(/^finalMixes\.0$/, `finalMixes.${activeIndex}`);
+
   const clearFieldError = useCallback((path: string) => {
+    setValidationAttempt((flags) => (flags.format ? flags : { ...flags, format: true }));
     setValidationErrors((prev) => {
       const copy = { ...prev };
       delete copy[path];
@@ -928,15 +1001,66 @@ const MixingForm = ({
     });
   }, []);
 
+  const emitMixingValidationFailure = useCallback(
+    (
+      mappedErrors: Record<string, string>,
+      intent: "draft" | "submit",
+      navItems: CombinedNavItem[],
+    ) => {
+      const focus = resolveFirstMixingValidationFocus(mappedErrors);
+      const firstMessage =
+        (focus?.fieldPath && mappedErrors[focus.fieldPath]) ||
+        Object.values(mappedErrors).find((m) => String(m ?? "").trim()) ||
+        "";
+      const base =
+        intent === "draft"
+          ? "Cannot save draft. Fix the validation errors first."
+          : "Cannot submit. Fix the validation errors first.";
+      // Explicit snackbar — same path as RMP / QC revalidation.
+      useAlertStore.getState().showValidationAlert(
+        firstMessage ? `${base} (${String(firstMessage).trim()})` : base,
+      );
+
+      if (focus) {
+        const navIndex = navItems.findIndex(
+          (item) => item.kind === focus.stageType && item.cardIndex === focus.cardIndex,
+        );
+        if (navIndex >= 0) setActiveCardIndex(navIndex);
+        setValidationFocusRequest((prev) => ({
+          id: (prev?.id ?? 0) + 1,
+          fieldPath: focus.fieldPath,
+        }));
+      }
+    },
+    [],
+  );
+
+  // Focus after card paint / tab switch (rAF alone is too early when remounting Premix/Final Mix).
+  useEffect(() => {
+    if (!validationFocusRequest?.fieldPath) return;
+    const fieldPath = validationFocusRequest.fieldPath;
+    let tries = 0;
+    const tryFocus = () => {
+      tries += 1;
+      if (focusMixField(fieldPath)) return;
+      if (tries < 8) {
+        window.setTimeout(tryFocus, 50);
+      }
+    };
+    const t = window.setTimeout(tryFocus, 80);
+    return () => clearTimeout(t);
+  }, [validationFocusRequest, activeCardIndex, validationErrors]);
+
   useEffect(() => {
     let isMounted = true;
 
     const fetchCycles = async () => {
-      if (!batchStageContext?.projectId || motorStage == null) return;
+      const resolvedProjectId = String(projectId ?? "").trim();
+      if (!resolvedProjectId || motorStage == null) return;
       setLoadingCycles(true);
       try {
         const response = await mixingController.fetchMixingCycle(
-          batchStageContext.projectId,
+          resolvedProjectId,
           motorStage,
         );
         const dataList = (response as any)?.data?.data || (response as any)?.data || response || [];
@@ -963,7 +1087,7 @@ const MixingForm = ({
     return () => {
       isMounted = false;
     };
-  }, [batchStageContext?.projectId, motorStage]);
+  }, [projectId, motorStage]);
 
   const batchMixingStages = useMemo(
     () => identificationSheet?.metadata?.mixing?.stages ?? [],
@@ -1344,15 +1468,18 @@ const MixingForm = ({
     stageType: "PREMIX" | "FINAL_MIX",
     cardNo: string | number,
   ) => {
+    setValidationAttempt((flags) => ({ ...flags, format: true, unit: true, submit: false }));
     if (stageType === "PREMIX") {
       const activeIndex = premixCards.findIndex((p) => p.premixNo === String(cardNo));
       if (activeIndex < 0) return;
       const payload = { premixes: [premixCards[activeIndex]] };
       const errs = validateMixing(payload, "UNIT");
       if (hasValidationErrors(errs)) {
-        mapAndSetErrors(errs, (p) => p.replace(/^premixes\.0\./, `premixes.${activeIndex}.`));
+        const mapped = mapAndSetErrors(errs, remapPremixErrorPath(activeIndex));
+        emitMixingValidationFailure(mapped, "draft", combinedNavItems);
         return;
       }
+      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     } else {
       const activeIndex = finalMixCards.findIndex((f) => f.mixNo === String(cardNo));
@@ -1360,23 +1487,29 @@ const MixingForm = ({
       const payload = { finalMixes: [finalMixCards[activeIndex]] };
       const errs = validateMixing(payload, "UNIT");
       if (hasValidationErrors(errs)) {
-        mapAndSetErrors(errs, (p) => p.replace(/^finalMixes\.0\./, `finalMixes.${activeIndex}.`));
+        const mapped = mapAndSetErrors(errs, remapFinalMixErrorPath(activeIndex));
+        emitMixingValidationFailure(mapped, "draft", combinedNavItems);
         return;
       }
+      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     }
   };
 
   const handleSubmitClick = async (stageType: "PREMIX" | "FINAL_MIX", cardNo: string | number) => {
+    setValidationAttempt({ format: true, unit: true, submit: true });
     if (stageType === "PREMIX") {
       const activeIndex = premixCards.findIndex((p) => p.premixNo === String(cardNo));
       if (activeIndex < 0) return;
       const payload = { premixes: [premixCards[activeIndex]] };
       const errs = validateMixing(payload, "SUBMIT");
       if (hasValidationErrors(errs)) {
-        mapAndSetErrors(errs, (p) => p.replace(/^premixes\.0\./, `premixes.${activeIndex}.`));
+        const mapped = mapAndSetErrors(errs, remapPremixErrorPath(activeIndex));
+        emitMixingValidationFailure(mapped, "submit", combinedNavItems);
         return;
       }
+      setValidationErrors({});
+      setValidationAttempt({ format: false, unit: false, submit: false });
       onSubmitMixCard?.(stageType, String(cardNo));
     } else {
       const activeIndex = finalMixCards.findIndex((f) => f.mixNo === String(cardNo));
@@ -1384,45 +1517,75 @@ const MixingForm = ({
       const payload = { finalMixes: [finalMixCards[activeIndex]] };
       const errs = validateMixing(payload, "SUBMIT");
       if (hasValidationErrors(errs)) {
-        mapAndSetErrors(errs, (p) => p.replace(/^finalMixes\.0\./, `finalMixes.${activeIndex}.`));
+        const mapped = mapAndSetErrors(errs, remapFinalMixErrorPath(activeIndex));
+        emitMixingValidationFailure(mapped, "submit", combinedNavItems);
         return;
       }
+      setValidationErrors({});
+      setValidationAttempt({ format: false, unit: false, submit: false });
       onSubmitMixCard?.(stageType, String(cardNo));
     }
   };
 
+  // Live validation from the start: FORMAT always after first edit/attempt; SUBMIT after failed submit.
   useEffect(() => {
     const activePremixItem = activePremix;
     const activeFinalMixItem = activeFinalMix;
-
     if (!activePremixItem && !activeFinalMixItem) return;
 
+    const attempt = validationAttemptRef.current;
+    if (!attempt.format && !attempt.unit && !attempt.submit) return;
+
+    // Keep required highlights after Save (UNIT) / Submit — do not wipe with FORMAT.
+    const tier: ValidationTier = attempt.submit
+      ? "SUBMIT"
+      : attempt.unit
+        ? "UNIT"
+        : "FORMAT";
     const handler = setTimeout(() => {
       if (activePremixItem) {
         const activeIndex = premixCards.findIndex((p) => p.premixNo === activePremixItem.premixNo);
         if (activeIndex < 0) return;
-
         const payload = { premixes: [activePremixItem] };
-        const errs = validateMixing(payload, "UNIT");
-
-        if (hasValidationErrors(errs)) {
-          mapAndSetErrors(errs, (p) => p.replace(/^premixes\.0\./, `premixes.${activeIndex}.`));
-        }
+        const errs = validateMixing(payload, tier);
+        const prefix = `premixes.${activeIndex}.`;
+        setValidationErrors((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((key) => {
+            if (key.startsWith(prefix) || key === `premixes.${activeIndex}`) delete next[key];
+          });
+          for (const [path, message] of Object.entries(errs)) {
+            const mappedPath = path
+              .replace(/^premixes\.0\./, prefix)
+              .replace(/^premixes\.0$/, `premixes.${activeIndex}`);
+            next[mappedPath] = message;
+          }
+          return next;
+        });
       } else if (activeFinalMixItem) {
         const activeIndex = finalMixCards.findIndex((f) => f.mixNo === activeFinalMixItem.mixNo);
         if (activeIndex < 0) return;
-
         const payload = { finalMixes: [activeFinalMixItem] };
-        const errs = validateMixing(payload, "UNIT");
-
-        if (hasValidationErrors(errs)) {
-          mapAndSetErrors(errs, (p) => p.replace(/^finalMixes\.0\./, `finalMixes.${activeIndex}.`));
-        }
+        const errs = validateMixing(payload, tier);
+        const prefix = `finalMixes.${activeIndex}.`;
+        setValidationErrors((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((key) => {
+            if (key.startsWith(prefix) || key === `finalMixes.${activeIndex}`) delete next[key];
+          });
+          for (const [path, message] of Object.entries(errs)) {
+            const mappedPath = path
+              .replace(/^finalMixes\.0\./, prefix)
+              .replace(/^finalMixes\.0$/, `finalMixes.${activeIndex}`);
+            next[mappedPath] = message;
+          }
+          return next;
+        });
       }
-    }, 200);
+    }, 120);
 
     return () => clearTimeout(handler);
-  }, [activePremix, activeFinalMix, premixCards, finalMixCards]);
+  }, [activePremix, activeFinalMix, premixCards, finalMixCards, validationAttempt]);
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -1603,6 +1766,7 @@ const MixingForm = ({
                 onQualityChange={updateQualityCheck}
                 onClearFieldError={clearFieldError}
                 errors={validationErrors}
+                validationAttempt={validationAttempt}
                 isEditMode={isEditMode}
               />
             ) : activeFinalMix ? (
@@ -1641,6 +1805,7 @@ const MixingForm = ({
                 onQualityChange={updateFinalMixQualityCheck}
                 onProcessChange={updateFinalMixProcessParticular}
                 errors={validationErrors}
+                validationAttempt={validationAttempt}
                 onClearFieldError={clearFieldError}
                 isEditMode={isEditMode}
               />

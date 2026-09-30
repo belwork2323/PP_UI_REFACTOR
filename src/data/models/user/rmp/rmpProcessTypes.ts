@@ -188,6 +188,19 @@ export const processTypeToUiKey = (processType: string | null | undefined): RmpM
   return "defaultSolid";
 };
 
+/** Map AP_* processType → COARSE | FINE | ULTRA_FINE when API omits gradeCode. */
+export const gradeCodeFromApProcessType = (
+  processType: string | null | undefined,
+): string => {
+  const raw = String(processType ?? "")
+    .trim()
+    .toUpperCase();
+  if (raw === "AP_COARSE") return "COARSE";
+  if (raw === "AP_FINE") return "FINE";
+  if (raw === "AP_ULTRA_FINE") return "ULTRA_FINE";
+  return "";
+};
+
 export const findMaterialInList = (
   materials: MaterialsListItem[],
   materialCode: string,

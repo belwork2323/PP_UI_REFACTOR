@@ -1,3 +1,4 @@
+import { focusFieldByDataAttr } from "@/data/validation/utils/focusFieldByDataAttr";
 import type {
   CasePrepAbradingDetailsRow,
   CasePrepIngredientRow,
@@ -6,7 +7,6 @@ import type {
   CasePrepParameterRow,
   CasePrepQualificationParameterRow,
 } from "./CasePrepMotorDataModel";
-import { focusFieldByDataAttr } from "../validation/utils/focusFieldByDataAttr";
 
 export type CasePrepSubmissionIntent = "DRAFT" | "SUBMIT";
 export type CasePrepValidationErrors = Record<string, string>;

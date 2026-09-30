@@ -95,6 +95,8 @@ const QualityControlPage = () => {
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
     handleProcessingWeightmentSheetChange,
+    weightmentErrors,
+    weightmentValidationAttempt,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,
@@ -161,15 +163,18 @@ const QualityControlPage = () => {
   );
 
   const listLoading = loading && !loadingFormDetails && view === "list";
-  const formOpening = Boolean(loadingFormDetails);
+  // Full-page opener only while leaving the list — once the form is open, use the
+  // inline Subscale-style loader (divisionAutoPopulateLoading) for RMR / details.
+  const showFullPageLoader =
+    listLoading || (Boolean(loadingFormDetails) && view !== "form");
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <WorkflowFormOpeningLoader
-        open={listLoading || formOpening}
-        title={formOpening ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        open={showFullPageLoader}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
         message={
-          formOpening ? strings.FORM_OPENING_MESSAGE : "Loading quality control batches…"
+          loadingFormDetails ? strings.FORM_OPENING_MESSAGE : "Loading quality control batches…"
         }
         color={QC_DIVISION_BRAND.primary}
         accentColor={QC_DIVISION_BRAND.primaryLight}
@@ -194,7 +199,7 @@ const QualityControlPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && !formOpening && (
+      {view === "form" && activeBatch && (
         <>
           <UserWorkflowFormHeader
             mode="update"
@@ -301,6 +306,8 @@ const QualityControlPage = () => {
             onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
             onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
             onProcessingWeightmentSheetChange={handleProcessingWeightmentSheetChange}
+            weightmentErrors={weightmentErrors}
+            weightmentValidationAttempt={weightmentValidationAttempt}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}
             navApprovalActions={
               !readOnly

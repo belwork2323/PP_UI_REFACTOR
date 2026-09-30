@@ -14,6 +14,9 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { createDataTableTheme } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { QualityCheckRow } from "../../../../../data/models/user/MixingFormModel";
+import useValidationDisplay, {
+  type ValidationAttemptFlags,
+} from "@/ui/components/validation/useValidationDisplay";
 
 const S = STRINGS.MANUFACTURING.MIXING;
 const BRAND = MIXING_BRAND;
@@ -29,6 +32,8 @@ type MixingQualityChecksTableProps = {
   /** Pass full path like `premixes.${cardIdx}.qualityChecks` or `finalMixes.${cardIdx}.qualityChecks` */
   arrayName?: string;
   onChange?: (parameterId: string | number, index: number, value: string) => void;
+  onClearFieldError?: (path: string) => void;
+  validationAttempt?: ValidationAttemptFlags;
 };
 
 const resolveRowSampleCount = (row: QualityCheckRow): number => {
@@ -53,12 +58,13 @@ export const MixingQualityChecksTable = ({
   arrayName = "qualityChecks",
   errors = {},
   onChange,
+  onClearFieldError,
+  validationAttempt = { format: false, unit: false, submit: false },
 }: MixingQualityChecksTableProps) => {
   const maxSampleCount = Math.max(1, ...rows.map(resolveRowSampleCount), 1);
   const sampleIndices = Array.from({ length: maxSampleCount }, (_, i) => i);
-
-  // Helper to retrieve error message for a given path
-  const getFieldError = (fieldPath: string) => errors?.[fieldPath];
+  const { visibleError } = useValidationDisplay(errors ?? {}, validationAttempt);
+  const getFieldError = (fieldPath: string) => visibleError(fieldPath);
 
   return (
     <TableContainer sx={{ ...dt.tableContainer, overflowX: "auto" }}>
@@ -93,7 +99,10 @@ export const MixingQualityChecksTable = ({
                 borderLeft: observedGroupBorder,
               }}
             >
-              {S.COL_OBSERVED_VALUES}
+              {S.COL_OBSERVED_VALUES}{" "}
+              <Box component="span" sx={{ color: "error.main", ml: 0.5 }}>
+                *
+              </Box>
             </TableCell>
           </TableRow>
 
@@ -182,14 +191,10 @@ export const MixingQualityChecksTable = ({
                             placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
                             error={!!fieldError}
                             helperText={fieldError}
+                            fieldPath={fieldPath}
                             onChange={(val: string) => {
-                              // Trigger value change update
                               onChange?.(row.parameterId, sampleIdx, val);
-
-                              // Clear the error for this exact path immediately if it exists
-                              if (fieldError && errors && fieldPath in errors) {
-                                delete errors[fieldPath];
-                              }
+                              if (fieldError) onClearFieldError?.(fieldPath);
                             }}
                             required
                           />

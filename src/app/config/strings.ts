@@ -1354,7 +1354,8 @@ export const STRINGS = {
       FORM_OPENING_TITLE: "Opening Raw Material Preparation",
       FORM_OPENING_MESSAGE:
         "Loading batch details, materials, and form data. This will only take a moment…",
-      SELECT_AT_LEAST_ONE: "No materials are loaded for this premix. Check the identification sheet.",
+      SELECT_AT_LEAST_ONE:
+        "No materials are loaded for this premix. Check the identification sheet.",
       MATERIAL_GRADE_REQUIRED: "Select a grade for every solid material that requires one.",
       SELECT_PREMIX_AND_PROCESS: "Select a premix and process to load the form",
       NO_PROCESS_SELECTED_TITLE: "No process selected",
@@ -1381,15 +1382,15 @@ export const STRINGS = {
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       DELETE_PREMIX_TOOLTIP: "Remove this premix",
-      WEIGHTMENT_SHEET_TITLE: "Weightment Sheet for Dispatch of Material to Mixing Station",
+      WEIGHTMENT_SHEET_TITLE: "Weighment Sheet for Dispatch of Material to Mixing Station",
       WEIGHTMENT_SHEET_SUBTITLE:
         "All materials for this premix — select from identification sheet; use Add Row for extra containers",
       WEIGHTMENT_SHEET_LOCKED_HINT:
-        "Weightment is locked because this premix is waiting for approval or already approved.",
+        "Weighment is locked because this premix is waiting for approval or already approved.",
       WEIGHTMENT_MIXER_BUILDING: "Mixer Building Number",
       WEIGHTMENT_ADD_ROW: "Add Row",
       WEIGHTMENT_ALL_MATERIALS_ADDED: "All identification sheet materials are already added.",
-      WEIGHTMENT_EMPTY_TITLE: "No weightment entries yet",
+      WEIGHTMENT_EMPTY_TITLE: "No weighment entries yet",
       WEIGHTMENT_EMPTY_SUBTITLE:
         "Add a row to record material weights transferred to the mixing station",
       WEIGHTMENT_COMPARE_LABEL: "Compare with identification sheet",
@@ -1411,7 +1412,7 @@ export const STRINGS = {
       WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED:
         "Record deviation found and enter a deviation message when values differ from the identification sheet.",
       WEIGHTMENT_INCOMPLETE_ROW:
-        "Each weightment row must include a material from the identification sheet.",
+        "Each weighment row must include a material from the identification sheet.",
       WEIGHTMENT_SELECT_MATERIAL: "Select material",
       WEIGHTMENT_TABLE_COL_MATERIAL_CODE: "Material Code",
       WEIGHTMENT_TABLE_COL_MATERIAL_NAME: "Material Name",
@@ -2564,6 +2565,7 @@ export const STRINGS = {
       FORM_OPENING_MESSAGE:
         "Loading batch details, division schema, and form data. This will only take a moment…",
       SCHEMA_LOADING_TITLE: "Loading QC Form",
+      REVALIDATION_LOADING_TITLE: "Loading raw material revalidation…",
       SUBTITLE: "Select division and form type to load the QC schema",
       DIVISION_LABEL: "Division",
       DIVISION_PLACEHOLDER: "Select division",

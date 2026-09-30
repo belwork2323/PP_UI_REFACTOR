@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import {
   Box,
   Table,
@@ -232,8 +232,11 @@ export const TableTextInput = ({
   disabled = false,
   readOnly = false,
   type = "text",
+  inputMode,
   multiline = false,
   minRows,
+  dataCpField,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -241,26 +244,49 @@ export const TableTextInput = ({
   disabled?: boolean;
   readOnly?: boolean;
   type?: string;
+  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
   multiline?: boolean;
   minRows?: number;
+  /** Validation focus target (`data-cp-field`). */
+  dataCpField?: string;
+  /** Show invalid border (submit validation). */
+  error?: boolean;
 }) => {
   if (readOnly) {
-    return <WorkflowReadOnlyText value={value} />;
+    return (
+      <Box {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
+        <WorkflowReadOnlyText
+          value={value}
+          sx={
+            error
+              ? {
+                  borderColor: "error.main",
+                  bgcolor: "rgba(211, 47, 47, 0.04)",
+                }
+              : undefined
+          }
+        />
+      </Box>
+    );
   }
 
   return (
-    <TextField
-      size="small"
-      fullWidth
-      type={type}
-      multiline={multiline}
-      minRows={minRows}
-      value={value}
-      placeholder={placeholder}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      sx={casePrepTableInputSx}
-    />
+    <Box {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
+      <TextField
+        size="small"
+        fullWidth
+        type={type}
+        inputMode={inputMode}
+        multiline={multiline}
+        minRows={minRows}
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        error={error}
+        onChange={(event) => onChange(event.target.value)}
+        sx={casePrepTableInputSx}
+      />
+    </Box>
   );
 };
 
@@ -290,6 +316,12 @@ type ParameterTableProps = {
   readOnly?: boolean;
   emptyText?: string;
   requiredValue?: boolean;
+  /** Focus path for default value inputs (`data-cp-field`). */
+  getValueFieldPath?: (index: number) => string;
+  getValueError?: (index: number) => string | undefined;
+  /** Focus path for observations column. */
+  getObservationsFieldPath?: (index: number) => string;
+  getObservationsError?: (index: number) => string | undefined;
 };
 
 const DEFAULT_PARAM_COLUMNS: ParameterTableColumn[] = [
@@ -297,6 +329,13 @@ const DEFAULT_PARAM_COLUMNS: ParameterTableColumn[] = [
   { key: "value", label: "Value" },
   { key: "remarks", label: "Remarks" },
 ];
+
+const ParamFieldError = ({ message }: { message?: string }) =>
+  message ? (
+    <Typography sx={{ fontSize: "0.68rem", color: "error.main", mt: 0.35, lineHeight: 1.3 }}>
+      {message}
+    </Typography>
+  ) : null;
 
 export const ParameterTable = ({
   columns = DEFAULT_PARAM_COLUMNS,
@@ -309,6 +348,10 @@ export const ParameterTable = ({
   readOnly = false,
   emptyText = "No rows",
   requiredValue = false,
+  getValueFieldPath,
+  getValueError,
+  getObservationsFieldPath,
+  getObservationsError,
 }: ParameterTableProps) => {
   if (!rows.length) {
     return (
@@ -343,26 +386,34 @@ export const ParameterTable = ({
                   );
                 }
                 if (col.key === "value") {
+                  const valueError = getValueError?.(index);
                   return (
                     <TableCell key={col.key} sx={casePrepTableCellSx}>
-                      {renderValue
-                        ? renderValue(row, index)
-                        : (
+                      {renderValue ? (
+                        renderValue(row, index)
+                      ) : (
+                        <>
                           <TableTextInput
                             value={row.value ?? ""}
                             onChange={(next) => onChangeValue?.(index, next)}
                             disabled={disabled}
                             readOnly={readOnly || row.readonly}
-                            type={row.valueFieldType === "number" ? "number" : "text"}
+                            type="text"
+                            inputMode={row.valueFieldType === "number" ? "decimal" : undefined}
                             multiline={row.valueFieldType === "textarea"}
                             minRows={row.valueFieldType === "textarea" ? 2 : undefined}
                             placeholder="Enter value"
+                            dataCpField={getValueFieldPath?.(index)}
+                            error={Boolean(valueError)}
                           />
-                        )}
+                          <ParamFieldError message={valueError} />
+                        </>
+                      )}
                     </TableCell>
                   );
                 }
                 if (col.key === "observations") {
+                  const obsError = getObservationsError?.(index);
                   return (
                     <TableCell key={col.key} sx={casePrepTableCellSx}>
                       <TableTextInput
@@ -373,7 +424,10 @@ export const ParameterTable = ({
                         multiline
                         minRows={2}
                         placeholder="Observations"
+                        dataCpField={getObservationsFieldPath?.(index)}
+                        error={Boolean(obsError)}
                       />
+                      <ParamFieldError message={obsError} />
                     </TableCell>
                   );
                 }
