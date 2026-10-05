@@ -24,6 +24,9 @@ import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions
 import {
   QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID,
   QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID,
+  QC_HARDWARE_PREHEATING_TABLE_ID,
+  QC_HARDWARE_LINEAR_COATING_TABLE_ID,
+  QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID,
   getHardwareAbradingRows,
   getHardwareDispatchValues,
   getHardwareDispatchVisualObservationRows,
@@ -187,7 +190,13 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
     );
   };
 
-  const renderInput = (row: T, index: number, column: ColumnDef<T>): ReactNode => {
+  const renderInput = (
+    row: T,
+    index: number,
+    column: ColumnDef<T>,
+    fieldPath: string,
+    hasError: boolean,
+  ): ReactNode => {
     const value = String(row[column.id] ?? "");
     if (readOnly) {
       if (column.fieldType === "select") {
@@ -207,51 +216,60 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
 
     if (column.fieldType === "date") {
       return (
-        <DateField
-          compact
-          value={value}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="DD-MM-YYYY"
-          inputSx={tableDateFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <DateField
+            compact
+            value={value}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="DD-MM-YYYY"
+            inputSx={tableDateFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "time") {
       return (
-        <TimeField
-          compact
-          value={normalizeTimeValue(value)}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="HH:mm"
-          inputSx={tableTimeFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <TimeField
+            compact
+            value={normalizeTimeValue(value)}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="HH:mm"
+            inputSx={tableTimeFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "select") {
       const options = column.options ?? [];
       return (
-        <AppDropdown
-          compact
-          value={value}
-          onChange={(next) => updateRow(index, column.id, next)}
-          options={options}
-          disabled={Boolean(column.loadingOptions)}
-          placeholder={
-            column.loadingOptions
-              ? "Loading..."
-              : options.length
-                ? "Select"
-                : "No options"
-          }
-          renderValue={(selected) => {
-            const code = String(selected ?? "").trim();
-            if (!code) return null;
-            return options.find((option) => option.value === code)?.label || code;
-          }}
-          sx={tableFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <AppDropdown
+            compact
+            value={value}
+            onChange={(next) => updateRow(index, column.id, next)}
+            options={options}
+            disabled={Boolean(column.loadingOptions)}
+            error={hasError}
+            placeholder={
+              column.loadingOptions
+                ? "Loading..."
+                : options.length
+                  ? "Select"
+                  : "No options"
+            }
+            renderValue={(selected) => {
+              const code = String(selected ?? "").trim();
+              if (!code) return null;
+              return options.find((option) => option.value === code)?.label || code;
+            }}
+            sx={tableFieldSx}
+          />
+        </Box>
       );
     }
 
@@ -265,6 +283,8 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
         value={value}
         onChange={(event) => updateRow(index, column.id, event.target.value)}
         sx={tableFieldSx}
+        error={hasError}
+        inputProps={{ "data-qc-field": fieldPath }}
       />
     );
   };
@@ -331,7 +351,7 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
                   const message = fieldError(validationErrors ?? undefined, path);
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
-                      {renderInput(row, index, column)}
+                      {renderInput(row, index, column, path, Boolean(message))}
                       {!readOnly ? <FieldErrorText message={message} /> : null}
                     </TableCell>
                   );
@@ -388,23 +408,23 @@ const ABRADING_COLUMNS: ColumnDef<QcHardwareCutRow>[] = [
 ];
 
 const PREHEATING_COLUMNS_BASE: ColumnDef<QcHardwarePreheatingRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date" },
-  { id: "START_TIME", label: "Start Time", fieldType: "time" },
-  { id: "END_TIME", label: "End Time", fieldType: "time" },
-  { id: "OVEN_NUMBER", label: "Oven Number", fieldType: "text" },
-  { id: "BUILDING_NO", label: "Building No", fieldType: "select" },
-  { id: "TEMPERATURE", label: "Temperature (°C)", fieldType: "number" },
-  { id: "VACUUM_LEVEL", label: "Vacuum Level (Torr)", fieldType: "number" },
+  { id: "DATE", label: "Date", fieldType: "date", required: true },
+  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
+  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "OVEN_NUMBER", label: "Oven Number", fieldType: "text", required: true },
+  { id: "BUILDING_NO", label: "Building No", fieldType: "select", required: true },
+  { id: "TEMPERATURE", label: "Temperature (°C)", fieldType: "number", required: true },
+  { id: "VACUUM_LEVEL", label: "Vacuum Level (Torr)", fieldType: "number", required: true },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
 ];
 
 const LINEAR_COATING_COLUMNS: ColumnDef<QcHardwareLinearCoatingRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date" },
-  { id: "START_TIME", label: "Start Time", fieldType: "time" },
-  { id: "END_TIME", label: "End Time", fieldType: "time" },
-  { id: "LINER_QTY", label: "Quantity of liner used (g)", fieldType: "number" },
-  { id: "INSULATION_TEMP", label: "Insulation Temp", fieldType: "number" },
-  { id: "RH", label: "RH", fieldType: "number" },
+  { id: "DATE", label: "Date", fieldType: "date", required: true },
+  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
+  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "LINER_QTY", label: "Quantity of liner used (g)", fieldType: "number", required: true },
+  { id: "INSULATION_TEMP", label: "Insulation Temp", fieldType: "number", required: true },
+  { id: "RH", label: "RH", fieldType: "number", required: true },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
 ];
 
@@ -564,6 +584,8 @@ const QCHardwareProcessPanel = ({
             OBSERVATIONS: "",
           })}
           readOnly={readOnly}
+          validationErrors={validationErrors}
+          errorPrefix={QC_HARDWARE_PREHEATING_TABLE_ID}
         />
       ) : null}
 
@@ -584,6 +606,8 @@ const QCHardwareProcessPanel = ({
             OBSERVATIONS: "",
           })}
           readOnly={readOnly}
+          validationErrors={validationErrors}
+          errorPrefix={QC_HARDWARE_LINEAR_COATING_TABLE_ID}
         />
       ) : null}
 
@@ -601,85 +625,121 @@ const QCHardwareProcessPanel = ({
               p: 1.5,
             }}
           >
-            {DISPATCH_NUMBER_FIELDS.map((field) => (
-              <Box key={field.key} sx={{ flex: "1 1 220px", minWidth: 200 }}>
+            {DISPATCH_NUMBER_FIELDS.map((field) => {
+              const message = fieldError(validationErrors ?? undefined, field.key);
+              return (
+                <Box key={field.key} sx={{ flex: "1 1 220px", minWidth: 200 }}>
+                  {readOnly ? (
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                        color: BRAND.primary,
+                        mb: 0.5,
+                      }}
+                    >
+                      {field.label}
+                    </Typography>
+                  ) : (
+                    <FieldLabelWithAsterisk
+                      label={field.label}
+                      required
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 700,
+                        color: BRAND.textSub,
+                        mb: 0.5,
+                      }}
+                    />
+                  )}
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue
+                      value={dispatchValues[field.key]}
+                      muted={!String(dispatchValues[field.key] ?? "").trim()}
+                    />
+                  ) : (
+                    <TextField
+                      size="small"
+                      fullWidth
+                      type="number"
+                      value={dispatchValues[field.key] ?? ""}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        onChange((prev) =>
+                          setHardwareDispatchValues(prev, {
+                            ...getHardwareDispatchValues(prev),
+                            [field.key]: nextValue,
+                          }),
+                        );
+                      }}
+                      sx={tableFieldSx}
+                      error={Boolean(message)}
+                      inputProps={{ "data-qc-field": field.key }}
+                    />
+                  )}
+                  {!readOnly ? <FieldErrorText message={message} /> : null}
+                </Box>
+              );
+            })}
+            <Box sx={{ flex: "1 1 280px", minWidth: 240 }}>
+              {readOnly ? (
                 <Typography
                   sx={{
                     fontSize: "0.65rem",
-                    fontWeight: readOnly ? 800 : 700,
-                    letterSpacing: readOnly ? "0.02em" : undefined,
-                    textTransform: readOnly ? "uppercase" : undefined,
-                    color: readOnly ? BRAND.primary : BRAND.textSub,
+                    fontWeight: 800,
+                    letterSpacing: "0.02em",
+                    textTransform: "uppercase",
+                    color: BRAND.primary,
                     mb: 0.5,
                   }}
                 >
-                  {field.label}
+                  Date and Time of dispatch of motor to casting division
                 </Typography>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue
-                    value={dispatchValues[field.key]}
-                    muted={!String(dispatchValues[field.key] ?? "").trim()}
-                  />
-                ) : (
-                  <TextField
-                    size="small"
-                    fullWidth
-                    type="number"
-                    value={dispatchValues[field.key] ?? ""}
-                    onChange={(event) => {
-                      const nextValue = event.target.value;
-                      onChange((prev) =>
-                        setHardwareDispatchValues(prev, {
-                          ...getHardwareDispatchValues(prev),
-                          [field.key]: nextValue,
-                        }),
-                      );
-                    }}
-                    sx={tableFieldSx}
-                    error={Boolean(fieldError(validationErrors ?? undefined, field.key))}
-                  />
-                )}
-                <FieldErrorText message={fieldError(validationErrors ?? undefined, field.key)} />
-              </Box>
-            ))}
-            <Box sx={{ flex: "1 1 280px", minWidth: 240 }}>
-              <Typography
-                sx={{
-                  fontSize: "0.65rem",
-                  fontWeight: readOnly ? 800 : 700,
-                  letterSpacing: readOnly ? "0.02em" : undefined,
-                  textTransform: readOnly ? "uppercase" : undefined,
-                  color: readOnly ? BRAND.primary : BRAND.textSub,
-                  mb: 0.5,
-                }}
-              >
-                Date and Time of dispatch of motor to casting division
-              </Typography>
+              ) : (
+                <FieldLabelWithAsterisk
+                  label="Date and Time of dispatch of motor to casting division"
+                  required
+                  sx={{
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    color: BRAND.textSub,
+                    mb: 0.5,
+                  }}
+                />
+              )}
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={dispatchValues.DISPATCH_DATE_TIME}
                   muted={!String(dispatchValues.DISPATCH_DATE_TIME ?? "").trim()}
                 />
               ) : (
-                <DateTimeField
-                  compact
-                  value={dispatchValues.DISPATCH_DATE_TIME ?? ""}
-                  onChange={(next) =>
-                    onChange((prev) =>
-                      setHardwareDispatchValues(prev, {
-                        ...getHardwareDispatchValues(prev),
-                        DISPATCH_DATE_TIME: next,
-                      }),
-                    )
-                  }
-                  placeholder="DD-MM-YYYY HH:mm"
-                  inputSx={tableDateTimeFieldSx}
-                  error={Boolean(fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME"))}
-                />
+                <Box data-qc-field="DISPATCH_DATE_TIME">
+                  <DateTimeField
+                    compact
+                    value={dispatchValues.DISPATCH_DATE_TIME ?? ""}
+                    onChange={(next) =>
+                      onChange((prev) =>
+                        setHardwareDispatchValues(prev, {
+                          ...getHardwareDispatchValues(prev),
+                          DISPATCH_DATE_TIME: next,
+                        }),
+                      )
+                    }
+                    placeholder="DD-MM-YYYY HH:mm"
+                    inputSx={tableDateTimeFieldSx}
+                    error={Boolean(
+                      fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME"),
+                    )}
+                  />
+                </Box>
               )}
-              <FieldErrorText
-                message={fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME")}
-              />
+              {!readOnly ? (
+                <FieldErrorText
+                  message={fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME")}
+                />
+              ) : null}
             </Box>
           </Stack>
           <Box
@@ -715,69 +775,96 @@ const QCHardwareProcessPanel = ({
                   <TableRow>
                     <TableCell sx={{ ...TH, width: 56 }}>Sr No</TableCell>
                     <TableCell sx={TH}>Parameter</TableCell>
-                    <TableCell sx={TH}>Observations</TableCell>
+                    <TableCell sx={TH}>
+                      {readOnly ? (
+                        "Observations"
+                      ) : (
+                        <FieldLabelWithAsterisk
+                          label="Observations"
+                          required
+                          sx={{
+                            display: "inline",
+                            fontSize: "inherit",
+                            fontWeight: "inherit",
+                            color: "inherit",
+                            mb: 0,
+                          }}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell sx={TH}>Remarks</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {visualObservationRows.map((row, index) => (
-                    <TableRow key={`${row.PARAMETER ?? "row"}-${index}`}>
-                      <TableCell sx={cellSx}>{index + 1}</TableCell>
-                      <TableCell sx={cellSx}>
-                        {readOnly ? (
-                          <QCDivisionReadOnlyValue value={row.PARAMETER} />
-                        ) : (
-                          <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: BRAND.text }}>
-                            {row.PARAMETER}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={cellSx}>
-                        {readOnly ? (
-                          <QCDivisionReadOnlyValue
-                            value={row.OBSERVATIONS}
-                            muted={!String(row.OBSERVATIONS ?? "").trim()}
-                          />
-                        ) : (
-                          <TextField
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={1}
-                            value={row.OBSERVATIONS ?? ""}
-                            onChange={(event) =>
-                              patchVisualObservationRow(index, {
-                                OBSERVATIONS: event.target.value,
-                              })
-                            }
-                            sx={tableFieldSx}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell sx={cellSx}>
-                        {readOnly ? (
-                          <QCDivisionReadOnlyValue
-                            value={row.REMARKS}
-                            muted={!String(row.REMARKS ?? "").trim()}
-                          />
-                        ) : (
-                          <TextField
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={1}
-                            value={row.REMARKS ?? ""}
-                            onChange={(event) =>
-                              patchVisualObservationRow(index, {
-                                REMARKS: event.target.value,
-                              })
-                            }
-                            sx={tableFieldSx}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {visualObservationRows.map((row, index) => {
+                    const obsPath = `${QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID}.${index}.OBSERVATIONS`;
+                    const obsMessage = fieldError(validationErrors ?? undefined, obsPath);
+                    return (
+                      <TableRow key={`${row.PARAMETER ?? "row"}-${index}`}>
+                        <TableCell sx={cellSx}>{index + 1}</TableCell>
+                        <TableCell sx={cellSx}>
+                          {readOnly ? (
+                            <QCDivisionReadOnlyValue value={row.PARAMETER} />
+                          ) : (
+                            <Typography
+                              sx={{ fontSize: "0.72rem", fontWeight: 600, color: BRAND.text }}
+                            >
+                              {row.PARAMETER}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell sx={cellSx}>
+                          {readOnly ? (
+                            <QCDivisionReadOnlyValue
+                              value={row.OBSERVATIONS}
+                              muted={!String(row.OBSERVATIONS ?? "").trim()}
+                            />
+                          ) : (
+                            <>
+                              <TextField
+                                size="small"
+                                fullWidth
+                                multiline
+                                minRows={1}
+                                value={row.OBSERVATIONS ?? ""}
+                                onChange={(event) =>
+                                  patchVisualObservationRow(index, {
+                                    OBSERVATIONS: event.target.value,
+                                  })
+                                }
+                                sx={tableFieldSx}
+                                error={Boolean(obsMessage)}
+                                inputProps={{ "data-qc-field": obsPath }}
+                              />
+                              <FieldErrorText message={obsMessage} />
+                            </>
+                          )}
+                        </TableCell>
+                        <TableCell sx={cellSx}>
+                          {readOnly ? (
+                            <QCDivisionReadOnlyValue
+                              value={row.REMARKS}
+                              muted={!String(row.REMARKS ?? "").trim()}
+                            />
+                          ) : (
+                            <TextField
+                              size="small"
+                              fullWidth
+                              multiline
+                              minRows={1}
+                              value={row.REMARKS ?? ""}
+                              onChange={(event) =>
+                                patchVisualObservationRow(index, {
+                                  REMARKS: event.target.value,
+                                })
+                              }
+                              sx={tableFieldSx}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>

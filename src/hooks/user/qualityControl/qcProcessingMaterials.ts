@@ -718,10 +718,9 @@ export const ensureWeightmentRowsForPremixMaterials = (
 
   if (toSeed.length === 0) {
     const stamped = stampIdentificationLocks(existing);
-    if (
-      JSON.stringify(stamped) === JSON.stringify(sheet.weightmentDetails) &&
-      stamped.every((row) => Number(row.premixNo) === premix)
-    ) {
+    // Compare against filtered premix rows (not the full sheet) so already-ensured
+    // sheets return the same reference and do not trip React update-depth loops.
+    if (JSON.stringify(stamped) === JSON.stringify(existing)) {
       return sheet;
     }
     return mergeWeightmentSheetForPremix(

@@ -254,6 +254,9 @@ export const BATCH_MANAGEMENT = {
   DELETE_BATCH: `${API_BASE}/admin/batch`,
 };
 
+export const BLOCKCHAIN = {
+  GET_BATCH_BY_ID: `${API_BASE}/admin/blockchain/fetch`,
+};
 // System Manager Dashboard — 7 API endpoints (all POST)
 export const SYSTEM_MANAGER = {
   STATS: `${API_BASE}/system-manager/dashboard/stats`,

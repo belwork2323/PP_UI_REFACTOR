@@ -6,6 +6,8 @@ import {
   Avatar,
   Chip,
   CircularProgress,
+  Button,
+  TextField,
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import Card from "@ui/components/common/Card";
@@ -16,6 +18,8 @@ import DateRangeRow from "@ui/components/common/DateRangeRow";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
 import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import { STRINGS } from "@app/config/strings";
+import { fetchBatchById } from "@data/api/admin/BatchManagement/batchManagementApi";
+import { fetchBlockchainBatchById } from "@/data/api/admin/blockchainEvent/bacthApi";
 
 const AC = STRINGS.ADMIN_COMMON;
 
@@ -41,7 +45,7 @@ type DashboardBlockchainSectionProps = {
   };
   setEventsDraftFilter: <K extends keyof DashboardBlockchainSectionProps["eventsDraftFilters"]>(
     field: K,
-    value: DashboardBlockchainSectionProps["eventsDraftFilters"][K]
+    value: DashboardBlockchainSectionProps["eventsDraftFilters"][K],
   ) => void;
   applyEventsFilters: () => void;
   eventsActiveFilterCount: number;
@@ -71,6 +75,40 @@ export default function DashboardBlockchainSection({
     filterToggle: th.filterToggle,
   };
 
+  const [batchId, setBatchId] = React.useState("");
+  const [batchData, setBatchData] = React.useState<any>(null);
+  const [batchLoading, setBatchLoading] = React.useState(false);
+  const [batchError, setBatchError] = React.useState("");
+
+  const handleFetchBatchDetails = async () => {
+    const trimmedBatchId = batchId.trim();
+
+    if (!trimmedBatchId) {
+      setBatchError("Please enter a batch ID.");
+      setBatchData(null);
+      return;
+    }
+
+    setBatchLoading(true);
+    setBatchError("");
+
+    try {
+      const response = await fetchBlockchainBatchById(trimmedBatchId);
+
+      if (response?.success === false) {
+        throw response;
+      }
+
+      const payload = response?.data ?? response?.batch ?? response;
+      setBatchData(payload);
+    } catch (error: any) {
+      setBatchData(null);
+      setBatchError(error?.message || "Failed to fetch batch details from blockchain.");
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   return (
     <Card sx={th.dashboard.blockchainCard}>
       <SectionHeader
@@ -78,7 +116,85 @@ export default function DashboardBlockchainSection({
         titleSx={th.timeline.sectionTitle.sx}
       />
 
-      <AdminListShell
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        sx={{ p: 2, alignItems: "stretch" }}
+      >
+        <Stack sx={{ width: { xs: "100%", md: 360 }, minWidth: 0 }} spacing={1.5}>
+          <TextField
+            label="Batch ID"
+            placeholder="Enter batch ID"
+            value={batchId}
+            onChange={(event) => setBatchId(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                void handleFetchBatchDetails();
+              }
+            }}
+            size="small"
+            fullWidth
+            sx={{ minWidth: 220 }}
+          />
+
+          <Button
+            variant="contained"
+            onClick={() => void handleFetchBatchDetails()}
+            disabled={batchLoading || !batchId.trim()}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {batchLoading ? "Loading..." : "Fetch details"}
+          </Button>
+        </Stack>
+
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 420,
+            minHeight: 260,
+            maxHeight: 460,
+            borderRadius: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "#0f172a",
+            color: "#e2e8f0",
+            p: 2,
+            overflowY: "auto",
+            overflowX: "auto",
+            scrollbarWidth: "thin",
+          }}
+        >
+          {batchLoading ? (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CircularProgress size={18} color="inherit" />
+              <Typography variant="body2">Fetching batch details…</Typography>
+            </Stack>
+          ) : batchError ? (
+            <Typography variant="body2" color="error.light">
+              {batchError}
+            </Typography>
+          ) : batchData ? (
+            <pre
+              style={{
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}
+            >
+              {JSON.stringify(batchData, null, 2)}
+            </pre>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Enter a batch ID to view the blockchain response JSON.
+            </Typography>
+          )}
+        </Box>
+      </Stack>
+
+      {/* <AdminListShell
         search={eventsSearchQuery}
         onSearchChange={setEventsSearchQuery}
         searchPlaceholder={t.PLACEHOLDERS.EVENT_SEARCH}
@@ -204,7 +320,7 @@ export default function DashboardBlockchainSection({
             ))
           )}
         </Stack>
-      </AdminListShell>
+      </AdminListShell> */}
     </Card>
   );
 }

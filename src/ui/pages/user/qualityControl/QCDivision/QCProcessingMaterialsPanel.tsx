@@ -38,6 +38,11 @@ import { rmpUiKeyShowsProcessPanel } from "../../../../../data/models/user/rmp/r
 import RawMaterialMaterialProcessPanel from "../../manufacturing/RawMaterial/materialProcess/RawMaterialMaterialProcessPanel";
 import type { ValidationAttemptFlags } from "../../../../components/validation/useValidationDisplay";
 import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
+import { focusRmpField } from "../../../../../data/validation/adapters/rawMaterialPreparation.validation";
+import {
+  lotOptionsForMaterial,
+  quantityPerPremixForMaterial,
+} from "../../../../../hooks/user/qualityControl/qcProcessing.validation";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -62,14 +67,18 @@ type QCProcessingMaterialsPanelProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
-  /** Persist typed Lot/Drying/Sieving edits (RMP parity). */
   onProcessingProcessChange?: (
     entryId: string,
     slotState: RawMaterialPrepMaterialProcessSlot,
   ) => void;
-  /** RMP-parity weighment field errors (paths under weightment.*). */
   weightmentErrors?: ValidationErrors;
   validationAttempt?: ValidationAttemptFlags;
+  processingFieldErrors?: Record<string, ValidationErrors>;
+  processingValidationFocusRequest?: {
+    id: number;
+    entryId: string;
+    fieldPath: string;
+  } | null;
   unitActions?: QCDivisionEntryUnitActions | null;
 };
 
@@ -90,6 +99,8 @@ const QCProcessingMaterialsPanel = ({
   onProcessingProcessChange,
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
+  processingFieldErrors = {},
+  processingValidationFocusRequest = null,
   unitActions = null,
 }: QCProcessingMaterialsPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -111,6 +122,24 @@ const QCProcessingMaterialsPanel = ({
     }
     setActiveMaterialIndex((prev) => Math.min(prev, materialEntries.length - 1));
   }, [materialEntries.length]);
+
+  // RMP parity: switch material tab then focus the first invalid lot field.
+  useEffect(() => {
+    if (!processingValidationFocusRequest?.entryId) return;
+    const idx = materialEntries.findIndex(
+      (entry) => entry.entryId === processingValidationFocusRequest.entryId,
+    );
+    if (idx >= 0) setActiveMaterialIndex(idx);
+    const fieldPath = processingValidationFocusRequest.fieldPath;
+    let tries = 0;
+    const tryFocus = () => {
+      tries += 1;
+      if (focusRmpField(fieldPath)) return;
+      if (tries < 8) window.setTimeout(tryFocus, 50);
+    };
+    const timer = window.setTimeout(tryFocus, 80);
+    return () => clearTimeout(timer);
+  }, [processingValidationFocusRequest, materialEntries]);
 
   const activeEntry = materialEntries[activeMaterialIndex] ?? null;
   const activeValues = activeEntry ? entryValuesById[activeEntry.entryId] : null;
@@ -228,23 +257,22 @@ const QCProcessingMaterialsPanel = ({
           );
     if (!materials.length) return;
 
-    onProcessingWeightmentSheetChange((prev) => {
-      const prevHasRows = (prev.weightmentDetails?.length ?? 0) > 0;
-      const base = prevHasRows ? prev : fullWeightmentSheet;
-      const ensured = ensureWeightmentRowsForPremixMaterials(base, {
-        premixNo: activePremixNoForWeightment,
-        materials,
-      });
-      if (
-        JSON.stringify(ensured.weightmentDetails) ===
-        JSON.stringify(base.weightmentDetails)
-      ) {
-        return prevHasRows ? prev : ensured;
-      }
-      return ensured;
+    const base = formData.processingWeightmentSheet ?? fullWeightmentSheet;
+    const ensured = ensureWeightmentRowsForPremixMaterials(base, {
+      premixNo: activePremixNoForWeightment,
+      materials,
     });
+    // Match RMP: do not call onChange when details are unchanged (avoids max update depth).
+    if (
+      JSON.stringify(ensured.weightmentDetails) ===
+      JSON.stringify(base.weightmentDetails)
+    ) {
+      return;
+    }
+    onProcessingWeightmentSheetChange(ensured);
   }, [
     activePremixNoForWeightment,
+    formData.processingWeightmentSheet,
     fullWeightmentSheet,
     identificationSheet?.materials,
     materialEntries,
@@ -559,23 +587,31 @@ const QCProcessingMaterialsPanel = ({
           {schemaUnavailable ? (
             <Stack spacing={1.25}>
               {activeProcessSlot && rmpUiKeyShowsProcessPanel(activeProcessSlot.uiKey) ? (
-                <RawMaterialMaterialProcessPanel
-                  slotState={activeProcessSlot}
-                  onSlotChange={(next) => {
-                    if (!activeEntry || inputsLocked) return;
-                    onProcessingProcessChange?.(activeEntry.entryId, next);
-                  }}
-                  materialCode={String(activeEntry.materialCode ?? "")}
-                  rmpFormTemplate={activeEntry.rmpFormTemplate}
-                  lotOptions={
-                    (activeEntry.savedProcess?.lotDetails ?? [])
-                      .map((lot) => String(lot.lotId ?? "").trim())
-                      .filter(Boolean)
-                  }
-                  quantityPerPremix={0}
-                  readOnly={inputsLocked}
-                  theme={manufacturingTheme}
-                />
+                <Box data-rmp-slot={activeEntry.processSlot === "liquid" ? "liquid" : "solid"}>
+                  <RawMaterialMaterialProcessPanel
+                    slotState={activeProcessSlot}
+                    onSlotChange={(next) => {
+                      if (!activeEntry || inputsLocked) return;
+                      onProcessingProcessChange?.(activeEntry.entryId, next);
+                    }}
+                    materialCode={String(activeEntry.materialCode ?? "")}
+                    rmpFormTemplate={activeEntry.rmpFormTemplate}
+                    lotOptions={lotOptionsForMaterial(
+                      identificationSheet?.materials,
+                      activeEntry.materialCode,
+                      (activeEntry.savedProcess?.lotDetails ?? [])
+                        .map((lot) => String(lot.lotId ?? "").trim())
+                        .filter(Boolean),
+                    )}
+                    quantityPerPremix={quantityPerPremixForMaterial(
+                      identificationSheet?.materials,
+                      activeEntry.materialCode,
+                    )}
+                    readOnly={inputsLocked}
+                    theme={manufacturingTheme}
+                    validationErrors={processingFieldErrors[activeEntry.entryId]}
+                  />
+                </Box>
               ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (
                 <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
               ) : null}
@@ -591,6 +627,7 @@ const QCProcessingMaterialsPanel = ({
                   premixNo={activePremixNoForWeightment}
                   disabled={inputsLocked}
                   allowAddRemoveRows
+                  compareHighlightOnly
                   weightmentErrors={weightmentErrors}
                   validationAttempt={validationAttempt}
                   rowSourceIndices={weightmentRowSourceIndices}

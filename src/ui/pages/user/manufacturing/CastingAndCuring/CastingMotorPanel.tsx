@@ -106,6 +106,7 @@ const CompactTime = ({
   readOnly,
   error,
   helperText,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -113,17 +114,20 @@ const CompactTime = ({
   readOnly?: boolean;
   error?: boolean;
   helperText?: string | null;
+  fieldPath?: string;
 }) => (
-  <TimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    inputSx={castingCuringTableInputSx}
-    error={error}
-    helperText={helperText}
-  />
+  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+    <TimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      inputSx={castingCuringTableInputSx}
+      error={error}
+      helperText={helperText}
+    />
+  </Box>
 );
 
 const CompactDateTime = ({
@@ -131,21 +135,25 @@ const CompactDateTime = ({
   onChange,
   disabled,
   readOnly,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  fieldPath?: string;
 }) => (
-  <DateTimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    placeholder="DD-MM-YYYY HH:mm"
-    inputSx={castingCuringTableInputSx}
-  />
+  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+    <DateTimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      placeholder="DD-MM-YYYY HH:mm"
+      inputSx={castingCuringTableInputSx}
+    />
+  </Box>
 );
 
 const ValueByFieldType = ({
@@ -154,22 +162,42 @@ const ValueByFieldType = ({
   onChange,
   disabled,
   readOnly,
+  fieldPath,
+  error,
+  helperText,
 }: {
   value: string;
   fieldType?: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  fieldPath?: string;
+  error?: boolean;
+  helperText?: string | null;
 }) => {
   const type = String(fieldType ?? "text").toLowerCase();
   if (type === "time") {
     return (
-      <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+      <CompactTime
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        fieldPath={fieldPath}
+        error={error}
+        helperText={helperText}
+      />
     );
   }
   if (type === "datetime") {
     return (
-      <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+      <CompactDateTime
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        fieldPath={fieldPath}
+      />
     );
   }
   if (type === "number") {
@@ -181,6 +209,9 @@ const ValueByFieldType = ({
         readOnly={readOnly}
         type="number"
         placeholder="0"
+        fieldPath={fieldPath}
+        error={error}
+        helperText={helperText}
       />
     );
   }
@@ -194,6 +225,9 @@ const ValueByFieldType = ({
         multiline
         minRows={2}
         placeholder="Enter value"
+        fieldPath={fieldPath}
+        error={error}
+        helperText={helperText}
       />
     );
   }
@@ -204,6 +238,9 @@ const ValueByFieldType = ({
       disabled={disabled}
       readOnly={readOnly}
       placeholder="Enter value"
+      fieldPath={fieldPath}
+      error={error}
+      helperText={helperText}
     />
   );
 };
@@ -615,10 +652,9 @@ const CastingMotorPanel = ({
                     readOnly={readOnly}
                     type="number"
                     required
+                    fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`}
                     error={Boolean(
-                      validationErrors?.[
-                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`
-                      ],
+                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`],
                     )}
                     helperText={
                       validationErrors?.[
@@ -640,10 +676,9 @@ const CastingMotorPanel = ({
                     readOnly={readOnly}
                     type="number"
                     required
+                    fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`}
                     error={Boolean(
-                      validationErrors?.[
-                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`
-                      ],
+                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`],
                     )}
                     helperText={
                       validationErrors?.[
@@ -665,10 +700,9 @@ const CastingMotorPanel = ({
                     readOnly={readOnly}
                     type="number"
                     required
+                    fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`}
                     error={Boolean(
-                      validationErrors?.[
-                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`
-                      ],
+                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`],
                     )}
                     helperText={
                       validationErrors?.[
@@ -700,10 +734,9 @@ const CastingMotorPanel = ({
                     readOnly={readOnly}
                     type="number"
                     required
+                    fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`}
                     error={Boolean(
-                      validationErrors?.[
-                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`
-                      ],
+                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`],
                     )}
                     helperText={
                       validationErrors?.[
@@ -766,10 +799,9 @@ const CastingMotorPanel = ({
                 readOnly={readOnly}
                 type="number"
                 placeholder="0"
+                fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`}
                 error={Boolean(
-                  validationErrors?.[
-                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`
-                  ],
+                  validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`],
                 )}
                 helperText={
                   validationErrors?.[
@@ -787,10 +819,9 @@ const CastingMotorPanel = ({
                 readOnly={readOnly}
                 type="number"
                 placeholder="0"
+                fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`}
                 error={Boolean(
-                  validationErrors?.[
-                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`
-                  ],
+                  validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`],
                 )}
                 helperText={
                   validationErrors?.[
@@ -815,6 +846,7 @@ const CastingMotorPanel = ({
           width="100%"
           placeholder="0"
           required
+          dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`}
           error={Boolean(
             validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
           )}
@@ -882,10 +914,9 @@ const CastingMotorPanel = ({
                           placeholder={BOWL_ID_PLACEHOLDER}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -905,10 +936,9 @@ const CastingMotorPanel = ({
                           }}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -929,10 +959,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -953,10 +982,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1000,10 +1028,9 @@ const CastingMotorPanel = ({
                           }}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1023,10 +1050,9 @@ const CastingMotorPanel = ({
                           }}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1047,10 +1073,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1070,10 +1095,9 @@ const CastingMotorPanel = ({
                           }}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1161,10 +1185,9 @@ const CastingMotorPanel = ({
                           placeholder={BOWL_ID_PLACEHOLDER}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1185,10 +1208,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1209,10 +1231,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1233,10 +1254,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1260,10 +1280,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1284,10 +1303,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1308,10 +1326,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1332,10 +1349,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1356,10 +1372,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`}
                           error={Boolean(
-                            validationErrors?.[
-                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`
-                            ],
+                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1402,6 +1417,7 @@ const CastingMotorPanel = ({
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            dataCcField={`CASTING_PROCESS.INITIAL_VACUUM`}
             error={Boolean(validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`])}
             helperText={validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`]}
           />
@@ -1422,6 +1438,7 @@ const CastingMotorPanel = ({
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            dataCcField={`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`}
             error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`])}
             helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`]}
           />
@@ -1442,6 +1459,7 @@ const CastingMotorPanel = ({
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            dataCcField={`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`}
             error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`])}
             helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`]}
           />
@@ -1508,10 +1526,9 @@ const CastingMotorPanel = ({
                           placeholder={BOWL_ID_PLACEHOLDER}
                           disabled={disabled}
                           readOnly={readOnly}
+                          fieldPath={`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`}
                           error={Boolean(
-                            validationErrors?.[
-                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`
-                            ],
+                            validationErrors?.[`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1538,10 +1555,9 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           type="number"
+                          fieldPath={`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`}
                           error={Boolean(
-                            validationErrors?.[
-                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`
-                            ],
+                            validationErrors?.[`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1613,7 +1629,13 @@ const CastingMotorPanel = ({
                       }}
                       disabled={disabled}
                       readOnly={readOnly}
-                      // pass helper via wrapper prop if ValueByFieldType supports it; otherwise ValueByFieldType
+                      fieldPath={`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`}
+                      error={Boolean(
+                        validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`],
+                      )}
+                      helperText={
+                        validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`]
+                      }
                     />
                     {validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`] ? (
                       <Typography sx={{ color: "#d32f2f", fontSize: "0.75rem", mt: 0.5 }}>

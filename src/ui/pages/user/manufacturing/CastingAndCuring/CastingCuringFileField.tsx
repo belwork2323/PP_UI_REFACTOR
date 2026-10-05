@@ -39,6 +39,8 @@ type CastingCuringFileFieldProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string;
+  /** Validation focus target (`data-cc-field`). */
+  fieldPath?: string;
 };
 
 const acceptForMode = (mode: FileAcceptMode) =>
@@ -63,6 +65,7 @@ const CastingCuringFileField = ({
   required = false,
   error,
   helperText,
+  fieldPath,
 }: CastingCuringFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -102,7 +105,10 @@ const CastingCuringFileField = ({
   };
 
   return (
-    <Box sx={{ minWidth: compact ? 140 : undefined }}>
+    <Box
+      sx={{ minWidth: compact ? 140 : undefined }}
+      {...(fieldPath ? { "data-cc-field": fieldPath } : {})}
+    >
       {label ? (
         <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>{label}</Typography>
       ) : null}

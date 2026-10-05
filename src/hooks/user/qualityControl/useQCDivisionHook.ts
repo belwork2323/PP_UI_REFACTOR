@@ -136,6 +136,12 @@ import {
 import { hasValidationErrors } from "../../../data/validation/validationErrors";
 import type { ValidationAttemptFlags } from "../../../ui/components/validation/useValidationDisplay";
 import {
+  firstQcProcessingValidationMessage,
+  resolveFirstQcProcessingFocus,
+  validateQcProcessingEntriesForSubmit,
+  validateQcProcessingEntryProcess,
+} from "./qcProcessing.validation";
+import {
   resolveDivisionSchemaRequest,
   canLoadDivisionSchema,
   shouldSkipQcSchemaFetch,
@@ -273,6 +279,7 @@ import {
   applyMixingDivisionEntryToValues,
   createInitialViscosityValues,
   createSeededMixingDetailsValues,
+  extractMixingCycleCodeFromPayload,
   extractMixingQualityCheckDefinitionsFromPayload,
   findMixingPremixDomainEntry,
   hydrateMixingDetailsValuesFromDomain,
@@ -280,11 +287,16 @@ import {
   hydrateMixingDivisionFromFormData,
   hydrateViscosityValuesFromDomain,
   hydrateViscosityValuesFromSections,
+  mapMixingCycleQualityChecksToDefinitions,
   mergeFinalMixEntrySchemaValues,
   pickFinalMixDetailsSchemaValues,
+  pickViscositySchemaValues,
   resolveMixingQcFormData,
+  resolvePreferredMixingQualityCheckDefinitions,
   type QcMixingQualityCheckDefinition,
 } from "./qcMixingTables";
+import mixingController from "../../../controllers/user/manufacturing/mixingController";
+import { resolveMixingCycleQualityChecks } from "../../../data/models/user/MixingFormModel";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isManufacturingFillDetailsStatus,
@@ -524,6 +536,15 @@ export const useQCDivisionHook = () => {
     });
   const weightmentValidationAttemptRef = useRef(weightmentValidationAttempt);
   weightmentValidationAttemptRef.current = weightmentValidationAttempt;
+  /** RMP-parity lot/process field errors keyed by processing entryId. */
+  const [processingFieldErrors, setProcessingFieldErrors] = useState<
+    Record<string, ValidationErrors>
+  >({});
+  const [processingValidationFocusRequest, setProcessingValidationFocusRequest] = useState<{
+    id: number;
+    entryId: string;
+    fieldPath: string;
+  } | null>(null);
   /** Revalidation: FORMAT live from start; submit flag gates required-field live clear. */
   const [revalidationValidationAttempt, setRevalidationValidationAttempt] =
     useState<ValidationAttemptFlags>({
@@ -533,6 +554,23 @@ export const useQCDivisionHook = () => {
     });
   const revalidationValidationAttemptRef = useRef(revalidationValidationAttempt);
   revalidationValidationAttemptRef.current = revalidationValidationAttempt;
+  /** Mixing: keep SUBMIT required errors after failed submit (RMP/revalidation parity). */
+  const [mixingValidationAttempt, setMixingValidationAttempt] = useState<ValidationAttemptFlags>({
+    format: false,
+    unit: false,
+    submit: false,
+  });
+  const mixingValidationAttemptRef = useRef(mixingValidationAttempt);
+  mixingValidationAttemptRef.current = mixingValidationAttempt;
+  /** Hardware: keep SUBMIT required errors after failed submit (RMP/Mixing parity). */
+  const [hardwareValidationAttempt, setHardwareValidationAttempt] =
+    useState<ValidationAttemptFlags>({
+      format: false,
+      unit: false,
+      submit: false,
+    });
+  const hardwareValidationAttemptRef = useRef(hardwareValidationAttempt);
+  hardwareValidationAttemptRef.current = hardwareValidationAttempt;
   const [mixingFinalMixDetailsValues, setMixingFinalMixDetailsValues] = useState<
     SchemaFormValues | undefined
   >(defaultSplit.mixingFinalMixDetailsValues);
@@ -568,7 +606,9 @@ export const useQCDivisionHook = () => {
     (updater: (prev: QualityControlFormState) => QualityControlFormState) => {
       // Prefer latest ref (kept in sync by entry-value edits) so async seeds do not
       // overwrite uploads that have not painted yet.
-      const next = updater(formDataRef.current);
+      const prev = formDataRef.current;
+      const next = updater(prev);
+      if (next === prev) return;
       formDataRef.current = next;
       applyFullFormState(next);
     },
@@ -595,51 +635,96 @@ export const useQCDivisionHook = () => {
       ),
     [],
   );
-  // Derive Mixing parameter/spec rows from division-details / QC details (no quality-checks API).
-  const mixingQualityChecksByStage = useMemo(
-    () =>
-      selectedDivision === "MIXING"
-        ? {
-            PREMIX: extractMixingQualityCheckDefinitionsFromPayload(
-              divisionAutoPopulateData,
-              "PREMIX",
-            ),
-            FINAL_MIX: extractMixingQualityCheckDefinitionsFromPayload(
-              divisionAutoPopulateData,
-              "FINAL_MIX",
-            ),
-          }
-        : {
-            PREMIX: [] as QcMixingQualityCheckDefinition[],
-            FINAL_MIX: [] as QcMixingQualityCheckDefinition[],
-          },
-    [divisionAutoPopulateData, selectedDivision],
-  );
+  // Mixing quality checks from Mixing Cycle Master (same as manufacturing Mixing).
+  // Falls back to division-details qualityChecks when cycle code / master fetch is unavailable.
+  const [mixingQualityChecksByStage, setMixingQualityChecksByStage] = useState<{
+    PREMIX: QcMixingQualityCheckDefinition[];
+    FINAL_MIX: QcMixingQualityCheckDefinition[];
+  }>({ PREMIX: [], FINAL_MIX: [] });
   const mixingQualityChecksByStageRef = useRef(mixingQualityChecksByStage);
   mixingQualityChecksByStageRef.current = mixingQualityChecksByStage;
+
+  useEffect(() => {
+    if (selectedDivision !== "MIXING") {
+      setMixingQualityChecksByStage({ PREMIX: [], FINAL_MIX: [] });
+      return;
+    }
+
+    let cancelled = false;
+    const payload = divisionAutoPopulateData;
+    const fromPayloadPremix = extractMixingQualityCheckDefinitionsFromPayload(payload, "PREMIX");
+    const fromPayloadFinal = extractMixingQualityCheckDefinitionsFromPayload(payload, "FINAL_MIX");
+    const cycleCode = extractMixingCycleCodeFromPayload(payload);
+
+    const applyFallback = () => {
+      if (cancelled) return;
+      setMixingQualityChecksByStage({
+        PREMIX: fromPayloadPremix,
+        FINAL_MIX: fromPayloadFinal,
+      });
+    };
+
+    if (!cycleCode) {
+      applyFallback();
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await mixingController.fetchMixingCycleDetails(cycleCode);
+        if (cancelled) return;
+        const data =
+          (response as { data?: unknown })?.data ??
+          (response as { success?: boolean; data?: unknown })?.data ??
+          response;
+        const resolved = resolveMixingCycleQualityChecks(
+          data && typeof data === "object" ? (data as Record<string, unknown>) : null,
+        );
+        const premix = mapMixingCycleQualityChecksToDefinitions(resolved.premixQualityChecks);
+        const finalMix = mapMixingCycleQualityChecksToDefinitions(resolved.finalMixQualityChecks);
+        setMixingQualityChecksByStage({
+          PREMIX: resolvePreferredMixingQualityCheckDefinitions(premix, fromPayloadPremix),
+          FINAL_MIX: resolvePreferredMixingQualityCheckDefinitions(finalMix, fromPayloadFinal),
+        });
+      } catch (error) {
+        console.error("Failed to fetch Mixing Cycle Master quality checks", error);
+        applyFallback();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [divisionAutoPopulateData, selectedDivision]);
 
   const buildSeededPremixDetailsValues = (premixNo: number, autoPopulatePayload?: unknown) => {
     const payload = autoPopulatePayload ?? divisionAutoPopulateDataRef.current;
     const fromPayload = extractMixingQualityCheckDefinitionsFromPayload(payload, "PREMIX");
+    // Prefer Mixing Cycle Master defs (correct noOfSamples) over division-details
+    // qualityChecks that often omit sample counts after DTO strip.
+    const qualityCheckDefinitions = resolvePreferredMixingQualityCheckDefinitions(
+      mixingQualityChecksByStageRef.current.PREMIX,
+      fromPayload,
+    );
     return createSeededMixingDetailsValues("premix", {
       premixNo,
       autoPopulatePayload: payload,
       batchPayload: activeBatchRef.current,
-      qualityCheckDefinitions: fromPayload.length
-        ? fromPayload
-        : mixingQualityChecksByStageRef.current.PREMIX,
+      qualityCheckDefinitions,
     });
   };
   const buildSeededFinalMixDetailsValues = (premixNo: number, autoPopulatePayload?: unknown) => {
     const payload = autoPopulatePayload ?? divisionAutoPopulateDataRef.current;
     const fromPayload = extractMixingQualityCheckDefinitionsFromPayload(payload, "FINAL_MIX");
+    const qualityCheckDefinitions = resolvePreferredMixingQualityCheckDefinitions(
+      mixingQualityChecksByStageRef.current.FINAL_MIX,
+      fromPayload,
+    );
     return createSeededMixingDetailsValues("finalMix", {
       premixNo,
       autoPopulatePayload: payload,
       batchPayload: activeBatchRef.current,
-      qualityCheckDefinitions: fromPayload.length
-        ? fromPayload
-        : mixingQualityChecksByStageRef.current.FINAL_MIX,
+      qualityCheckDefinitions,
     });
   };
   const [divisionAutoPopulateLoading, setDivisionAutoPopulateLoading] = useState(false);
@@ -837,6 +922,7 @@ export const useQCDivisionHook = () => {
     setWeightmentErrors({});
     setWeightmentValidationAttempt({ format: false, unit: false, submit: false });
     setRevalidationValidationAttempt({ format: false, unit: false, submit: false });
+    setMixingValidationAttempt({ format: false, unit: false, submit: false });
     setReadOnly(false);
     setDetailsRow(null);
     setDetailsData(null);
@@ -3230,9 +3316,9 @@ export const useQCDivisionHook = () => {
               // TO_BE_INITIATED → re-seed empty fields from manufacturing division-details.
               const seedPayload = await resolveSeedPayloadForUnit();
               if (requestId !== partialNavLoadRequestIdRef.current) return;
-              const premixDefs = extractMixingQualityCheckDefinitionsFromPayload(
-                seedPayload,
-                "PREMIX",
+              const premixDefs = resolvePreferredMixingQualityCheckDefinitions(
+                mixingQualityChecksByStageRef.current.PREMIX,
+                extractMixingQualityCheckDefinitionsFromPayload(seedPayload, "PREMIX"),
               );
               updateFormData((prev) => {
                 let next = { ...prev };
@@ -3248,9 +3334,7 @@ export const useQCDivisionHook = () => {
                         premixNo: mixNo,
                         autoPopulatePayload: seedPayload,
                         batchPayload: activeBatchRef.current,
-                        qualityCheckDefinitions: premixDefs.length
-                          ? premixDefs
-                          : mixingQualityChecksByStageRef.current.PREMIX,
+                        qualityCheckDefinitions: premixDefs,
                       },
                       { onlyIfEmpty: true },
                     ),
@@ -4289,10 +4373,53 @@ export const useQCDivisionHook = () => {
       if (entry) {
         try {
           const isRevalidation = entry.kind === "REVALIDATION";
+          const isMixing =
+            entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX";
+          const isHardware = entry.kind === "HARDWARE_PROCESS";
           if (isRevalidation) {
             // FORMAT from the first edit; SUBMIT live only after Submit Division was pressed.
             setRevalidationValidationAttempt((flags) => ({ ...flags, format: true }));
             const tier: ValidationTier = revalidationValidationAttemptRef.current.submit
+              ? "SUBMIT"
+              : "FORMAT";
+            const liveErrors = validateQcDivisionEntry(entry, nextValuesResolved, tier, {
+              finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
+              viscosityValues: nextValuesResolved,
+            });
+            setEntryValidationErrors((prev) => {
+              if (Object.keys(liveErrors).length === 0) {
+                if (!prev[entryId]) return prev;
+                const { [entryId]: _removed, ...rest } = prev;
+                return rest;
+              }
+              return { ...prev, [entryId]: liveErrors };
+            });
+          } else if (isMixing) {
+            // RMP/revalidation parity: keep SUBMIT required highlights after failed submit.
+            setMixingValidationAttempt((flags) =>
+              flags.format ? flags : { ...flags, format: true },
+            );
+            const tier: ValidationTier = mixingValidationAttemptRef.current.submit
+              ? "SUBMIT"
+              : "FORMAT";
+            const liveErrors = validateQcDivisionEntry(entry, nextValuesResolved, tier, {
+              finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
+              viscosityValues: nextValuesResolved,
+            });
+            setEntryValidationErrors((prev) => {
+              if (Object.keys(liveErrors).length === 0) {
+                if (!prev[entryId]) return prev;
+                const { [entryId]: _removed, ...rest } = prev;
+                return rest;
+              }
+              return { ...prev, [entryId]: liveErrors };
+            });
+          } else if (isHardware) {
+            // RMP/Mixing parity: keep SUBMIT required highlights after failed unit submit.
+            setHardwareValidationAttempt((flags) =>
+              flags.format ? flags : { ...flags, format: true },
+            );
+            const tier: ValidationTier = hardwareValidationAttemptRef.current.submit
               ? "SUBMIT"
               : "FORMAT";
             const liveErrors = validateQcDivisionEntry(entry, nextValuesResolved, tier, {
@@ -4335,6 +4462,33 @@ export const useQCDivisionHook = () => {
       ...formDataRef.current,
       mixingFinalMixDetailsValues: values,
     };
+
+    // Live-revalidate active Final Mix entry after shared details edit (RMP parity).
+    const attempt = mixingValidationAttemptRef.current;
+    if (!attempt.format && !attempt.submit) return;
+    const finalMixEntry = (formDataRef.current.divisionEntries ?? []).find(
+      (entry) => entry.kind === "MIXING_FINAL_MIX",
+    );
+    if (!finalMixEntry) return;
+    const entryValues =
+      formDataRef.current.divisionEntryValues?.[finalMixEntry.entryId]?.schemaValues ?? {};
+    const tier: ValidationTier = attempt.submit ? "SUBMIT" : "FORMAT";
+    try {
+      const liveErrors = validateQcDivisionEntry(finalMixEntry, entryValues, tier, {
+        finalMixDetailsValues: values,
+        viscosityValues: entryValues,
+      });
+      setEntryValidationErrors((prev) => {
+        if (Object.keys(liveErrors).length === 0) {
+          if (!prev[finalMixEntry.entryId]) return prev;
+          const { [finalMixEntry.entryId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [finalMixEntry.entryId]: liveErrors };
+      });
+    } catch (error) {
+      console.error("QC Mixing final-mix live validation failed", error);
+    }
   }, []);
 
   const handleProcessingProcessChange = useCallback(
@@ -4350,6 +4504,39 @@ export const useQCDivisionHook = () => {
         });
         if (!changed) return prev;
         return { ...prev, divisionEntries: nextEntries };
+      });
+
+      // Live lot validation after a failed submit (RMP parity).
+      const attempt = weightmentValidationAttemptRef.current;
+      if (!attempt.submit && !attempt.unit) {
+        setProcessingFieldErrors((prev) => {
+          if (!prev[entryId]) return prev;
+          const { [entryId]: _removed, ...rest } = prev;
+          return rest;
+        });
+        return;
+      }
+
+      const liveEntry = formDataRef.current.divisionEntries?.find((e) => e.entryId === entryId);
+      if (!liveEntry || liveEntry.kind !== "PROCESSING_MATERIAL") return;
+      const identificationMaterials = resolveQcIdentificationMaterials(
+        latestBatchDetailsRef.current ?? activeBatchRef.current,
+      );
+      // Apply slot override so live errors match the edit before formData paints.
+      const nextEntry = applyProcessingProcessSlotToEntry(liveEntry, slotState);
+      const liveErrors = validateQcProcessingEntryProcess(
+        nextEntry,
+        { submit: attempt.submit, unit: attempt.unit },
+        identificationMaterials,
+        slotState,
+      );
+      setProcessingFieldErrors((prev) => {
+        if (Object.keys(liveErrors).length === 0) {
+          if (!prev[entryId]) return prev;
+          const { [entryId]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [entryId]: liveErrors };
       });
     },
     [updateFormData],
@@ -4378,13 +4565,26 @@ export const useQCDivisionHook = () => {
         const resolved = typeof next === "function" ? next(current) : next;
         // Avoid re-render loops from ensure/seed effects that no-op.
         if (resolved === prev.processingWeightmentSheet) return prev;
+        if (
+          prev.processingWeightmentSheet &&
+          JSON.stringify(resolved.weightmentDetails) ===
+            JSON.stringify(prev.processingWeightmentSheet.weightmentDetails) &&
+          JSON.stringify(resolved.validation) ===
+            JSON.stringify(prev.processingWeightmentSheet.validation) &&
+          String(resolved.mixerBuildingNumber ?? "") ===
+            String(prev.processingWeightmentSheet.mixerBuildingNumber ?? "")
+        ) {
+          return prev;
+        }
         resolvedSheet = resolved;
         return { ...prev, processingWeightmentSheet: resolved };
       });
 
       if (!resolvedSheet) return;
 
-      setWeightmentValidationAttempt((flags) => ({ ...flags, format: true }));
+      setWeightmentValidationAttempt((flags) =>
+        flags.format ? flags : { ...flags, format: true },
+      );
       const liveForm = formDataRef.current;
       const premixNos = new Set(
         (liveForm.divisionEntries ?? [])
@@ -4405,15 +4605,16 @@ export const useQCDivisionHook = () => {
       const identificationMaterials = resolveQcIdentificationMaterials(
         latestBatchDetailsRef.current ?? activeBatchRef.current,
       );
-      setWeightmentErrors(
-        validateWeightmentErrorsLive(
-          resolvedSheet,
-          selections,
-          identificationMaterials,
-          weightmentValidationAttemptRef.current.submit
-            ? { submit: true }
-            : { submit: false },
-        ),
+      const nextErrors = validateWeightmentErrorsLive(
+        resolvedSheet,
+        selections,
+        identificationMaterials,
+        weightmentValidationAttemptRef.current.submit
+          ? { submit: true }
+          : { submit: false },
+      );
+      setWeightmentErrors((prev) =>
+        JSON.stringify(prev) === JSON.stringify(nextErrors) ? prev : nextErrors,
       );
     },
     [selectedPremix, updateFormData],
@@ -4719,6 +4920,8 @@ export const useQCDivisionHook = () => {
           >();
           const mixingFinalMixDetailSections: SchemaSectionSubmission[] = [];
           let domainMixingFinalMixDetailsValues: SchemaFormValues | undefined;
+          // QC details may split Mixing into PREMIX + FINAL_MIX divisionDetails — hydrate once.
+          let mixingDomainHydrated = false;
 
           const enqueueSchema = (
             division: QcApiDivision,
@@ -4931,19 +5134,86 @@ export const useQCDivisionHook = () => {
             }
 
             if (division === "MIXING") {
-              const hydratedMixing = hydrateMixingDivisionFromFormData(detailData);
-              if (hydratedMixing) {
-                hydratedMixing.premixEntries.forEach(({ premixNo, values }) => {
-                  const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", [], premixNo);
-                  entryValues[entryId] = { schemaValues: values };
-                });
-                hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
-                  const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", [], premixNo);
-                  entryValues[entryId] = { schemaValues: values };
-                });
-                if (hydratedMixing.finalMixDetailsValues && !domainMixingFinalMixDetailsValues) {
-                  domainMixingFinalMixDetailsValues = hydratedMixing.finalMixDetailsValues;
+              // Match qcDivisionDetailsHydration: merge all Mixing divisionDetails once
+              // via resolveMixingQcFormData so Premix headers/values survive silent refresh
+              // after submit (detailData alone can miss premixDetails on a FINAL_MIX slice).
+              if (!mixingDomainHydrated) {
+                const mergedMixingData =
+                  resolveMixingQcFormData(fetchedDetailsPayload) ??
+                  (detailData && typeof detailData === "object"
+                    ? (detailData as Record<string, unknown>)
+                    : null);
+                const hydratedMixing = mergedMixingData
+                  ? hydrateMixingDivisionFromFormData(mergedMixingData)
+                  : null;
+                if (hydratedMixing) {
+                  mixingDomainHydrated = true;
+                  hydratedMixing.premixEntries.forEach(({ premixNo, values }) => {
+                    const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", [], premixNo);
+                    entryValues[entryId] = {
+                      schemaValues: applyMixingDivisionEntryToValues(
+                        values,
+                        {
+                          variant: "premix",
+                          premixNo,
+                          autoPopulatePayload: divisionAutoPopulateDataRef.current,
+                          batchPayload: activeBatchRef.current,
+                          qualityCheckDefinitions:
+                            mixingQualityChecksByStageRef.current.PREMIX,
+                        },
+                        { onlyIfEmpty: true },
+                      ),
+                    };
+                  });
+                  hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
+                    const { entryId } = makeEntry(
+                      "MIXING_FINAL_MIX",
+                      "FINAL_MIX",
+                      [],
+                      premixNo,
+                    );
+                    const detailsPart = pickFinalMixDetailsSchemaValues(values);
+                    const seededDetails = detailsPart
+                      ? applyMixingDivisionEntryToValues(
+                          detailsPart,
+                          {
+                            variant: "finalMix",
+                            premixNo,
+                            autoPopulatePayload: divisionAutoPopulateDataRef.current,
+                            batchPayload: activeBatchRef.current,
+                            qualityCheckDefinitions:
+                              mixingQualityChecksByStageRef.current.FINAL_MIX,
+                          },
+                          { onlyIfEmpty: true },
+                        )
+                      : undefined;
+                    entryValues[entryId] = {
+                      schemaValues: mergeFinalMixEntrySchemaValues(
+                        seededDetails,
+                        pickViscositySchemaValues(values) ?? values,
+                      ),
+                    };
+                  });
+                  if (
+                    hydratedMixing.finalMixDetailsValues &&
+                    !domainMixingFinalMixDetailsValues
+                  ) {
+                    domainMixingFinalMixDetailsValues = applyMixingDivisionEntryToValues(
+                      hydratedMixing.finalMixDetailsValues,
+                      {
+                        variant: "finalMix",
+                        premixNo: 1,
+                        autoPopulatePayload: divisionAutoPopulateDataRef.current,
+                        batchPayload: activeBatchRef.current,
+                        qualityCheckDefinitions:
+                          mixingQualityChecksByStageRef.current.FINAL_MIX,
+                      },
+                      { onlyIfEmpty: true },
+                    );
+                  }
+                  continue;
                 }
+              } else {
                 continue;
               }
 
@@ -6268,6 +6538,34 @@ export const useQCDivisionHook = () => {
     }
     }
     if (!validationOk) {
+      const hasMixingErrors = entriesToValidate.some(
+        (entry) =>
+          (entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX") &&
+          Object.keys(errorsByEntryId[entry.entryId] ?? {}).length > 0,
+      );
+      if (hasMixingErrors) {
+        const nextFlags = {
+          format: true,
+          unit: intent === "draft",
+          submit: intent === "submit",
+        };
+        mixingValidationAttemptRef.current = nextFlags;
+        setMixingValidationAttempt(nextFlags);
+      }
+      const hasHardwareErrors = entriesToValidate.some(
+        (entry) =>
+          entry.kind === "HARDWARE_PROCESS" &&
+          Object.keys(errorsByEntryId[entry.entryId] ?? {}).length > 0,
+      );
+      if (hasHardwareErrors) {
+        const nextFlags = {
+          format: true,
+          unit: intent === "draft",
+          submit: intent === "submit",
+        };
+        hardwareValidationAttemptRef.current = nextFlags;
+        setHardwareValidationAttempt(nextFlags);
+      }
       applyQcValidationFailure(errorsByEntryId, intent === "draft" ? "draft" : "submit");
       return false;
     }
@@ -6279,8 +6577,23 @@ export const useQCDivisionHook = () => {
       });
       return next;
     });
+    // Mixing passed — clear attempt flags so FORMAT live does not keep SUBMIT highlights.
+    if (
+      entriesToValidate.some(
+        (entry) => entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX",
+      )
+    ) {
+      const cleared = { format: false, unit: false, submit: false };
+      mixingValidationAttemptRef.current = cleared;
+      setMixingValidationAttempt(cleared);
+    }
+    if (entriesToValidate.some((entry) => entry.kind === "HARDWARE_PROCESS")) {
+      const cleared = { format: false, unit: false, submit: false };
+      hardwareValidationAttemptRef.current = cleared;
+      setHardwareValidationAttempt(cleared);
+    }
 
-    // RMP-parity weighment validation for Raw Material Processing (schemaUnavailable materials).
+    // RMP-parity process (lots) + weighment validation for Raw Material Processing.
     const processingEntriesForWeightment = entriesToValidate.filter(
       (entry) => entry.kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable,
     );
@@ -6310,13 +6623,35 @@ export const useQCDivisionHook = () => {
       });
 
       if (intent === "submit") {
+        // Lots first (same order as manufacturing RMP), then weighment.
+        const processErrorsByEntryId = validateQcProcessingEntriesForSubmit(
+          processingEntriesForWeightment,
+          identificationMaterials,
+        );
+        setProcessingFieldErrors(processErrorsByEntryId);
+
         if (!weightmentSheet) {
-          showValidationAlert(messages.SUBMIT_VALIDATION_FAILED);
-          setWeightmentErrors({
+          const emptyMixerErrors = {
             "weightment.mixerBuildingNumber":
               STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.VALIDATION.mixerBuildingNumber?.required ??
               "Mixer / building number is required",
-          });
+          };
+          setWeightmentErrors(emptyMixerErrors);
+          const firstMessage =
+            firstQcProcessingValidationMessage(processErrorsByEntryId, emptyMixerErrors) ??
+            messages.SUBMIT_VALIDATION_FAILED;
+          showValidationAlert(firstMessage);
+          const focus = resolveFirstQcProcessingFocus(
+            processErrorsByEntryId,
+            processingEntriesForWeightment,
+          );
+          if (focus) {
+            setProcessingValidationFocusRequest((prev) => ({
+              id: (prev?.id ?? 0) + 1,
+              entryId: focus.entryId,
+              fieldPath: focus.fieldPath,
+            }));
+          }
           return false;
         }
 
@@ -6327,11 +6662,28 @@ export const useQCDivisionHook = () => {
         );
         setWeightmentErrors(nextWeightmentErrors);
 
-        if (hasValidationErrors(nextWeightmentErrors)) {
-          showValidationAlert(messages.SUBMIT_VALIDATION_FAILED);
-          const firstPath = Object.keys(nextWeightmentErrors).sort()[0];
-          if (firstPath) {
-            window.setTimeout(() => focusRmpField(firstPath), 0);
+        const hasProcessErrors = Object.keys(processErrorsByEntryId).length > 0;
+        const hasWeightErrors = hasValidationErrors(nextWeightmentErrors);
+        if (hasProcessErrors || hasWeightErrors) {
+          const firstMessage =
+            firstQcProcessingValidationMessage(processErrorsByEntryId, nextWeightmentErrors) ??
+            messages.SUBMIT_VALIDATION_FAILED;
+          showValidationAlert(firstMessage);
+          const focus = resolveFirstQcProcessingFocus(
+            processErrorsByEntryId,
+            processingEntriesForWeightment,
+          );
+          if (focus) {
+            setProcessingValidationFocusRequest((prev) => ({
+              id: (prev?.id ?? 0) + 1,
+              entryId: focus.entryId,
+              fieldPath: focus.fieldPath,
+            }));
+          } else {
+            const firstPath = Object.keys(nextWeightmentErrors).sort()[0];
+            if (firstPath) {
+              window.setTimeout(() => focusRmpField(firstPath), 0);
+            }
           }
           return false;
         }
@@ -6345,23 +6697,12 @@ export const useQCDivisionHook = () => {
           showAlert(identificationError, "warning");
           return false;
         }
+        setProcessingFieldErrors({});
         setWeightmentErrors({});
       } else {
-        // Draft: format-only for filled weighment values.
-        const formatErrors = weightmentSheet
-          ? validateWeightmentErrorsLive(weightmentSheet, selections, identificationMaterials, {
-              submit: false,
-            })
-          : {};
-        setWeightmentErrors(formatErrors);
-        if (hasValidationErrors(formatErrors)) {
-          showValidationAlert(messages.DRAFT_VALIDATION_FAILED);
-          const firstPath = Object.keys(formatErrors).sort()[0];
-          if (firstPath) {
-            window.setTimeout(() => focusRmpField(firstPath), 0);
-          }
-          return false;
-        }
+        // Draft: RMP parity — clear required errors; do not block save.
+        setProcessingFieldErrors({});
+        setWeightmentErrors({});
       }
     } else {
       setWeightmentErrors({});
@@ -7184,6 +7525,9 @@ export const useQCDivisionHook = () => {
     entryValidationErrors,
     weightmentErrors,
     weightmentValidationAttempt,
+    mixingValidationAttempt,
+    processingFieldErrors,
+    processingValidationFocusRequest,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
     handleProcessingProcessChange,

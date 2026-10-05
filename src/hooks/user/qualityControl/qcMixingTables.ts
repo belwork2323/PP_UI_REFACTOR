@@ -62,6 +62,8 @@ export type QcMixingDetailsRow = {
   PARAMETER?: string;
   PARAMETER_ID?: string;
   SPECIFICATION?: string;
+  /** Sample count from Mixing Cycle Master (`noOfSamples`) — drives VALUE_* columns. */
+  SAMPLE_COUNT?: number;
   VALUE_1?: string;
   VALUE_2?: string;
   VALUE_3?: string;
@@ -69,6 +71,7 @@ export type QcMixingDetailsRow = {
   VALUE_5?: string;
   REMARKS?: string;
   readonly?: boolean;
+  [key: string]: string | number | boolean | undefined;
 };
 
 /** Spec list row from Mixing division-details / QC details qualityChecks. */
@@ -77,6 +80,9 @@ export type QcMixingQualityCheckDefinition = {
   parameter: string;
   specification: string;
   sampleCount?: number;
+  /** Structured bounds from Mixing Cycle Master (manufacturing parity). */
+  specMin?: number;
+  specMax?: number;
 };
 
 export type QcMixingViscosityRow = {
@@ -112,19 +118,69 @@ const DETAILS_TABLE_ID: Record<QcMixingDetailsVariant, string> = {
 
 const hasValue = (value: unknown) => Boolean(String(value ?? "").trim());
 
-const rowHasUserData = (row: QcMixingDetailsRow) =>
-  hasValue(row.BOWL_NO) ||
-  hasValue(row.DATE_OF_PREMIX) ||
-  hasValue(row.DATE_OF_FINAL_MIX) ||
-  hasValue(row.MIXER_BLDG_NO) ||
-  hasValue(row.PREMIX_QTY) ||
-  hasValue(row.SPECIFICATION) ||
-  hasValue(row.VALUE_1) ||
-  hasValue(row.VALUE_2) ||
-  hasValue(row.VALUE_3) ||
-  hasValue(row.VALUE_4) ||
-  hasValue(row.VALUE_5) ||
-  hasValue(row.REMARKS);
+/** Build VALUE_1..VALUE_N keys (Mixing parity: columns follow noOfSamples). */
+export const buildMixingValueFields = (sampleCount: number): string[] => {
+  const n = Math.max(1, Math.floor(Number(sampleCount) || 1));
+  return Array.from({ length: n }, (_, index) => `VALUE_${index + 1}`);
+};
+
+/** Resolve sample count from a QC row or master definition. */
+export const resolveMixingRowSampleCount = (
+  row:
+    | QcMixingDetailsRow
+    | QcMixingQualityCheckDefinition
+    | Record<string, unknown>
+    | null
+    | undefined,
+): number => {
+  if (!row || typeof row !== "object") return 1;
+  const meta = Number(
+    (row as QcMixingDetailsRow).SAMPLE_COUNT ??
+      (row as QcMixingQualityCheckDefinition).sampleCount ??
+      (row as { noOfSamples?: unknown }).noOfSamples,
+  );
+  if (Number.isFinite(meta) && meta > 0) return Math.floor(meta);
+  let max = 0;
+  for (let i = 1; i <= 20; i += 1) {
+    if (`VALUE_${i}` in row) max = i;
+  }
+  return Math.max(1, max);
+};
+
+const emptyValueFields = (sampleCount: number): Record<string, string> => {
+  const fields: Record<string, string> = {};
+  buildMixingValueFields(sampleCount).forEach((key) => {
+    fields[key] = "";
+  });
+  return fields;
+};
+
+const pickValueFieldsFromRow = (
+  source: QcMixingDetailsRow | null | undefined,
+  sampleCount: number,
+): Record<string, string> => {
+  const fields: Record<string, string> = {};
+  buildMixingValueFields(sampleCount).forEach((key) => {
+    fields[key] = String(source?.[key] ?? "").trim() ? String(source?.[key] ?? "") : "";
+  });
+  return fields;
+};
+
+const rowHasUserData = (row: QcMixingDetailsRow) => {
+  if (
+    hasValue(row.BOWL_NO) ||
+    hasValue(row.DATE_OF_PREMIX) ||
+    hasValue(row.DATE_OF_FINAL_MIX) ||
+    hasValue(row.MIXER_BLDG_NO) ||
+    hasValue(row.PREMIX_QTY) ||
+    hasValue(row.SPECIFICATION) ||
+    hasValue(row.REMARKS)
+  ) {
+    return true;
+  }
+  const sampleCount = resolveMixingRowSampleCount(row);
+  return buildMixingValueFields(sampleCount).some((key) => hasValue(row[key]));
+};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -149,6 +205,45 @@ const resolveSpecBound = (value: unknown): string => {
     return pickString(rec.parsedValue, rec.source, rec.value);
   }
   return pickString(value);
+};
+
+/** Parse min/max from Mixing Cycle Master spec object or display string ("1 - 100 mV"). */
+export const parseMixingSpecificationBounds = (
+  specification: unknown,
+): { min?: number; max?: number } => {
+  if (specification && typeof specification === "object" && !Array.isArray(specification)) {
+    const rec = specification as Record<string, unknown>;
+    const minRaw = resolveSpecBound(rec.minValue ?? rec.min);
+    const maxRaw = resolveSpecBound(rec.maxValue ?? rec.max);
+    const min = minRaw !== "" ? Number(minRaw) : NaN;
+    const max = maxRaw !== "" ? Number(maxRaw) : NaN;
+    return {
+      ...(Number.isFinite(min) ? { min } : {}),
+      ...(Number.isFinite(max) ? { max } : {}),
+    };
+  }
+  const text = String(specification ?? "").trim();
+  if (!text || /^na$/i.test(text)) return {};
+  const range = text.match(/(-?\d+(?:\.\d+)?)\s*[-–—]\s*(-?\d+(?:\.\d+)?)/);
+  if (range) {
+    const min = Number(range[1]);
+    const max = Number(range[2]);
+    return {
+      ...(Number.isFinite(min) ? { min } : {}),
+      ...(Number.isFinite(max) ? { max } : {}),
+    };
+  }
+  const le = text.match(/[≤<=]\s*(-?\d+(?:\.\d+)?)/);
+  if (le) {
+    const max = Number(le[1]);
+    return Number.isFinite(max) ? { max } : {};
+  }
+  const ge = text.match(/[≥>=]\s*(-?\d+(?:\.\d+)?)/);
+  if (ge) {
+    const min = Number(ge[1]);
+    return Number.isFinite(min) ? { min } : {};
+  }
+  return {};
 };
 
 /** Format API specification; empty `{}` / missing bounds → `"NA"`. */
@@ -202,19 +297,79 @@ export const parseMixingQualityCheckDefinitions = (
         rec.name,
         parameterId,
       );
-      const specification = formatSpecificationLabel(
-        rec.specification ?? rec.referenceRange ?? rec.specs,
-      );
+      const specSource = rec.specification ?? rec.referenceRange ?? rec.specs;
+      const specification = formatSpecificationLabel(specSource);
       if (!parameterId && !parameter) return null;
-      const sampleCount = pickNumber(rec.noOfSamples, rec.sampleCount);
+      // Manufacturing Mixing Cycle Master: noOfSamples may be stripped on wire —
+      // fall back to observations / values length (Mixing Form parity).
+      const observedLen = readObservationValues(
+        asArray(rec.observations ?? rec.values ?? rec.observedValues),
+      ).length;
+      const sampleCount = Math.max(
+        1,
+        Number(pickNumber(rec.noOfSamples, rec.sampleCount) ?? 0) || observedLen || 1,
+        observedLen,
+      );
+      const bounds = parseMixingSpecificationBounds(specSource);
       return {
         parameterId: parameterId || parameter,
         parameter,
         specification,
-        ...(sampleCount != null ? { sampleCount } : {}),
+        sampleCount,
+        ...(bounds.min != null ? { specMin: bounds.min } : {}),
+        ...(bounds.max != null ? { specMax: bounds.max } : {}),
       };
     })
     .filter((row): row is QcMixingQualityCheckDefinition => row != null);
+};
+
+/**
+ * Prefer Mixing Cycle Master definitions (correct noOfSamples); merge in payload
+ * parameter ids/specs when master list is empty or missing a row.
+ */
+export const resolvePreferredMixingQualityCheckDefinitions = (
+  cycleMasterDefs: QcMixingQualityCheckDefinition[] | null | undefined,
+  payloadDefs: QcMixingQualityCheckDefinition[] | null | undefined,
+): QcMixingQualityCheckDefinition[] => {
+  const master = cycleMasterDefs ?? [];
+  const payload = payloadDefs ?? [];
+  if (!master.length) return payload;
+  if (!payload.length) return master;
+
+  const payloadById = new Map(
+    payload.map((def) => [String(def.parameterId).trim().toUpperCase(), def]),
+  );
+  return master.map((def) => {
+    const match = payloadById.get(String(def.parameterId).trim().toUpperCase());
+    return {
+      ...def,
+      sampleCount: Math.max(1, Number(def.sampleCount) || 1, Number(match?.sampleCount) || 1),
+      specification: def.specification || match?.specification || "NA",
+      parameter: def.parameter || match?.parameter || "",
+    };
+  });
+};
+
+/** Read observation / values list — Manufacturing Mixing uses `{ sampleNo, value }` objects. */
+const readObservationValues = (observations: unknown[]): string[] => {
+  const byIndex: string[] = [];
+  observations.forEach((obs, index) => {
+    if (obs == null) return;
+    if (typeof obs === "string" || typeof obs === "number") {
+      byIndex[index] = String(obs).trim();
+      return;
+    }
+    const rec = asRecord(obs);
+    if (!rec) return;
+    const value = pickString(rec.value, rec.observedValue, rec.result);
+    const sampleNo = Number(rec.sampleNo);
+    if (Number.isFinite(sampleNo) && sampleNo > 0) {
+      byIndex[sampleNo - 1] = value;
+      return;
+    }
+    byIndex[index] = value;
+  });
+  return byIndex;
 };
 
 const pickNumber = (...values: unknown[]): number | null => {
@@ -383,6 +538,80 @@ export const extractMixingQualityCheckDefinitionsFromPayload = (
   return [];
 };
 
+/** Map Mixing Cycle Master quality-check rows → QC definitions (includes noOfSamples). */
+export const mapMixingCycleQualityChecksToDefinitions = (
+  checks: unknown,
+): QcMixingQualityCheckDefinition[] => {
+  return asArray(checks)
+    .map((item): QcMixingQualityCheckDefinition | null => {
+      const rec = asRecord(item);
+      if (!rec) return null;
+      const parameterId = pickString(
+        rec.parameterId,
+        rec.id,
+        rec.specificationCode,
+        rec.specCode,
+        rec.code,
+      );
+      const parameter = pickString(
+        rec.parameterName,
+        rec.parameter,
+        rec.specificationName,
+        rec.name,
+        parameterId,
+      );
+      if (!parameterId && !parameter) return null;
+      const sampleCount = Math.max(1, Number(rec.noOfSamples ?? rec.sampleCount) || 1);
+      const specSource = rec.specification ?? rec.referenceRange ?? rec.specs;
+      const bounds = parseMixingSpecificationBounds(specSource);
+      return {
+        parameterId: parameterId || parameter,
+        parameter,
+        specification: formatSpecificationLabel(specSource),
+        sampleCount,
+        ...(bounds.min != null ? { specMin: bounds.min } : {}),
+        ...(bounds.max != null ? { specMax: bounds.max } : {}),
+      };
+    })
+    .filter((row): row is QcMixingQualityCheckDefinition => row != null);
+};
+
+/** First mixingCycleCode found on manufacturing Mixing stage entries. */
+export const extractMixingCycleCodeFromPayload = (payload: unknown): string => {
+  const stages = resolveMixingStages(payload);
+  for (const stage of stages) {
+    for (const entry of asArray(asRecord(stage)?.premixes)) {
+      const unwrapped = unwrapStagePremixEntry(asRecord(entry));
+      if (!unwrapped) continue;
+      const cycle = asRecord(unwrapped.mixingCycle) ?? asRecord(unwrapped.finalMixCycle);
+      const code = pickString(
+        unwrapped.mixingCycleCode,
+        cycle?.mixingCycleCode,
+        cycle?.code,
+        unwrapped.mixingCycleId,
+        cycle?.mixingCycleId,
+      );
+      if (code) return code;
+    }
+  }
+
+  const roots = [
+    payload,
+    asRecord(payload)?.data,
+    asRecord(payload)?.__manufacturingDivisionData,
+  ];
+  for (const root of roots) {
+    for (const item of asArray(asRecord(root)?.premixes)) {
+      const rec = asRecord(item);
+      if (!rec) continue;
+      const cycle = asRecord(rec.mixingCycle);
+      const code = pickString(rec.mixingCycleCode, cycle?.mixingCycleCode, rec.mixingCycleId);
+      if (code) return code;
+    }
+  }
+  return "";
+};
+
 const buildMixingDetailsSeedFromEntry = (
   entry: Record<string, unknown> | null | undefined,
   variant: QcMixingDetailsVariant,
@@ -500,14 +729,12 @@ const applyMixingQualityChecksToValues = (
       const byId = existingById.get(String(row.PARAMETER_ID ?? "").trim().toUpperCase());
       const byName = existingByName.get(String(row.PARAMETER ?? "").trim().toUpperCase());
       const prior = byId ?? byName ?? existingRows[index];
+      const sampleCount = resolveMixingRowSampleCount(row);
       return {
         ...row,
         ...shared,
-        VALUE_1: prior?.VALUE_1 ?? row.VALUE_1,
-        VALUE_2: prior?.VALUE_2 ?? row.VALUE_2,
-        VALUE_3: prior?.VALUE_3 ?? row.VALUE_3,
-        VALUE_4: prior?.VALUE_4 ?? row.VALUE_4,
-        VALUE_5: prior?.VALUE_5 ?? row.VALUE_5,
+        SAMPLE_COUNT: sampleCount,
+        ...pickValueFieldsFromRow(prior ?? row, sampleCount),
         REMARKS: prior?.REMARKS ?? row.REMARKS,
         SPECIFICATION:
           pickString(row.SPECIFICATION) || pickString(prior?.SPECIFICATION) || "",
@@ -521,7 +748,6 @@ const applyMixingQualityChecksToValues = (
     return setMixingDetailsRows(values, variant, rows);
   }
 
-  const valueFields = getMixingValueFields(variant);
   const nextRows = rows.map((row, rowIndex) => {
     const rowParameterId = String(row.PARAMETER_ID ?? "").trim().toUpperCase();
     const check =
@@ -529,73 +755,58 @@ const applyMixingQualityChecksToValues = (
         checks.find((item) => {
           const rec = asRecord(item);
           if (!rec) return false;
-          const checkId = pickString(
-            rec.parameterId,
-            rec.specificationCode,
-            rec.specCode,
-          ).toUpperCase();
-          return Boolean(rowParameterId && checkId && checkId === rowParameterId);
+          const id = pickString(rec.parameterId, rec.id, rec.specificationCode).toUpperCase();
+          const name = pickString(rec.parameterName, rec.parameter, rec.name).toUpperCase();
+          return (
+            (rowParameterId && id === rowParameterId) ||
+            (name && name === String(row.PARAMETER ?? "").trim().toUpperCase())
+          );
         }),
-      ) ??
-      // Index fallback only when rows have no parameterId yet (pre-spec-list seed).
-      (rowParameterId ? null : asRecord(checks[rowIndex]));
+      ) ?? asRecord(checks[rowIndex]);
 
     const definition =
       definitionById.get(rowParameterId) ??
-      (check
-        ? definitionById.get(
-            pickString(check.parameterId, check.specificationCode, check.specCode).toUpperCase(),
-          )
-        : undefined);
-
-    const next = { ...row };
-    // Prefer embedded qualityChecks from division-details / QC details (name + specification + observations).
-    if (definition) {
-      next.PARAMETER = definition.parameter || next.PARAMETER;
-      next.SPECIFICATION = definition.specification || "NA";
-      next.PARAMETER_ID = definition.parameterId || next.PARAMETER_ID;
-    } else if (check) {
-      const parameterName = pickString(
-        check.parameterName,
-        check.parameter,
-        check.specificationName,
+      definitions.find(
+        (def) =>
+          def.parameter.trim().toUpperCase() === String(row.PARAMETER ?? "").trim().toUpperCase(),
       );
-      const specification = formatSpecificationLabel(
-        check.specification ?? check.referenceRange ?? check.specs,
-      );
-      if (parameterName) next.PARAMETER = parameterName;
-      next.SPECIFICATION = specification || "NA";
-      const checkId = pickString(check.parameterId, check.specificationCode, check.specCode);
-      if (checkId) next.PARAMETER_ID = checkId;
-    }
-
-    if (!check) return next;
-
-    const observations = asArray(check.observations)
-      .map((item, index) => {
-        if (item == null) return null;
-        if (typeof item === "string" || typeof item === "number") {
-          return { index, value: String(item) };
-        }
-        const rec = asRecord(item);
-        if (!rec) return null;
-        const sampleNo = pickNumber(rec.sampleNo);
-        return {
-          index: sampleNo != null && sampleNo > 0 ? sampleNo - 1 : index,
-          value: String(rec.value ?? "").trim(),
-        };
-      })
-      .filter((item): item is { index: number; value: string } => Boolean(item));
-
+    const sampleCount = Math.max(
+      1,
+      Number(definition?.sampleCount) || 0,
+      pickNumber(check?.noOfSamples, check?.sampleCount) || 0,
+      resolveMixingRowSampleCount(row),
+      readObservationValues(
+        asArray(check?.observations ?? check?.values ?? check?.observedValues),
+      ).length,
+    );
+    const valueFields = buildMixingValueFields(sampleCount);
+    const observed = readObservationValues(
+      asArray(check?.observedValues ?? check?.values ?? check?.observations),
+    );
+    const nextValues: Record<string, string> = {};
     valueFields.forEach((field, index) => {
-      const observation = observations.find((item) => item.index === index);
-      const observationValue = String(observation?.value ?? "").trim();
-      if (!observationValue) return;
-      const current = String(next[field] ?? "").trim();
-      if (options?.onlyIfEmpty !== false && current) return;
-      next[field] = observationValue;
+      const fromObserved = observed[index];
+      const prior = row[field];
+      if (options?.onlyIfEmpty && hasValue(prior)) {
+        nextValues[field] = String(prior ?? "");
+        return;
+      }
+      nextValues[field] =
+        fromObserved != null && String(fromObserved).trim() !== ""
+          ? String(fromObserved).trim()
+          : String(prior ?? "");
     });
-    return next;
+
+    return {
+      ...row,
+      SAMPLE_COUNT: sampleCount,
+      ...nextValues,
+      SPECIFICATION:
+        pickString(row.SPECIFICATION) ||
+        formatSpecificationLabel(check?.specification) ||
+        definition?.specification ||
+        "NA",
+    };
   });
 
   return setMixingDetailsRows(values, variant, nextRows);
@@ -727,24 +938,31 @@ export const createInitialMixingDetailsRows = (
   qualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null,
 ): QcMixingDetailsRow[] => {
   if (qualityCheckDefinitions?.length) {
-    return qualityCheckDefinitions.map((definition) => ({
-      PARAMETER: definition.parameter,
-      PARAMETER_ID: definition.parameterId,
-      readonly: true,
-      BOWL_NO: "",
-      [DETAILS_DATE_KEY[variant]]: "",
-      MIXER_BLDG_NO: "",
-      PREMIX_QTY: "",
-      SPECIFICATION: definition.specification || "NA",
-      VALUE_1: "",
-      VALUE_2: "",
-      VALUE_3: "",
-      VALUE_4: "",
-      VALUE_5: variant === "premix" ? "" : undefined,
-      REMARKS: "",
-    }));
+    return qualityCheckDefinitions.map((definition) => {
+      const sampleCount = Math.max(1, Number(definition.sampleCount) || 1);
+      const bounds =
+        definition.specMin != null || definition.specMax != null
+          ? { min: definition.specMin, max: definition.specMax }
+          : parseMixingSpecificationBounds(definition.specification);
+      return {
+        PARAMETER: definition.parameter,
+        PARAMETER_ID: definition.parameterId,
+        readonly: true,
+        BOWL_NO: "",
+        [DETAILS_DATE_KEY[variant]]: "",
+        MIXER_BLDG_NO: "",
+        PREMIX_QTY: "",
+        SPECIFICATION: definition.specification || "NA",
+        ...(bounds.min != null ? { SPEC_MIN: bounds.min } : {}),
+        ...(bounds.max != null ? { SPEC_MAX: bounds.max } : {}),
+        SAMPLE_COUNT: sampleCount,
+        ...emptyValueFields(sampleCount),
+        REMARKS: "",
+      };
+    });
   }
 
+  // Last-resort static fallback when master data is unavailable.
   return DETAILS_PARAMETERS[variant].map((parameter) => ({
     PARAMETER: parameter,
     readonly: true,
@@ -752,18 +970,27 @@ export const createInitialMixingDetailsRows = (
     [DETAILS_DATE_KEY[variant]]: "",
     MIXER_BLDG_NO: "",
     PREMIX_QTY: "",
-    SPECIFICATION: "",
-    VALUE_1: "",
-    VALUE_2: "",
-    VALUE_3: "",
-    VALUE_4: "",
-    VALUE_5: variant === "premix" ? "" : undefined,
+    SPECIFICATION: "NA",
+    SAMPLE_COUNT: 1,
+    ...emptyValueFields(1),
     REMARKS: "",
   }));
 };
 
-export const getMixingValueFields = (variant: QcMixingDetailsVariant) =>
-  variant === "premix" ? QC_MIXING_PREMIX_VALUE_FIELDS : QC_MIXING_FINAL_MIX_VALUE_FIELDS;
+/** Value columns for the table header — max sample count across rows/definitions. */
+export const getMixingValueFields = (
+  variant: QcMixingDetailsVariant,
+  rowsOrDefs?: Array<QcMixingDetailsRow | QcMixingQualityCheckDefinition> | null,
+): string[] => {
+  if (rowsOrDefs?.length) {
+    const max = Math.max(1, ...rowsOrDefs.map((row) => resolveMixingRowSampleCount(row)));
+    return buildMixingValueFields(max);
+  }
+  // Legacy fallback when no defs/rows yet.
+  return variant === "premix"
+    ? [...QC_MIXING_PREMIX_VALUE_FIELDS]
+    : [...QC_MIXING_FINAL_MIX_VALUE_FIELDS];
+};
 
 export const createInitialPremixDetailsValues = (
   qualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null,
@@ -810,30 +1037,71 @@ export const getMixingDetailsRows = (
         byId.get(definition.parameterId.trim().toUpperCase()) ??
         byName.get(definition.parameter.trim().toUpperCase()) ??
         rows[index];
+      const sampleCount = Math.max(
+        1,
+        Number(definition.sampleCount) || resolveMixingRowSampleCount(match) || 1,
+      );
       return {
         ...(match ?? {}),
         PARAMETER: definition.parameter || match?.PARAMETER || "",
         PARAMETER_ID: definition.parameterId || match?.PARAMETER_ID || "",
         SPECIFICATION: definition.specification || match?.SPECIFICATION || "NA",
+        ...(definition.specMin != null
+          ? { SPEC_MIN: definition.specMin }
+          : match?.SPEC_MIN != null
+            ? { SPEC_MIN: match.SPEC_MIN }
+            : {}),
+        ...(definition.specMax != null
+          ? { SPEC_MAX: definition.specMax }
+          : match?.SPEC_MAX != null
+            ? { SPEC_MAX: match.SPEC_MAX }
+            : {}),
         REMARKS: match?.REMARKS ?? "",
-        VALUE_1: match?.VALUE_1 ?? "",
-        VALUE_2: match?.VALUE_2 ?? "",
-        VALUE_3: match?.VALUE_3 ?? "",
-        VALUE_4: match?.VALUE_4 ?? "",
-        VALUE_5: match?.VALUE_5 ?? "",
+        SAMPLE_COUNT: sampleCount,
+        ...pickValueFieldsFromRow(match, sampleCount),
         readonly: true,
       };
     });
   }
-  if (rows.length >= DETAILS_PARAMETERS[variant].length) return rows;
-  const byParameter = new Map(rows.map((row) => [String(row.PARAMETER ?? ""), row]));
-  return DETAILS_PARAMETERS[variant].map(
-    (parameter) =>
-      byParameter.get(parameter) ?? {
-        PARAMETER: parameter,
-        readonly: true,
-      },
+
+  // Prefer persisted form rows as-is. Master QC may have 1..N parameters that do not
+  // match the legacy Homogeneity/Moisture fallback — remapping those wiped bowl/date/
+  // mixer/batch/value on save (buildMixingDetailsDomainPayload calls this without defs).
+  const normalizePersisted = (row: QcMixingDetailsRow): QcMixingDetailsRow => {
+    const sampleCount = resolveMixingRowSampleCount(row);
+    return {
+      ...row,
+      SAMPLE_COUNT: sampleCount,
+      ...pickValueFieldsFromRow(row, sampleCount),
+    };
+  };
+
+  const hasMasterOrUserRows = rows.some(
+    (row) =>
+      Boolean(String(row.PARAMETER_ID ?? "").trim()) ||
+      rowHasUserData(row) ||
+      Boolean(String(row.PARAMETER ?? "").trim()),
   );
+  if (hasMasterOrUserRows) {
+    return rows.map(normalizePersisted);
+  }
+
+  // Legacy static-parameter fallback only when form rows are blank placeholders.
+  const byParameter = new Map(rows.map((row) => [String(row.PARAMETER ?? ""), row]));
+  return DETAILS_PARAMETERS[variant].map((parameter) => {
+    const match = byParameter.get(parameter);
+    const sampleCount = resolveMixingRowSampleCount(match);
+    return (
+      match
+        ? normalizePersisted(match)
+        : {
+            PARAMETER: parameter,
+            readonly: true,
+            SAMPLE_COUNT: sampleCount,
+            ...emptyValueFields(sampleCount),
+          }
+    );
+  });
 };
 
 export const setMixingDetailsRows = (
@@ -844,6 +1112,85 @@ export const setMixingDetailsRows = (
   ...(values ?? {}),
   [DETAILS_FORM_KEY[variant]]: rows,
 });
+
+/**
+ * Write master QC Specification / sample columns into form rows when the UI
+ * overlays them for display but form state still has empty SPECIFICATION
+ * (common when auto-seed locks header fields before quality checks arrive).
+ * Preserves user-entered SPECIFICATION / VALUE / REMARKS.
+ */
+export const mergeMixingQualityChecksIntoValues = (
+  values: SchemaFormValues | null | undefined,
+  variant: QcMixingDetailsVariant,
+  qualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null,
+): SchemaFormValues | null => {
+  if (!qualityCheckDefinitions?.length) return null;
+  const formKey = DETAILS_FORM_KEY[variant];
+  const current = values ?? {};
+  const raw = current[formKey];
+  const existingRows =
+    Array.isArray(raw) && raw.length
+      ? (raw.filter((row) => row && typeof row === "object") as QcMixingDetailsRow[])
+      : [];
+
+  const byId = new Map(
+    existingRows
+      .filter((row) => String(row.PARAMETER_ID ?? "").trim())
+      .map((row) => [String(row.PARAMETER_ID).trim().toUpperCase(), row]),
+  );
+  const byName = new Map(
+    existingRows
+      .filter((row) => String(row.PARAMETER ?? "").trim())
+      .map((row) => [String(row.PARAMETER).trim().toUpperCase(), row]),
+  );
+
+  let changed = existingRows.length !== qualityCheckDefinitions.length;
+  const nextRows: QcMixingDetailsRow[] = qualityCheckDefinitions.map((definition, index) => {
+    const match =
+      byId.get(definition.parameterId.trim().toUpperCase()) ??
+      byName.get(definition.parameter.trim().toUpperCase()) ??
+      existingRows[index];
+    const sampleCount = Math.max(
+      1,
+      Number(definition.sampleCount) || resolveMixingRowSampleCount(match) || 1,
+    );
+    const masterSpec = String(definition.specification ?? "").trim();
+    const existingSpec = String(match?.SPECIFICATION ?? "").trim();
+    const nextSpec = existingSpec || masterSpec || "NA";
+    if (
+      !match ||
+      String(match.PARAMETER ?? "") !== (definition.parameter || match?.PARAMETER || "") ||
+      String(match.PARAMETER_ID ?? "") !== (definition.parameterId || match?.PARAMETER_ID || "") ||
+      existingSpec !== nextSpec ||
+      Number(match.SAMPLE_COUNT ?? 0) !== sampleCount
+    ) {
+      changed = true;
+    }
+    return {
+      ...(match ?? {}),
+      PARAMETER: definition.parameter || match?.PARAMETER || "",
+      PARAMETER_ID: definition.parameterId || match?.PARAMETER_ID || "",
+      SPECIFICATION: nextSpec,
+      ...(definition.specMin != null
+        ? { SPEC_MIN: definition.specMin }
+        : match?.SPEC_MIN != null
+          ? { SPEC_MIN: match.SPEC_MIN }
+          : {}),
+      ...(definition.specMax != null
+        ? { SPEC_MAX: definition.specMax }
+        : match?.SPEC_MAX != null
+          ? { SPEC_MAX: match.SPEC_MAX }
+          : {}),
+      SAMPLE_COUNT: sampleCount,
+      ...pickValueFieldsFromRow(match, sampleCount),
+      REMARKS: match?.REMARKS ?? "",
+      readonly: true,
+    };
+  });
+
+  if (!changed && existingRows.length) return null;
+  return setMixingDetailsRows(current, variant, nextRows);
+};
 
 export const getViscosityRows = (
   values: SchemaFormValues | null | undefined,
@@ -1018,6 +1365,7 @@ export type QcMixingDomainParameter = {
   specification: string;
   value?: string;
   values?: string[];
+  noOfSamples?: number;
   remarks?: string;
 };
 
@@ -1034,21 +1382,21 @@ export type QcMixingDomainDetails = {
 
 const buildDomainParametersFromRows = (
   rows: QcMixingDetailsRow[],
-  variant: QcMixingDetailsVariant,
+  _variant: QcMixingDetailsVariant,
 ): QcMixingDomainParameter[] => {
-  const valueFields = getMixingValueFields(variant);
   return rows.map((row) => {
-    const compactValues = valueFields.map((field) => String(row[field] ?? "").trim());
-    while (compactValues.length && !compactValues[compactValues.length - 1]) {
-      compactValues.pop();
-    }
-    const firstValue = compactValues.find((value) => value) ?? "";
+    const sampleCount = resolveMixingRowSampleCount(row);
+    const valueFields = buildMixingValueFields(sampleCount);
+    // Manufacturing Mixing parity: keep full noOfSamples slots (do not drop trailing empties).
+    const values = valueFields.map((field) => String(row[field] ?? "").trim());
+    const firstValue = values.find((value) => value) ?? "";
     return {
       ...(pickString(row.PARAMETER_ID) ? { parameterId: pickString(row.PARAMETER_ID) } : {}),
       parameter: pickString(row.PARAMETER),
       specification: pickString(row.SPECIFICATION),
       value: firstValue,
-      values: compactValues,
+      values,
+      noOfSamples: sampleCount,
       remarks: pickString(row.REMARKS),
     };
   });
@@ -1058,7 +1406,18 @@ export const buildMixingDetailsDomainPayload = (
   values: SchemaFormValues | null | undefined,
   variant: QcMixingDetailsVariant,
 ): QcMixingDomainDetails | null => {
-  const rows = sanitizeDetailsRowsForVariant(getMixingDetailsRows(values, variant), variant);
+  // Prefer the raw form table array — never remap through static Homogeneity/Moisture
+  // fallbacks (that wiped bowl/date/mixer/batch/value on submit).
+  const formKey = DETAILS_FORM_KEY[variant];
+  const raw = values?.[formKey];
+  const persistedRows =
+    Array.isArray(raw) && raw.length
+      ? (raw.filter((row) => row && typeof row === "object") as QcMixingDetailsRow[])
+      : [];
+  const rows = sanitizeDetailsRowsForVariant(
+    persistedRows.length ? persistedRows : getMixingDetailsRows(values, variant),
+    variant,
+  );
   if (!rows.length) return null;
   const first = rows[0];
   return {
@@ -1194,6 +1553,18 @@ export const buildMixingPremixesPayload = (
             submissionType && !bucket.premixEntryId ? submissionType : null,
           );
         }
+      } else if (!bucket.premixEntryId && form.mixingFinalMixDetailsValues) {
+        // Shared Final Mix details bucket (no viscosity entry yet).
+        const sharedDetails = buildMixingDetailsDomainPayload(
+          form.mixingFinalMixDetailsValues,
+          "finalMix",
+        );
+        if (sharedDetails) {
+          payload.finalMixDetails = buildMixingDetailsWithSubmissionType(
+            sharedDetails,
+            submissionType,
+          );
+        }
       }
 
       return payload;
@@ -1211,7 +1582,6 @@ const mapDomainParametersToRows = (
   shared: QcMixingDetailsSeed,
 ): QcMixingDetailsRow[] => {
   const list = asArray(parameters);
-  const valueFields = getMixingValueFields(variant);
   if (!list.length) {
     return createInitialMixingDetailsRows(variant).map((row) => ({
       ...row,
@@ -1221,30 +1591,38 @@ const mapDomainParametersToRows = (
 
   return list.map((item) => {
     const rec = asRecord(item) ?? {};
-    const valuesFromArray = asArray(rec.values).map((value) => String(value ?? "").trim());
-    const observations = asArray(rec.observations);
-    const valuesFromObservations = observations.map((obs) => {
-      if (typeof obs === "string" || typeof obs === "number") return String(obs);
-      return pickString(asRecord(obs)?.value);
-    });
+    const rawValuesList = asArray(rec.values).map((value) => String(value ?? "").trim());
+    // Treat all-empty values[] as absent so we can fall back to `value` / observations.
+    const valuesFromArray = rawValuesList.some((value) => Boolean(value)) ? rawValuesList : [];
+    const valuesFromObservations = readObservationValues(asArray(rec.observations));
+    const hasObservedValue = valuesFromObservations.some((value) => Boolean(value));
     const singleValue = pickString(rec.value, rec.result);
     const resolvedValues =
       valuesFromArray.length > 0
         ? valuesFromArray
-        : valuesFromObservations.length > 0
+        : hasObservedValue
           ? valuesFromObservations
           : singleValue
             ? [singleValue]
             : [];
+    const sampleCount = Math.max(
+      1,
+      Number(rec.noOfSamples ?? rec.sampleCount) || resolvedValues.length || 1,
+      resolvedValues.length,
+      // Keep column count when API returned empty padded values[] of known length.
+      rawValuesList.length,
+      valuesFromObservations.length,
+    );
+    const valueFields = buildMixingValueFields(sampleCount);
 
     const row: QcMixingDetailsRow = {
       ...shared,
       PARAMETER_ID: pickString(rec.parameterId, rec.specificationCode, rec.specCode),
       PARAMETER: pickString(rec.parameterName, rec.parameter, rec.specificationName),
-      SPECIFICATION: formatSpecificationLabel(
-        rec.specification ?? rec.referenceRange ?? rec.specs,
-      ) || "NA",
+      SPECIFICATION:
+        formatSpecificationLabel(rec.specification ?? rec.referenceRange ?? rec.specs) || "NA",
       REMARKS: pickString(rec.remarks, rec.remark, rec.REMARKS),
+      SAMPLE_COUNT: sampleCount,
       readonly: true,
     };
     valueFields.forEach((field, index) => {
@@ -1266,17 +1644,36 @@ export const hydrateMixingDetailsValuesFromDomain = (
   }
 
   const shared: QcMixingDetailsSeed = {
-    BOWL_NO: pickString(rec.bowlNo, rec.BOWL_NO),
-    MIXER_BLDG_NO: pickString(rec.mixerBuildingNo, rec.MIXER_BLDG_NO),
-    PREMIX_QTY: pickString(rec.premixQty, rec.PREMIX_QTY),
+    BOWL_NO: pickString(rec.bowlNo, rec.BOWL_NO, rec.bowlNumber, rec.bowl),
+    MIXER_BLDG_NO: pickString(
+      rec.mixerBuildingNo,
+      rec.MIXER_BLDG_NO,
+      rec.mixerBldgNo,
+      rec.mixerBuilding,
+    ),
+    PREMIX_QTY: pickString(rec.premixQty, rec.PREMIX_QTY, rec.batchSize, rec.batchSizeKg),
   };
   if (variant === "premix") {
-    shared.DATE_OF_PREMIX = pickString(rec.dateOfPremix, rec.DATE_OF_PREMIX);
+    shared.DATE_OF_PREMIX = pickString(
+      rec.dateOfPremix,
+      rec.DATE_OF_PREMIX,
+      rec.premixDate,
+      rec.mixDate,
+    );
   } else {
-    shared.DATE_OF_FINAL_MIX = pickString(rec.dateOfFinalMix, rec.DATE_OF_FINAL_MIX);
+    shared.DATE_OF_FINAL_MIX = pickString(
+      rec.dateOfFinalMix,
+      rec.DATE_OF_FINAL_MIX,
+      rec.finalMixDate,
+      rec.mixDate,
+    );
   }
 
-  const rows = mapDomainParametersToRows(rec.parameters, variant, shared);
+  const rows = mapDomainParametersToRows(
+    rec.parameters ?? rec.qualityChecks,
+    variant,
+    shared,
+  );
   return setMixingDetailsRows({}, variant, syncSharedDetailsFields(rows, variant));
 };
 
@@ -1313,7 +1710,10 @@ export const hydrateMixingDivisionFromFormData = (
   const root = asRecord(data);
   if (!root) return null;
 
-  const premixes = asArray(root.premixes);
+  // Accept `{ premixes }`, `{ data: { premixes } }`, or merged resolveMixingQcFormData output.
+  const premixes = asArray(root.premixes).length
+    ? asArray(root.premixes)
+    : asArray(asRecord(root.data)?.premixes);
   if (premixes.length) {
     const premixEntries: HydratedMixingDivisionData["premixEntries"] = [];
     const finalMixEntries: HydratedMixingDivisionData["finalMixEntries"] = [];

@@ -1025,9 +1025,9 @@ const MixingForm = ({
           ? "Cannot save draft. Fix the validation errors first."
           : "Cannot submit. Fix the validation errors first.";
       // Explicit snackbar — same path as RMP / QC revalidation.
-      useAlertStore.getState().showValidationAlert(
-        firstMessage ? `${base} (${String(firstMessage).trim()})` : base,
-      );
+      useAlertStore
+        .getState()
+        .showValidationAlert(firstMessage ? `${base} (${String(firstMessage).trim()})` : base);
 
       if (focus) {
         const navIndex = navItems.findIndex(
@@ -1079,10 +1079,7 @@ const MixingForm = ({
       if (!resolvedProjectId || motorStage == null) return;
       setLoadingCycles(true);
       try {
-        const response = await mixingController.fetchMixingCycle(
-          resolvedProjectId,
-          motorStage,
-        );
+        const response = await mixingController.fetchMixingCycle(resolvedProjectId, motorStage);
         const dataList = (response as any)?.data?.data || (response as any)?.data || response || [];
 
         const list = Array.isArray(dataList) ? dataList : [dataList];
@@ -1544,11 +1541,7 @@ const MixingForm = ({
     if (!attempt.format && !attempt.unit && !attempt.submit) return;
 
     // Keep required highlights after Save (UNIT) / Submit — do not wipe with FORMAT.
-    const tier: ValidationTier = attempt.submit
-      ? "SUBMIT"
-      : attempt.unit
-        ? "UNIT"
-        : "FORMAT";
+    const tier: ValidationTier = attempt.submit ? "SUBMIT" : attempt.unit ? "UNIT" : "FORMAT";
     const handler = setTimeout(() => {
       if (activePremixItem) {
         const activeIndex = premixCards.findIndex((p) => p.premixNo === activePremixItem.premixNo);

@@ -11,6 +11,7 @@ import {
   pickFinalMixDetailsSchemaValues,
   pickViscositySchemaValues,
   type QcMixingDetailsSeed,
+  type QcMixingQualityCheckDefinition,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import QCMixingDetailsTable from "./QCMixingDetailsTable";
@@ -32,6 +33,7 @@ type QCMixingFinalMixPanelProps = {
   readOnly?: boolean;
   fieldsDisabled?: boolean;
   autoSeed?: QcMixingDetailsSeed | null;
+  qualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null;
   unitActions?: QCDivisionEntryUnitActions | null;
   actionLabels?: Pick<QCDivisionEntryUnitActions, "saveDraftLabel" | "submitLabel" | "viewDetailsLabel">;
   detailsValidationErrors?: Record<string, string> | null;
@@ -47,6 +49,7 @@ const QCMixingFinalMixPanel = ({
   readOnly = false,
   fieldsDisabled = false,
   autoSeed = null,
+  qualityCheckDefinitions = null,
   unitActions = null,
   actionLabels = null,
   detailsValidationErrors = null,
@@ -170,6 +173,7 @@ const QCMixingFinalMixPanel = ({
           onChange={handleFinalMixDetailsChange}
           readOnly={readOnly}
           autoSeed={autoSeed}
+          qualityCheckDefinitions={qualityCheckDefinitions}
           validationErrors={detailsValidationErrors}
         />
         <QCMixingViscosityTable

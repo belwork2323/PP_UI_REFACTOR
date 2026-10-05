@@ -41,12 +41,13 @@ const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
   ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
-    headerFontSize: "0.68rem",
-    headerLetterSpacing: "0.06em",
-    headerPaddingY: "10px",
-    headerPaddingX: "12px",
+    headerFontSize: "0.62rem",
+    headerLetterSpacing: "0.04em",
+    headerPaddingY: "5px",
+    headerPaddingX: "8px",
   }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
+  lineHeight: 1.2,
 };
 
 const cellSx = {
@@ -197,7 +198,7 @@ const QCMixingViscosityTable = ({
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.TIME} />
                   ) : (
-                    <Box>
+                    <Box data-qc-field={`viscosityRows.${index}.TIME`}>
                       <TextField
                         size="small"
                         fullWidth
@@ -206,6 +207,7 @@ const QCMixingViscosityTable = ({
                         onChange={(event) => updateRow(index, "TIME", event.target.value)}
                         sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
                         error={Boolean(err(`viscosityRows.${index}.TIME`))}
+                        inputProps={{ "data-qc-field": `viscosityRows.${index}.TIME` }}
                       />
                       <FieldErrorText message={err(`viscosityRows.${index}.TIME`)} />
                     </Box>
@@ -215,7 +217,7 @@ const QCMixingViscosityTable = ({
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.VISCOSITY_VALUE} />
                   ) : (
-                    <Box>
+                    <Box data-qc-field={`viscosityRows.${index}.VISCOSITY_VALUE`}>
                       <TextField
                         size="small"
                         fullWidth
@@ -224,6 +226,9 @@ const QCMixingViscosityTable = ({
                         onChange={(event) => updateRow(index, "VISCOSITY_VALUE", event.target.value)}
                         sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
                         error={Boolean(err(`viscosityRows.${index}.VISCOSITY_VALUE`))}
+                        inputProps={{
+                          "data-qc-field": `viscosityRows.${index}.VISCOSITY_VALUE`,
+                        }}
                       />
                       <FieldErrorText message={err(`viscosityRows.${index}.VISCOSITY_VALUE`)} />
                     </Box>

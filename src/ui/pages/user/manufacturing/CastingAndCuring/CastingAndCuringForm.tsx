@@ -15,7 +15,6 @@ import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { useAlertStore } from "../../../../../app/store/alertStore";
 import {
-  firstValidationError,
   hasValidationErrors,
 } from "../../../../../data/validation/validationErrors";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
@@ -37,40 +36,6 @@ import {
 } from "../../../../../data/models/user/CastingCuringFormModel";
 import { createEmptyCastingMotorData } from "../../../../../data/models/user/CastingMotorDataModel";
 import { createEmptyCuringMotorData } from "../../../../../data/models/user/CuringMotorDataModel";
-
-const CURING_VALIDATION_PREFIXES = [
-  "CURING_CYCLES.",
-  "POST_CURING_DETAILS.",
-  "DECORING_DETAILS.",
-] as const;
-
-const isCuringValidationPath = (path: string) =>
-  CURING_VALIDATION_PREFIXES.some((prefix) => path.startsWith(prefix));
-
-const resolveProcessTabForValidationErrors = (
-  errors: Record<string, string>,
-): MotorProcessTab | null => {
-  const keys = Object.keys(errors);
-  if (keys.length === 0) return null;
-  const hasCuring = keys.some(isCuringValidationPath);
-  const hasCasting = keys.some((key) => !isCuringValidationPath(key));
-  if (hasCuring && !hasCasting) return "CURING";
-  if (hasCasting) return "CASTING";
-  return "CURING";
-};
-
-const stripValidationErrorsByPrefix = (
-  errors: Record<string, string>,
-  prefixes: readonly string[],
-) => {
-  const next = { ...errors };
-  Object.keys(next).forEach((key) => {
-    if (prefixes.some((prefix) => key.startsWith(prefix))) {
-      delete next[key];
-    }
-  });
-  return next;
-};
 import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
@@ -83,6 +48,8 @@ import CastingCuringFlowBar from "./CastingCuringFlowBar";
 import CastingMotorPanel from "./CastingMotorPanel";
 import CuringMotorPanel from "./CuringMotorPanel";
 import {
+  focusCcField,
+  resolveFirstCastingCuringValidationFocus,
   validateCastingMotor,
   validateCuringMotor,
 } from "../../../../../data/validation/adapters/castingCuring.validation";
@@ -106,6 +73,25 @@ const S = STRINGS.MANUFACTURING.CASTING_CURING;
 const { thermostat: ThermostatRoundedIcon } = icons.user.manufacturing.castingAndCuring.form;
 
 type MotorProcessTab = "CASTING" | "CURING";
+
+const CURING_VALIDATION_PREFIXES = [
+  "CURING_CYCLES.",
+  "POST_CURING_DETAILS.",
+  "DECORING_DETAILS.",
+] as const;
+
+const stripValidationErrorsByPrefix = (
+  errors: Record<string, string>,
+  prefixes: readonly string[],
+) => {
+  const next = { ...errors };
+  Object.keys(next).forEach((key) => {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      delete next[key];
+    }
+  });
+  return next;
+};
 
 type CastingAndCuringFormProps = {
   batch?: CastingCuringBatchMotorSource | null;
@@ -167,7 +153,7 @@ const CastingAndCuringForm = ({
   theme,
 }: CastingAndCuringFormProps) => {
   const BRAND = CASTING_CURING_BRAND;
-  const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const motorCards = useMemo(() => {
     const formMotors = Array.isArray(addedMotors) ? addedMotors : [];
     return mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors);
@@ -194,6 +180,10 @@ const CastingAndCuringForm = ({
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("CASTING");
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    fieldPath: string;
+  } | null>(null);
   const [ovenOptions, setOvenOptions] = useState<
     Array<{ value: string; label: string; noOfOvenAvailable?: number }>
   >([]);
@@ -205,6 +195,58 @@ const CastingAndCuringForm = ({
     setActiveMotorIndex(0);
     prevMotorCountRef.current = 0;
   }, [formSessionKey]);
+
+  const emitCastingCuringValidationFailure = useCallback((errors: Record<string, string>) => {
+    setValidationErrors(errors);
+    const focus = resolveFirstCastingCuringValidationFocus(errors);
+    const firstMessage =
+      (focus?.fieldPath && (errors[focus.fieldPath] ||
+        Object.entries(errors).find(([k]) =>
+          k === focus.fieldPath ||
+          k === focus.fieldPath.replace(/\.START_DATE$/, ".START_TIME") ||
+          k === focus.fieldPath.replace(/\.END_DATE$/, ".END_TIME"),
+        )?.[1])) ||
+      Object.values(errors).find((m) => String(m ?? "").trim()) ||
+      "";
+    const base = S.SUBMIT_VALIDATION_FAILED;
+    showValidationAlert(
+      firstMessage ? `${base} (${String(firstMessage).trim()})` : base,
+    );
+    if (focus) {
+      setActiveProcessTab(focus.processTab);
+      setValidationFocusRequest((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        fieldPath: focus.fieldPath,
+      }));
+    }
+  }, [showValidationAlert]);
+
+  // Focus once per validation failure request. Do NOT depend on validationErrors —
+  // live clear-on-edit updates would steal focus mid-typing.
+  useEffect(() => {
+    if (!validationFocusRequest?.fieldPath) return;
+    const fieldPath = validationFocusRequest.fieldPath;
+    let tries = 0;
+    let cancelled = false;
+    const retryTimers: number[] = [];
+    const tryFocus = () => {
+      if (cancelled) return;
+      tries += 1;
+      if (focusCcField(fieldPath)) {
+        setValidationFocusRequest(null);
+        return;
+      }
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const t = window.setTimeout(tryFocus, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      retryTimers.forEach((id) => clearTimeout(id));
+    };
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath, activeProcessTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -557,7 +599,7 @@ const CastingAndCuringForm = ({
                         if (!motor) return;
 
                         if (!curingFormLoaded) {
-                          showAlert(S.CURING_REQUIRED_BEFORE_SUBMIT, "warning");
+                          showValidationAlert(S.CURING_REQUIRED_BEFORE_SUBMIT);
                           setActiveProcessTab("CURING");
                           return;
                         }
@@ -570,16 +612,7 @@ const CastingAndCuringForm = ({
                         const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
 
                         if (hasValidationErrors(errors)) {
-                          setValidationErrors(errors);
-                          const nextTab = resolveProcessTabForValidationErrors(errors);
-                          if (nextTab) setActiveProcessTab(nextTab);
-                          const firstError = firstValidationError(errors);
-                          showAlert(
-                            firstError
-                              ? `${S.SUBMIT_VALIDATION_FAILED} (${firstError})`
-                              : S.SUBMIT_VALIDATION_FAILED,
-                            "warning",
-                          );
+                          emitCastingCuringValidationFailure(errors);
                           return;
                         }
                         setValidationErrors({});

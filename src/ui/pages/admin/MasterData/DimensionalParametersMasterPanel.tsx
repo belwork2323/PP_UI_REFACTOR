@@ -50,6 +50,7 @@ type Props = {
   refreshDisabled?: boolean;
   t: any;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
+  isCentreHead?: boolean;
 };
 
 const DimensionalParametersMasterPanel = ({
@@ -60,13 +61,17 @@ const DimensionalParametersMasterPanel = ({
   refreshDisabled = false,
   t,
   onStatsChange,
+  isCentreHead = false,
 }: Props) => {
   const mode = useThemeStore((s) => s.mode);
   const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
   const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
 
-  const { projects: projectSelectOptions, options: projectOptions, loading: projectLoading } =
-    useProjectForMotorStageOptions(true);
+  const {
+    projects: projectSelectOptions,
+    options: projectOptions,
+    loading: projectLoading,
+  } = useProjectForMotorStageOptions(true);
   const { options: unitOptions, loading: unitLoading } = useUnitMasterOptions(true);
   const hook = useDimensionalParametersMasterHook({
     activeFilter,
@@ -162,13 +167,17 @@ const DimensionalParametersMasterPanel = ({
                 <TableCell sx={{ ...table.headerCell, minWidth: 220 }}>
                   {S.DIMENSIONAL_PARAMETERS.COL_PROJECT}
                 </TableCell>
-                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}</TableCell>
+                <TableCell sx={table.headerCell}>
+                  {S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}
+                </TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MIN}</TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MAX}</TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_UNIT}</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -195,11 +204,11 @@ const DimensionalParametersMasterPanel = ({
                     <TableCell sx={{ ...table.cell, minWidth: 220 }}>
                       {renderProjectCell(row.projectId)}
                     </TableCell>
-                      <TableCell sx={table.cell}>
-                        <Typography sx={table.bodyText}>
-                          {formatMotorStageLabel(row.motorType, filterMotorStageOptions)}
-                        </Typography>
-                      </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>
+                        {formatMotorStageLabel(row.motorType, filterMotorStageOptions)}
+                      </Typography>
+                    </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.minValue ?? "—"}</Typography>
                     </TableCell>
@@ -219,42 +228,33 @@ const DimensionalParametersMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => setViewTarget(row)}
-                            disabled={
-                              hook.saving ||
-                              formOpen ||
-                              hook.disabling ||
-                              hook.enabling
-                            }
+                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
                             aria-label={S.TABLE.VIEW}
                           >
                             <icons.visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title={S.TABLE.EDIT}>
-                          <IconButton
-                            size="small"
-                            onClick={() => hook.openEdit(row)}
-                            disabled={
-                              hook.saving ||
-                              formOpen ||
-                              hook.disabling ||
-                              hook.enabling
-                            }
-                            aria-label={S.TABLE.EDIT}
-                          >
-                            <icons.Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <MasterDataActiveSwitch
-                          isActive={row.isActive}
-                          disabled={
-                            hook.saving ||
-                            formOpen ||
-                            hook.disabling ||
-                            hook.enabling
-                          }
-                          onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
-                        />
+                        {!isCentreHead && (
+                          <>
+                            <Tooltip title={S.TABLE.EDIT}>
+                              <IconButton
+                                size="small"
+                                onClick={() => hook.openEdit(row)}
+                                disabled={
+                                  hook.saving || formOpen || hook.disabling || hook.enabling
+                                }
+                                aria-label={S.TABLE.EDIT}
+                              >
+                                <icons.Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <MasterDataActiveSwitch
+                              isActive={row.isActive}
+                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                              onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                            />
+                          </>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -273,18 +273,19 @@ const DimensionalParametersMasterPanel = ({
           rowsPerPageOptions={[5, 10, 25]}
         />
       </Paper>
-
-      <Box sx={t.addRowBar}>
-        <Button
-          variant="contained"
-          startIcon={<icons.projectMgmt.add />}
-          onClick={hook.openCreate}
-          disabled={hook.loading || formOpen}
-          sx={t.pageHeader.newProjectButton}
-        >
-          {addButtonLabel}
-        </Button>
-      </Box>
+      {!isCentreHead && (
+        <Box sx={t.addRowBar}>
+          <Button
+            variant="contained"
+            startIcon={<icons.projectMgmt.add />}
+            onClick={hook.openCreate}
+            disabled={hook.loading || formOpen}
+            sx={t.pageHeader.newProjectButton}
+          >
+            {addButtonLabel}
+          </Button>
+        </Box>
+      )}
 
       <DimensionalParametersMasterFormDialog
         open={formOpen}

@@ -53,6 +53,7 @@ type Props = {
   t: any;
   onListPayloadChange?: (payload: CuringCycleListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
+  isCentreHead?: boolean;
 };
 
 const CuringCycleMasterPanel = ({
@@ -64,13 +65,17 @@ const CuringCycleMasterPanel = ({
   t,
   onListPayloadChange,
   onStatsChange,
+  isCentreHead = false,
 }: Props) => {
   const mode = useThemeStore((s) => s.mode);
   const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
   const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
 
-  const { projects: projectSelectOptions, options: projectOptions, loading: projectLoading } =
-    useProjectForMotorStageOptions(true);
+  const {
+    projects: projectSelectOptions,
+    options: projectOptions,
+    loading: projectLoading,
+  } = useProjectForMotorStageOptions(true);
   const { options: curingTypeOptions } = useCuringTypeOptions();
   const hook = useCuringCycleMasterHook({
     activeFilter,
@@ -162,7 +167,9 @@ const CuringCycleMasterPanel = ({
                 <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_STEPS}</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -187,7 +194,9 @@ const CuringCycleMasterPanel = ({
                       </Typography>
                     </TableCell>
                     <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{formatCuringTypeLabel(row.curingType)}</Typography>
+                      <Typography sx={table.bodyText}>
+                        {formatCuringTypeLabel(row.curingType)}
+                      </Typography>
                     </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.cycles.length}</Typography>
@@ -202,42 +211,33 @@ const CuringCycleMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => setViewTarget(row)}
-                            disabled={
-                              hook.saving ||
-                              formOpen ||
-                              hook.disabling ||
-                              hook.enabling
-                            }
+                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
                             aria-label={S.TABLE.VIEW}
                           >
                             <icons.visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title={S.TABLE.EDIT}>
-                          <IconButton
-                            size="small"
-                            onClick={() => hook.openEdit(row)}
-                            disabled={
-                              hook.saving ||
-                              formOpen ||
-                              hook.disabling ||
-                              hook.enabling
-                            }
-                            aria-label={S.TABLE.EDIT}
-                          >
-                            <icons.Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <MasterDataActiveSwitch
-                          isActive={row.isActive}
-                          disabled={
-                            hook.saving ||
-                            formOpen ||
-                            hook.disabling ||
-                            hook.enabling
-                          }
-                          onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
-                        />
+                        {!isCentreHead && (
+                          <>
+                            <Tooltip title={S.TABLE.EDIT}>
+                              <IconButton
+                                size="small"
+                                onClick={() => hook.openEdit(row)}
+                                disabled={
+                                  hook.saving || formOpen || hook.disabling || hook.enabling
+                                }
+                                aria-label={S.TABLE.EDIT}
+                              >
+                                <icons.Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <MasterDataActiveSwitch
+                              isActive={row.isActive}
+                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                              onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                            />
+                          </>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -256,18 +256,19 @@ const CuringCycleMasterPanel = ({
           rowsPerPageOptions={[5, 10, 25]}
         />
       </Paper>
-
-      <Box sx={t.addRowBar}>
-        <Button
-          variant="contained"
-          startIcon={<icons.projectMgmt.add />}
-          onClick={hook.openCreate}
-          disabled={hook.loading || formOpen}
-          sx={t.pageHeader.newProjectButton}
-        >
-          {addButtonLabel}
-        </Button>
-      </Box>
+      {!isCentreHead && (
+        <Box sx={t.addRowBar}>
+          <Button
+            variant="contained"
+            startIcon={<icons.projectMgmt.add />}
+            onClick={hook.openCreate}
+            disabled={hook.loading || formOpen}
+            sx={t.pageHeader.newProjectButton}
+          >
+            {addButtonLabel}
+          </Button>
+        </Box>
+      )}
 
       <CuringCycleMasterFormDialog
         open={formOpen}

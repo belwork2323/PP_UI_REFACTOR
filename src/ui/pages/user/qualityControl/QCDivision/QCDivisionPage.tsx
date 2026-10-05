@@ -98,6 +98,8 @@ const QualityControlPage = () => {
     handleProcessingWeightmentSheetChange,
     weightmentErrors,
     weightmentValidationAttempt,
+    processingFieldErrors,
+    processingValidationFocusRequest,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,
@@ -310,6 +312,8 @@ const QualityControlPage = () => {
             onProcessingProcessChange={handleProcessingProcessChange}
             weightmentErrors={weightmentErrors}
             weightmentValidationAttempt={weightmentValidationAttempt}
+            processingFieldErrors={processingFieldErrors}
+            processingValidationFocusRequest={processingValidationFocusRequest}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}
             navApprovalActions={
               !readOnly

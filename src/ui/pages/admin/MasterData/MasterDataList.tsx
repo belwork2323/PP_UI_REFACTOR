@@ -84,6 +84,7 @@ type Props = {
   motorStageFilter?: string;
   onMotorStageFilterChange?: (value: string) => void;
   motorStageFilterOptions?: AppDropdownOption[];
+  isCentreHead?: boolean;
 };
 
 const MasterDataList = ({
@@ -118,6 +119,7 @@ const MasterDataList = ({
   motorStageFilter = "",
   onMotorStageFilterChange,
   motorStageFilterOptions = [],
+  isCentreHead = false,
 }: Props) => {
   const { table, tableCell } = t;
   const mode = useThemeStore((s) => s.mode);
@@ -139,10 +141,7 @@ const MasterDataList = ({
     if (inlineMode) setShowErrors(false);
   }, [inlineMode]);
 
-  const fieldErrors = useMemo(
-    () => getMasterDataFieldErrors(form, schema, false),
-    [form, schema],
-  );
+  const fieldErrors = useMemo(() => getMasterDataFieldErrors(form, schema, false), [form, schema]);
 
   const visibleError = (key: string): string | undefined => {
     const err = fieldErrors[key];
@@ -162,8 +161,7 @@ const MasterDataList = ({
 
   const codeField = schema?.fields?.find((f) => f.key === "code");
   const nameField = schema?.fields?.find((f) => f.key === "name");
-  const hideCodeColumn =
-    selectedType === "mixers" || Boolean(codeField?.serverGenerated);
+  const hideCodeColumn = selectedType === "mixers" || Boolean(codeField?.serverGenerated);
   const showNameInput = !nameField?.serverGenerated;
   const showNameColumn = showNameInput;
   const codeRequired = !hideCodeColumn && !codeField?.serverGenerated;
@@ -245,7 +243,11 @@ const MasterDataList = ({
       );
     }
 
-    const dropdownOptions = getMasterDataAttributeOptions(selectedType, field, dynamicAttributeOptions);
+    const dropdownOptions = getMasterDataAttributeOptions(
+      selectedType,
+      field,
+      dynamicAttributeOptions,
+    );
     if (dropdownOptions) {
       return (
         <AppSearchableDropdown
@@ -264,8 +266,7 @@ const MasterDataList = ({
     }
 
     const isInteger = field.dataType === "INTEGER";
-    const isNumeric =
-      isInteger || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
+    const isNumeric = isInteger || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
     const allowNegativeInteger = field.min == null || field.min < 0;
     const integerInputPattern = allowNegativeInteger ? /^-?\d*$/ : /^\d*$/;
     return (
@@ -379,7 +380,9 @@ const MasterDataList = ({
             checked={Boolean(form.isActive)}
             disabled={saving}
             confirmName={
-              !showNameInput && form.attributes.motorStage !== "" && form.attributes.motorStage != null
+              !showNameInput &&
+              form.attributes.motorStage !== "" &&
+              form.attributes.motorStage != null
                 ? `Stage ${form.attributes.motorStage}`
                 : form.name || form.code || "record"
             }
@@ -458,9 +461,11 @@ const MasterDataList = ({
               ))}
               <MasterDataAuditHeaderCells table={table} />
               <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-              <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
-                {S.TABLE.COL_ACTIONS}
-              </TableCell>
+              {!isCentreHead && (
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
+                  {S.TABLE.COL_ACTIONS}
+                </TableCell>
+              )}
             </TableRow>
           </TableHead>
 
@@ -509,15 +514,17 @@ const MasterDataList = ({
                   <TableCell sx={table.cell}>
                     <MasterDataActiveStatusChip isActive={row.isActive} />
                   </TableCell>
-                  <TableCell sx={table.cellActionsWrapper}>
-                    <Box sx={tableCell.actionsBox}>
-                      <MasterDataActiveSwitch
-                        isActive={row.isActive}
-                        disabled={inlineMode != null || saving || togglingStatus}
-                        onToggle={(nextActive) => onToggleActive(row, nextActive)}
-                      />
-                    </Box>
-                  </TableCell>
+                  {!isCentreHead && (
+                    <TableCell sx={table.cellActionsWrapper}>
+                      <Box sx={tableCell.actionsBox}>
+                        <MasterDataActiveSwitch
+                          isActive={row.isActive}
+                          disabled={inlineMode != null || saving || togglingStatus}
+                          onToggle={(nextActive) => onToggleActive(row, nextActive)}
+                        />
+                      </Box>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

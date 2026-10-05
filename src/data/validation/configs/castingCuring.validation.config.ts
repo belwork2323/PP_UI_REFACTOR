@@ -134,12 +134,12 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
-  slurryDepth: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
+  // slurryDepth: {
+  //   valueType: "number" as const,
+  //   requiredIn: ["SUBMIT"],
+  //   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  //   pattern: S.PATTERNS.FLOAT,
+  // },
   flowRate: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],

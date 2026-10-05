@@ -28,6 +28,7 @@ import {
   hydrateMixingDetailsValuesFromSections,
   hydrateViscosityValuesFromSections,
   mergeFinalMixEntrySchemaValues,
+  mergeMixingQualityChecksIntoValues,
   pickFinalMixDetailsSchemaValues,
   pickViscositySchemaValues,
   resolveMixingDetailsSeed,
@@ -231,12 +232,36 @@ const QCDivisionEntryPanel = ({
     [entry.entryId, entry.kind, entryValues.schemaValues, onEntryValuesChange],
   );
 
-  // Seed Premix once when the entry/seed source changes — never on every keystroke.
+  // Seed Premix once when empty; merge master SPECIFICATION when quality checks arrive.
+  // Also run when read-only (Waiting/Approved) so empty headers after silent refresh
+  // still pick up manufacturing auto-seed for display / form state.
   useEffect(() => {
-    if (readOnly || entry.kind !== "MIXING_PREMIX") return;
+    if (entry.kind !== "MIXING_PREMIX") return;
     if (!premixAutoSeed && !(mixingQualityCheckDefinitions?.length)) return;
     const current = entryValues.schemaValues;
-    if (current && Object.keys(current).length > 0) return;
+    if (current && Object.keys(current).length > 0) {
+      let next = mergeMixingQualityChecksIntoValues(
+        current,
+        "premix",
+        mixingQualityCheckDefinitions,
+      );
+      next = applyMixingDivisionEntryToValues(
+        next ?? current,
+        {
+          variant: "premix",
+          premixNo: entry.premixNo,
+          autoPopulatePayload: divisionAutoPopulateData,
+          batchPayload,
+          qualityCheckDefinitions: mixingQualityCheckDefinitions,
+        },
+        { onlyIfEmpty: true },
+      );
+      if (JSON.stringify(next) !== JSON.stringify(current)) {
+        onEntryValuesChange(entry.entryId, next);
+      }
+      return;
+    }
+    if (readOnly) return;
     const seeded = applyMixingDivisionEntryToValues(
       createInitialPremixDetailsValues(mixingQualityCheckDefinitions),
       {
@@ -249,7 +274,7 @@ const QCDivisionEntryPanel = ({
       { onlyIfEmpty: true },
     );
     onEntryValuesChange(entry.entryId, seeded);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only when entry identity / seed source arrives empty
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed/merge when entry identity / defs arrive
   }, [
     batchPayload,
     divisionAutoPopulateData,
@@ -674,6 +699,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           readOnly={readOnly}
           autoSeed={premixAutoSeed}
+          qualityCheckDefinitions={mixingQualityCheckDefinitions}
           validationErrors={validationErrors}
         />
       </Box>
@@ -704,6 +730,7 @@ const QCDivisionEntryPanel = ({
           values={mixingViscosityValues}
           onChange={handleValuesChange}
           readOnly={readOnly}
+          validationErrors={validationErrors}
         />
       </Box>
     );

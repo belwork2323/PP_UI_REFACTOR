@@ -226,6 +226,8 @@ export interface TableTextInputProps {
   helperText?: ReactNode;
   name?: string;
   required?: boolean;
+  /** Validation focus target (`data-cc-field`). */
+  fieldPath?: string;
 }
 
 export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputProps>(
@@ -242,11 +244,12 @@ export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputP
       helperText,
       error = false,
       required = false,
+      fieldPath,
       ...rest
     },
     ref,
-  ) =>
-    readOnly ? (
+  ) => {
+    const control = readOnly ? (
       <WorkflowReadOnlyText value={String(value ?? "")} />
     ) : (
       <TextField
@@ -266,7 +269,9 @@ export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputP
         sx={castingCuringTableInputSx}
         required
       />
-    ),
+    );
+    return fieldPath ? <Box data-cc-field={fieldPath}>{control}</Box> : control;
+  },
 );
 
 TableTextInput.displayName = "TableTextInput";
@@ -278,9 +283,10 @@ export const TableSelectInput = ({
   placeholder = "Select",
   disabled = false,
   readOnly = false,
-  error = false, // 1. Added error prop
-  helperText, // 2. Added helperText prop
+  error = false,
+  helperText,
   required = false,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -288,16 +294,19 @@ export const TableSelectInput = ({
   placeholder?: string;
   disabled?: boolean;
   readOnly?: boolean;
-  error?: boolean; // Type definition for error
-  helperText?: string; // Type definition for helperText
+  error?: boolean;
+  helperText?: string;
   required?: boolean;
+  /** Validation focus target (`data-cc-field`). */
+  fieldPath?: string;
 }) => {
   if (readOnly) {
     const label = options.find((option) => option.value === value)?.label ?? value;
-    return <WorkflowReadOnlyText value={label} />;
+    const control = <WorkflowReadOnlyText value={label} />;
+    return fieldPath ? <Box data-cc-field={fieldPath}>{control}</Box> : control;
   }
 
-  return (
+  const control = (
     <TextField
       select
       size="small"
@@ -305,8 +314,8 @@ export const TableSelectInput = ({
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      error={error} // 3. Passed error down to TextField
-      helperText={helperText} // 4. Passed helperText down to TextField so the message shows!
+      error={error}
+      helperText={helperText}
       sx={castingCuringTableInputSx}
       SelectProps={{ displayEmpty: true }}
       required={required}
@@ -321,6 +330,7 @@ export const TableSelectInput = ({
       ))}
     </TextField>
   );
+  return fieldPath ? <Box data-cc-field={fieldPath}>{control}</Box> : control;
 };
 
 type ParameterTableColumn = {

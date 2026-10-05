@@ -23,6 +23,7 @@ import {
   createInitialFinalMixDetailsValues,
   hydrateMixingDetailsValuesFromSections,
   mergeFinalMixEntrySchemaValues,
+  mergeMixingQualityChecksIntoValues,
   pickFinalMixDetailsSchemaValues,
   pickViscositySchemaValues,
   resolveMixingDetailsSeed,
@@ -95,6 +96,12 @@ export type QCDivisionFormBodyProps = {
   ) => void;
   weightmentErrors?: Record<string, string>;
   weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
+  processingFieldErrors?: Record<string, Record<string, string>>;
+  processingValidationFocusRequest?: {
+    id: number;
+    entryId: string;
+    fieldPath: string;
+  } | null;
   onRemoveDivisionEntry: (entryId: string) => void;
   /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
   hideEntryGroupNav?: boolean;
@@ -130,6 +137,8 @@ const QCDivisionFormBody = ({
   onProcessingProcessChange,
   weightmentErrors = {},
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
+  processingFieldErrors = {},
+  processingValidationFocusRequest = null,
   onRemoveDivisionEntry,
   unitActions = null,
   canResetPostCureSetup = false,
@@ -236,26 +245,52 @@ const QCDivisionFormBody = ({
   );
 
   // Seed once when the active Final Mix unit changes — do not re-seed on every keystroke.
+  // Also merge master SPECIFICATION / fill empty auto-seed headers when quality checks arrive.
+  // When read-only, still fill empty headers from manufacturing (post-submit silent refresh).
   useEffect(() => {
-    if (readOnly) return;
     if (activeEntry?.kind !== "MIXING_FINAL_MIX") return;
     const fromEntry = pickFinalMixDetailsSchemaValues(
       formData.divisionEntryValues?.[activeEntry.entryId]?.schemaValues,
     );
+    const manufacturing =
+      (divisionAutoPopulateData as any)?.__manufacturingDivisionData ?? divisionAutoPopulateData;
+
+    const applySeedMerge = (base: SchemaFormValues) => {
+      const merged =
+        mergeMixingQualityChecksIntoValues(base, "finalMix", mixingQualityChecksByStage.FINAL_MIX) ??
+        base;
+      return applyMixingDivisionEntryToValues(
+        merged,
+        {
+          variant: "finalMix",
+          premixNo: finalMixSeedPremixNo,
+          autoPopulatePayload: manufacturing,
+          batchPayload: batch,
+          qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
+        },
+        { onlyIfEmpty: true },
+      );
+    };
+
     if (fromEntry && Object.keys(fromEntry).length > 0) {
+      const nextDetails = applySeedMerge(fromEntry);
       if (
-        JSON.stringify(fromEntry) !== JSON.stringify(formData.mixingFinalMixDetailsValues ?? {})
+        JSON.stringify(nextDetails) !== JSON.stringify(formData.mixingFinalMixDetailsValues ?? {})
       ) {
-        onMixingFinalMixDetailsChange(fromEntry);
+        onMixingFinalMixDetailsChange(nextDetails);
       }
       return;
     }
-    if (!finalMixAutoSeed && !mixingQualityChecksByStage.FINAL_MIX.length) return;
-    if (formData.mixingFinalMixDetailsValues && Object.keys(formData.mixingFinalMixDetailsValues).length > 0) {
+    const currentDetails = formData.mixingFinalMixDetailsValues;
+    if (currentDetails && Object.keys(currentDetails).length > 0) {
+      const nextDetails = applySeedMerge(currentDetails);
+      if (JSON.stringify(nextDetails) !== JSON.stringify(currentDetails)) {
+        onMixingFinalMixDetailsChange(nextDetails);
+      }
       return;
     }
-    const manufacturing =
-      (divisionAutoPopulateData as any)?.__manufacturingDivisionData ?? divisionAutoPopulateData;
+    if (readOnly) return;
+    if (!finalMixAutoSeed && !mixingQualityChecksByStage.FINAL_MIX.length) return;
     const seeded = applyMixingDivisionEntryToValues(
       createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX),
       {
@@ -268,8 +303,14 @@ const QCDivisionFormBody = ({
       { onlyIfEmpty: true },
     );
     handleFinalMixDetailsChange(seeded);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only when active Final Mix unit changes
-  }, [activeEntry?.entryId, activeEntry?.kind, finalMixSeedPremixNo, readOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed/merge when unit / defs change
+  }, [
+    activeEntry?.entryId,
+    activeEntry?.kind,
+    finalMixSeedPremixNo,
+    mixingQualityChecksByStage.FINAL_MIX,
+    readOnly,
+  ]);
 
   const visibleEntries = useMemo(() => resolveVisibleEntries(activeContent), [activeContent]);
   const processingMaterialEntries = useMemo(
@@ -442,8 +483,15 @@ const QCDivisionFormBody = ({
               readOnly={readOnly}
               fieldsDisabled={fieldsDisabled}
               autoSeed={finalMixAutoSeed}
+              qualityCheckDefinitions={mixingQualityChecksByStage.FINAL_MIX}
               unitActions={finalMixActionLabels}
               actionLabels={finalMixActionLabels ?? undefined}
+              detailsValidationErrors={
+                validationErrorsByEntryId[activeEntry.entryId] ?? null
+              }
+              viscosityValidationErrors={
+                validationErrorsByEntryId[activeEntry.entryId] ?? null
+              }
             />
           </Box>
         ) : null}
@@ -473,6 +521,8 @@ const QCDivisionFormBody = ({
               onProcessingProcessChange={onProcessingProcessChange}
               weightmentErrors={weightmentErrors}
               validationAttempt={weightmentValidationAttempt}
+              processingFieldErrors={processingFieldErrors}
+              processingValidationFocusRequest={processingValidationFocusRequest}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
             />
         ) : (

@@ -80,6 +80,7 @@ const CompactTime = ({
   required = false,
   error,
   helperText,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -88,18 +89,21 @@ const CompactTime = ({
   required: boolean;
   error?: boolean;
   helperText?: string;
+  fieldPath?: string;
 }) => (
-  <TimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    inputSx={castingCuringTableInputSx}
-    required={required}
-    error={error}
-    helperText={helperText}
-  />
+  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+    <TimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      inputSx={castingCuringTableInputSx}
+      required={required}
+      error={error}
+      helperText={helperText}
+    />
+  </Box>
 );
 
 const CompactDate = ({
@@ -110,6 +114,7 @@ const CompactDate = ({
   required = false,
   error,
   helperText,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -118,18 +123,21 @@ const CompactDate = ({
   required: boolean;
   error?: boolean;
   helperText?: string;
+  fieldPath?: string;
 }) => (
-  <DateField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    required={required}
-    inputSx={castingCuringTableInputSx}
-    error={error}
-    helperText={helperText}
-  />
+  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+    <DateField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      required={required}
+      inputSx={castingCuringTableInputSx}
+      error={error}
+      helperText={helperText}
+    />
+  </Box>
 );
 
 const CompactDateTime = ({
@@ -140,6 +148,7 @@ const CompactDateTime = ({
   required = false,
   error,
   helperText,
+  fieldPath,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -148,19 +157,22 @@ const CompactDateTime = ({
   required?: boolean;
   error?: boolean;
   helperText?: string;
+  fieldPath?: string;
 }) => (
-  <DateTimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    placeholder="DD-MM-YYYY HH:mm"
-    inputSx={castingCuringTableInputSx}
-    required={required}
-    error={error}
-    helperText={helperText}
-  />
+  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+    <DateTimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      placeholder="DD-MM-YYYY HH:mm"
+      inputSx={castingCuringTableInputSx}
+      required={required}
+      error={error}
+      helperText={helperText}
+    />
+  </Box>
 );
 
 const CYCLE_HEADERS = [
@@ -274,6 +286,7 @@ const CuringMotorPanel = ({
                         readOnly={readOnly}
                         type="number"
                         required
+                        fieldPath={tempPath}
                         error={Boolean(validationErrors?.[tempPath])}
                         helperText={validationErrors?.[tempPath]}
                       />
@@ -289,6 +302,7 @@ const CuringMotorPanel = ({
                         readOnly={readOnly}
                         type="number"
                         required
+                        fieldPath={timePath}
                         error={Boolean(validationErrors?.[timePath])}
                         helperText={validationErrors?.[timePath]}
                       />
@@ -305,6 +319,7 @@ const CuringMotorPanel = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         required
+                        fieldPath={startDatePath}
                         error={Boolean(startError)}
                         helperText={startError}
                       />
@@ -321,6 +336,7 @@ const CuringMotorPanel = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         required
+                        fieldPath={endDatePath}
                         error={Boolean(endError)}
                         helperText={endError}
                       />
@@ -335,6 +351,7 @@ const CuringMotorPanel = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         type="number"
+                        fieldPath={pressurePath}
                         error={Boolean(validationErrors?.[pressurePath])}
                         helperText={validationErrors?.[pressurePath]}
                       />
@@ -350,6 +367,7 @@ const CuringMotorPanel = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         required
+                        fieldPath={waterStatusPath}
                         error={Boolean(validationErrors?.[waterStatusPath])}
                         helperText={validationErrors?.[waterStatusPath]}
                       />
@@ -391,6 +409,7 @@ const CuringMotorPanel = ({
               minRows={2}
               placeholder="Any other observations"
               required
+              fieldPath={"POST_CURING_DETAILS.OTHER_OBSERVATIONS"}
               error={Boolean(validationErrors?.["POST_CURING_DETAILS.OTHER_OBSERVATIONS"])}
               helperText={validationErrors?.["POST_CURING_DETAILS.OTHER_OBSERVATIONS"]}
             />
@@ -409,6 +428,7 @@ const CuringMotorPanel = ({
               minRows={2}
               placeholder="Visual observation"
               required
+              fieldPath={"POST_CURING_DETAILS.VISUAL_OBSERVATION"}
               error={Boolean(validationErrors?.["POST_CURING_DETAILS.VISUAL_OBSERVATION"])}
               helperText={validationErrors?.["POST_CURING_DETAILS.VISUAL_OBSERVATION"]}
             />
@@ -424,6 +444,7 @@ const CuringMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              fieldPath="POST_CURING_DETAILS.PRESSURE_PLATE_REMOVAL_DATE_TIME"
               error={Boolean(
                 validationErrors?.["POST_CURING_DETAILS.PRESSURE_PLATE_REMOVAL_DATE_TIME"],
               )}
@@ -445,6 +466,7 @@ const CuringMotorPanel = ({
               type="text"
               placeholder="0"
               required
+              fieldPath={"POST_CURING_DETAILS.SHORE_A_HARDNESS"}
               error={Boolean(validationErrors?.["POST_CURING_DETAILS.SHORE_A_HARDNESS"])}
               helperText={validationErrors?.["POST_CURING_DETAILS.SHORE_A_HARDNESS"]}
             />
@@ -460,6 +482,7 @@ const CuringMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              fieldPath="POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME"
               error={Boolean(
                 validationErrors?.["POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME"],
               )}
@@ -482,6 +505,7 @@ const CuringMotorPanel = ({
               disabled={disabled}
               readOnly={readOnly}
               required
+              fieldPath={"DECORING_DETAILS.DECORING_DATE"}
               error={Boolean(validationErrors?.["DECORING_DETAILS.DECORING_DATE"])}
               helperText={validationErrors?.["DECORING_DETAILS.DECORING_DATE"]}
             />
@@ -505,6 +529,7 @@ const CuringMotorPanel = ({
               disabled={disabled || loadingBuildings}
               readOnly={readOnly}
               required
+              fieldPath={"DECORING_DETAILS.BUILDING_NO"}
               error={Boolean(validationErrors?.["DECORING_DETAILS.BUILDING_NO"])}
               helperText={validationErrors?.["DECORING_DETAILS.BUILDING_NO"]}
             />
@@ -522,6 +547,7 @@ const CuringMotorPanel = ({
               type="number"
               placeholder="0"
               required
+              fieldPath={"DECORING_DETAILS.DECORING_LOAD"}
               error={Boolean(validationErrors?.["DECORING_DETAILS.DECORING_LOAD"])}
               helperText={validationErrors?.["DECORING_DETAILS.DECORING_LOAD"]}
             />
@@ -540,6 +566,7 @@ const CuringMotorPanel = ({
               minRows={2}
               placeholder="Remarks"
               required
+              fieldPath={"DECORING_DETAILS.DECORING_REMARKS"}
               error={Boolean(validationErrors?.["DECORING_DETAILS.DECORING_REMARKS"])}
               helperText={validationErrors?.["DECORING_DETAILS.DECORING_REMARKS"]}
             />
@@ -558,6 +585,7 @@ const CuringMotorPanel = ({
               acceptMode="imageVideo"
               emptyLabel="Upload photos or videos"
               required
+              fieldPath={"DECORING_DETAILS.DECORING_VISUAL_OBSERVATION"}
               error={Boolean(validationErrors?.["DECORING_DETAILS.DECORING_VISUAL_OBSERVATION"])}
               helperText={validationErrors?.["DECORING_DETAILS.DECORING_VISUAL_OBSERVATION"]}
             />

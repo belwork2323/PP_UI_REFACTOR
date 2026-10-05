@@ -16,6 +16,8 @@ type CasePrepTextFieldProps = {
   required?: boolean;
   /** Validation focus target (`data-cp-field`). */
   dataCpField?: string;
+  /** Casting & Curing validation focus target (`data-cc-field`). */
+  dataCcField?: string;
 };
 
 const CasePrepTextField = ({
@@ -31,13 +33,18 @@ const CasePrepTextField = ({
   helperText,
   required = false,
   dataCpField,
+  dataCcField,
 }: CasePrepTextFieldProps) => {
   const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
   const palette = theme?.palette ?? {};
   const hasValue = String(value ?? "").trim().length > 0;
 
   return (
-    <Box sx={flowBar.selectField?.(width)} {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
+    <Box
+      sx={flowBar.selectField?.(width)}
+      {...(dataCpField ? { "data-cp-field": dataCpField } : {})}
+      {...(dataCcField ? { "data-cc-field": dataCcField } : {})}
+    >
       <Typography component="label" sx={flowBar.selectLabel}>
         {required ? <FieldLabelWithAsterisk label={label} required /> : label}
       </Typography>

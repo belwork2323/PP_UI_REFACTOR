@@ -20,6 +20,7 @@ import DimensionalParametersMasterPanel from "./DimensionalParametersMasterPanel
 import { getMasterDataAddButtonLabel, getMasterTypeDisplayLabel } from "./masterDataLabels";
 import { masterDataStatusFilterChipProps } from "./components/masterDataStatusStyles";
 import useProjectForMotorStageOptions from "@/hooks/admin/MasterData/useProjectForMotorStageOptions";
+import { useAuthStore } from "@/app/store/authStore";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -42,6 +43,9 @@ const TYPE_NOUN: Record<string, string> = {
 };
 
 const MasterDataPage = () => {
+  const user = useAuthStore();
+  console.log(user.user.roleId);
+
   const mode = useThemeStore((s) => s.mode);
   const t = getMasterDataTheme(mode);
   const hook = useMasterDataHook();
@@ -97,6 +101,7 @@ const MasterDataPage = () => {
     [hook.selectedType, hook.types],
   );
 
+  const isCentreHead = user?.user?.roleId === 5;
   return (
     <Box sx={t.page}>
       <AdminManagementPageHeader title={S.PAGE.TITLE} subtitle={S.PAGE.SUBTITLE} theme={t} />
@@ -155,6 +160,7 @@ const MasterDataPage = () => {
               onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
+              isCentreHead={isCentreHead}
             />
           ) : hook.selectedType === "insulation-specifications" ? (
             <InsulationSpecMasterPanel
@@ -165,6 +171,7 @@ const MasterDataPage = () => {
               onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
+              isCentreHead={isCentreHead}
             />
           ) : hook.selectedType === "dimensional-parameters" ? (
             <DimensionalParametersMasterPanel
@@ -175,6 +182,7 @@ const MasterDataPage = () => {
               onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
+              isCentreHead={isCentreHead}
             />
           ) : hook.selectedType === "mixing-cycles" ? (
             <MixingCycleMasterPanel
@@ -185,6 +193,7 @@ const MasterDataPage = () => {
               onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
+              isCentreHead={isCentreHead}
             />
           ) : hook.selectedType === "curing-cycles" ? (
             <CuringCycleMasterPanel
@@ -195,6 +204,7 @@ const MasterDataPage = () => {
               onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
+              isCentreHead={isCentreHead}
             />
           ) : (
             <>
@@ -230,21 +240,23 @@ const MasterDataPage = () => {
                 motorStageFilter={hook.motorStageFilter}
                 onMotorStageFilterChange={hook.setMotorStageFilter}
                 motorStageFilterOptions={hook.motorStageFilterOptions}
+                isCentreHead={isCentreHead}
               />
-
-              <Box sx={t.addRowBar}>
-                <Button
-                  variant="contained"
-                  startIcon={<icons.projectMgmt.add />}
-                  onClick={hook.openCreate}
-                  disabled={
-                    hook.loadingList || !hook.selectedType || hook.inlineMode != null || isNested
-                  }
-                  sx={t.pageHeader.newProjectButton}
-                >
-                  {addButtonLabel}
-                </Button>
-              </Box>
+              {!isCentreHead && (
+                <Box sx={t.addRowBar}>
+                  <Button
+                    variant="contained"
+                    startIcon={<icons.projectMgmt.add />}
+                    onClick={hook.openCreate}
+                    disabled={
+                      hook.loadingList || !hook.selectedType || hook.inlineMode != null || isNested
+                    }
+                    sx={t.pageHeader.newProjectButton}
+                  >
+                    {addButtonLabel}
+                  </Button>
+                </Box>
+              )}
             </>
           )}
         </Box>

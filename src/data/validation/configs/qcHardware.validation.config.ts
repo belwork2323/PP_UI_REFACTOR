@@ -7,6 +7,15 @@ import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
+/** Stable UI / FieldErrorText prefixes — must match QCHardwareProcessPanel errorPrefix. */
+export const QC_HARDWARE_ERROR_PREFIX = {
+  FIRST_CUT: "FIRST_CUT",
+  SECOND_CUT: "SECOND_CUT",
+  PREHEATING: "PREHEATING_DETAILS",
+  LINEAR_COATING: "LINEAR_COATING_DETAILS",
+  VISUAL_OBSERVATIONS: "VISUAL_OBSERVATIONS",
+} as const;
+
 const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
@@ -42,31 +51,31 @@ export type QcHardwareValidationTarget = {
 };
 
 export const qcHardwareValidationFields: Record<string, FieldRuleConfig> = {
-  // Abrading cut row (sheet: Date, Start, End, Qty of Dust)
+  // Abrading cut row (Case Prep abrading details — Date, Start, End, Qty of Dust)
   cutDate: date(["SUBMIT"]),
   cutStartTime: time(["SUBMIT"]),
   cutEndTime: time(["SUBMIT"]),
   dustQty: number(["SUBMIT"]),
   cutObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
-  // Preheating (extra process)
+  // Preheating (Case Prep pre-heating monitoring table subset)
   ovenNumber: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   buildingNo: text(["SUBMIT"], S.PATTERNS.BUILDING_CODE),
   temperature: number(["SUBMIT"]),
   vacuumLevel: number(["SUBMIT"]),
 
-  // Linear coating
+  // Linear coating (Case Prep liner application log subset)
   linerQty: number(["SUBMIT"]),
   insulationTemp: number(["SUBMIT"]),
   rh: number(["SUBMIT"]),
 
-  // Dispatch hardware unit
+  // Dispatch (Case Prep dispatch punctures + datetime + visual observations)
   hePunctures: number(["SUBMIT"]),
   nePunctures: number(["SUBMIT"]),
   lfPunctures: number(["SUBMIT"]),
   dispatchDateTime: text(["SUBMIT"]),
-  // Preset visual-observation rows — notes optional (UI has no required asterisks)
-  visualObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Case Prep: dispatch visual observation notes are mandatory
+  visualObservations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -87,7 +96,10 @@ const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unkn
   return undefined;
 };
 
-const findTableRows = (values: Record<string, unknown>, tableIds: string[]): Record<string, unknown>[] => {
+const findTableRows = (
+  values: Record<string, unknown>,
+  tableIds: string[],
+): Record<string, unknown>[] => {
   for (const id of tableIds) {
     const direct = asArray(values[id]);
     if (direct.length) return direct.map((r) => asRecord(r) ?? {});
@@ -101,6 +113,16 @@ const findTableRows = (values: Record<string, unknown>, tableIds: string[]): Rec
   return [];
 };
 
+const resolveAbradingPrefix = (key: string): string => {
+  const upper = key.toUpperCase();
+  if (upper.includes("SECOND")) return QC_HARDWARE_ERROR_PREFIX.SECOND_CUT;
+  if (upper.includes("FIRST")) return QC_HARDWARE_ERROR_PREFIX.FIRST_CUT;
+  if (upper.endsWith("::SECOND_CUT") || upper === "SECOND_CUT") {
+    return QC_HARDWARE_ERROR_PREFIX.SECOND_CUT;
+  }
+  return QC_HARDWARE_ERROR_PREFIX.FIRST_CUT;
+};
+
 export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValidationTarget> = {
   id: "qc-hardware",
   fields: qcHardwareValidationFields,
@@ -110,17 +132,25 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
     const sub = String(target.subType ?? "").toUpperCase();
 
     if (sub === "ABRADING") {
-      const tables = [
-        { id: "FIRST_CUT", keys: ["ABRADING_FIRST_CUT", "FIRST_CUT", "QC_HARDWARE_ABRADING_FIRST_CUT"] },
-        { id: "SECOND_CUT", keys: ["ABRADING_SECOND_CUT", "SECOND_CUT", "QC_HARDWARE_ABRADING_SECOND_CUT"] },
-      ];
-      // Prefer any array that looks like cut rows
       const pushCut = (prefix: string, rows: Record<string, unknown>[]) => {
-        rows.forEach((row, i) => {
+        const list = rows.length ? rows : [{}];
+        list.forEach((row, i) => {
           fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
-          fields.push({ path: `${prefix}.${i}.START_TIME`, value: row.START_TIME, ruleKey: "cutStartTime" });
-          fields.push({ path: `${prefix}.${i}.END_TIME`, value: row.END_TIME, ruleKey: "cutEndTime" });
-          fields.push({ path: `${prefix}.${i}.DUST_QTY`, value: row.DUST_QTY, ruleKey: "dustQty" });
+          fields.push({
+            path: `${prefix}.${i}.START_TIME`,
+            value: row.START_TIME,
+            ruleKey: "cutStartTime",
+          });
+          fields.push({
+            path: `${prefix}.${i}.END_TIME`,
+            value: row.END_TIME,
+            ruleKey: "cutEndTime",
+          });
+          fields.push({
+            path: `${prefix}.${i}.DUST_QTY`,
+            value: row.DUST_QTY,
+            ruleKey: "dustQty",
+          });
           fields.push({
             path: `${prefix}.${i}.OBSERVATIONS`,
             value: row.OBSERVATIONS,
@@ -129,65 +159,151 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
         });
       };
 
-      let found = false;
+      const firstRows = findTableRows(values, [
+        QC_HARDWARE_ERROR_PREFIX.FIRST_CUT,
+        "ABRADING_FIRST_CUT",
+        "QC_HARDWARE_ABRADING_FIRST_CUT",
+      ]);
+      const secondRows = findTableRows(values, [
+        QC_HARDWARE_ERROR_PREFIX.SECOND_CUT,
+        "ABRADING_SECOND_CUT",
+        "QC_HARDWARE_ABRADING_SECOND_CUT",
+      ]);
+
+      if (firstRows.length || secondRows.length) {
+        pushCut(QC_HARDWARE_ERROR_PREFIX.FIRST_CUT, firstRows);
+        pushCut(QC_HARDWARE_ERROR_PREFIX.SECOND_CUT, secondRows);
+        return fields;
+      }
+
+      // Fallback: detect cut-shaped arrays under scoped section keys
+      let foundFirst = false;
+      let foundSecond = false;
       for (const [key, val] of Object.entries(values)) {
         const arr = asArray(val);
         if (!arr.length) continue;
         const sample = asRecord(arr[0]);
-        if (sample && ("DUST_QTY" in sample || ("DATE" in sample && "START_TIME" in sample))) {
-          const prefix = key.toUpperCase().includes("SECOND") ? "SECOND_CUT" : key;
-          pushCut(prefix, arr.map((r) => asRecord(r) ?? {}));
-          found = true;
+        if (!sample || !("DUST_QTY" in sample || ("DATE" in sample && "START_TIME" in sample))) {
+          continue;
         }
+        const prefix = resolveAbradingPrefix(key);
+        if (prefix === QC_HARDWARE_ERROR_PREFIX.SECOND_CUT) {
+          if (foundSecond) continue;
+          foundSecond = true;
+        } else {
+          if (foundFirst) continue;
+          foundFirst = true;
+        }
+        pushCut(prefix, arr.map((r) => asRecord(r) ?? {}));
       }
-      if (!found) {
-        fields.push({ path: "FIRST_CUT.0.DATE", value: "", ruleKey: "cutDate" });
-      }
+      if (!foundFirst) pushCut(QC_HARDWARE_ERROR_PREFIX.FIRST_CUT, []);
+      if (!foundSecond) pushCut(QC_HARDWARE_ERROR_PREFIX.SECOND_CUT, []);
       return fields;
     }
 
     if (sub === "PREHEATING") {
-      for (const [key, val] of Object.entries(values)) {
-        const arr = asArray(val);
-        if (!arr.length) continue;
-        const sample = asRecord(arr[0]);
-        if (sample && ("OVEN_NUMBER" in sample || "TEMPERATURE" in sample)) {
-          arr.forEach((item, i) => {
-            const row = asRecord(item) ?? {};
-            fields.push({ path: `${key}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
-            fields.push({ path: `${key}.${i}.START_TIME`, value: row.START_TIME, ruleKey: "cutStartTime" });
-            fields.push({ path: `${key}.${i}.END_TIME`, value: row.END_TIME, ruleKey: "cutEndTime" });
-            fields.push({ path: `${key}.${i}.OVEN_NUMBER`, value: row.OVEN_NUMBER, ruleKey: "ovenNumber" });
-            fields.push({ path: `${key}.${i}.BUILDING_NO`, value: row.BUILDING_NO, ruleKey: "buildingNo" });
-            fields.push({ path: `${key}.${i}.TEMPERATURE`, value: row.TEMPERATURE, ruleKey: "temperature" });
-            fields.push({ path: `${key}.${i}.VACUUM_LEVEL`, value: row.VACUUM_LEVEL, ruleKey: "vacuumLevel" });
-          });
-        }
-      }
+      const rows = findTableRows(values, [
+        QC_HARDWARE_ERROR_PREFIX.PREHEATING,
+        "PREHEATING",
+        "QC_HARDWARE_PREHEATING",
+      ]);
+      const list =
+        rows.length > 0
+          ? rows
+          : (() => {
+              for (const [key, val] of Object.entries(values)) {
+                const arr = asArray(val);
+                if (!arr.length) continue;
+                const sample = asRecord(arr[0]);
+                if (sample && ("OVEN_NUMBER" in sample || "TEMPERATURE" in sample)) {
+                  return arr.map((r) => asRecord(r) ?? {});
+                }
+              }
+              return [{}] as Record<string, unknown>[];
+            })();
+      const prefix = QC_HARDWARE_ERROR_PREFIX.PREHEATING;
+      list.forEach((row, i) => {
+        fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
+        fields.push({
+          path: `${prefix}.${i}.START_TIME`,
+          value: row.START_TIME,
+          ruleKey: "cutStartTime",
+        });
+        fields.push({
+          path: `${prefix}.${i}.END_TIME`,
+          value: row.END_TIME,
+          ruleKey: "cutEndTime",
+        });
+        fields.push({
+          path: `${prefix}.${i}.OVEN_NUMBER`,
+          value: row.OVEN_NUMBER,
+          ruleKey: "ovenNumber",
+        });
+        fields.push({
+          path: `${prefix}.${i}.BUILDING_NO`,
+          value: row.BUILDING_NO,
+          ruleKey: "buildingNo",
+        });
+        fields.push({
+          path: `${prefix}.${i}.TEMPERATURE`,
+          value: row.TEMPERATURE,
+          ruleKey: "temperature",
+        });
+        fields.push({
+          path: `${prefix}.${i}.VACUUM_LEVEL`,
+          value: row.VACUUM_LEVEL,
+          ruleKey: "vacuumLevel",
+        });
+      });
       return fields;
     }
 
     if (sub === "LINEAR_COATING" || sub === "LINER_COATING") {
-      for (const [key, val] of Object.entries(values)) {
-        const arr = asArray(val);
-        if (!arr.length) continue;
-        const sample = asRecord(arr[0]);
-        if (sample && ("LINER_QTY" in sample || "INSULATION_TEMP" in sample)) {
-          arr.forEach((item, i) => {
-            const row = asRecord(item) ?? {};
-            fields.push({ path: `${key}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
-            fields.push({ path: `${key}.${i}.START_TIME`, value: row.START_TIME, ruleKey: "cutStartTime" });
-            fields.push({ path: `${key}.${i}.END_TIME`, value: row.END_TIME, ruleKey: "cutEndTime" });
-            fields.push({ path: `${key}.${i}.LINER_QTY`, value: row.LINER_QTY, ruleKey: "linerQty" });
-            fields.push({
-              path: `${key}.${i}.INSULATION_TEMP`,
-              value: row.INSULATION_TEMP,
-              ruleKey: "insulationTemp",
-            });
-            fields.push({ path: `${key}.${i}.RH`, value: row.RH, ruleKey: "rh" });
-          });
-        }
-      }
+      const rows = findTableRows(values, [
+        QC_HARDWARE_ERROR_PREFIX.LINEAR_COATING,
+        "LINEAR_COATING",
+        "LINER_COATING",
+        "QC_HARDWARE_LINEAR_COATING",
+      ]);
+      const list =
+        rows.length > 0
+          ? rows
+          : (() => {
+              for (const [key, val] of Object.entries(values)) {
+                const arr = asArray(val);
+                if (!arr.length) continue;
+                const sample = asRecord(arr[0]);
+                if (sample && ("LINER_QTY" in sample || "INSULATION_TEMP" in sample)) {
+                  return arr.map((r) => asRecord(r) ?? {});
+                }
+              }
+              return [{}] as Record<string, unknown>[];
+            })();
+      const prefix = QC_HARDWARE_ERROR_PREFIX.LINEAR_COATING;
+      list.forEach((row, i) => {
+        fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
+        fields.push({
+          path: `${prefix}.${i}.START_TIME`,
+          value: row.START_TIME,
+          ruleKey: "cutStartTime",
+        });
+        fields.push({
+          path: `${prefix}.${i}.END_TIME`,
+          value: row.END_TIME,
+          ruleKey: "cutEndTime",
+        });
+        fields.push({
+          path: `${prefix}.${i}.LINER_QTY`,
+          value: row.LINER_QTY,
+          ruleKey: "linerQty",
+        });
+        fields.push({
+          path: `${prefix}.${i}.INSULATION_TEMP`,
+          value: row.INSULATION_TEMP,
+          ruleKey: "insulationTemp",
+        });
+        fields.push({ path: `${prefix}.${i}.RH`, value: row.RH, ruleKey: "rh" });
+      });
       return fields;
     }
 
@@ -205,11 +321,10 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
         ruleKey: "dispatchDateTime",
       });
       const vis = findTableRows(values, [
-        "VISUAL_OBSERVATIONS",
+        QC_HARDWARE_ERROR_PREFIX.VISUAL_OBSERVATIONS,
         "DISPATCH_VISUAL_OBSERVATIONS",
         "QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS",
       ]);
-      // Also accept any ::-scoped visual observation table
       const scopedVis =
         vis.length > 0
           ? vis
@@ -223,12 +338,12 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
                   return arr.map((r) => asRecord(r) ?? {});
                 }
               }
-              return [] as Record<string, unknown>[];
+              return [{}] as Record<string, unknown>[];
             })();
       scopedVis.forEach((item, i) => {
         const row = asRecord(item) ?? {};
         fields.push({
-          path: `VISUAL_OBSERVATIONS.${i}.OBSERVATIONS`,
+          path: `${QC_HARDWARE_ERROR_PREFIX.VISUAL_OBSERVATIONS}.${i}.OBSERVATIONS`,
           value: row.OBSERVATIONS,
           ruleKey: "visualObservations",
         });

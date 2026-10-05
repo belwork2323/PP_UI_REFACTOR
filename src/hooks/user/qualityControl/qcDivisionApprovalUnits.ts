@@ -506,12 +506,26 @@ export const isQcPartialItemEnabledByDivisionDetails = (
 
 export const isQcPartialItemEnabledForWorkflow = (
   item: QcPartialNavItem | null | undefined,
-  gate: { approvedPremixNos?: Set<number>; approvedMotorIds?: Set<string>; enableAll?: boolean } | null | undefined,
+  gate: {
+    approvedPremixNos?: Set<number>;
+    approvedFinalMixNos?: Set<number>;
+    approvedMotorIds?: Set<string>;
+    enableAll?: boolean;
+  } | null | undefined,
 ): boolean => {
   if (!isQcPartialItemEnabledByDivisionDetails(item)) return false;
   if (!item || item.kind === "DIVISION") return true;
   if (!gate || gate.enableAll) return true;
-  if (item.kind === "PREMIX" || item.kind === "FINAL_MIX") {
+  if (item.kind === "FINAL_MIX") {
+    const mixNo = item.finalMixNo ?? item.premixNo;
+    if (mixNo == null) return true;
+    if (gate.approvedFinalMixNos && gate.approvedFinalMixNos.size > 0) {
+      return gate.approvedFinalMixNos.has(mixNo);
+    }
+    if (gate.approvedFinalMixNos) return false;
+    return gate.approvedPremixNos?.has(mixNo) ?? false;
+  }
+  if (item.kind === "PREMIX") {
     const premixNo = item.premixNo ?? item.finalMixNo;
     if (premixNo == null) return true;
     return gate.approvedPremixNos?.has(premixNo) ?? false;

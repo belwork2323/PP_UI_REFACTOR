@@ -46,6 +46,7 @@ type Props = {
   t: any;
   onListPayloadChange?: (payload: InsulationSpecListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
+  isCentreHead?: boolean;
 };
 
 const InsulationSpecMasterPanel = ({
@@ -57,6 +58,7 @@ const InsulationSpecMasterPanel = ({
   t,
   onListPayloadChange,
   onStatsChange,
+  isCentreHead = false,
 }: Props) => {
   const hook = useInsulationSpecMasterHook({
     activeFilter,
@@ -95,7 +97,9 @@ const InsulationSpecMasterPanel = ({
                 <TableCell sx={table.headerCell}>Parameters</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -145,21 +149,29 @@ const InsulationSpecMasterPanel = ({
                               <icons.visibility fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title={S.TABLE.EDIT}>
-                            <IconButton
-                              size="small"
-                              onClick={() => hook.openEdit(row)}
-                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
-                              aria-label={S.TABLE.EDIT}
-                            >
-                              <icons.Edit fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <MasterDataActiveSwitch
-                            isActive={row.isActive}
-                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
-                            onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
-                          />
+                          {!isCentreHead && (
+                            <>
+                              <Tooltip title={S.TABLE.EDIT}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => hook.openEdit(row)}
+                                  disabled={
+                                    hook.saving || formOpen || hook.disabling || hook.enabling
+                                  }
+                                  aria-label={S.TABLE.EDIT}
+                                >
+                                  <icons.Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <MasterDataActiveSwitch
+                                isActive={row.isActive}
+                                disabled={
+                                  hook.saving || formOpen || hook.disabling || hook.enabling
+                                }
+                                onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                              />
+                            </>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -179,18 +191,19 @@ const InsulationSpecMasterPanel = ({
           rowsPerPageOptions={[5, 10, 25]}
         />
       </Paper>
-
-      <Box sx={t.addRowBar}>
-        <Button
-          variant="contained"
-          startIcon={<icons.projectMgmt.add />}
-          onClick={hook.openCreate}
-          disabled={hook.loading || formOpen}
-          sx={t.pageHeader.newProjectButton}
-        >
-          {addButtonLabel}
-        </Button>
-      </Box>
+      {!isCentreHead && (
+        <Box sx={t.addRowBar}>
+          <Button
+            variant="contained"
+            startIcon={<icons.projectMgmt.add />}
+            onClick={hook.openCreate}
+            disabled={hook.loading || formOpen}
+            sx={t.pageHeader.newProjectButton}
+          >
+            {addButtonLabel}
+          </Button>
+        </Box>
+      )}
 
       <InsulationSpecMasterFormDialog
         open={formOpen}

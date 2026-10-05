@@ -137,8 +137,14 @@ export function validateQcDivisionEntry(
   }
 
   // SUBMIT only: adapter returned no field errors but values are still empty
-  if (tier === "SUBMIT" && Object.keys(errors).length === 0 && !hasMeaningfulValue(values)) {
+  if (tier === "SUBMIT" && Object.keys(errors).length === 0) {
+    const meaningful =
+      kind === "MIXING_FINAL_MIX"
+        ? hasMeaningfulValue(options?.finalMixDetailsValues ?? values) ||
+          hasMeaningfulValue(options?.viscosityValues ?? values)
+        : hasMeaningfulValue(values);
     if (
+      !meaningful &&
       kind !== "SIMPLE" &&
       kind !== "STF" &&
       !(kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable)

@@ -51,6 +51,15 @@ const pickString = (...values: unknown[]): string => {
   return "";
 };
 
+const isYetToStartStatus = (status: unknown): boolean => {
+  const upper = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return !upper || upper === "YET_TO_START";
+};
+
+/** Manufacturing unit must be APPROVED before QC can fill that unit. */
 const isApprovedStatus = (status: unknown): boolean => {
   const normalized = normalizePartialItemStatus(status);
   if (normalized === "APPROVED") return true;
@@ -60,6 +69,12 @@ const isApprovedStatus = (status: unknown): boolean => {
     .replace(/\s+/g, "_");
   return APPROVED_STATUSES.has(upper);
 };
+
+/**
+ * QC divisionStatuses unit lock: backend unlockPremixUnit promotes YET_TO_START → TO_BE_INITIATED
+ * when manufacturing Mixing Final Mix / Premix is approved. Treat any non-YET_TO_START as unlocked.
+ */
+const isUnitUnlockedStatus = (status: unknown): boolean => !isYetToStartStatus(status);
 
 const normalizeNameKey = (value: unknown) =>
   String(value ?? "")
@@ -223,8 +238,12 @@ const isRawMaterialPrepStage = (stage: StageProgressEntry): boolean => {
   );
 };
 
-const isNdtStage = (stage: StageProgressEntry): boolean =>
-  normalizeNameKey(stage.subDepartmentName) === "ndt";
+const isNdtStage = (stage: StageProgressEntry): boolean => {
+  const id = Number(stage.subDepartmentId ?? (stage as { sub_department_id?: unknown }).sub_department_id);
+  // SUB_DEPT.NDT = 10 (QC NDT user subdepartment, not manufacturing).
+  if (Number.isFinite(id) && id === 10) return true;
+  return normalizeNameKey(stage.subDepartmentName) === "ndt";
+};
 
 const isCasePrepStage = (stage: StageProgressEntry): boolean => {
   const sub = normalizeNameKey(stage.subDepartmentName);
@@ -283,7 +302,7 @@ const manufacturingPredecessorForQcDivision = (
   if (currentKey === "TRIMMING") {
     return { match: isTrimmingStage, label: "Trimming", kind: "motor" };
   }
-  // NDT, QC, WEIGHTMENT — manufacturing NDT motors unlock these QC divisions.
+  // NDT, QC, WEIGHTMENT — unlock only after the NDT subdepartment (id 10) is approved.
   if (currentKey === "NDT" || currentKey === "QC" || currentKey === "WEIGHTMENT") {
     return { match: isNdtStage, label: "NDT", kind: "motor" };
   }
@@ -521,11 +540,37 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
     candidatePremixNos: params.candidatePremixNos,
     candidateMotorIds: params.candidateMotorIds,
   });
+
+  // QC divisionStatuses: manufacturing Mixing Final Mix / Premix approval unlocks QC units
+  // to TO_BE_INITIATED via unlockQcMixingFromManufacturing. Merge so Final Mix unlocks even
+  // when stageProgress finalMixStatuses are sparse.
+  const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
+
   if (fromManufacturing) {
+    if (fromDivisionStatuses && !fromDivisionStatuses.enableAll) {
+      fromDivisionStatuses.approvedPremixNos.forEach((n) =>
+        fromManufacturing.approvedPremixNos.add(n),
+      );
+      fromDivisionStatuses.approvedMotorIds.forEach((id) =>
+        fromManufacturing.approvedMotorIds.add(id),
+      );
+      if (currentKey === "MIXING") {
+        const finalNos =
+          fromManufacturing.approvedFinalMixNos ??
+          (fromManufacturing.approvedFinalMixNos = new Set<number>());
+        fromDivisionStatuses.approvedFinalMixNos?.forEach((n) => finalNos.add(n));
+      }
+    }
     return fromManufacturing;
   }
 
-  const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
+  // NDT / QC / Weighment must wait for the NDT subdepartment stage.
+  // Never fall back to QC divisionStatuses — seeded TO_BE_INITIATED motor rows
+  // would incorrectly unlock these tabs as soon as any QC division starts.
+  if (currentKey === "NDT" || currentKey === "QC" || currentKey === "WEIGHTMENT") {
+    return emptyGate("motor", false, "NDT");
+  }
+
   if (fromDivisionStatuses) {
     return fromDivisionStatuses;
   }
@@ -621,18 +666,13 @@ const matchDivisionRow = (
   return false;
 };
 
-const isUnitUnlockedStatus = (status: unknown): boolean => {
-  const upper = String(status ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
-  return upper !== "" && upper !== "YET_TO_START";
-};
-
 const resolveGateFromQcDivisionStatuses = (
   params: {
     stageProgress?: unknown;
     currentStage?: unknown;
+    premixStatuses?: unknown;
+    finalMixStatuses?: unknown;
+    motorStatuses?: unknown;
     candidatePremixNos?: Array<number | string>;
     candidateMotorIds?: string[];
   },
@@ -650,8 +690,10 @@ const resolveGateFromQcDivisionStatuses = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  if (divisionStatus === "YET_TO_START") {
-    return emptyGate(null, false, "QC divisionStatuses");
+  // Division still locked at catalog level — no units available yet.
+  // TO_BE_INITIATED means manufacturing already unlocked the division (Premix and/or Final Mix).
+  if (divisionStatus === "YET_TO_START" || !divisionStatus) {
+    return emptyGate(null, false, "QC division statuses");
   }
 
   if (currentKey === "RAW_MATERIAL_PROCESSING" || currentKey === "MIXING") {
@@ -684,11 +726,41 @@ const resolveGateFromQcDivisionStatuses = (
       if (isUnitUnlockedStatus(premixStatusFromRow(rec))) approvedFinalMixNos.add(premixNo);
     });
 
+    // Form-details unit maps (Mix Navigation) — unlock after manufacturing Mixing approval.
+    asArray(params.premixStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const stageType = String(rec.stageType ?? rec.stage_type ?? "")
+        .trim()
+        .toUpperCase();
+      if (stageType === "FINAL_MIX") {
+        const premixNo = premixNoFromRow(rec);
+        if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
+          approvedFinalMixNos.add(premixNo);
+        }
+        return;
+      }
+      const premixNo = premixNoFromRow(rec);
+      if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
+        approvedPremixNos.add(premixNo);
+      }
+    });
+    asArray(params.finalMixStatuses).forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const premixNo = premixNoFromRow(rec);
+      if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
+        approvedFinalMixNos.add(premixNo);
+      }
+    });
+
     const hasUnitRows =
       asArray(divisionRow.premixStatuses).length > 0 ||
-      asArray(divisionRow.finalMixStatuses).length > 0;
+      asArray(divisionRow.finalMixStatuses).length > 0 ||
+      asArray(params.premixStatuses).length > 0 ||
+      asArray(params.finalMixStatuses).length > 0;
     if (!hasUnitRows) {
-      return emptyGate("premix", false, "QC divisionStatuses");
+      return emptyGate("premix", false, "QC division statuses");
     }
 
     return {
@@ -737,7 +809,12 @@ export const isQcPartialItemEnabledByPreviousDivision = (
     if (gate.kind !== "premix") return true;
     const mixNo = Number(item.finalMixNo ?? item.premixNo);
     if (!Number.isFinite(mixNo) || mixNo <= 0) return false;
-    if (gate.approvedFinalMixNos) return gate.approvedFinalMixNos.has(mixNo);
+    // Prefer Final Mix gate from manufacturing Mixing / QC divisionStatuses.
+    if (gate.approvedFinalMixNos && gate.approvedFinalMixNos.size > 0) {
+      return gate.approvedFinalMixNos.has(mixNo);
+    }
+    // Empty Final Mix set with an explicit Set means still locked (do not fall back to Premix).
+    if (gate.approvedFinalMixNos) return false;
     return gate.approvedPremixNos.has(mixNo);
   }
   if (item.kind === "PREMIX") {
@@ -772,7 +849,9 @@ export const getQcPartialNavTabDisabledReason = (
   const fallback =
     item.kind === "MOTOR"
       ? `This motor was not approved in ${previousLabel} and cannot be filled in QC yet.`
-      : `This premix was not approved in ${previousLabel} and cannot be filled in QC yet.`;
+      : item.kind === "FINAL_MIX"
+        ? `This final mix was not approved in ${previousLabel} and cannot be filled in QC yet.`
+        : `This premix was not approved in ${previousLabel} and cannot be filled in QC yet.`;
 
   if (messages.previousStage?.includes("{division}")) {
     return messages.previousStage.replace("{division}", previousLabel);

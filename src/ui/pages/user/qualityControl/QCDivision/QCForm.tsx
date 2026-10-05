@@ -128,6 +128,12 @@ type QCFormProps = {
   ) => void;
   weightmentErrors?: Record<string, string>;
   weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
+  processingFieldErrors?: Record<string, Record<string, string>>;
+  processingValidationFocusRequest?: {
+    id: number;
+    entryId: string;
+    fieldPath: string;
+  } | null;
   onRemoveDivisionEntry: (entryId: string) => void;
   navApprovalActions?: QCDivisionNavApprovalActions | null;
   unitActions?: QCDivisionEntryUnitActions | null;
@@ -214,6 +220,8 @@ const QCForm = ({
   onProcessingProcessChange,
   weightmentErrors = {},
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
+  processingFieldErrors = {},
+  processingValidationFocusRequest = null,
   onRemoveDivisionEntry,
   navApprovalActions = null,
   unitActions = null,
@@ -505,6 +513,8 @@ const QCForm = ({
           onProcessingProcessChange={onProcessingProcessChange}
           weightmentErrors={weightmentErrors}
           weightmentValidationAttempt={weightmentValidationAttempt}
+          processingFieldErrors={processingFieldErrors}
+          processingValidationFocusRequest={processingValidationFocusRequest}
           onRemoveDivisionEntry={onRemoveDivisionEntry}
           activePartialItem={activePartialItem}
           unitActions={unitActions}
