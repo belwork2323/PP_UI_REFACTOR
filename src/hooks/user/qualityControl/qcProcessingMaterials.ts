@@ -34,6 +34,9 @@ import {
   mergeMaterialsLists,
   type RawMaterialPrepMaterialOption,
 } from "../manufacturing/rawMaterialPrepFlowConfig";
+import { buildProcessFromTypedForm } from "../../../data/models/user/rmp/buildProcessFromTypedForm";
+import { typedProcessToDisplaySections } from "../../../data/models/user/rmp/processFormMapper";
+import type { RawMaterialPrepMaterialProcessSlot } from "../../../data/models/user/RawMaterialPreparationModel";
 import { resolveBatchDetailsRoot } from "./qcBatchContext";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
@@ -78,6 +81,8 @@ export type QcProcessingMaterialSeed = {
   materialName: string;
   gradeId: number | null;
   gradeCode: string | null;
+  /** From material master — retained even when process data is empty. */
+  rmpFormTemplate?: string | null;
   sections: SchemaSectionSubmission[];
   /** Typed RMP process (processType + nested blocks). Prefer over sections for UI. */
   process?: PreparationProcessEntry;
@@ -822,6 +827,37 @@ export const fetchProcessingMaterialCatalog = async (): Promise<QcProcessingMate
   };
 };
 
+/** Resolve material-master form template (TMP / DEFAULT / AP / …) for process UI. */
+export const resolveProcessingRmpFormTemplate = (
+  materialCode: string,
+  catalog?: QcProcessingMaterialCatalog | null,
+  fallback?: string | null,
+): string => {
+  const fromFallback = String(fallback ?? "").trim().toUpperCase();
+  if (fromFallback) return fromFallback;
+  const code = String(materialCode ?? "").trim();
+  if (!code || !catalog) return "DEFAULT";
+  const match = findPrepMaterialByCode(
+    mergeMaterialsLists(catalog.solidMaterials, catalog.liquidMaterials),
+    code,
+  );
+  return String(match?.rmpFormTemplate ?? "").trim().toUpperCase() || "DEFAULT";
+};
+
+/** Attach catalog template onto seeds so UI retains the form after empty draft saves. */
+export const withCatalogRmpFormTemplate = (
+  seeds: QcProcessingMaterialSeed[],
+  catalog: QcProcessingMaterialCatalog,
+): QcProcessingMaterialSeed[] =>
+  seeds.map((seed) => ({
+    ...seed,
+    rmpFormTemplate: resolveProcessingRmpFormTemplate(
+      seed.materialCode,
+      catalog,
+      seed.rmpFormTemplate,
+    ),
+  }));
+
 const processingMaterialSeedKey = (seed: Pick<
   QcProcessingMaterialSeed,
   "premixNo" | "materialCode" | "processSlot"
@@ -946,6 +982,10 @@ export const buildProcessingMaterialSeedsFromBatchSheet = (
           materialName: selection.materialName,
           gradeId: selection.solidGradeId ?? null,
           gradeCode: selection.solidGradeCode || null,
+          rmpFormTemplate: resolveProcessingRmpFormTemplate(
+            selection.solidMaterialCode,
+            catalog,
+          ),
           sections: [],
         });
       }
@@ -966,6 +1006,10 @@ export const buildProcessingMaterialSeedsFromBatchSheet = (
           materialName: selection.materialName,
           gradeId: null,
           gradeCode: null,
+          rmpFormTemplate: resolveProcessingRmpFormTemplate(
+            selection.liquidMaterialCode,
+            catalog,
+          ),
           sections: [],
         });
       }
@@ -995,7 +1039,10 @@ export const resolveProcessingMaterialSeedsForPremix = async (
 
   if (options?.useFormDetails) {
     return {
-      seeds: getProcessingMaterialsForPremix(payload, premixNo),
+      seeds: withCatalogRmpFormTemplate(
+        getProcessingMaterialsForPremix(payload, premixNo),
+        catalog,
+      ),
       catalog,
     };
   }
@@ -1003,7 +1050,10 @@ export const resolveProcessingMaterialSeedsForPremix = async (
   const fromDivisionDetails = getProcessingMaterialsForPremix(payload, premixNo);
   if (fromDivisionDetails.length) {
     return {
-      seeds: sortProcessingSeedsBySheetOrder(fromDivisionDetails, options?.batchPayload),
+      seeds: withCatalogRmpFormTemplate(
+        sortProcessingSeedsBySheetOrder(fromDivisionDetails, options?.batchPayload),
+        catalog,
+      ),
       catalog,
     };
   }
@@ -1060,9 +1110,32 @@ export const hydrateProcessingMaterialValuesFromSeed = (
 
 export const buildProcessingMaterialEntry = (
   seed: QcProcessingMaterialSeed,
-  options?: { schemaUnavailable?: boolean },
+  options?: { schemaUnavailable?: boolean; rmpFormTemplate?: string | null },
 ): QcDivisionEntry => {
   const schemaCacheKey = getQcProcessingMaterialSchemaCacheKey(seed);
+  const rmpFormTemplate =
+    String(options?.rmpFormTemplate ?? seed.rmpFormTemplate ?? "")
+      .trim()
+      .toUpperCase() || "DEFAULT";
+  const identityProcess: PreparationProcessEntry = {
+    materialId: seed.materialId,
+    materialCode: seed.materialCode,
+    materialName: seed.materialName,
+    gradeId: seed.gradeId,
+    gradeCode: seed.gradeCode,
+    lotDetails: seed.process?.lotDetails ?? [],
+    drying: seed.process?.drying ?? null,
+    sieving: seed.process?.sieving ?? null,
+    apCoarse: seed.process?.apCoarse ?? null,
+    apFine: seed.process?.apFine ?? null,
+    apUltraFine: seed.process?.apUltraFine ?? null,
+    aluminum: seed.process?.aluminum ?? null,
+    doa: seed.process?.doa ?? null,
+    processType: seed.process?.processType,
+    ...(seed.sections.length || seed.process?.sections?.length
+      ? { sections: seed.process?.sections?.length ? seed.process.sections : seed.sections }
+      : {}),
+  };
   return {
     entryId: createProcessingEntryId(),
     flowKey: "RAW_MATERIAL",
@@ -1078,11 +1151,39 @@ export const buildProcessingMaterialEntry = (
     gradeId: seed.gradeId,
     gradeCode: seed.gradeCode,
     processSlot: seed.processSlot,
+    rmpFormTemplate,
     schemaCacheKey,
     schemaUnavailable: options?.schemaUnavailable === true,
     // Keep API-flat sections; normalize at hydrate time (same as RMP).
     savedSections: seed.sections,
-    savedProcess: seed.process,
+    // Always keep a process shell so empty drafts still hydrate the material template.
+    savedProcess: seed.process ?? identityProcess,
+  };
+};
+
+/** Apply typed process panel edits onto a processing material entry (RMP parity). */
+export const applyProcessingProcessSlotToEntry = (
+  entry: QcDivisionEntry,
+  slotState: RawMaterialPrepMaterialProcessSlot,
+): QcDivisionEntry => {
+  const process = buildProcessFromTypedForm({
+    uiKey: slotState.uiKey,
+    processForm: slotState.processForm,
+    material: undefined,
+    gradeCode: String(entry.gradeCode ?? "").trim(),
+    fallback: {
+      materialId: Number(entry.materialId ?? 0),
+      materialCode: String(entry.materialCode ?? "").trim(),
+      materialName: String(entry.materialName ?? entry.materialCode ?? "").trim(),
+      gradeId: entry.gradeId ?? undefined,
+    },
+  });
+  if (!process) return entry;
+  const sections = typedProcessToDisplaySections(process);
+  return {
+    ...entry,
+    savedProcess: process,
+    savedSections: sections.length ? sections : entry.savedSections,
   };
 };
 
@@ -1110,6 +1211,16 @@ export type QcProcessingProcessApiPayload = {
   schemaVersion: string;
   schemaType: string;
   sections: Array<{ sectionId: string; sectionData: Record<string, unknown>[] }>;
+  /** RMP-parity typed blocks — persisted so empty drafts still reload with template data. */
+  processType?: string;
+  lotDetails?: LotDetailDto[];
+  drying?: PreparationProcessEntry["drying"];
+  sieving?: PreparationProcessEntry["sieving"];
+  apCoarse?: PreparationProcessEntry["apCoarse"];
+  apFine?: PreparationProcessEntry["apFine"];
+  apUltraFine?: PreparationProcessEntry["apUltraFine"];
+  aluminum?: PreparationProcessEntry["aluminum"];
+  doa?: PreparationProcessEntry["doa"];
 };
 
 export type QcProcessingPremixApiPayload = {
@@ -1136,21 +1247,44 @@ const toApiProcessPayload = (process: SchemaProcessSubmission): QcProcessingProc
   return payload;
 };
 
-/** Fallback when schema is not hydrated — keep material identity + any saved sections. */
+/** Fallback when schema is not hydrated — keep identity + typed process / sections (RMP parity). */
 const buildProcessingProcessFromEntry = (
   entry: QcDivisionEntry,
   sections: SchemaSectionSubmission[],
-): QcProcessingProcessApiPayload =>
-  toApiProcessPayload({
-    materialId: Number(entry.materialId ?? 0),
-    materialCode: String(entry.materialCode ?? "").trim(),
-    materialName: String(entry.materialName ?? entry.materialCode ?? "").trim(),
-    gradeId: entry.gradeId ?? null,
-    gradeCode: entry.gradeCode ?? null,
+): QcProcessingProcessApiPayload => {
+  const process = entry.savedProcess;
+  const typedSections =
+    sections.length > 0
+      ? sections
+      : process
+        ? typedProcessToDisplaySections(process)
+        : [];
+  const base = toApiProcessPayload({
+    materialId: Number(entry.materialId ?? process?.materialId ?? 0),
+    materialCode: String(entry.materialCode ?? process?.materialCode ?? "").trim(),
+    materialName: String(
+      entry.materialName ?? process?.materialName ?? entry.materialCode ?? "",
+    ).trim(),
+    gradeId: entry.gradeId ?? process?.gradeId ?? null,
+    gradeCode: entry.gradeCode ?? process?.gradeCode ?? null,
     schemaVersion: RMP_SCHEMA_VERSION,
     schemaType: RMP_SCHEMA_TYPE,
-    sections,
+    sections: typedSections,
   });
+  if (!process) return base;
+  return {
+    ...base,
+    ...(process.processType ? { processType: process.processType } : {}),
+    lotDetails: process.lotDetails ?? [],
+    drying: process.drying ?? null,
+    sieving: process.sieving ?? null,
+    apCoarse: process.apCoarse ?? null,
+    apFine: process.apFine ?? null,
+    apUltraFine: process.apUltraFine ?? null,
+    aluminum: process.aluminum ?? null,
+    doa: process.doa ?? null,
+  };
+};
 
 export const deriveProcessingMaterialType = (
   solidCount: number,

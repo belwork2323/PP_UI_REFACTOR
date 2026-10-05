@@ -4,7 +4,10 @@ import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
-import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import type {
+  RawMaterialPrepMaterialProcessSlot,
+  RawMaterialPrepWeightmentSheet,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { QcDivisionCatalogNavTab } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import type {
   QcPartialItemStatus,
@@ -119,6 +122,10 @@ type QCFormProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  onProcessingProcessChange?: (
+    entryId: string,
+    slotState: RawMaterialPrepMaterialProcessSlot,
+  ) => void;
   weightmentErrors?: Record<string, string>;
   weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
   onRemoveDivisionEntry: (entryId: string) => void;
@@ -204,6 +211,7 @@ const QCForm = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onProcessingWeightmentSheetChange,
+  onProcessingProcessChange,
   weightmentErrors = {},
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
   onRemoveDivisionEntry,
@@ -494,6 +502,7 @@ const QCForm = ({
           onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
           onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
           onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
+          onProcessingProcessChange={onProcessingProcessChange}
           weightmentErrors={weightmentErrors}
           weightmentValidationAttempt={weightmentValidationAttempt}
           onRemoveDivisionEntry={onRemoveDivisionEntry}

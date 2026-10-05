@@ -2,7 +2,7 @@
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
-import { str } from "../fieldValidators";
+import { ALPHA_NUM, str } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
@@ -41,6 +41,30 @@ export type QcRawMaterialValidationTarget = {
   values: SchemaFormValues | Record<string, unknown>;
 };
 
+/** Specs without a numeric bound (N/A / blank) → alphanumeric ACEM result; otherwise numeric. */
+export function specificationImpliesNumeric(spec: unknown): boolean {
+  const text = String(spec ?? "").trim();
+  if (!text) return false;
+  const normalized = text.replace(/\s+/g, " ").toLowerCase();
+  if (
+    normalized === "n/a" ||
+    normalized === "na" ||
+    normalized === "n.a." ||
+    normalized === "n.a" ||
+    normalized === "not applicable" ||
+    normalized === "-" ||
+    normalized === "—" ||
+    normalized === "–"
+  ) {
+    return false;
+  }
+  return /\d/.test(text);
+}
+
+export function acemQcResultRuleKey(specification: unknown): "acemQcResult" | "acemQcResultAlphanumeric" {
+  return specificationImpliesNumeric(specification) ? "acemQcResult" : "acemQcResultAlphanumeric";
+}
+
 export const qcRawMaterialValidationFields: Record<string, FieldRuleConfig> = {
   // Read-only lot ids from master (e.g. LOT-17) — allow hyphens
   // Read-only lot from master — required on submit; draft allows empty via FORMAT tier
@@ -48,10 +72,20 @@ export const qcRawMaterialValidationFields: Record<string, FieldRuleConfig> = {
   // Parameter / Specs come from material master (may include °C, @, µ, etc.) — no format pattern
   parameter: text(["SUBMIT"]),
   specification: text(["SUBMIT"]),
-  // Analysed / ACEM results: require on submit only. Do not run number FORMAT checks on
-  // draft — analysed values may be non-numeric placeholders, and empty ACEM must not block.
+  // Analysed result may be non-numeric (e.g. Appearance "rough").
   result: text(["SUBMIT"]),
+  // ACEM QC Result: numeric when specs have a range/bound; alphanumeric when N/A.
+  // FORMAT validates type/pattern of filled values; SUBMIT also requires a value.
   acemQcResult: number(["SUBMIT"]),
+  acemQcResultAlphanumeric: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    pattern: ALPHA_NUM,
+    messages: {
+      required: S.FIELD_REQUIRED,
+      invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+    },
+  },
   validity: date(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   qcCertificate: file([]),
@@ -142,7 +176,7 @@ export const qcRawMaterialValidationConfig: SubDeptValidationConfig<QcRawMateria
         fields.push({
           path: `rows.${index}.ACEM_QC_RESULT`,
           value: row.ACEM_QC_RESULT,
-          ruleKey: "acemQcResult",
+          ruleKey: acemQcResultRuleKey(row.SPECIFICATION),
         });
         fields.push({
           path: `rows.${index}.VALIDITY`,

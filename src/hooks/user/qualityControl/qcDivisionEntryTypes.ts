@@ -47,6 +47,8 @@ export type QcDivisionEntry = {
   gradeId?: number | null;
   gradeCode?: string | null;
   processSlot?: QcProcessingProcessSlot;
+  /** Material master form template (TMP / DEFAULT / AP / …) — always drives process UI. */
+  rmpFormTemplate?: string | null;
   /** Cache key for RAW_MATERIALS schema in schemasByKey. */
   schemaCacheKey?: string;
   /** True when RMP schema fetch failed — UI shows weighment fallback instead. */

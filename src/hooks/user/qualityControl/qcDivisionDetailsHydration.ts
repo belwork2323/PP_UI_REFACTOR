@@ -97,10 +97,12 @@ import {
 import { fetchQcSchemaWithInflightDedup, getCachedQcSchema, mapWithConcurrency } from "./qcSchemaFetchCache";
 import {
   buildProcessingMaterialEntry,
+  fetchProcessingMaterialCatalog,
   fetchQcProcessingMaterialSchema,
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
   parseWeightmentSheetFromDivisionDetails,
+  withCatalogRmpFormTemplate,
 } from "./qcProcessingMaterials";
 import type { RawMaterialPrepWeightmentSheet } from "../../../data/models/user/RawMaterialPreparationModel";
 
@@ -248,11 +250,14 @@ export async function hydrateQcDivisionFormFromDetails(
       ) {
         processingWeightmentSheet = detailSheet;
       }
-      for (const seed of processingSeeds) {
+      const catalog = await fetchProcessingMaterialCatalog();
+      const seedsWithTemplate = withCatalogRmpFormTemplate(processingSeeds, catalog);
+      for (const seed of seedsWithTemplate) {
         try {
           const schema = await fetchQcProcessingMaterialSchema({
             subDepartmentId: effectiveSubDepartmentId,
             seed,
+            catalog,
           });
           if (schema) {
             const entry = buildProcessingMaterialEntry(seed);

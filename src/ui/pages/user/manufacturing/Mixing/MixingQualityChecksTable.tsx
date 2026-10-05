@@ -156,7 +156,7 @@ export const MixingQualityChecksTable = ({
 
             return (
               <TableRow
-                key={row.parameterId || `${row.parameter}-${rowIdx}`}
+                key={`${String(row.parameterId ?? "qc")}-${rowIdx}`}
                 sx={dt.tableRow(rowIdx)}
               >
                 <TableCell sx={{ ...dt.tableCell, fontWeight: 700 }}>

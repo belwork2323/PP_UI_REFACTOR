@@ -357,6 +357,7 @@ export const useMixingHook = () => {
 
         setActiveBatch(nextBatch);
         setIsEditMode(editMode);
+        snapshotStateRef.current = nextFormData;
         setFormData(nextFormData);
         setInitialSnapshot(JSON.stringify(nextFormData));
         setMixCardStatusById(
@@ -365,9 +366,8 @@ export const useMixingHook = () => {
             : buildMixCardStatusMapFromForm(nextFormData),
         );
         setView("form");
-        if (silent) {
-          setFormHydrationKey((value) => value + 1);
-        }
+        // Remount MixingForm so local card state hydrates from this load (not a stale echo).
+        setFormHydrationKey((value) => value + 1);
 
         // Enrich process particulars per card from that card's mixing cycle (not Premix 1 only).
         try {
@@ -405,8 +405,29 @@ export const useMixingHook = () => {
             ) => {
               if (!template.length) return current;
               return template.map((row) => {
-                const existing = current.find((item) => item.parameterId === row.parameterId);
-                return existing ? { ...row, observedValues: existing.observedValues } : row;
+                const paramKey = String(row.parameterId ?? "").trim();
+                const existing = current.find(
+                  (item) => String(item.parameterId ?? "").trim() === paramKey,
+                );
+                if (!existing) return { ...row, parameterId: paramKey };
+                const sampleCount = Math.max(
+                  1,
+                  Number(row.noOfSamples) || 1,
+                  Number(existing.noOfSamples) || 0,
+                  Array.isArray(existing.observedValues) ? existing.observedValues.length : 0,
+                );
+                const prior = Array.isArray(existing.observedValues)
+                  ? existing.observedValues
+                  : [];
+                return {
+                  ...row,
+                  parameterId: paramKey,
+                  noOfSamples: sampleCount,
+                  observedValues: Array.from({ length: sampleCount }, (_, i) => {
+                    const value = prior[i];
+                    return value == null ? "" : String(value);
+                  }),
+                };
               });
             };
 
@@ -450,6 +471,7 @@ export const useMixingHook = () => {
               }),
             };
 
+            snapshotStateRef.current = updated;
             setFormData(updated);
             setInitialSnapshot(JSON.stringify(updated));
           }
@@ -533,7 +555,10 @@ export const useMixingHook = () => {
     });
   }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
-  const handleFormChange = useCallback((payload) => {
+  const handleFormChange = useCallback((payload: MixingFormState) => {
+    // Keep ref in sync immediately so save/submit never reads a stale render snapshot
+    // (QC observed values were saving prior keystrokes, e.g. 100 → 9).
+    snapshotStateRef.current = payload;
     setFormData((prev) => {
       if (JSON.stringify(prev) === JSON.stringify(payload)) {
         return prev;
@@ -651,7 +676,10 @@ export const useMixingHook = () => {
         return false;
       }
 
-      if (intent === "submit" && !hasMixCardValue(formData, stageType, cardNo)) {
+      // Prefer the live ref (updated synchronously from the form) over possibly stale state.
+      const latestFormData = snapshotStateRef.current ?? formData;
+
+      if (intent === "submit" && !hasMixCardValue(latestFormData, stageType, cardNo)) {
         showAlert(S.MIX_CARD_EMPTY_ERROR, "warning");
         return false;
       }
@@ -659,7 +687,7 @@ export const useMixingHook = () => {
       const premixSubmissionType: PremixSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
       const formSubmissionType = "DRAFT" as const;
       const isCreateFlow = !resolveMixFormId(activeBatch);
-      const mixingDetails = mapMixingFormStateToPayload(formData, {
+      const mixingDetails = mapMixingFormStateToPayload(latestFormData, {
         targetMixCardId: mixCardId,
         premixSubmissionType,
         mixCardStatusById,
@@ -750,10 +778,10 @@ export const useMixingHook = () => {
 
           await openFormWithResolvedData(refreshedBatch, stillRejectedEdit, {
             silent: true,
-            preserveLocalFormData: formData,
+            preserveLocalFormData: latestFormData,
           });
         } else {
-          setInitialSnapshot(JSON.stringify(formData));
+          setInitialSnapshot(JSON.stringify(latestFormData));
         }
 
         return true;
@@ -783,7 +811,7 @@ export const useMixingHook = () => {
               bumpBatchRefresh();
               await openFormWithResolvedData(batchToReopen, isEditMode, {
                 silent: true,
-                preserveLocalFormData: formData,
+                preserveLocalFormData: snapshotStateRef.current ?? formData,
               });
             },
             showAlert,

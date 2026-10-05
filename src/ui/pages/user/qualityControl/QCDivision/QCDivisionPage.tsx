@@ -94,6 +94,7 @@ const QualityControlPage = () => {
     entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
+    handleProcessingProcessChange,
     handleProcessingWeightmentSheetChange,
     weightmentErrors,
     weightmentValidationAttempt,
@@ -306,6 +307,7 @@ const QualityControlPage = () => {
             onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
             onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
             onProcessingWeightmentSheetChange={handleProcessingWeightmentSheetChange}
+            onProcessingProcessChange={handleProcessingProcessChange}
             weightmentErrors={weightmentErrors}
             weightmentValidationAttempt={weightmentValidationAttempt}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}

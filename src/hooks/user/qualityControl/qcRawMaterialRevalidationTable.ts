@@ -159,7 +159,7 @@ export const buildRevalidationMaterialsPayload = (
     parameter: string;
     specification: string;
     result: string;
-    acemResult?: number | null;
+    acemResult?: string | null;
     validity: string;
     remarks: string;
     qcCertificate: string[];
@@ -169,11 +169,10 @@ export const buildRevalidationMaterialsPayload = (
     .filter((row) => row._rowRole !== "picker")
     .filter((row) => !isEmptyRevalidationRow(row));
 
-  const toOptionalAcemNumber = (value: unknown): number | null | undefined => {
+  /** Persist ACEM as string so N/A-spec alphanumeric values (e.g. "na") are kept. */
+  const toOptionalAcemResult = (value: unknown): string | null => {
     const text = String(value ?? "").trim();
-    if (!text) return null; // omit empty string — backend acemQcResult is Double
-    const num = Number(text.replace(/,/g, ""));
-    return Number.isFinite(num) ? num : undefined;
+    return text === "" ? null : text;
   };
 
   const byIngredient = new Map<
@@ -183,7 +182,7 @@ export const buildRevalidationMaterialsPayload = (
       parameter: string;
       specification: string;
       result: string;
-      acemResult?: number | null;
+      acemResult?: string | null;
       validity: string;
       remarks: string;
       qcCertificate: string[];
@@ -208,13 +207,12 @@ export const buildRevalidationMaterialsPayload = (
       (groupId ? ingredientByGroup.get(groupId) ?? "" : "");
     if (!ingredient) return;
     const list = byIngredient.get(ingredient) ?? [];
-    const acemResult = toOptionalAcemNumber(row.ACEM_QC_RESULT);
     const detail: {
       lotBatchNumber: string;
       parameter: string;
       specification: string;
       result: string;
-      acemResult?: number | null;
+      acemResult?: string | null;
       validity: string;
       remarks: string;
       qcCertificate: string[];
@@ -225,14 +223,11 @@ export const buildRevalidationMaterialsPayload = (
       parameter: String(row.PARAMETER ?? "").trim(),
       specification: String(row.SPECIFICATION ?? "").trim(),
       result: String(row.RESULT ?? "").trim(),
+      acemResult: toOptionalAcemResult(row.ACEM_QC_RESULT),
       validity: String(row.VALIDITY ?? "").trim(),
       remarks: String(row.REMARKS ?? "").trim(),
       qcCertificate: normalizeCertificateFileIds(row.QC_CERTIFICATE),
     };
-    // Send null (not "") so Jackson can bind Double; skip non-numeric on draft.
-    if (acemResult !== undefined) {
-      detail.acemResult = acemResult;
-    }
     list.push(detail);
     byIngredient.set(ingredient, list);
   });

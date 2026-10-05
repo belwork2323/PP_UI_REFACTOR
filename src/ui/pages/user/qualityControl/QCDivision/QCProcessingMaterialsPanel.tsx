@@ -18,7 +18,11 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcProcessingMaterials";
 import { normalizeSheetMaterialsForWeightmentCompare } from "../../../../../data/models/user/rawMaterialWeightmentValidation";
 import type { QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
-import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import type {
+  RawMaterialPrepMaterialProcessSlot,
+  RawMaterialPrepWeightmentSheet,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
+import { hydratePremixProcessSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { IdentificationSheet } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
@@ -30,7 +34,6 @@ import RawMaterialWeightmentSheetPanel from "../../manufacturing/RawMaterial/Raw
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
-import { hydratePremixProcessSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import { rmpUiKeyShowsProcessPanel } from "../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
 import RawMaterialMaterialProcessPanel from "../../manufacturing/RawMaterial/materialProcess/RawMaterialMaterialProcessPanel";
 import type { ValidationAttemptFlags } from "../../../../components/validation/useValidationDisplay";
@@ -59,6 +62,11 @@ type QCProcessingMaterialsPanelProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  /** Persist typed Lot/Drying/Sieving edits (RMP parity). */
+  onProcessingProcessChange?: (
+    entryId: string,
+    slotState: RawMaterialPrepMaterialProcessSlot,
+  ) => void;
   /** RMP-parity weighment field errors (paths under weightment.*). */
   weightmentErrors?: ValidationErrors;
   validationAttempt?: ValidationAttemptFlags;
@@ -79,6 +87,7 @@ const QCProcessingMaterialsPanel = ({
   schemaError: _schemaError = null,
   onEntryValuesChange,
   onProcessingWeightmentSheetChange,
+  onProcessingProcessChange,
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
   unitActions = null,
@@ -332,24 +341,19 @@ const QCProcessingMaterialsPanel = ({
     });
   };
 
-  const activeReadOnlyProcessSlot = useMemo(() => {
-    const hasTypedProcess =
-      Boolean(activeEntry?.savedProcess?.processType) ||
-      Boolean(activeEntry?.savedProcess?.lotDetails?.length) ||
-      Boolean(activeEntry?.savedProcess?.doa) ||
-      Boolean(activeEntry?.savedProcess?.aluminum) ||
-      Boolean(activeEntry?.savedProcess?.apCoarse) ||
-      Boolean(activeEntry?.savedProcess?.apFine) ||
-      Boolean(activeEntry?.savedProcess?.apUltraFine) ||
-      Boolean(activeEntry?.savedProcess?.drying) ||
-      Boolean(activeEntry?.savedProcess?.sieving) ||
-      Boolean(activeEntry?.savedSections?.length);
-    if (!activeEntry || !hasTypedProcess) return null;
+  // Always resolve from material master template (RMP parity) — do not hide Lot/Drying/Sieving
+  // when the user saved an empty draft.
+  const activeProcessSlot = useMemo(() => {
+    if (!activeEntry) return null;
     const materialCode = String(
       activeEntry.savedProcess?.materialCode ?? activeEntry.materialCode ?? "",
     ).trim();
     if (!materialCode) return null;
     const slot = activeEntry.processSlot === "liquid" ? "liquid" : "solid";
+    const gradeCode =
+      String(activeEntry.savedProcess?.gradeCode ?? activeEntry.gradeCode ?? "").trim() || undefined;
+    const rmpFormTemplate =
+      String(activeEntry.rmpFormTemplate ?? "").trim().toUpperCase() || "DEFAULT";
     const fallbackProcess = {
       materialId: Number(activeEntry.savedProcess?.materialId ?? activeEntry.materialId ?? 0),
       materialCode,
@@ -358,16 +362,26 @@ const QCProcessingMaterialsPanel = ({
           activeEntry.savedProcess?.materialName ?? activeEntry.materialName ?? materialCode,
         ).trim() || materialCode,
       gradeId: activeEntry.savedProcess?.gradeId ?? activeEntry.gradeId ?? null,
-      gradeCode:
-        String(activeEntry.savedProcess?.gradeCode ?? activeEntry.gradeCode ?? "").trim() || null,
+      gradeCode: gradeCode ?? null,
       lotDetails: activeEntry.savedProcess?.lotDetails ?? [],
-      sections: activeEntry.savedSections,
+      drying: activeEntry.savedProcess?.drying ?? null,
+      sieving: activeEntry.savedProcess?.sieving ?? null,
+      apCoarse: activeEntry.savedProcess?.apCoarse ?? null,
+      apFine: activeEntry.savedProcess?.apFine ?? null,
+      apUltraFine: activeEntry.savedProcess?.apUltraFine ?? null,
+      aluminum: activeEntry.savedProcess?.aluminum ?? null,
+      doa: activeEntry.savedProcess?.doa ?? null,
+      processType: activeEntry.savedProcess?.processType,
+      sections: activeEntry.savedProcess?.sections?.length
+        ? activeEntry.savedProcess.sections
+        : activeEntry.savedSections,
     };
     return hydratePremixProcessSlot(
       slot,
       materialCode,
       activeEntry.savedProcess ?? fallbackProcess,
-      fallbackProcess.gradeCode ?? undefined,
+      gradeCode,
+      rmpFormTemplate,
     );
   }, [activeEntry]);
 
@@ -544,19 +558,22 @@ const QCProcessingMaterialsPanel = ({
 
           {schemaUnavailable ? (
             <Stack spacing={1.25}>
-              {activeReadOnlyProcessSlot &&
-              rmpUiKeyShowsProcessPanel(activeReadOnlyProcessSlot.uiKey) ? (
+              {activeProcessSlot && rmpUiKeyShowsProcessPanel(activeProcessSlot.uiKey) ? (
                 <RawMaterialMaterialProcessPanel
-                  slotState={activeReadOnlyProcessSlot}
-                  onSlotChange={() => undefined}
+                  slotState={activeProcessSlot}
+                  onSlotChange={(next) => {
+                    if (!activeEntry || inputsLocked) return;
+                    onProcessingProcessChange?.(activeEntry.entryId, next);
+                  }}
                   materialCode={String(activeEntry.materialCode ?? "")}
+                  rmpFormTemplate={activeEntry.rmpFormTemplate}
                   lotOptions={
                     (activeEntry.savedProcess?.lotDetails ?? [])
                       .map((lot) => String(lot.lotId ?? "").trim())
                       .filter(Boolean)
                   }
                   quantityPerPremix={0}
-                  readOnly
+                  readOnly={inputsLocked}
                   theme={manufacturingTheme}
                 />
               ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (

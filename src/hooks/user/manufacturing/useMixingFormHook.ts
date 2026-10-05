@@ -49,6 +49,63 @@ const NUMERIC_PROCESS_FIELDS: Set<keyof ProcessParticularRow> = new Set([
   "temp",
   "vacuum",
 ]);
+
+const mergeQualityChecksPreservingObserved = (
+  incoming: QualityCheckRow[] | undefined,
+  current: QualityCheckRow[] | undefined,
+): QualityCheckRow[] => {
+  const template = Array.isArray(incoming) ? incoming : [];
+  const existing = Array.isArray(current) ? current : [];
+  if (!template.length) return existing;
+  return template.map((row) => {
+    const paramKey = String(row.parameterId ?? "").trim();
+    const prior = existing.find((item) => String(item.parameterId ?? "").trim() === paramKey);
+    const sampleCount = Math.max(
+      1,
+      Number(row.noOfSamples) || 1,
+      Number(prior?.noOfSamples) || 0,
+      Array.isArray(prior?.observedValues) ? prior!.observedValues!.length : 0,
+    );
+    const priorValues = Array.isArray(prior?.observedValues) ? prior!.observedValues! : [];
+    const templateValues = Array.isArray(row.observedValues) ? row.observedValues : [];
+    return {
+      ...row,
+      parameterId: paramKey || String(row.parameterId ?? ""),
+      noOfSamples: sampleCount,
+      observedValues: Array.from({ length: sampleCount }, (_, i) => {
+        const fromPrior = priorValues[i];
+        if (fromPrior != null && String(fromPrior).trim() !== "") return String(fromPrior);
+        const fromTemplate = templateValues[i];
+        return fromTemplate == null ? "" : String(fromTemplate);
+      }),
+    };
+  });
+};
+
+const mergeCardsPreservingObservedValues = <T extends PremixEntry | FinalMixEntry>(
+  current: T[],
+  incoming: T[],
+  idKey: "premixNo" | "mixNo",
+): T[] => {
+  if (!Array.isArray(incoming) || !incoming.length) return current;
+  return incoming.map((card) => {
+    const cardId = String((card as Record<string, unknown>)[idKey] ?? "").trim();
+    const prior = current.find(
+      (item) => String((item as Record<string, unknown>)[idKey] ?? "").trim() === cardId,
+    );
+    if (!prior) return card;
+    return {
+      ...card,
+      qualityChecks: mergeQualityChecksPreservingObserved(card.qualityChecks, prior.qualityChecks),
+      // Keep process rows the user already filled when incoming is only a template seed.
+      processParticulars:
+        (prior.processParticulars?.length ?? 0) > 0
+          ? prior.processParticulars
+          : card.processParticulars,
+    } as T;
+  });
+};
+
 export const useMixingFormHook = (
   initialData?: MixingFormState,
   onBlocksChange?: (payload: MixingFormState) => void,
@@ -95,42 +152,55 @@ export const useMixingFormHook = (
 
   // Keep a reference to prevent initialData updates from triggering cyclic re-renders
   const isInternalUpdate = useRef(false);
+  /** Last payload we published upward — used to ignore parent echoes that would clobber typing. */
+  const lastEmittedSerializedRef = useRef<string | null>(null);
 
-  // Sync state upward to parent ONLY when state changes internally
+  const publishBlocks = useCallback((nextPremix: PremixEntry[], nextFinal: FinalMixEntry[]) => {
+    const payload = { premixCards: nextPremix, finalMixCards: nextFinal };
+    lastEmittedSerializedRef.current = JSON.stringify(payload);
+    onBlocksChangeRef.current?.(payload);
+  }, []);
+
+  // Sync state upward when cards change (skip one beat after controlled downward hydrate).
   useEffect(() => {
     if (isInternalUpdate.current) {
       isInternalUpdate.current = false;
       return;
     }
-    onBlocksChangeRef.current?.({
-      premixCards,
-      finalMixCards,
-    });
-  }, [premixCards, finalMixCards]);
+    publishBlocks(premixCards, finalMixCards);
+  }, [premixCards, finalMixCards, publishBlocks]);
 
-  // Sync initialData downward ONLY when initialData actually changes externally
+  // Sync initialData downward only for *external* parent updates (load / cycle enrich).
+  // Never re-apply our own upward echo — that was overwriting observed values mid-typing
+  // (e.g. enter 100, parent still had 9, local got reset to 9 on save).
   useEffect(() => {
     if (!initialData) return;
 
-    const hasPersistedPremixCards = (initialData.premixCards?.length ?? 0) > 0;
-    const hasPersistedFinalMixCards = (initialData.finalMixCards?.length ?? 0) > 0;
+    const incomingPremix = initialData.premixCards ?? [];
+    const incomingFinal = initialData.finalMixCards ?? [];
+    if (!incomingPremix.length) return;
 
-    if (hasPersistedPremixCards) {
-      isInternalUpdate.current = true;
-      setPremixCards(initialData.premixCards);
-      setFinalMixCards(
-        hasPersistedFinalMixCards
-          ? initialData.finalMixCards
-          : buildInitialFinalMixCardsWithDefaults(
-              initialData.premixCards.length,
-              resolveMasterDataName(identificationSheet?.mixerType),
-              null,
-              identificationSheet?.batchSize,
-              identificationSheet?.date,
-            ),
+    const incomingSerialized = JSON.stringify({
+      premixCards: incomingPremix,
+      finalMixCards: incomingFinal,
+    });
+    if (incomingSerialized === lastEmittedSerializedRef.current) return;
+
+    isInternalUpdate.current = true;
+    setPremixCards((prev) => mergeCardsPreservingObservedValues(prev, incomingPremix, "premixNo"));
+    setFinalMixCards((prev) => {
+      if (incomingFinal.length > 0) {
+        return mergeCardsPreservingObservedValues(prev, incomingFinal, "mixNo");
+      }
+      return buildInitialFinalMixCardsWithDefaults(
+        incomingPremix.length,
+        resolveMasterDataName(identificationSheet?.mixerType),
+        null,
+        identificationSheet?.batchSize,
+        identificationSheet?.date,
       );
-    }
-  }, [initialData]);
+    });
+  }, [initialData, identificationSheet?.mixerType, identificationSheet?.batchSize, identificationSheet?.date]);
 
   const usedPremixNumbers = useMemo(
     () => premixCards.map((entry) => Number(entry.premixNo)).filter((value) => value > 0),
@@ -229,7 +299,7 @@ export const useMixingFormHook = (
 
   const updateProcessParticular = useCallback(
     (
-      premixNo: string,
+      premixNo: string | number,
       rowId: number,
       field: keyof ProcessParticularRow,
       value: string | number,
@@ -238,11 +308,11 @@ export const useMixingFormHook = (
 
       setPremixCards((prev) =>
         prev.map((premix) => {
-          if (premix.premixNo !== premixNo) return premix;
+          if (String(premix.premixNo) !== String(premixNo)) return premix;
           return {
             ...premix,
             processParticulars: premix.processParticulars.map((row) =>
-              row.operationId === rowId ? { ...row, [field]: parsedValue } : row,
+              Number(row.operationId) === Number(rowId) ? { ...row, [field]: parsedValue } : row,
             ),
           };
         }),
@@ -262,21 +332,26 @@ export const useMixingFormHook = (
         return {
           ...premix,
           qualityChecks: rows.map((row) => {
+            const paramKey = String(row.parameterId ?? "").trim();
             const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
             const currentRow = premix.qualityChecks.find(
-              (entry) => entry.parameterId === row.parameterId,
+              (entry) => String(entry.parameterId ?? "").trim() === paramKey,
             );
 
             const specification = currentRow?.specification ?? row.specification;
-            const existingValues = currentRow?.observedValues ?? [];
+            const existingValues = Array.isArray(currentRow?.observedValues)
+              ? currentRow!.observedValues!
+              : [];
             const observedValues = Array.from(
               { length: sampleCount },
-              (_, i) => existingValues[i] ?? "",
+              (_, i) => (existingValues[i] == null ? "" : String(existingValues[i])),
             );
 
             return {
               ...row,
+              parameterId: paramKey,
               specification,
+              noOfSamples: sampleCount,
               observedValues,
             };
           }),
@@ -294,21 +369,26 @@ export const useMixingFormHook = (
           if (targetIndex !== undefined && index !== targetIndex) return entry;
 
           const nextRows = rows.map((row) => {
+            const paramKey = String(row.parameterId ?? "").trim();
             const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
             const currentRow = entry.qualityChecks.find(
-              (item) => item.parameterId === row.parameterId,
+              (item) => String(item.parameterId ?? "").trim() === paramKey,
             );
 
             const specification = currentRow?.specification ?? row.specification;
-            const existingValues = currentRow?.observedValues ?? [];
+            const existingValues = Array.isArray(currentRow?.observedValues)
+              ? currentRow!.observedValues!
+              : [];
             const observedValues = Array.from(
               { length: sampleCount },
-              (_, i) => existingValues[i] ?? "",
+              (_, i) => (existingValues[i] == null ? "" : String(existingValues[i])),
             );
 
             return {
               ...row,
+              parameterId: paramKey,
               specification,
+              noOfSamples: sampleCount,
               observedValues,
             };
           });
@@ -373,16 +453,21 @@ export const useMixingFormHook = (
   );
 
   const updateFinalMixProcessParticular = useCallback(
-    (mixNo: string, rowId: number, field: keyof ProcessParticularRow, value: string | number) => {
+    (
+      mixNo: string | number,
+      rowId: number,
+      field: keyof ProcessParticularRow,
+      value: string | number,
+    ) => {
       const parsedValue = value;
 
       setFinalMixCards((prev) =>
         prev.map((card) =>
-          card.mixNo === mixNo
+          String(card.mixNo) === String(mixNo)
             ? {
                 ...card,
                 processParticulars: card.processParticulars.map((row) =>
-                  row.operationId === rowId ? { ...row, [field]: parsedValue } : row,
+                  Number(row.operationId) === Number(rowId) ? { ...row, [field]: parsedValue } : row,
                 ),
               }
             : card,
@@ -394,17 +479,28 @@ export const useMixingFormHook = (
 
   const updateFinalMixQualityCheck = useCallback(
     (mixNo: number | string, parameterId: string | number, index: number, value: string) => {
+      const sampleIndex = Number(index);
+      if (!Number.isFinite(sampleIndex) || sampleIndex < 0) return;
+      const paramKey = String(parameterId ?? "").trim();
       setFinalMixCards((prev) =>
         prev.map((entry) => {
-          // Match against mixNo (converted to String for type-safe comparison)
           if (String(entry.mixNo) !== String(mixNo)) return entry;
           return {
             ...entry,
             qualityChecks: entry.qualityChecks.map((row) => {
-              if (row.parameterId !== parameterId) return row;
-              const updatedValues = [...(row.observedValues ?? [])];
-              updatedValues[index] = value;
-              return { ...row, observedValues: updatedValues };
+              if (String(row.parameterId ?? "").trim() !== paramKey) return row;
+              const sampleCount = Math.max(
+                1,
+                Number(row.noOfSamples) || 1,
+                sampleIndex + 1,
+                Array.isArray(row.observedValues) ? row.observedValues.length : 0,
+              );
+              const updatedValues = Array.from({ length: sampleCount }, (_, i) => {
+                if (i === sampleIndex) return String(value ?? "");
+                const existing = Array.isArray(row.observedValues) ? row.observedValues[i] : "";
+                return existing == null ? "" : String(existing);
+              });
+              return { ...row, parameterId: paramKey, observedValues: updatedValues };
             }),
           };
         }),
@@ -414,17 +510,29 @@ export const useMixingFormHook = (
   );
 
   const updateQualityCheck = useCallback(
-    (premixNo: string, parameterId: string | number, index: number, value: string) => {
+    (premixNo: string | number, parameterId: string | number, index: number, value: string) => {
+      const sampleIndex = Number(index);
+      if (!Number.isFinite(sampleIndex) || sampleIndex < 0) return;
+      const paramKey = String(parameterId ?? "").trim();
       setPremixCards((prev) =>
         prev.map((premix) => {
-          if (premix.premixNo !== premixNo) return premix;
+          if (String(premix.premixNo) !== String(premixNo)) return premix;
           return {
             ...premix,
             qualityChecks: premix.qualityChecks.map((row) => {
-              if (row.parameterId !== parameterId) return row;
-              const updatedValues = [...(row.observedValues ?? [])];
-              updatedValues[index] = value;
-              return { ...row, observedValues: updatedValues };
+              if (String(row.parameterId ?? "").trim() !== paramKey) return row;
+              const sampleCount = Math.max(
+                1,
+                Number(row.noOfSamples) || 1,
+                sampleIndex + 1,
+                Array.isArray(row.observedValues) ? row.observedValues.length : 0,
+              );
+              const updatedValues = Array.from({ length: sampleCount }, (_, i) => {
+                if (i === sampleIndex) return String(value ?? "");
+                const existing = Array.isArray(row.observedValues) ? row.observedValues[i] : "";
+                return existing == null ? "" : String(existing);
+              });
+              return { ...row, parameterId: paramKey, observedValues: updatedValues };
             }),
           };
         }),
@@ -455,10 +563,15 @@ export const useMixingFormHook = (
           if (targetPremixNo != null && String(card.premixNo) !== String(targetPremixNo)) {
             return card; // leave other premixes untouched
           }
+          const nextProcess = Array.isArray(operations) ? operations.map((op) => ({ ...op })) : [];
+          // Keep process rows the user already filled; only seed when empty.
+          const processParticulars =
+            (card.processParticulars?.length ?? 0) > 0 ? card.processParticulars : nextProcess;
           return {
             ...card,
-            processParticulars: (operations ?? []).map((op) => ({ ...op })),
-            qualityChecks: (qualityChecks ?? []).map((qc) => ({ ...qc })),
+            processParticulars,
+            // Never wipe in-progress / saved observed values when cycle details arrive late.
+            qualityChecks: mergeQualityChecksPreservingObserved(qualityChecks, card.qualityChecks),
           };
         }),
       );
@@ -473,10 +586,13 @@ export const useMixingFormHook = (
           if (targetMixNo != null && String(card.mixNo) !== String(targetMixNo)) {
             return card;
           }
+          const nextProcess = Array.isArray(operations) ? operations.map((op) => ({ ...op })) : [];
+          const processParticulars =
+            (card.processParticulars?.length ?? 0) > 0 ? card.processParticulars : nextProcess;
           return {
             ...card,
-            processParticulars: (operations ?? []).map((op) => ({ ...op })),
-            qualityChecks: (qualityChecks ?? []).map((qc) => ({ ...qc })),
+            processParticulars,
+            qualityChecks: mergeQualityChecksPreservingObserved(qualityChecks, card.qualityChecks),
           };
         }),
       );

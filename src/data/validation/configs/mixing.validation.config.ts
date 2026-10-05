@@ -8,28 +8,28 @@ const M = VALIDATIONSTRING;
 export const mixingFieldRules = {
   mixerType: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   bldgNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   premixDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   premixQuantity: {
     valueType: "number" as const,
     pattern: M.PATTERNS.FLOAT,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   mixingCycleCode: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   bowlId: {
@@ -286,16 +286,11 @@ export const mixingValidationConfig: SubDeptValidationConfig<MixingData> = {
               if (val === undefined || val === null || String(val).trim() === "") continue;
             }
 
-            // Coerce and validate as number (supports both integers and decimals)
+            // Validate as number without mutating form state (mutation steals/breaks typing).
             const num = Number(val);
             if (Number.isNaN(num)) {
               errors[path] = mixingFieldRules.observedValue.messages.invalid;
               continue;
-            }
-
-            // Optionally ensure the stored entry is treated as a number
-            if (typeof values[o] === "string" && values[o].trim() !== "") {
-              values[o] = num;
             }
 
             if (min !== undefined && max !== undefined) {

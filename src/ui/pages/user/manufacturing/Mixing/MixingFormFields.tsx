@@ -225,12 +225,12 @@ export const MixingTableInput = ({
   <TextField
     size="small"
     fullWidth
-    value={value}
+    value={value ?? ""}
     placeholder={placeholder}
     disabled={disabled}
     error={error}
     helperText={helperText}
-    onChange={(event) => onChange(event.target.value)}
+    onChange={(event) => onChange(String(event.target.value ?? ""))}
     sx={mixingTableInputSx}
     required={required}
     inputRef={inputRef}

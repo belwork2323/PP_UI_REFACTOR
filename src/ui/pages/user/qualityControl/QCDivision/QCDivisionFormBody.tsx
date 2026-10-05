@@ -3,7 +3,10 @@ import { Box, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QcDivisionEntry, QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
-import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import type {
+  RawMaterialPrepMaterialProcessSlot,
+  RawMaterialPrepWeightmentSheet,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
   buildDivisionNavGroups,
@@ -86,6 +89,10 @@ export type QCDivisionFormBodyProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  onProcessingProcessChange?: (
+    entryId: string,
+    slotState: RawMaterialPrepMaterialProcessSlot,
+  ) => void;
   weightmentErrors?: Record<string, string>;
   weightmentValidationAttempt?: import("../../../../components/validation/useValidationDisplay").ValidationAttemptFlags;
   onRemoveDivisionEntry: (entryId: string) => void;
@@ -120,6 +127,7 @@ const QCDivisionFormBody = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onProcessingWeightmentSheetChange,
+  onProcessingProcessChange,
   weightmentErrors = {},
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
   onRemoveDivisionEntry,
@@ -462,6 +470,7 @@ const QCDivisionFormBody = ({
               schemaError={schemaError}
               onEntryValuesChange={onDivisionEntryValuesChange}
               onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
+              onProcessingProcessChange={onProcessingProcessChange}
               weightmentErrors={weightmentErrors}
               validationAttempt={weightmentValidationAttempt}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}

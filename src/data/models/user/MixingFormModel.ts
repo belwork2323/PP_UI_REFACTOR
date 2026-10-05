@@ -903,42 +903,56 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
   };
 };
 
+const toNullableApiNumber = (value: unknown): number | string | null => {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === "" ? null : trimmed;
+};
+
 const mapProcessRowsToApi = (rows: ProcessParticularRow[]) =>
   rows.map((row) => ({
     operationId: row.operationId,
-    rpm: row.rpm,
-    time: row.time,
-    temp: row.temp,
-    vacuum: row.vacuum,
+    rpm: toNullableApiNumber(row.rpm),
+    time: toNullableApiNumber(row.time),
+    temp: toNullableApiNumber(row.temp),
+    vacuum: toNullableApiNumber(row.vacuum),
   }));
 export const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
   rows.map((row) => {
-    const sampleCount = Number(row.noOfSamples) || 1;
-    const values = row.observedValues ?? [];
+    const sampleCount = Math.max(1, Number(row.noOfSamples) || 1);
+    const values = Array.isArray(row.observedValues) ? row.observedValues : [];
 
-    const observations = values.slice(0, sampleCount).map((val, index) => ({
-      sampleNo: index + 1,
-      value: String(val ?? "").trim(),
-    }));
+    const observations = Array.from({ length: sampleCount }, (_, index) => {
+      const trimmed = String(values[index] ?? "").trim();
+      return {
+        sampleNo: index + 1,
+        // Blank draft values stay null so backend format validators are not tripped.
+        value: trimmed === "" ? null : trimmed,
+      };
+    });
 
     return {
-      parameterId: row.parameterId,
+      parameterId: String(row.parameterId ?? "").trim(),
       noOfSamples: sampleCount,
       observations,
     };
   });
 
-/** Read observation values by index; still accept legacy `{ sampleNo, value }` payloads. */
+/** Read observation values by sampleNo (preferred) or array index. */
 const readObservationValues = (observations: unknown[]): string[] => {
   const byIndex: string[] = [];
   observations.forEach((obs, index) => {
     if (obs == null) return;
     if (typeof obs === "string" || typeof obs === "number") {
-      byIndex[index] = String(obs);
+      byIndex[index] = String(obs).trim();
       return;
     }
     const rec = obs as Record<string, unknown>;
-    const value = String(rec.value ?? "").trim();
+    // Only read explicit value fields — never coerce the whole observation
+    // (that could pick up unrelated nested fields / sampleNo).
+    const rawValue = rec.value ?? rec.observedValue ?? rec.result;
+    const value =
+      rawValue === undefined || rawValue === null ? "" : coerceFieldValue(rawValue);
     const sampleNo = Number(rec.sampleNo);
     if (Number.isFinite(sampleNo) && sampleNo > 0) {
       byIndex[sampleNo - 1] = value;
@@ -967,32 +981,32 @@ export const mapProcessRows = (
   });
 };
 
+const observationValueToString = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return coerceFieldValue(value);
+  }
+  return String(value).trim();
+};
+
 const mapApiQualityChecksToRows = (apiRows: any[] = []): QualityCheckRow[] =>
   apiRows.map((row) => {
-    const rawObservations: Array<{ value?: string | number }> = Array.isArray(row?.observations)
-      ? row.observations
-      : [];
+    const rawObservations: unknown[] = Array.isArray(row?.observations) ? row.observations : [];
+    const bySample = readObservationValues(rawObservations);
 
-    // Count filled slots to resolve minimum sample count if noOfSamples is missing
-    const filledSlots = rawObservations.reduce(
-      (count, item, index) =>
-        item?.value != null && String(item.value).trim() !== ""
-          ? Math.max(count, index + 1)
-          : count,
+    const filledSlots = bySample.reduce(
+      (count, value, index) => (String(value ?? "").trim() !== "" ? Math.max(count, index + 1) : count),
       0,
     );
 
-    // Dynamic sample count resolution
     const sampleCount = Math.max(
       1,
       Number(row?.noOfSamples ?? row?.sampleCount) || filledSlots || 1,
     );
 
-    // Build dynamic observedValues array matching sampleCount index order
-    const observedValues = Array.from({ length: sampleCount }, (_, index) => {
-      const item = rawObservations[index];
-      return item?.value !== undefined && item?.value !== null ? String(item.value).trim() : "";
-    });
+    const observedValues = Array.from({ length: sampleCount }, (_, index) =>
+      observationValueToString(bySample[index]),
+    );
 
     return {
       parameterId: String(row?.parameterId ?? "").trim(),
@@ -1012,31 +1026,28 @@ const mergeQualityChecks = (
   }
 
   return masterRows.map((master) => {
-    const api = apiRows.find((row) => row.parameterId === master.parameterId);
+    const masterParam = String(master.parameterId ?? "").trim();
+    const api = apiRows.find(
+      (row) => String(row?.parameterId ?? "").trim() === masterParam,
+    );
 
-    // Resolve dynamic sample count from master or API
     const sampleCount = Math.max(
       1,
       Number(master.noOfSamples ?? api?.noOfSamples ?? api?.sampleCount) || 1,
     );
 
-    // Extract raw observation objects from API if present
-    const rawObservations: Array<{ value?: string | number }> = Array.isArray(api?.observations)
-      ? api.observations
-      : [];
+    const rawObservations: unknown[] = Array.isArray(api?.observations) ? api.observations : [];
+    const bySample = readObservationValues(rawObservations);
 
-    // Map values dynamically according to sampleCount while preserving original index positions
     const observedValues = Array.from({ length: sampleCount }, (_, index) => {
-      const item = rawObservations[index];
-      if (item?.value !== undefined && item?.value !== null) {
-        return String(item.value).trim();
-      }
-      // Fallback to existing master values if present, else empty string
-      return master.observedValues?.[index] ?? "";
+      const fromApi = observationValueToString(bySample[index]);
+      if (fromApi) return fromApi;
+      return observationValueToString(master.observedValues?.[index]);
     });
 
     return {
       ...master,
+      parameterId: masterParam,
       noOfSamples: sampleCount,
       observedValues,
     };
@@ -1540,16 +1551,22 @@ export class MixingDetailsModel {
 export const mapBackendQualityChecksToRows = (definitions: any[]): QualityCheckRow[] => {
   if (!Array.isArray(definitions)) return [];
 
-  return definitions.map((item, index) => ({
-    id: item.id || `qc-${index}`,
-    parameterId: item.parameterId ?? item.id ?? index,
-    parameter: item.parameter || item.parameterName || "",
-    parameterName: item.parameterName || item.parameter || "",
-    specification: item.specification ?? {},
-    noOfSamples: Number(item.noOfSamples) || 1,
-    observedValues: Array.isArray(item.observedValues)
-      ? item.observedValues
-      : Array.from({ length: Number(item.noOfSamples) || 1 }, () => ""),
-    disabled: Boolean(item.disabled),
-  }));
+  return definitions.map((item, index) => {
+    const sampleCount = Math.max(1, Number(item.noOfSamples) || 1);
+    const rawObserved = Array.isArray(item.observedValues) ? item.observedValues : null;
+    return {
+      id: item.id || `qc-${index}`,
+      // Always string — number/string mismatches were dropping observed values on merge/update.
+      parameterId: String(item.parameterId ?? item.id ?? index).trim(),
+      parameter: item.parameter || item.parameterName || "",
+      parameterName: item.parameterName || item.parameter || "",
+      specification: item.specification ?? {},
+      noOfSamples: sampleCount,
+      observedValues: Array.from({ length: sampleCount }, (_, i) => {
+        const value = rawObserved?.[i];
+        return value == null ? "" : String(value);
+      }),
+      disabled: Boolean(item.disabled),
+    };
+  });
 };

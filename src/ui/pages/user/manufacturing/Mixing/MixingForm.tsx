@@ -215,9 +215,9 @@ const PremixStageCard = ({
   const getFieldError = (fieldPath: string) => visibleError(fieldPath);
 
   const handleQualityCheckChange = (parameterId: string | number, index: number, value: string) => {
-    onQualityChange(premix.premixNo, parameterId, index, value);
+    onQualityChange(premix.premixNo, parameterId, index, String(value ?? ""));
     const qcIdx = (premix.qualityChecks || []).findIndex(
-      (r) => String(r.parameterId) === String(parameterId),
+      (r) => String(r.parameterId ?? "").trim() === String(parameterId ?? "").trim(),
     );
     if (qcIdx >= 0) {
       const path = `premixes.${cardIdx}.qualityChecks.${qcIdx}.observedValues.${index}`;
@@ -436,15 +436,17 @@ const PremixStageCard = ({
           </Box>
         </Box>
 
-        <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
-          {S.SECTION_PROCESS_PARTICULARS}
-        </Typography>
-
-        {getFieldError(`premixes.${cardIdx}.processParticulars.root`) && (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {getFieldError(`premixes.${cardIdx}.processParticulars.root`)}
+        <Box data-mix-field={`premixes.${cardIdx}.processParticulars.root`}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
+            {S.SECTION_PROCESS_PARTICULARS}
           </Typography>
-        )}
+
+          {getFieldError(`premixes.${cardIdx}.processParticulars.root`) && (
+            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+              {getFieldError(`premixes.${cardIdx}.processParticulars.root`)}
+            </Typography>
+          )}
+        </Box>
 
         <TableContainer sx={{ ...dataTable.tableContainer, overflowX: "auto", mb: 2.5 }}>
           <Table size="small" sx={{ minWidth: 760 }}>
@@ -526,15 +528,17 @@ const PremixStageCard = ({
           </Table>
         </TableContainer>
 
-        <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
-          {S.SECTION_QUALITY_CHECKS}
-        </Typography>
-
-        {getFieldError(`premixes.${cardIdx}.qualityChecks.root`) && (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {getFieldError(`premixes.${cardIdx}.qualityChecks.root`)}
+        <Box data-mix-field={`premixes.${cardIdx}.qualityChecks.root`}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
+            {S.SECTION_QUALITY_CHECKS}
           </Typography>
-        )}
+
+          {getFieldError(`premixes.${cardIdx}.qualityChecks.root`) && (
+            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+              {getFieldError(`premixes.${cardIdx}.qualityChecks.root`)}
+            </Typography>
+          )}
+        </Box>
 
         {qualityChecksLoading ? (
           <Stack direction="row" alignItems="center" gap={1} sx={{ py: 1.5 }}>
@@ -752,15 +756,17 @@ const FinalMixStageCard = ({
           })()}
         </Box>
 
-        <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
-          {S.SECTION_PROCESS_PARTICULARS}
-        </Typography>
-
-        {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`) && (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`)}
+        <Box data-mix-field={`finalMixes.${cardIdx}.processParticulars.root`}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
+            {S.SECTION_PROCESS_PARTICULARS}
           </Typography>
-        )}
+
+          {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`) && (
+            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+              {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`)}
+            </Typography>
+          )}
+        </Box>
 
         <TableContainer sx={{ ...dataTable.tableContainer, overflowX: "auto", mb: 2.5 }}>
           <Table size="small" sx={{ minWidth: 760 }}>
@@ -842,23 +848,25 @@ const FinalMixStageCard = ({
           </Table>
         </TableContainer>
 
-        <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
-          {S.SECTION_QUALITY_CHECKS}
-        </Typography>
-
-        {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`) && (
-          <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`)}
+        <Box data-mix-field={`finalMixes.${cardIdx}.qualityChecks.root`}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
+            {S.SECTION_QUALITY_CHECKS}
           </Typography>
-        )}
+
+          {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`) && (
+            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+              {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`)}
+            </Typography>
+          )}
+        </Box>
 
         <MixingQualityChecksTable
           rows={entry.qualityChecks || []}
           readOnly={readOnly}
           onChange={(parameterId, index, value) => {
-            onQualityChange(entry.mixNo, parameterId, index, value);
+            onQualityChange(entry.mixNo, parameterId, index, String(value ?? ""));
             const qcIdx = (entry.qualityChecks || []).findIndex(
-              (r) => String(r.parameterId) === String(parameterId),
+              (r) => String(r.parameterId ?? "").trim() === String(parameterId ?? "").trim(),
             );
             if (qcIdx >= 0) {
               onClearFieldError?.(
@@ -1035,21 +1043,33 @@ const MixingForm = ({
     [],
   );
 
-  // Focus after card paint / tab switch (rAF alone is too early when remounting Premix/Final Mix).
+  // Focus once per validation failure request. Do NOT depend on validationErrors —
+  // live revalidation updates errors on every keystroke and would steal focus mid-typing.
   useEffect(() => {
     if (!validationFocusRequest?.fieldPath) return;
     const fieldPath = validationFocusRequest.fieldPath;
     let tries = 0;
+    let cancelled = false;
+    const retryTimers: number[] = [];
     const tryFocus = () => {
+      if (cancelled) return;
       tries += 1;
-      if (focusMixField(fieldPath)) return;
+      if (focusMixField(fieldPath)) {
+        // Clear so later error-map updates / card switches cannot re-focus this path.
+        setValidationFocusRequest(null);
+        return;
+      }
       if (tries < 8) {
-        window.setTimeout(tryFocus, 50);
+        retryTimers.push(window.setTimeout(tryFocus, 50));
       }
     };
     const t = window.setTimeout(tryFocus, 80);
-    return () => clearTimeout(t);
-  }, [validationFocusRequest, activeCardIndex, validationErrors]);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      retryTimers.forEach((id) => clearTimeout(id));
+    };
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1468,30 +1488,17 @@ const MixingForm = ({
     stageType: "PREMIX" | "FINAL_MIX",
     cardNo: string | number,
   ) => {
-    setValidationAttempt((flags) => ({ ...flags, format: true, unit: true, submit: false }));
+    // RMP parity: draft save does not enforce required fields (lots / QC / process optional).
+    // Format issues are still surfaced live after the user has interacted with fields.
+    setValidationAttempt((flags) => ({ ...flags, format: true, unit: false, submit: false }));
+    setValidationErrors({});
     if (stageType === "PREMIX") {
       const activeIndex = premixCards.findIndex((p) => p.premixNo === String(cardNo));
       if (activeIndex < 0) return;
-      const payload = { premixes: [premixCards[activeIndex]] };
-      const errs = validateMixing(payload, "UNIT");
-      if (hasValidationErrors(errs)) {
-        const mapped = mapAndSetErrors(errs, remapPremixErrorPath(activeIndex));
-        emitMixingValidationFailure(mapped, "draft", combinedNavItems);
-        return;
-      }
-      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     } else {
       const activeIndex = finalMixCards.findIndex((f) => f.mixNo === String(cardNo));
       if (activeIndex < 0) return;
-      const payload = { finalMixes: [finalMixCards[activeIndex]] };
-      const errs = validateMixing(payload, "UNIT");
-      if (hasValidationErrors(errs)) {
-        const mapped = mapAndSetErrors(errs, remapFinalMixErrorPath(activeIndex));
-        emitMixingValidationFailure(mapped, "draft", combinedNavItems);
-        return;
-      }
-      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     }
   };

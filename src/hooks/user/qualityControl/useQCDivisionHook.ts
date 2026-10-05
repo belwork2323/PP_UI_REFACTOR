@@ -108,8 +108,10 @@ import {
   type QcProcessingSlot,
 } from "./qcProcessingConfig";
 import {
+  applyProcessingProcessSlotToEntry,
   buildProcessingMaterialEntry,
   buildWeightmentSelectionsFromProcessingEntries,
+  fetchProcessingMaterialCatalog,
   fetchQcProcessingMaterialSchema,
   getProcessingMaterialsForPremix,
   hydrateProcessingMaterialValuesFromSeed,
@@ -118,8 +120,12 @@ import {
   resolveQcIdentificationMaterials,
   resolveQcProcessingWeightmentSheet,
   parseWeightmentSheetFromDivisionDetails,
+  withCatalogRmpFormTemplate,
 } from "./qcProcessingMaterials";
-import type { RawMaterialPrepWeightmentSheet } from "../../../data/models/user/RawMaterialPreparationModel";
+import type {
+  RawMaterialPrepMaterialProcessSlot,
+  RawMaterialPrepWeightmentSheet,
+} from "../../../data/models/user/RawMaterialPreparationModel";
 import {
   focusRmpField,
   getWeightmentIdentificationError,
@@ -4331,6 +4337,24 @@ export const useQCDivisionHook = () => {
     };
   }, []);
 
+  const handleProcessingProcessChange = useCallback(
+    (entryId: string, slotState: RawMaterialPrepMaterialProcessSlot) => {
+      updateFormData((prev) => {
+        const entries = prev.divisionEntries ?? [];
+        let changed = false;
+        const nextEntries = entries.map((entry) => {
+          if (entry.entryId !== entryId) return entry;
+          const nextEntry = applyProcessingProcessSlotToEntry(entry, slotState);
+          if (nextEntry !== entry) changed = true;
+          return nextEntry;
+        });
+        if (!changed) return prev;
+        return { ...prev, divisionEntries: nextEntries };
+      });
+    },
+    [updateFormData],
+  );
+
   const handleProcessingWeightmentSheetChange = useCallback(
     (
       next:
@@ -4808,11 +4832,14 @@ export const useQCDivisionHook = () => {
               ) {
                 processingWeightmentSheet = detailSheet;
               }
-              for (const seed of processingSeeds) {
+              const catalog = await fetchProcessingMaterialCatalog();
+              const seedsWithTemplate = withCatalogRmpFormTemplate(processingSeeds, catalog);
+              for (const seed of seedsWithTemplate) {
                 try {
                   const schema = await fetchQcProcessingMaterialSchema({
                     subDepartmentId,
                     seed,
+                    catalog,
                   });
                   if (!schema) {
                     const entry = buildProcessingMaterialEntry(seed, {
@@ -7159,6 +7186,7 @@ export const useQCDivisionHook = () => {
     weightmentValidationAttempt,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
+    handleProcessingProcessChange,
     handleProcessingWeightmentSheetChange,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
