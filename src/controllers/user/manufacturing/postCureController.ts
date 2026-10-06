@@ -7,8 +7,10 @@ import {
 import {
   createPostCureFormApi,
   fetchPostCureFormDetailsApi,
+  fetchPostCureIngredientsApi,
   updatePostCureFormApi,
 } from "../../../data/api/users/manufacturing/postCureFormApi";
+import type { PostCureIngredientsApiResponse } from "../../../data/models/user/postCureIngredientRecipes";
 
 export type PostCureCreatePayload = {
   batchId: string;
@@ -60,6 +62,19 @@ export const postCureController = {
       );
     } catch (error) {
       console.error("Failed to update post-cure form:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  fetchIngredients: async (recipeType: string) => {
+    try {
+      const response = await fetchPostCureIngredientsApi({ recipeType });
+      return new ApiResponseModel<PostCureIngredientsApiResponse>(response, (res) => {
+        const data = (res as { data?: PostCureIngredientsApiResponse })?.data ?? res;
+        return data as PostCureIngredientsApiResponse;
+      });
+    } catch (error) {
+      console.error("Failed to fetch post-cure ingredients:", error);
       return new ApiResponseModel(error);
     }
   },

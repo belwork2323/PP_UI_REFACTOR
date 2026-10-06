@@ -3,6 +3,7 @@ import type { QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiT
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import {
+  buildDualPostCureMotorPayload,
   collectPostCureFileRefsFromMotorSession,
   createEmptyPostCureMotorData,
   parseInhibitionMotorDataFromApi,
@@ -769,7 +770,11 @@ const hydrateNotApplicableFromData = (values: SchemaFormValues, data: Record<str
     data.DISPATCH_STATION,
     data.dispatchStation,
   );
-  values[formKey(section, "REMARKS")] = pickString(data.REMARKS, data.remarks);
+  values[formKey(section, "REMARKS")] = pickString(
+    data.REMARKS,
+    data.remarks,
+    data.notApplicableRemarks,
+  );
 };
 
 const isLooseFlapManufacturingSection = (sectionId: string) =>
@@ -1054,16 +1059,11 @@ const buildInhibitionDetailsPayload = (
 
   if (resolvedInhibitor === "NOT_APPLICABLE") {
     const section = QC_POST_CURE_SECTION_IDS.NOT_APPLICABLE;
-    return {
+    // Remarks-only — mix / qualification / application sections must be absent for N/A.
+    return omitEmpty({
       inhibitorType: "NOT_APPLICABLE",
-      qualificationDetails: {},
-      applicationDetails: [],
-      ...omitEmpty({
-        dispatchDate: toApiDate(getPostCureField(values, section, "DISPATCH_DATE")),
-        dispatchStation: getPostCureField(values, section, "DISPATCH_STATION") || undefined,
-        remarks: getPostCureField(values, section, "REMARKS") || undefined,
-      }),
-    };
+      notApplicableRemarks: getPostCureField(values, section, "REMARKS") || undefined,
+    });
   }
 
   if (resolvedInhibitor === "HEMCOAT-3K") {
@@ -1167,6 +1167,7 @@ const mapIngredientRowsForQcApi = (
   rows: Array<{
     srNo?: string | number;
     ingredient?: string;
+    materialCode?: string | null;
     mfgLot?: string;
     partsByWeight?: string;
     quantity?: string;
@@ -1176,12 +1177,15 @@ const mapIngredientRowsForQcApi = (
 ) => {
   const mapped = rows
     .map((row, index) => {
-      const ingredient = String(row.ingredient ?? "").trim();
+      const displayName = String(row.ingredient ?? "").trim();
+      const materialCode = String(row.materialCode ?? "").trim();
+      // Case Prep style: prefer master code in payload `ingredient` when known.
+      const ingredient = materialCode || displayName;
       const mfgLot = String(row.mfgLot ?? "").trim();
       const partsByWeight = String(row.partsByWeight ?? "").trim();
       const qtyRaw = qtyKey === "quantity" ? row.quantity : row.qtyTaken;
       const quantityTaken = toApiNumberFromUi(qtyRaw);
-      const isTotal = isIngredientTotalLabel(row.srNo, ingredient);
+      const isTotal = isIngredientTotalLabel(row.srNo, displayName || ingredient);
       // Skip untouched preset rows — empty ingredient payloads fail QC API validation.
       if (!isTotal && !mfgLot && quantityTaken == null) return null;
       const base = omitEmpty({
@@ -1282,12 +1286,11 @@ const buildQcInhibitionFromSession = (
       data?.variant === "inhibition-not-applicable"
         ? String(data.inhibitionNotApplicable?.remarks ?? "").trim()
         : "";
-    return {
+    // Remarks-only payload — premix/final/qualification/application must be absent for N/A.
+    return omitEmpty({
       inhibitorType: "NOT_APPLICABLE",
-      qualificationDetails: {},
-      applicationDetails: [],
-      ...omitEmpty({ remarks: remarks || undefined }),
-    };
+      notApplicableRemarks: remarks || undefined,
+    });
   }
 
   if (data?.variant === "inhibition-hemcoat-3k" || apiInhibitor === "HEMCOAT_3K") {
@@ -1395,8 +1398,8 @@ const buildQcInhibitionFromSession = (
 
 /**
  * Nested Post Cure motor payload for create/update (`data.postCureMotorDetails[]`).
- * Always emits both `looseFlapFillingDetails` and `inhibitionDetails` (QC dual model).
- * Built from manufacturing-shaped session values, but shaped for the QC API.
+ * Uses manufacturing {@link buildDualPostCureMotorPayload} so QC wire matches
+ * Post Cure subdepartment (`looseFlapFillingDetails` + nested `inhibitionDetails`).
  */
 export const buildPostCureMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
@@ -1407,21 +1410,30 @@ export const buildPostCureMotorDetailPayload = (
 ): Record<string, unknown> => {
   // Prefer session shape; fall back to legacy section keys via getPostCureSessionFromValues.
   const session = getPostCureSessionFromValues(values, inhibitorType);
-  const apiInhibitor =
-    toApiInhibitorType(session.inhibitorType) ||
-    toApiInhibitorType(String(inhibitorType ?? "")) ||
-    "";
+  const resolvedInhibitor =
+    session.inhibitorType || toPostCureUiInhibitorType(inhibitorType) || "";
+  const dual = buildDualPostCureMotorPayload({
+    inhibitorType: resolvedInhibitor,
+    looseFlapData: session.looseFlapData,
+    inhibitionData: session.inhibitionData,
+  });
+
+  // Ensure inhibitionDetails is always present for the QC dual model (empty IR1 shell
+  // when inhibitor type is not yet chosen — matches prior QC builder behavior).
+  const inhibitionDetails =
+    dual.inhibitionDetails ??
+    buildQcInhibitionFromSession({
+      ...session,
+      inhibitorType: resolvedInhibitor || "IR1",
+    });
 
   return omitEmpty({
     motorId,
     motorSubmissionType,
-    ...(apiInhibitor ? { inhibitorType: apiInhibitor } : {}),
-    looseFlapFillingDetails: buildQcLooseFlapFromSession(session.looseFlapData),
-    // QC dual model always expects inhibitionDetails (even when empty / N/A).
-    inhibitionDetails: buildQcInhibitionFromSession({
-      ...session,
-      inhibitorType: session.inhibitorType || toPostCureUiInhibitorType(inhibitorType) || "IR1",
-    }),
+    ...(dual.inhibitorType ? { inhibitorType: dual.inhibitorType } : {}),
+    looseFlapFillingDetails:
+      dual.looseFlapFillingDetails ?? buildQcLooseFlapFromSession(session.looseFlapData),
+    inhibitionDetails,
   });
 };
 
@@ -1522,7 +1534,12 @@ export const postCureMotorDetailToSections = (
               qualDetails.dispatchStation,
               inhibition.DISPATCH_STATION,
             ),
-            REMARKS: pickString(inhibition.remarks, qualDetails.remarks, inhibition.REMARKS),
+            REMARKS: pickString(
+              inhibition.notApplicableRemarks,
+              inhibition.remarks,
+              qualDetails.remarks,
+              inhibition.REMARKS,
+            ),
           }),
         ],
         motorId,

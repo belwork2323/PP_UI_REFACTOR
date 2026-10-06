@@ -127,6 +127,8 @@ type QCDivisionEntryPanelProps = {
   onResetPostCureSetup?: () => void;
   /** Per-entry field errors (REVALIDATION paths: rows.{i}.RESULT, …). */
   validationErrors?: Record<string, string> | null;
+  /** Clear a single field error (Post Cure / RMP-parity clear-on-edit). */
+  clearFieldError?: (path: string) => void;
 };
 
 const QCDivisionEntryPanel = ({
@@ -151,6 +153,7 @@ const QCDivisionEntryPanel = ({
   canResetPostCureSetup = false,
   onResetPostCureSetup,
   validationErrors = null,
+  clearFieldError,
 }: QCDivisionEntryPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
 
@@ -585,6 +588,7 @@ const QCDivisionEntryPanel = ({
         disabled={fieldsDisabled}
         headerActions={headerActions}
         validationErrors={validationErrors}
+        clearFieldError={clearFieldError}
       />
     );
   }

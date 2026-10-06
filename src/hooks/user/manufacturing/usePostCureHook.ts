@@ -79,6 +79,7 @@ export const usePostCureHook = () => {
   const listParams = useSubdepartmentBatches("post-cure-operations");
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
 
@@ -538,7 +539,13 @@ export const usePostCureHook = () => {
             inhibitorType: targetMotor.inhibitorType,
           });
           setServerValidationErrors(fieldErrors);
-          showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
+          if (Object.keys(fieldErrors).length > 0) {
+            showValidationAlert(
+              getErrorMessage(response, STRINGS.MANUFACTURING.POST_CURE.SUBMIT_VALIDATION_FAILED),
+            );
+          } else {
+            showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
+          }
           return false;
         }
         setServerValidationErrors({});
@@ -608,6 +615,7 @@ export const usePostCureHook = () => {
       previousStageGate,
       refreshBatchLocks,
       showAlert,
+      showValidationAlert,
       subDepartmentId,
     ],
   );

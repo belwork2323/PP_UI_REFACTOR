@@ -1,5 +1,5 @@
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Stack,
@@ -12,6 +12,7 @@ import {
   TableRow,
   Button,
   IconButton,
+  MenuItem,
   TextField,
   alpha,
 } from "@mui/material";
@@ -30,8 +31,29 @@ import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileF
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import type { ValidationErrors } from "@/data/validation/adapters/trimming.validation";
 import { fieldError } from "@/data/validation/adapters/trimming.validation";
+import { generalController } from "../../../../../controllers/admin/common/generalController";
+import { NDT_EQUIPMENT_OPTIONS } from "../../../../../hooks/user/qualityControl/ndtFlowConfig";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
+
+/** Sentinel select value — free-text is stored in `machineDetails`. */
+const MACHINE_DETAILS_OTHER = "OTHER";
+
+type MachineEquipmentOption = { value: string; label: string };
+
+const mapEquipmentListToOptions = (rows: unknown[]): MachineEquipmentOption[] =>
+  rows
+    .map((item) => {
+      const rec = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      const name = String(rec.equipmentName ?? rec.name ?? "").trim();
+      const code = String(rec.equipmentCode ?? rec.code ?? "").trim();
+      const label = name || code;
+      return label ? { value: label, label } : null;
+    })
+    .filter(Boolean) as MachineEquipmentOption[];
+
+const fallbackEquipmentOptions = (): MachineEquipmentOption[] =>
+  NDT_EQUIPMENT_OPTIONS.map((label) => ({ value: label, label }));
 
 const sectionTitleSx = (color: string) => ({
   fontWeight: 700,
@@ -186,6 +208,71 @@ export const TrimmingCommonTable = ({
   const dynamicLocations = activeMotorSession.commonFormatLocations ?? [];
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColInput, setNewColInput] = useState("");
+  const [equipmentOptions, setEquipmentOptions] = useState<MachineEquipmentOption[]>(
+    fallbackEquipmentOptions,
+  );
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
+  /** Row indexes where user chose "Other" (keeps select on Other even if text is empty). */
+  const [machineOtherModeByRow, setMachineOtherModeByRow] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadEquipment = async () => {
+      setEquipmentLoading(true);
+      try {
+        const response = await generalController.getEquipmentList();
+        if (cancelled) return;
+        if (!response?.success || !Array.isArray(response.data) || response.data.length === 0) {
+          setEquipmentOptions(fallbackEquipmentOptions());
+          return;
+        }
+        const mapped = mapEquipmentListToOptions(response.data);
+        setEquipmentOptions(mapped.length ? mapped : fallbackEquipmentOptions());
+      } catch {
+        if (!cancelled) setEquipmentOptions(fallbackEquipmentOptions());
+      } finally {
+        if (!cancelled) setEquipmentLoading(false);
+      }
+    };
+    void loadEquipment();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Reset Other-mode flags when switching motors (row indexes are per-session).
+  useEffect(() => {
+    setMachineOtherModeByRow({});
+  }, [activeMotorEntry.motorId]);
+
+  const machineSelectOptions = useMemo(
+    () => [
+      ...equipmentOptions,
+      { value: MACHINE_DETAILS_OTHER, label: "Other" },
+    ],
+    [equipmentOptions],
+  );
+
+  const isMachineOtherMode = (rowIndex: number, stored: string): boolean => {
+    if (machineOtherModeByRow[rowIndex]) return true;
+    const text = String(stored ?? "").trim();
+    if (!text) return false;
+    return !equipmentOptions.some((opt) => opt.value === text);
+  };
+
+  const resolveMachineSelectValue = (rowIndex: number, stored: string): string => {
+    if (isMachineOtherMode(rowIndex, stored)) return MACHINE_DETAILS_OTHER;
+    return String(stored ?? "").trim();
+  };
+
+  const patchTrimmingDetailRow = (rowIndex: number, patch: Record<string, unknown>) => {
+    const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+    nextRows[rowIndex] = { ...nextRows[rowIndex], ...patch };
+    onMotorSessionChange(activeMotorEntry.motorId, {
+      ...activeMotorSession,
+      trimmingDetails: nextRows,
+    });
+  };
 
   // --- Handlers for Dynamic Columns ---
   const handleSaveNewColumn = () => {
@@ -248,6 +335,15 @@ export const TrimmingCommonTable = ({
     if (!showStructureActions) return;
     const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
     nextRows.splice(rowIndex, 1);
+    setMachineOtherModeByRow((prev) => {
+      const next: Record<number, boolean> = {};
+      Object.entries(prev).forEach(([key, enabled]) => {
+        const index = Number(key);
+        if (!Number.isFinite(index) || index === rowIndex || !enabled) return;
+        next[index > rowIndex ? index - 1 : index] = true;
+      });
+      return next;
+    });
     onMotorSessionChange(activeMotorEntry.motorId, {
       ...activeMotorSession,
       trimmingDetails: nextRows,
@@ -293,7 +389,7 @@ export const TrimmingCommonTable = ({
           {readOnly ? (
             <ReadOnlyValue value={activeMotorSession.motorReceivedAt} />
           ) : (
-            <Box>
+            <Box data-qc-field="motorReceivedAt">
               <DateField
                 value={activeMotorSession.motorReceivedAt ?? ""}
                 onChange={(value) =>
@@ -305,6 +401,7 @@ export const TrimmingCommonTable = ({
                 placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
                 compact
                 disabled={inputsLocked}
+                error={Boolean(err("motorReceivedAt"))}
               />
               <FieldErrorText message={err("motorReceivedAt")} />
             </Box>
@@ -343,41 +440,78 @@ export const TrimmingCommonTable = ({
                       background: rowIndex % 2 === 0 ? colors.pageBg : alpha(colors.surface, 0.7),
                     }}
                   >
-                    <TableCell sx={tdSx}>
+                    <TableCell sx={{ ...tdSx, minWidth: 180 }}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.machineDetails} />
                       ) : (
-                        <Box>
-                          <FormInput
-                            value={row.machineDetails}
+                        <Stack
+                          spacing={0.75}
+                          data-qc-field={`trimmingDetails.${rowIndex}.machineDetails`}
+                        >
+                          <TextField
+                            select
+                            fullWidth
                             size="small"
+                            value={resolveMachineSelectValue(rowIndex, row.machineDetails)}
+                            disabled={inputsLocked || equipmentLoading}
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.machineDetails`))}
                             onChange={(e) => {
-                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                              nextRows[rowIndex] = {
-                                ...nextRows[rowIndex],
-                                machineDetails: e.target.value,
-                              };
-                              onMotorSessionChange(activeMotorEntry.motorId, {
-                                ...activeMotorSession,
-                                trimmingDetails: nextRows,
-                              });
+                              const next = String(e.target.value ?? "");
+                              if (next === MACHINE_DETAILS_OTHER) {
+                                const current = String(row.machineDetails ?? "").trim();
+                                const isKnown = equipmentOptions.some((opt) => opt.value === current);
+                                setMachineOtherModeByRow((prev) => ({ ...prev, [rowIndex]: true }));
+                                patchTrimmingDetailRow(rowIndex, {
+                                  machineDetails: isKnown ? "" : current,
+                                });
+                                return;
+                              }
+                              setMachineOtherModeByRow((prev) => ({ ...prev, [rowIndex]: false }));
+                              patchTrimmingDetailRow(rowIndex, { machineDetails: next });
                             }}
-                            disabled={inputsLocked}
-                          />
+                            SelectProps={{ displayEmpty: true }}
+                            sx={{
+                              "& .MuiInputBase-input": { fontSize: "0.82rem", py: 0.75 },
+                            }}
+                          >
+                            <MenuItem value="" disabled>
+                              <em>{equipmentLoading ? "Loading…" : "Select machine"}</em>
+                            </MenuItem>
+                            {machineSelectOptions.map((opt) => (
+                              <MenuItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                          {isMachineOtherMode(rowIndex, row.machineDetails) ? (
+                            <FormInput
+                              value={row.machineDetails}
+                              size="small"
+                              placeholder="Enter machine details"
+                              error={Boolean(err(`trimmingDetails.${rowIndex}.machineDetails`))}
+                              onChange={(e) =>
+                                patchTrimmingDetailRow(rowIndex, {
+                                  machineDetails: e.target.value,
+                                })
+                              }
+                              disabled={inputsLocked}
+                            />
+                          ) : null}
                           <FieldErrorText
                             message={err(`trimmingDetails.${rowIndex}.machineDetails`)}
                           />
-                        </Box>
+                        </Stack>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.startDate} />
                       ) : (
-                        <Box>
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.startDate`}>
                           <DateField
                             value={row.startDate}
                             compact
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.startDate`))}
                             onChange={(val) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                               nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
@@ -396,10 +530,11 @@ export const TrimmingCommonTable = ({
                       {readOnly ? (
                         <ReadOnlyValue value={row.completionDate} />
                       ) : (
-                        <Box>
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.completionDate`}>
                           <DateField
                             value={row.completionDate}
                             compact
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.completionDate`))}
                             onChange={(val) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                               nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
@@ -420,10 +555,11 @@ export const TrimmingCommonTable = ({
                       {readOnly ? (
                         <ReadOnlyValue value={row.arborSize} />
                       ) : (
-                        <Box>
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.arborSize`}>
                           <FormInput
                             value={row.arborSize}
                             inputMode="decimal"
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.arborSize`))}
                             onChange={(e) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                               nextRows[rowIndex] = {
@@ -445,10 +581,11 @@ export const TrimmingCommonTable = ({
                       {readOnly ? (
                         <ReadOnlyValue value={row.cutterSize} />
                       ) : (
-                        <Box>
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.cutterSize`}>
                           <FormInput
                             value={row.cutterSize}
                             inputMode="decimal"
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.cutterSize`))}
                             onChange={(e) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                               nextRows[rowIndex] = {
@@ -470,19 +607,23 @@ export const TrimmingCommonTable = ({
                       {readOnly ? (
                         <ReadOnlyValue value={row.remarks} />
                       ) : (
-                        <FormInput
-                          value={row.remarks}
-                          size="small"
-                          onChange={(e) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = { ...nextRows[rowIndex], remarks: e.target.value };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.remarks`}>
+                          <FormInput
+                            value={row.remarks}
+                            size="small"
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.remarks`))}
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = { ...nextRows[rowIndex], remarks: e.target.value };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText message={err(`trimmingDetails.${rowIndex}.remarks`)} />
+                        </Box>
                       )}
                     </TableCell>
                     {showStructureActions ? (
@@ -708,93 +849,93 @@ export const TrimmingCommonTable = ({
                       )}
                       </TableCell>
 
-                      {["R2T", "R2B", "R1R", "R1L"].map((location) => (
-                        <TableCell key={`reading-${location}`} sx={tdSx}>
-                          {readOnly ? (
-                            <ReadOnlyValue value={stage.readings[location] ?? ""} />
-                          ) : (
-                            <Box>
-                              <FormInput
-                                value={stage.readings[location] ?? ""}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  const nextParams = [
-                                    ...(activeMotorSession.commonFormatParameters ?? []),
-                                  ];
-                                  nextParams[paramIndex] = {
-                                    ...nextParams[paramIndex],
-                                    stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                      idx === stageIndex
-                                        ? {
-                                            ...s,
-                                            readings: {
-                                              ...s.readings,
-                                              [location]: e.target.value,
-                                            },
-                                          }
-                                        : s,
-                                    ),
-                                  };
-                                  onMotorSessionChange(activeMotorEntry.motorId, {
-                                    ...activeMotorSession,
-                                    commonFormatParameters: nextParams,
-                                  });
-                                }}
-                                disabled={inputsLocked}
-                              />
-                              <FieldErrorText
-                                message={err(
-                                  `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`,
-                                )}
-                              />
-                            </Box>
-                          )}
-                        </TableCell>
-                      ))}
+                      {["R2T", "R2B", "R1R", "R1L"].map((location) => {
+                        const readingPath = `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`;
+                        return (
+                          <TableCell key={`reading-${location}`} sx={tdSx}>
+                            {readOnly ? (
+                              <ReadOnlyValue value={stage.readings[location] ?? ""} />
+                            ) : (
+                              <Box data-qc-field={readingPath}>
+                                <FormInput
+                                  value={stage.readings[location] ?? ""}
+                                  inputMode="decimal"
+                                  error={Boolean(err(readingPath))}
+                                  onChange={(e) => {
+                                    const nextParams = [
+                                      ...(activeMotorSession.commonFormatParameters ?? []),
+                                    ];
+                                    nextParams[paramIndex] = {
+                                      ...nextParams[paramIndex],
+                                      stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                        idx === stageIndex
+                                          ? {
+                                              ...s,
+                                              readings: {
+                                                ...s.readings,
+                                                [location]: e.target.value,
+                                              },
+                                            }
+                                          : s,
+                                      ),
+                                    };
+                                    onMotorSessionChange(activeMotorEntry.motorId, {
+                                      ...activeMotorSession,
+                                      commonFormatParameters: nextParams,
+                                    });
+                                  }}
+                                  disabled={inputsLocked}
+                                />
+                                <FieldErrorText message={err(readingPath)} />
+                              </Box>
+                            )}
+                          </TableCell>
+                        );
+                      })}
 
-                      {dynamicLocations.map((location) => (
-                        <TableCell key={`reading-${location}`} sx={tdSx}>
-                          {readOnly ? (
-                            <ReadOnlyValue value={stage.readings[location] ?? ""} />
-                          ) : (
-                            <Box>
-                              <FormInput
-                                value={stage.readings[location] ?? ""}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  const nextParams = [
-                                    ...(activeMotorSession.commonFormatParameters ?? []),
-                                  ];
-                                  nextParams[paramIndex] = {
-                                    ...nextParams[paramIndex],
-                                    stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                      idx === stageIndex
-                                        ? {
-                                            ...s,
-                                            readings: {
-                                              ...s.readings,
-                                              [location]: e.target.value,
-                                            },
-                                          }
-                                        : s,
-                                    ),
-                                  };
-                                  onMotorSessionChange(activeMotorEntry.motorId, {
-                                    ...activeMotorSession,
-                                    commonFormatParameters: nextParams,
-                                  });
-                                }}
-                                disabled={inputsLocked}
-                              />
-                              <FieldErrorText
-                                message={err(
-                                  `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`,
-                                )}
-                              />
-                            </Box>
-                          )}
-                        </TableCell>
-                      ))}
+                      {dynamicLocations.map((location) => {
+                        const readingPath = `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`;
+                        return (
+                          <TableCell key={`reading-${location}`} sx={tdSx}>
+                            {readOnly ? (
+                              <ReadOnlyValue value={stage.readings[location] ?? ""} />
+                            ) : (
+                              <Box data-qc-field={readingPath}>
+                                <FormInput
+                                  value={stage.readings[location] ?? ""}
+                                  inputMode="decimal"
+                                  error={Boolean(err(readingPath))}
+                                  onChange={(e) => {
+                                    const nextParams = [
+                                      ...(activeMotorSession.commonFormatParameters ?? []),
+                                    ];
+                                    nextParams[paramIndex] = {
+                                      ...nextParams[paramIndex],
+                                      stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                        idx === stageIndex
+                                          ? {
+                                              ...s,
+                                              readings: {
+                                                ...s.readings,
+                                                [location]: e.target.value,
+                                              },
+                                            }
+                                          : s,
+                                      ),
+                                    };
+                                    onMotorSessionChange(activeMotorEntry.motorId, {
+                                      ...activeMotorSession,
+                                      commonFormatParameters: nextParams,
+                                    });
+                                  }}
+                                  disabled={inputsLocked}
+                                />
+                                <FieldErrorText message={err(readingPath)} />
+                              </Box>
+                            )}
+                          </TableCell>
+                        );
+                      })}
 
                       {isAddingColumn && <TableCell sx={tdSx} />}
 

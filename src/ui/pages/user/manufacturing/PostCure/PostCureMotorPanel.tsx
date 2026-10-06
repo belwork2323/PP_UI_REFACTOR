@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
+  CircularProgress,
+  MenuItem,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import { fetchCastingStationsApi } from "../../../../../data/api/users/operationsApi";
+import postCureController from "../../../../../controllers/user/manufacturing/postCureController";
+import {
+  buildPostCureIngredientRowsFromApi,
+  POST_CURE_RECIPE_TYPES,
+} from "../../../../../data/models/user/postCureIngredientRecipes";
+import { useCasePrepLinerMaterials } from "../../../../../hooks/user/manufacturing/useCasePrepLinerMaterials";
+import { postCureTableInputSx } from "./postCureFormPrimitivesShared";
 
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateField } from "../../../../components/common/DateField";
@@ -27,6 +38,8 @@ import {
 } from "./PostCureFormPrimitives";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import { WorkflowReadOnlyText } from "@/ui/components/common/WorkflowReadOnlyText";
+
+const str = (value: unknown): string => String(value ?? "");
 
 const postCureTableHeaderLabelSx = postCureTableHeaderCellSx(false);
 
@@ -101,30 +114,34 @@ export const LocationDateTable = ({
                     {readOnly ? (
                       <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
-                      <DateField
-                        value={row.fromDate ?? ""}
-                        onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
-                        error={Boolean(validationErrors[fromDateErrKey])}
-                        helperText={validationErrors[fromDateErrKey]}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        compact
-                      />
+                      <Box data-qc-field={fromDateErrKey}>
+                        <DateField
+                          value={row.fromDate ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
+                          error={Boolean(validationErrors[fromDateErrKey])}
+                          helperText={validationErrors[fromDateErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          compact
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
                       <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
-                      <DateField
-                        value={row.toDate ?? ""}
-                        onChange={(val: any) => handleFieldChange(index, "toDate", val)}
-                        error={Boolean(validationErrors[toDateErrKey])}
-                        helperText={validationErrors[toDateErrKey]}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        compact
-                      />
+                      <Box data-qc-field={toDateErrKey}>
+                        <DateField
+                          value={row.toDate ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "toDate", val)}
+                          error={Boolean(validationErrors[toDateErrKey])}
+                          helperText={validationErrors[toDateErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          compact
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
@@ -140,6 +157,7 @@ export const LocationDateTable = ({
                         readOnly={readOnly}
                         multiline
                         minRows={2}
+                        fieldPath={obsErrKey}
                       />
                     )}
                   </TableCell>
@@ -231,30 +249,34 @@ export const LocationQtyTable = ({
                     {readOnly ? (
                       <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
-                      <DateField
-                        value={row.fromDate ?? ""}
-                        onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
-                        error={Boolean(validationErrors[fromDateErrKey])}
-                        helperText={validationErrors[fromDateErrKey]}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        compact
-                      />
+                      <Box data-qc-field={fromDateErrKey}>
+                        <DateField
+                          value={row.fromDate ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
+                          error={Boolean(validationErrors[fromDateErrKey])}
+                          helperText={validationErrors[fromDateErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          compact
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
                       <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
-                      <DateField
-                        value={row.toDate ?? ""}
-                        onChange={(val: any) => handleFieldChange(index, "toDate", val)}
-                        error={Boolean(validationErrors[toDateErrKey])}
-                        helperText={validationErrors[toDateErrKey]}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        compact
-                      />
+                      <Box data-qc-field={toDateErrKey}>
+                        <DateField
+                          value={row.toDate ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "toDate", val)}
+                          error={Boolean(validationErrors[toDateErrKey])}
+                          helperText={validationErrors[toDateErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          compact
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
@@ -269,6 +291,7 @@ export const LocationQtyTable = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         type="number"
+                        fieldPath={qtyErrKey}
                       />
                     )}
                   </TableCell>
@@ -285,6 +308,7 @@ export const LocationQtyTable = ({
                         readOnly={readOnly}
                         multiline
                         minRows={2}
+                        fieldPath={obsErrKey}
                       />
                     )}
                   </TableCell>
@@ -309,6 +333,160 @@ export const LocationQtyTable = ({
 // ==========================================
 // 3. INGREDIENT QUANTITY TABLE
 // ==========================================
+type MfgLotCellProps = {
+  row: { materialCode?: string | null; mfgLot?: string };
+  disabled?: boolean;
+  readOnly?: boolean;
+  error?: boolean;
+  helperText?: string;
+  fieldPath?: string;
+  onChange: (mfgLot: string) => void;
+  fetchLotsForMaterialCode: (materialCode: string) => Promise<unknown>;
+  getCachedLotOptions: (
+    materialCode: string,
+    currentLot?: string,
+  ) => Array<{ value: string; label: string }>;
+  getApiLotCount: (materialCode: string) => number;
+  hasFetchedLots: (materialCode: string) => boolean;
+  isLoadingLots: (materialCode: string) => boolean;
+};
+
+const MfgLotTextField = ({
+  value,
+  disabled,
+  error,
+  helperText,
+  fieldPath,
+  onChange,
+}: {
+  value: string;
+  disabled?: boolean;
+  error?: boolean;
+  helperText?: string;
+  fieldPath?: string;
+  onChange: (mfgLot: string) => void;
+}) => {
+  const control = (
+    <TextField
+      size="small"
+      fullWidth
+      placeholder="Enter lot no"
+      disabled={disabled}
+      value={value}
+      error={error}
+      helperText={helperText}
+      onChange={(e) => onChange(String(e.target.value))}
+      inputProps={fieldPath ? { "data-qc-field": fieldPath } : undefined}
+      sx={postCureTableInputSx}
+    />
+  );
+  return fieldPath ? <Box data-qc-field={fieldPath}>{control}</Box> : control;
+};
+
+const MfgLotCell = ({
+  row,
+  disabled = false,
+  readOnly = false,
+  error = false,
+  helperText,
+  fieldPath,
+  onChange,
+  fetchLotsForMaterialCode,
+  getCachedLotOptions,
+  getApiLotCount,
+  hasFetchedLots,
+  isLoadingLots,
+}: MfgLotCellProps) => {
+  const materialCode = str(row.materialCode).trim();
+  const hasCode = Boolean(materialCode);
+  const currentLot = str(row.mfgLot).trim();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const loading = hasCode && isLoadingLots(materialCode);
+  const fetched = hasCode && hasFetchedLots(materialCode);
+  const apiLotCount = hasCode ? getApiLotCount(materialCode) : 0;
+
+  useEffect(() => {
+    if (!hasCode || fetched || loading) return;
+    void fetchLotsForMaterialCode(materialCode);
+  }, [fetched, fetchLotsForMaterialCode, hasCode, loading, materialCode]);
+
+  if (readOnly) {
+    return (
+      <WorkflowReadOnlyText value={currentLot || "—"} muted sx={{ fontSize: "0.78rem", py: 0.5 }} />
+    );
+  }
+
+  // No material code, or fetch finished with zero approved lots → text only (never both).
+  if (!hasCode || (fetched && !loading && apiLotCount === 0)) {
+    return (
+      <MfgLotTextField
+        value={currentLot}
+        disabled={disabled}
+        error={error}
+        helperText={helperText}
+        fieldPath={fieldPath}
+        onChange={onChange}
+      />
+    );
+  }
+
+  const options = getCachedLotOptions(materialCode, currentLot);
+  const selectValue =
+    currentLot && options.some((opt) => opt.value === currentLot) ? currentLot : currentLot || "";
+
+  const control = (
+    <TextField
+      select
+      size="small"
+      fullWidth
+      disabled={disabled}
+      value={selectValue}
+      error={error}
+      helperText={helperText}
+      onChange={(e) => onChange(String(e.target.value))}
+      sx={postCureTableInputSx}
+      SelectProps={{
+        displayEmpty: true,
+        onOpen: () => {
+          setMenuOpen(true);
+          void fetchLotsForMaterialCode(materialCode);
+        },
+        onClose: () => setMenuOpen(false),
+        renderValue: (selected) => {
+          const v = String(selected ?? "").trim();
+          if (!v) {
+            return (
+              <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+                {loading ? "Loading lots…" : "Select lot"}
+              </Typography>
+            );
+          }
+          return v;
+        },
+      }}
+    >
+      <MenuItem value="">
+        <em>Select lot</em>
+      </MenuItem>
+      {loading && menuOpen ? (
+        <MenuItem disabled value="__loading__">
+          <Stack direction="row" alignItems="center" gap={1}>
+            <CircularProgress size={14} />
+            Loading lots…
+          </Stack>
+        </MenuItem>
+      ) : null}
+      {options.map((opt) => (
+        <MenuItem key={opt.value} value={opt.value}>
+          {opt.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+
+  return fieldPath ? <Box data-qc-field={fieldPath}>{control}</Box> : control;
+};
+
 export const IngredientQuantityTable = ({
   basePath,
   value = [],
@@ -330,12 +508,20 @@ export const IngredientQuantityTable = ({
 }) => {
   const rows = value || [];
 
+  const {
+    fetchLotsForMaterialCode,
+    getCachedLotOptions,
+    getApiLotCount,
+    hasFetchedLots,
+    isLoadingLots,
+  } = useCasePrepLinerMaterials();
+
   const handleQuantityChange = (currentIndex: number, newValue: string) => {
     const updatedRows = [...rows];
     updatedRows[currentIndex] = { ...updatedRows[currentIndex], [qtyKey]: newValue };
 
     const qtyErrKey = `${basePath}.${currentIndex}.${qtyKey}`;
-    clearFieldError?.(qtyErrKey); // Clears only this row's quantity error
+    clearFieldError?.(qtyErrKey);
     const totalQty = updatedRows.reduce((acc: number, row: any) => {
       const srNo = String(row.srNo ?? row.SR_NO ?? "").toUpperCase();
       const isTotalRow = srNo === "TOTAL";
@@ -361,7 +547,7 @@ export const IngredientQuantityTable = ({
     updatedRows[currentIndex] = { ...updatedRows[currentIndex], mfgLot: newValue };
 
     const lotErrKey = `${basePath}.${currentIndex}.mfgLot`;
-    clearFieldError?.(lotErrKey); // Clears only this row's mfgLot error
+    clearFieldError?.(lotErrKey);
 
     onChange(updatedRows);
   };
@@ -406,16 +592,22 @@ export const IngredientQuantityTable = ({
                     {ingredient}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
-                    {isTotal || readOnly ? (
+                    {isTotal ? (
                       <WorkflowReadOnlyText value={row.mfgLot} muted />
                     ) : (
-                      <TableTextInput
-                        value={row.mfgLot ?? ""}
-                        onChange={(next: any) => handleMfgLotChange(index, next)}
-                        error={Boolean(validationErrors[mfgLotErrKey])}
-                        helperText={validationErrors[mfgLotErrKey]}
+                      <MfgLotCell
+                        row={row}
                         disabled={disabled}
                         readOnly={readOnly}
+                        error={Boolean(validationErrors[mfgLotErrKey])}
+                        helperText={validationErrors[mfgLotErrKey]}
+                        fieldPath={mfgLotErrKey}
+                        onChange={(mfgLot) => handleMfgLotChange(index, mfgLot)}
+                        fetchLotsForMaterialCode={fetchLotsForMaterialCode}
+                        getCachedLotOptions={getCachedLotOptions}
+                        getApiLotCount={getApiLotCount}
+                        hasFetchedLots={hasFetchedLots}
+                        isLoadingLots={isLoadingLots}
                       />
                     )}
                   </TableCell>
@@ -434,6 +626,7 @@ export const IngredientQuantityTable = ({
                         disabled={disabled || isTotal}
                         readOnly={readOnly}
                         type="number"
+                        fieldPath={qtyErrKey}
                       />
                     )}
                   </TableCell>
@@ -518,19 +711,22 @@ export const QualificationSection = ({
             helperText={validationErrors[batchNoErrKey]}
             disabled={disabled}
             readOnly={readOnly}
+            fieldPath={batchNoErrKey}
           />
         </Box>
         <Box>
           <FieldLabelWithAsterisk label="Date of Preparation" required />
-          <DateField
-            value={value?.qualificationPreparationDate ?? ""}
-            onChange={(val: any) => handleSectionFieldChange("qualificationPreparationDate", val)}
-            error={Boolean(validationErrors[prepDateErrKey])}
-            helperText={validationErrors[prepDateErrKey]}
-            disabled={disabled}
-            readOnly={readOnly}
-            compact
-          />
+          <Box data-qc-field={prepDateErrKey}>
+            <DateField
+              value={value?.qualificationPreparationDate ?? ""}
+              onChange={(val: any) => handleSectionFieldChange("qualificationPreparationDate", val)}
+              error={Boolean(validationErrors[prepDateErrKey])}
+              helperText={validationErrors[prepDateErrKey]}
+              disabled={disabled}
+              readOnly={readOnly}
+              compact
+            />
+          </Box>
         </Box>
       </FieldGrid>
 
@@ -575,6 +771,7 @@ export const QualificationSection = ({
                         disabled={disabled}
                         readOnly={readOnly}
                         required
+                        fieldPath={resultErrKey}
                       />
                     )}
                   </TableCell>
@@ -587,7 +784,7 @@ export const QualificationSection = ({
 
       <Box sx={{ mt: 1.5 }}>
         <FieldLabelWithAsterisk label="QC Report" required />
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: 1 }} data-qc-field={qcReportErrKey}>
           {useQcDivisionFileField ? (
             <QCDivisionFileField
               files={value?.qualificationQcReport || []}
@@ -688,6 +885,7 @@ export const InhibitionSharedSections = ({
               helperText={validationErrors["inhibitionBatchDetails.inhibitorBatchNo"]}
               disabled={disabled}
               readOnly={readOnly}
+              fieldPath={"inhibitionBatchDetails.inhibitorBatchNo"}
             />
           </Box>
           <Box>
@@ -700,6 +898,7 @@ export const InhibitionSharedSections = ({
               disabled={disabled}
               readOnly={readOnly}
               type="number"
+              fieldPath={"inhibitionBatchDetails.inhibitorBatchSize"}
             />
           </Box>
         </FieldGrid>
@@ -723,28 +922,32 @@ export const InhibitionSharedSections = ({
         <FieldGrid columns={2}>
           <Box>
             <FieldLabelWithAsterisk label="Date Of Dispatch" required />
-            <DateField
-              value={value?.dispatchDetails?.dispatchDate ?? ""}
-              onChange={(val: any) => handleDispatchChange("dispatchDate", val)}
-              error={Boolean(validationErrors["dispatchDetails.dispatchDate"])}
-              helperText={validationErrors["dispatchDetails.dispatchDate"]}
-              disabled={disabled}
-              readOnly={readOnly}
-              compact
-            />
+            <Box data-qc-field={"dispatchDetails.dispatchDate"}>
+              <DateField
+                value={value?.dispatchDetails?.dispatchDate ?? ""}
+                onChange={(val: any) => handleDispatchChange("dispatchDate", val)}
+                error={Boolean(validationErrors["dispatchDetails.dispatchDate"])}
+                helperText={validationErrors["dispatchDetails.dispatchDate"]}
+                disabled={disabled}
+                readOnly={readOnly}
+                compact
+              />
+            </Box>
           </Box>
           <Box>
             <FieldLabelWithAsterisk label="Dispatch Station" required />
-            <TableSelectInput
-              value={value?.dispatchDetails?.dispatchStation ?? ""}
-              onChange={(e: any) => handleDispatchChange("dispatchStation", e)}
-              options={stationOptions}
-              placeholder="Select station"
-              error={Boolean(validationErrors["dispatchDetails.dispatchStation"])}
-              helperText={validationErrors["dispatchDetails.dispatchStation"]}
-              disabled={disabled}
-              readOnly={readOnly}
-            />
+            <Box data-qc-field={"dispatchDetails.dispatchStation"}>
+              <TableSelectInput
+                value={value?.dispatchDetails?.dispatchStation ?? ""}
+                onChange={(e: any) => handleDispatchChange("dispatchStation", e)}
+                options={stationOptions}
+                placeholder="Select station"
+                error={Boolean(validationErrors["dispatchDetails.dispatchStation"])}
+                helperText={validationErrors["dispatchDetails.dispatchStation"]}
+                disabled={disabled}
+                readOnly={readOnly}
+              />
+            </Box>
           </Box>
         </FieldGrid>
       </SectionCard>
@@ -764,8 +967,15 @@ export const PostCureMotorPanel: React.FC<any> = ({
   readOnly = false,
   theme,
   useQcDivisionFileField = false,
+  motorId,
 }) => {
   const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const ingredientsFetchGenRef = useRef(0);
+  const ingredientsHydratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -799,6 +1009,121 @@ export const PostCureMotorPanel: React.FC<any> = ({
   const variant = String(variantRaw || "")
     .toLowerCase()
     .replace(/_/g, "-");
+
+  // Case Prep–style: seed mix tables from POST /post-cure/ingredients (parent owns fetch).
+  useEffect(() => {
+    const hydrateKey = `${str(motorId).trim()}::${variant}`;
+    if (ingredientsHydratedKeyRef.current === hydrateKey) return;
+
+    const recipePairs: Array<{
+      recipeType: string;
+      qtyKey: "quantity" | "qtyTaken";
+      apply: (rows: any[]) => void;
+    }> = [];
+
+    if (variant === "loose-flap-filling") {
+      recipePairs.push({
+        recipeType: POST_CURE_RECIPE_TYPES.LOOSE_FLAP_EPOXY,
+        qtyKey: "quantity",
+        apply: (rows) => {
+          const current = valueRef.current || {};
+          onChangeRef.current?.({
+            ...current,
+            looseFlapEpoxyPreparation: {
+              ...current.looseFlapEpoxyPreparation,
+              preparationDetails: rows,
+            },
+          });
+        },
+      });
+    } else if (variant === "inhibition-ir1") {
+      recipePairs.push(
+        {
+          recipeType: POST_CURE_RECIPE_TYPES.IR1_PREMIX,
+          qtyKey: "qtyTaken",
+          apply: (rows) => {
+            const current = valueRef.current || {};
+            onChangeRef.current?.({
+              ...current,
+              ir1Premix: { ...current.ir1Premix, ir1PremixTable: rows },
+            });
+          },
+        },
+        {
+          recipeType: POST_CURE_RECIPE_TYPES.IR1_FINAL_MIX,
+          qtyKey: "qtyTaken",
+          apply: (rows) => {
+            const current = valueRef.current || {};
+            onChangeRef.current?.({
+              ...current,
+              ir1FinalMix: { ...current.ir1FinalMix, ir1FinalMixTable: rows },
+            });
+          },
+        },
+      );
+    } else if (variant === "inhibition-hemcoat-3k") {
+      recipePairs.push(
+        {
+          recipeType: POST_CURE_RECIPE_TYPES.HEMCOAT_3K_PREMIX,
+          qtyKey: "qtyTaken",
+          apply: (rows) => {
+            const current = valueRef.current || {};
+            onChangeRef.current?.({
+              ...current,
+              hemcoat3kPreparation: {
+                ...current.hemcoat3kPreparation,
+                premixPreparationTable: rows,
+              },
+            });
+          },
+        },
+        {
+          recipeType: POST_CURE_RECIPE_TYPES.HEMCOAT_3K_FINAL_MIX,
+          qtyKey: "qtyTaken",
+          apply: (rows) => {
+            const current = valueRef.current || {};
+            onChangeRef.current?.({
+              ...current,
+              hemcoat3kFinalMix: { ...current.hemcoat3kFinalMix, finalMixTable: rows },
+            });
+          },
+        },
+      );
+    } else {
+      ingredientsHydratedKeyRef.current = hydrateKey;
+      return;
+    }
+
+    const gen = ++ingredientsFetchGenRef.current;
+    void (async () => {
+      const current = valueRef.current || {};
+      const existingByRecipe: Record<string, any[]> = {
+        [POST_CURE_RECIPE_TYPES.LOOSE_FLAP_EPOXY]:
+          current.looseFlapEpoxyPreparation?.preparationDetails ?? [],
+        [POST_CURE_RECIPE_TYPES.IR1_PREMIX]: current.ir1Premix?.ir1PremixTable ?? [],
+        [POST_CURE_RECIPE_TYPES.IR1_FINAL_MIX]: current.ir1FinalMix?.ir1FinalMixTable ?? [],
+        [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_PREMIX]:
+          current.hemcoat3kPreparation?.premixPreparationTable ?? [],
+        [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_FINAL_MIX]:
+          current.hemcoat3kFinalMix?.finalMixTable ?? [],
+      };
+
+      for (const pair of recipePairs) {
+        const result = await postCureController.fetchIngredients(pair.recipeType);
+        if (gen !== ingredientsFetchGenRef.current) return;
+        if (!result.success || !result.data) continue;
+        const next = buildPostCureIngredientRowsFromApi(
+          result.data,
+          pair.qtyKey,
+          existingByRecipe[pair.recipeType],
+        );
+        if (next.length) pair.apply(next);
+      }
+      if (gen === ingredientsFetchGenRef.current) {
+        ingredientsHydratedKeyRef.current = hydrateKey;
+      }
+    })();
+  }, [motorId, variant]);
 
   const updateSubSection = (sectionKey: string, sectionData: any) => {
     onChange?.({
@@ -841,30 +1166,34 @@ export const PostCureMotorPanel: React.FC<any> = ({
                 helperText={validationErrors["looseFlapEpoxyPreparation.epoxyBatchNo"]}
                 disabled={disabled}
                 readOnly={readOnly}
+                fieldPath={"looseFlapEpoxyPreparation.epoxyBatchNo"}
               />
             </Box>
             <Box>
               <FieldLabelWithAsterisk label="Date of Preparation" required />
-              <DateField
-                value={value?.looseFlapEpoxyPreparation?.epoxyPreparationDate ?? ""}
-                onChange={(val: any) => {
-                  clearFieldError?.("looseFlapEpoxyPreparation.epoxyPreparationDate");
-                  updateSubSection("looseFlapEpoxyPreparation", {
-                    ...value?.looseFlapEpoxyPreparation,
-                    epoxyPreparationDate: val,
-                  });
-                }}
-                error={Boolean(validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"])}
-                helperText={validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"]}
-                disabled={disabled}
-                readOnly={readOnly}
-                compact
-              />
+              <Box data-qc-field={"looseFlapEpoxyPreparation.epoxyPreparationDate"}>
+                <DateField
+                  value={value?.looseFlapEpoxyPreparation?.epoxyPreparationDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("looseFlapEpoxyPreparation.epoxyPreparationDate");
+                    updateSubSection("looseFlapEpoxyPreparation", {
+                      ...value?.looseFlapEpoxyPreparation,
+                      epoxyPreparationDate: val,
+                    });
+                  }}
+                  error={Boolean(validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"])}
+                  helperText={validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
             </Box>
           </FieldGrid>
 
           <IngredientQuantityTable
             basePath="looseFlapEpoxyPreparation.preparationDetails"
+
             value={value?.looseFlapEpoxyPreparation?.preparationDetails || []}
             onChange={(rows) =>
               updateSubSection("looseFlapEpoxyPreparation", {
@@ -926,6 +1255,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
           readOnly={readOnly}
           multiline
           minRows={4}
+          fieldPath={"inhibitionNotApplicable.remarks"}
         />
       </SectionCard>
     );
@@ -948,26 +1278,30 @@ export const PostCureMotorPanel: React.FC<any> = ({
                 helperText={validationErrors["ir1Premix.ir1PremixBatchNo"]}
                 disabled={disabled}
                 readOnly={readOnly}
+                fieldPath={"ir1Premix.ir1PremixBatchNo"}
               />
             </Box>
             <Box>
               <FieldLabelWithAsterisk label="Premix Date" required />
-              <DateField
-                value={value?.ir1Premix?.ir1PremixDate ?? ""}
-                onChange={(val: any) => {
-                  clearFieldError?.("ir1Premix.ir1PremixDate");
-                  updateSubSection("ir1Premix", { ...value?.ir1Premix, ir1PremixDate: val });
-                }}
-                error={Boolean(validationErrors["ir1Premix.ir1PremixDate"])}
-                helperText={validationErrors["ir1Premix.ir1PremixDate"]}
-                disabled={disabled}
-                readOnly={readOnly}
-                compact
-              />
+              <Box data-qc-field={"ir1Premix.ir1PremixDate"}>
+                <DateField
+                  value={value?.ir1Premix?.ir1PremixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("ir1Premix.ir1PremixDate");
+                    updateSubSection("ir1Premix", { ...value?.ir1Premix, ir1PremixDate: val });
+                  }}
+                  error={Boolean(validationErrors["ir1Premix.ir1PremixDate"])}
+                  helperText={validationErrors["ir1Premix.ir1PremixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
             </Box>
           </FieldGrid>
           <IngredientQuantityTable
             basePath="ir1Premix.ir1PremixTable"
+
             value={value?.ir1Premix?.ir1PremixTable || []}
             onChange={(rows) =>
               updateSubSection("ir1Premix", { ...value?.ir1Premix, ir1PremixTable: rows })
@@ -997,26 +1331,30 @@ export const PostCureMotorPanel: React.FC<any> = ({
                 helperText={validationErrors["ir1FinalMix.ir1FinalMixBatchNo"]}
                 disabled={disabled}
                 readOnly={readOnly}
+                fieldPath={"ir1FinalMix.ir1FinalMixBatchNo"}
               />
             </Box>
             <Box>
               <FieldLabelWithAsterisk label="Final Mix Date" required />
-              <DateField
-                value={value?.ir1FinalMix?.ir1FinalMixDate ?? ""}
-                onChange={(val: any) => {
-                  clearFieldError?.("ir1FinalMix.ir1FinalMixDate");
-                  updateSubSection("ir1FinalMix", { ...value?.ir1FinalMix, ir1FinalMixDate: val });
-                }}
-                error={Boolean(validationErrors["ir1FinalMix.ir1FinalMixDate"])}
-                helperText={validationErrors["ir1FinalMix.ir1FinalMixDate"]}
-                disabled={disabled}
-                readOnly={readOnly}
-                compact
-              />
+              <Box data-qc-field={"ir1FinalMix.ir1FinalMixDate"}>
+                <DateField
+                  value={value?.ir1FinalMix?.ir1FinalMixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("ir1FinalMix.ir1FinalMixDate");
+                    updateSubSection("ir1FinalMix", { ...value?.ir1FinalMix, ir1FinalMixDate: val });
+                  }}
+                  error={Boolean(validationErrors["ir1FinalMix.ir1FinalMixDate"])}
+                  helperText={validationErrors["ir1FinalMix.ir1FinalMixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
             </Box>
           </FieldGrid>
           <IngredientQuantityTable
             basePath="ir1FinalMix.ir1FinalMixTable"
+
             value={value?.ir1FinalMix?.ir1FinalMixTable || []}
             onChange={(rows) =>
               updateSubSection("ir1FinalMix", { ...value?.ir1FinalMix, ir1FinalMixTable: rows })
@@ -1076,29 +1414,33 @@ export const PostCureMotorPanel: React.FC<any> = ({
                 helperText={validationErrors["hemcoat3kPreparation.hemcoatPremixBatchNo"]}
                 disabled={disabled}
                 readOnly={readOnly}
+                fieldPath={"hemcoat3kPreparation.hemcoatPremixBatchNo"}
               />
             </Box>
             <Box>
               <FieldLabelWithAsterisk label="Premix Date" required />
-              <DateField
-                value={value?.hemcoat3kPreparation?.hemcoatPremixDate ?? ""}
-                onChange={(val: any) => {
-                  clearFieldError?.("hemcoat3kPreparation.hemcoatPremixDate");
-                  updateSubSection("hemcoat3kPreparation", {
-                    ...value?.hemcoat3kPreparation,
-                    hemcoatPremixDate: val,
-                  });
-                }}
-                error={Boolean(validationErrors["hemcoat3kPreparation.hemcoatPremixDate"])}
-                helperText={validationErrors["hemcoat3kPreparation.hemcoatPremixDate"]}
-                disabled={disabled}
-                readOnly={readOnly}
-                compact
-              />
+              <Box data-qc-field={"hemcoat3kPreparation.hemcoatPremixDate"}>
+                <DateField
+                  value={value?.hemcoat3kPreparation?.hemcoatPremixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("hemcoat3kPreparation.hemcoatPremixDate");
+                    updateSubSection("hemcoat3kPreparation", {
+                      ...value?.hemcoat3kPreparation,
+                      hemcoatPremixDate: val,
+                    });
+                  }}
+                  error={Boolean(validationErrors["hemcoat3kPreparation.hemcoatPremixDate"])}
+                  helperText={validationErrors["hemcoat3kPreparation.hemcoatPremixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
             </Box>
           </FieldGrid>
           <IngredientQuantityTable
             basePath="hemcoat3kPreparation.premixPreparationTable"
+
             value={value?.hemcoat3kPreparation?.premixPreparationTable || []}
             onChange={(rows) =>
               updateSubSection("hemcoat3kPreparation", {
@@ -1131,29 +1473,33 @@ export const PostCureMotorPanel: React.FC<any> = ({
                 helperText={validationErrors["hemcoat3kFinalMix.hemcoatFinalMixBatchNo"]}
                 disabled={disabled}
                 readOnly={readOnly}
+                fieldPath={"hemcoat3kFinalMix.hemcoatFinalMixBatchNo"}
               />
             </Box>
             <Box>
               <FieldLabelWithAsterisk label="Final Mix Date" required />
-              <DateField
-                value={value?.hemcoat3kFinalMix?.hemcoatFinalMixDate ?? ""}
-                onChange={(val: any) => {
-                  clearFieldError?.("hemcoat3kFinalMix.hemcoatFinalMixDate");
-                  updateSubSection("hemcoat3kFinalMix", {
-                    ...value?.hemcoat3kFinalMix,
-                    hemcoatFinalMixDate: val,
-                  });
-                }}
-                error={Boolean(validationErrors["hemcoat3kFinalMix.hemcoatFinalMixDate"])}
-                helperText={validationErrors["hemcoat3kFinalMix.hemcoatFinalMixDate"]}
-                disabled={disabled}
-                readOnly={readOnly}
-                compact
-              />
+              <Box data-qc-field={"hemcoat3kFinalMix.hemcoatFinalMixDate"}>
+                <DateField
+                  value={value?.hemcoat3kFinalMix?.hemcoatFinalMixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("hemcoat3kFinalMix.hemcoatFinalMixDate");
+                    updateSubSection("hemcoat3kFinalMix", {
+                      ...value?.hemcoat3kFinalMix,
+                      hemcoatFinalMixDate: val,
+                    });
+                  }}
+                  error={Boolean(validationErrors["hemcoat3kFinalMix.hemcoatFinalMixDate"])}
+                  helperText={validationErrors["hemcoat3kFinalMix.hemcoatFinalMixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
             </Box>
           </FieldGrid>
           <IngredientQuantityTable
             basePath="hemcoat3kFinalMix.finalMixTable"
+
             value={value?.hemcoat3kFinalMix?.finalMixTable || []}
             onChange={(rows) =>
               updateSubSection("hemcoat3kFinalMix", {

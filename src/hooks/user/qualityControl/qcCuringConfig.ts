@@ -97,13 +97,6 @@ export type QcCuringSubscaleParameterColumnId =
 
 const BEM_ARTICLE_TYPE_ORDER = ["40_KG_BEM", "10_KG_BEM", "2_KG_BEM"] as const;
 
-const SUBSCALE_ARTICLE_TYPE_ORDER = [
-  ...BEM_ARTICLE_TYPE_ORDER,
-  "WHEEL_PEEL",
-  "SBS_TBS",
-  "CARTOONS",
-] as const;
-
 export const resolveQcSubscaleArticleColumn = (
   articleType: unknown,
 ): QcCuringSubscaleParameterColumnId | null => {
@@ -130,19 +123,6 @@ export const bemArticleTypeSortOrder = (articleType: unknown): number => {
     .toUpperCase();
   const index = BEM_ARTICLE_TYPE_ORDER.indexOf(
     normalized as (typeof BEM_ARTICLE_TYPE_ORDER)[number],
-  );
-  return index >= 0 ? index : 99;
-};
-
-export const subscaleArticleTypeSortOrder = (articleType: unknown): number => {
-  const normalized = String(articleType ?? "")
-    .trim()
-    .toUpperCase();
-  if (normalized === "CARTONS") {
-    return SUBSCALE_ARTICLE_TYPE_ORDER.indexOf("CARTOONS");
-  }
-  const index = SUBSCALE_ARTICLE_TYPE_ORDER.indexOf(
-    normalized as (typeof SUBSCALE_ARTICLE_TYPE_ORDER)[number],
   );
   return index >= 0 ? index : 99;
 };

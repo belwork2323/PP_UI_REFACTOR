@@ -298,7 +298,7 @@ export const createEmptyPostCureMotorSession = (
 
 export const createInhibitionDataForType = (inhibitorType: string): PostCureMotorData | null => {
   const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
-  if (!variant || variant === "inhibition-not-applicable") return null;
+  if (!variant) return null;
   return createEmptyPostCureMotorData(variant);
 };
 
@@ -335,9 +335,14 @@ export const hydratePostCureMotorSession = (
   let inhibitionData: PostCureMotorData | null = null;
   if (hasInhibition && inhibitorType) {
     inhibitionData = parseInhibitionMotorDataFromApi(apiMotor, inhibitorType);
-  } else if (legacyOperation === POST_CURE_OPERATION_INHIBITION && inhibitorType) {
+  } else if (inhibitorType) {
     const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
-    if (variant && variant !== "inhibition-not-applicable") {
+    if (variant === "inhibition-not-applicable") {
+      // N/A may have empty/missing details on older drafts — still show remarks panel.
+      inhibitionData =
+        parseInhibitionMotorDataFromApi(apiMotor, inhibitorType) ??
+        createEmptyPostCureMotorData("inhibition-not-applicable");
+    } else if (legacyOperation === POST_CURE_OPERATION_INHIBITION && variant) {
       inhibitionData = parsePostCureMotorDataFromApi(apiMotor, variant);
     }
   }

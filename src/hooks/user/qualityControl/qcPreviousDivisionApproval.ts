@@ -87,7 +87,10 @@ const asStageEntries = (stages: unknown): StageProgressEntry[] => {
   return stages.filter((entry) => entry && typeof entry === "object") as StageProgressEntry[];
 };
 
-/** Prefer stageProgress order; overlay currentStage by subDepartmentId for latest statuses. */
+/**
+ * Prefer stageProgress order; overlay currentStage by subDepartmentId for latest statuses.
+ * Also append stages that exist only in currentStage (e.g. NDT id 10 just unlocked).
+ */
 const mergeStageProgress = (
   stageProgress?: unknown,
   currentStage?: unknown,
@@ -95,15 +98,28 @@ const mergeStageProgress = (
   const progress = asStageEntries(stageProgress);
   const current = asStageEntries(currentStage);
   if (!progress.length) return current;
+  if (!current.length) return progress;
+
   const currentById = new Map<number, StageProgressEntry>();
   current.forEach((stage) => {
     const id = Number(stage.subDepartmentId);
     if (Number.isFinite(id) && id > 0) currentById.set(id, stage);
   });
-  return progress.map((stage) => {
+
+  const merged = progress.map((stage) => {
     const id = Number(stage.subDepartmentId);
     return (Number.isFinite(id) && id > 0 && currentById.get(id)) || stage;
   });
+
+  current.forEach((stage) => {
+    const id = Number(stage.subDepartmentId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (!merged.some((entry) => Number(entry.subDepartmentId) === id)) {
+      merged.push(stage);
+    }
+  });
+
+  return merged;
 };
 
 /** QC Quality Control catalog (id 11) — not QC NDT. Those rows are current QC work. */
@@ -239,8 +255,10 @@ const isRawMaterialPrepStage = (stage: StageProgressEntry): boolean => {
 };
 
 const isNdtStage = (stage: StageProgressEntry): boolean => {
-  const id = Number(stage.subDepartmentId ?? (stage as { sub_department_id?: unknown }).sub_department_id);
-  // SUB_DEPT.NDT = 10 (QC NDT user subdepartment, not manufacturing).
+  const id = Number(
+    stage.subDepartmentId ?? (stage as { sub_department_id?: unknown }).sub_department_id,
+  );
+  // Main-batch manufacturing NDT stage (SUB_DEPT.NDT = 10).
   if (Number.isFinite(id) && id === 10) return true;
   return normalizeNameKey(stage.subDepartmentName) === "ndt";
 };
@@ -509,6 +527,10 @@ export const resolveManufacturingGateForQcDivision = (params: {
 /**
  * QC unit tabs: prefer manufacturing stageProgress APPROVED / COMPLETELY_APPROVED.
  * Fall back to QC divisionStatuses only when the manufacturing stage row is missing.
+ *
+ * For motor divisions, do not merge divisionStatuses unlocks when manufacturing stage exists —
+ * corrupted TO_BE_INITIATED rows must not bypass manufacturing APPROVED.
+ * Mixing still merges premix/final-mix unlocks (Final Mix can lag in stageProgress).
  */
 export const resolveQcPreviousDivisionApprovedUnits = (params: {
   currentDivisionKey: string;
@@ -547,30 +569,22 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
 
   if (fromManufacturing) {
-    if (fromDivisionStatuses && !fromDivisionStatuses.enableAll) {
+    if (currentKey === "MIXING" && fromDivisionStatuses && !fromDivisionStatuses.enableAll) {
       fromDivisionStatuses.approvedPremixNos.forEach((n) =>
         fromManufacturing.approvedPremixNos.add(n),
       );
-      fromDivisionStatuses.approvedMotorIds.forEach((id) =>
-        fromManufacturing.approvedMotorIds.add(id),
-      );
-      if (currentKey === "MIXING") {
-        const finalNos =
-          fromManufacturing.approvedFinalMixNos ??
-          (fromManufacturing.approvedFinalMixNos = new Set<number>());
-        fromDivisionStatuses.approvedFinalMixNos?.forEach((n) => finalNos.add(n));
-      }
+      const finalNos =
+        fromManufacturing.approvedFinalMixNos ??
+        (fromManufacturing.approvedFinalMixNos = new Set<number>());
+      fromDivisionStatuses.approvedFinalMixNos?.forEach((n) => finalNos.add(n));
     }
     return fromManufacturing;
   }
 
-  // NDT / QC / Weighment must wait for the NDT subdepartment stage.
-  // Never fall back to QC divisionStatuses — seeded TO_BE_INITIATED motor rows
-  // would incorrectly unlock these tabs as soon as any QC division starts.
-  if (currentKey === "NDT" || currentKey === "QC" || currentKey === "WEIGHTMENT") {
-    return emptyGate("motor", false, "NDT");
-  }
-
+  // Manufacturing stage row missing (or only present on currentStage before merge fix):
+  // fall back to QC divisionStatuses. Backend only promotes NDT/QC/Weighment unit rows from
+  // YET_TO_START → TO_BE_INITIATED after manufacturing NDT (or QC) approval — same pattern
+  // as Trimming/Post Cure. Initial seed keeps those units YET_TO_START, so this is safe.
   if (fromDivisionStatuses) {
     return fromDivisionStatuses;
   }
@@ -584,8 +598,17 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   return emptyGate(null, false);
 };
 
-/** Division tab: enabled when manufacturing gate has any approved unit or enableAll. */
-export const isQcDivisionEnabledByManufacturing = (params: {
+/** NDT / QC / WEIGHTMENT — unlocked only after manufacturing NDT motor APPROVED. */
+const isNdtFamilyQcDivision = (key: string): boolean =>
+  key === "NDT" || key === "QC" || key === "WEIGHTMENT";
+
+/**
+ * Division tab enablement from QC stage `divisionStatuses` (server-authoritative),
+ * with manufacturing NDT APPROVED as the source of truth for NDT / QC / WEIGHTMENT.
+ * Locked when status is missing or `YET_TO_START`; unlocked for any other status
+ * (except NDT-family, which also requires manufacturing NDT approval).
+ */
+export const isQcDivisionEnabledByServerStatus = (params: {
   divisionKey: string;
   stageProgress?: unknown;
   currentStage?: unknown;
@@ -603,32 +626,59 @@ export const isQcDivisionEnabledByManufacturing = (params: {
     return { enabled: true };
   }
 
-  const gate = resolveQcPreviousDivisionApprovedUnits({
-    currentDivisionKey: key,
-    stageProgress: params.stageProgress,
-    currentStage: params.currentStage,
-    batchType: params.batchType,
-    subBatchType: params.subBatchType,
-  });
-
-  if (gate.enableAll) return { enabled: true };
-
-  const hasApproved =
-    gate.approvedPremixNos.size > 0 ||
-    (gate.approvedFinalMixNos?.size ?? 0) > 0 ||
-    gate.approvedMotorIds.size > 0;
-
-  if (hasApproved) return { enabled: true };
-
-  const previousLabel = formatQcDivisionGateLabel(
-    gate.previousSubDepartmentName ?? manufacturingPredecessorForQcDivision(key)?.label,
-  );
   const currentLabel = formatQcDivisionGateLabel(key);
+
+  // NDT / QC / WEIGHTMENT: manufacturing NDT APPROVED is authoritative.
+  // Do not trust corrupted divisionStatuses TO_BE_INITIATED while manufacturing NDT
+  // is still only TO_BE_INITIATED (no motor APPROVED).
+  if (isNdtFamilyQcDivision(key)) {
+    const mfgGate = resolveManufacturingGateForQcDivision({
+      currentDivisionKey: key,
+      stageProgress: params.stageProgress,
+      currentStage: params.currentStage,
+    });
+    if (mfgGate) {
+      const manufacturingUnlocked = (mfgGate.approvedMotorIds?.size ?? 0) > 0;
+      if (!manufacturingUnlocked) {
+        return {
+          enabled: false,
+          reason: `Waiting for NDT approval to unlock ${currentLabel}.`,
+        };
+      }
+      return { enabled: true };
+    }
+    // Manufacturing NDT stage row missing — fall through to divisionStatuses.
+  }
+
+  const qcStage = findQcStageEntry(params.stageProgress, params.currentStage);
+  if (!qcStage) {
+    return {
+      enabled: false,
+      reason: `Waiting for manufacturing to unlock ${currentLabel}.`,
+    };
+  }
+
+  const rows = asArray(qcStage.divisionStatuses)
+    .map((entry) => asRecord(entry))
+    .filter((rec): rec is Record<string, unknown> => Boolean(rec));
+  const divisionRow = rows.find((row) => matchDivisionRow(row, key));
+  const divisionStatus = String(divisionRow?.status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+
+  if (divisionStatus && divisionStatus !== "YET_TO_START") {
+    return { enabled: true };
+  }
+
   return {
     enabled: false,
-    reason: `Approve at least one unit in ${previousLabel} to enable ${currentLabel}.`,
+    reason: `Waiting for manufacturing to unlock ${currentLabel}.`,
   };
 };
+
+/** @deprecated Prefer {@link isQcDivisionEnabledByServerStatus}; kept for call-site compatibility. */
+export const isQcDivisionEnabledByManufacturing = isQcDivisionEnabledByServerStatus;
 
 const findQcStageEntry = (
   stageProgress?: unknown,
@@ -637,7 +687,10 @@ const findQcStageEntry = (
   const stages = mergeStageProgress(stageProgress, currentStage);
   return (
     stages.find((stage) => {
-      const id = Number(stage.subDepartmentId ?? stage.sub_department_id);
+      const id = Number(
+        stage.subDepartmentId ??
+          (stage as { sub_department_id?: unknown }).sub_department_id,
+      );
       if (id === 11) return true;
       return isQcDivisionStageName(String(stage.subDepartmentName ?? ""));
     }) ?? null

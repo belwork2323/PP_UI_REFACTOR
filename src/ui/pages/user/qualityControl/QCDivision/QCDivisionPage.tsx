@@ -90,6 +90,7 @@ const QualityControlPage = () => {
     handleResetPostCureSetup,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
+    clearEntryFieldError,
     validationErrorsByEntryId,
     entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
@@ -285,6 +286,7 @@ const QualityControlPage = () => {
             validationErrorsByEntryId={
               validationErrorsByEntryId ?? entryValidationErrors ?? {}
             }
+            onClearEntryFieldError={clearEntryFieldError}
             flowBarTheme={flowBarTheme}
             onDivisionNavTabChange={handleDivisionNavTabChange}
             onProcessingTypeChange={handleProcessingTypeChange}

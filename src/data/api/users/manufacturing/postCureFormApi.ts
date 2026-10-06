@@ -15,3 +15,7 @@ export const fetchPostCureFormDetailsApi = async (payload: {
 export const updatePostCureFormApi = async (payload: any) => {
   return await put(USER_POST_CURE_FORM_ENDPOINTS.UPDATE_FORM, payload);
 };
+
+export const fetchPostCureIngredientsApi = async (payload: { recipeType: string }) => {
+  return await post(USER_POST_CURE_FORM_ENDPOINTS.INGREDIENTS, payload);
+};

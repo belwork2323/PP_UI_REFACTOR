@@ -41,6 +41,8 @@ export type StageProgressEntry = {
   premixStatuses?: StageProgressUnitStatus[] | null;
   motorStatuses?: StageProgressUnitStatus[] | null;
   finalMixStatuses?: StageProgressUnitStatus[] | null;
+  /** QC catalog rows (server-authoritative division unlock / unit gates). */
+  divisionStatuses?: unknown[] | null;
 };
 
 export type PreviousStageApprovedUnits = {

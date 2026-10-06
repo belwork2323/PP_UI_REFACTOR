@@ -14,7 +14,7 @@ import {
   createInhibitionDataForType,
 } from "../../../../../data/models/user/PostCureFormModel";
 import {
-  isPostCureInhibitionDetailsRequired,
+  isPostCureInhibitionPanelVisible,
   type PostCureMotorData,
 } from "../../../../../data/models/user/PostCureMotorDataModel";
 import { POST_CURE_INHIBITOR_TYPE_OPTIONS } from "../../../../../hooks/user/manufacturing/postCureConfig";
@@ -27,6 +27,10 @@ import { getQcPostCureMotorLabel } from "../../../../../hooks/user/qualityContro
 import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 import PostCureMotorPanel from "../../manufacturing/PostCure/PostCureMotorPanel";
 import { STRINGS } from "../../../../../app/config/strings";
+import {
+  focusQcPostCureField,
+  resolveFirstQcPostCureValidationFocus,
+} from "@/data/validation/adapters/qcPostCure.validation";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const MFG = STRINGS.MANUFACTURING.POST_CURE;
@@ -82,6 +86,7 @@ type QCPostCureMotorPanelProps = {
   disabled?: boolean;
   headerActions?: ReactNode;
   validationErrors?: Record<string, string> | null;
+  clearFieldError?: (path: string) => void;
 };
 
 const QCPostCureMotorPanel = ({
@@ -93,6 +98,7 @@ const QCPostCureMotorPanel = ({
   disabled = false,
   headerActions,
   validationErrors = null,
+  clearFieldError,
 }: QCPostCureMotorPanelProps) => {
   const inputsLocked = Boolean(disabled || readOnly);
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
@@ -136,6 +142,17 @@ const QCPostCureMotorPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to new validation errors
   }, [validationErrors]);
 
+  // After tab switch, retry focus so the first error control is in the DOM.
+  useEffect(() => {
+    if (!validationErrors || !Object.keys(validationErrors).length) return;
+    const fieldPath = resolveFirstQcPostCureValidationFocus(validationErrors);
+    if (!fieldPath) return;
+    const timer = window.setTimeout(() => {
+      focusQcPostCureField(fieldPath);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [validationErrors, activeProcessTab]);
+
   const persistSession = useCallback(
     (next: typeof session) => {
       if (inputsLocked) return;
@@ -143,10 +160,6 @@ const QCPostCureMotorPanel = ({
     },
     [inputsLocked, onChange],
   );
-
-  const clearFieldError = useCallback((_path: string) => {
-    // Entry-level validation errors are owned by the QC hook; panel clears happen on re-validate.
-  }, []);
 
   const handleInhibitorTypeChange = (nextInhibitorType: string) => {
     if (inputsLocked) return;
@@ -156,6 +169,7 @@ const QCPostCureMotorPanel = ({
       inhibitionData: createInhibitionDataForType(nextInhibitorType),
     });
     setInhibitionTypeEditing(false);
+    clearFieldError?.("inhibitorType");
   };
 
   const handleClearInhibitionSetup = () => {
@@ -166,6 +180,7 @@ const QCPostCureMotorPanel = ({
       inhibitionData: null,
     });
     setInhibitionTypeEditing(false);
+    clearFieldError?.("inhibitorType");
   };
 
   const inhibitionTypeSelected = Boolean(String(session.inhibitorType ?? "").trim());
@@ -174,7 +189,7 @@ const QCPostCureMotorPanel = ({
   const showInhibitionEdit = canChangeInhibitionSetup;
   const showInhibitionDelete = canChangeInhibitionSetup;
   const showInhibitionPanel =
-    inhibitionTypeSelected && isPostCureInhibitionDetailsRequired(session.inhibitorType);
+    inhibitionTypeSelected && isPostCureInhibitionPanelVisible(session.inhibitorType);
 
   const sectionToggleSx = {
     width: "100%",
@@ -266,6 +281,7 @@ const QCPostCureMotorPanel = ({
           readOnly={readOnly}
           theme={panelTheme}
           useQcDivisionFileField
+          motorId={motorId}
         />
       ) : null}
 
@@ -314,17 +330,19 @@ const QCPostCureMotorPanel = ({
                 ) : null}
               </Stack>
             </Stack>
-            <CasePrepSelect
-              label={MFG.INHIBITOR_TYPE_LABEL}
-              value={toPostCureUiInhibitorType(session.inhibitorType) || session.inhibitorType}
-              placeholder={MFG.INHIBITOR_TYPE_PLACEHOLDER}
-              options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
-              width={260}
-              theme={panelTheme}
-              disabled={!inputsLocked && inhibitionTypeLocked}
-              readOnly={inputsLocked}
-              onChange={handleInhibitorTypeChange}
-            />
+            <Box data-qc-field="inhibitorType">
+              <CasePrepSelect
+                label={MFG.INHIBITOR_TYPE_LABEL}
+                value={toPostCureUiInhibitorType(session.inhibitorType) || session.inhibitorType}
+                placeholder={MFG.INHIBITOR_TYPE_PLACEHOLDER}
+                options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
+                width={260}
+                theme={panelTheme}
+                disabled={!inputsLocked && inhibitionTypeLocked}
+                readOnly={inputsLocked}
+                onChange={handleInhibitorTypeChange}
+              />
+            </Box>
             {errors.inhibitorType ? (
               <Typography sx={{ fontSize: "0.72rem", color: BRAND.danger, mt: 0.75 }}>
                 {String(errors.inhibitorType)}
@@ -347,6 +365,7 @@ const QCPostCureMotorPanel = ({
               readOnly={readOnly}
               theme={panelTheme}
               useQcDivisionFileField
+              motorId={motorId}
             />
           ) : null}
         </Stack>

@@ -1,12 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { TableCell, TableRow, Typography } from "@mui/material";
+import { Box, TableCell, TableRow } from "@mui/material";
 import FormInput, { type FormInputProps } from "../../../../../components/common/FormInput";
 import { useDebouncedCallback } from "../../../../../../hooks/useDebouncedCallback";
 import { uniformTableBodyCellSx } from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { ProcessParticularRow } from "../../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { registerSubscalePendingDraft } from "../utils/subscalePendingDrafts";
-import { Control, Controller, useFormContext } from "react-hook-form";
-import { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 
 export type SubscaleCellChangeHandler = (
   tableId: string,
@@ -116,18 +114,21 @@ export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
   }, [commit, debouncedCommit]);
 
   const hasError = Boolean(errorMessage);
+  const fieldPath = `${tableId}.${rowIndex}.${fieldId}`;
 
   return (
-    <FormInput
-      inputRef={inputRef}
-      value={draft}
-      disabled={disabled}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      error={hasError}
-      helperText={errorMessage || ""}
-      {...rest}
-    />
+    <Box data-ss-field={fieldPath}>
+      <FormInput
+        inputRef={inputRef}
+        value={draft}
+        disabled={disabled}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        error={hasError}
+        helperText={errorMessage || ""}
+        {...rest}
+      />
+    </Box>
   );
 });
 
@@ -268,15 +269,17 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
 
   return (
     <TableCell sx={uniformTableBodyCellSx({ border, text })}>
-      <FormInput
-        inputRef={inputRef}
-        value={draft}
-        placeholder={placeholder}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        error={Boolean(errorMessage)}
-        helperText={errorMessage}
-      />
+      <Box data-ss-field={fieldName}>
+        <FormInput
+          inputRef={inputRef}
+          value={draft}
+          placeholder={placeholder}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          error={Boolean(errorMessage)}
+          helperText={errorMessage}
+        />
+      </Box>
     </TableCell>
   );
 });

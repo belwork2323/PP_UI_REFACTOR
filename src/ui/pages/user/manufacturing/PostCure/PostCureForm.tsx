@@ -36,7 +36,7 @@ import PostCureFlowBar from "./PostCureFlowBar";
 import PostCureMotorPanel from "./PostCureMotorPanel";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 import {
-  isPostCureInhibitionDetailsRequired,
+  isPostCureInhibitionPanelVisible,
   type PostCureMotorData,
 } from "@/data/models/user/PostCureMotorDataModel";
 import { validatePostCureMotorSession } from "@/data/validation/adapters/postCure.validation";
@@ -46,6 +46,10 @@ import {
 } from "@/data/validation/validationErrors";
 import { ValidationErrors } from "@/data/validation/submissionIntent";
 import { useAlertStore } from "../../../../../app/store/alertStore";
+import {
+  focusQcPostCureField,
+  resolveFirstQcPostCureValidationFocus,
+} from "@/data/validation/adapters/qcPostCure.validation";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 const { handyman: HandymanRoundedIcon } = icons.user.manufacturing.postCure.form;
@@ -113,9 +117,11 @@ const resolveValidationTab = (
   return currentTab;
 };
 
-const scrollToFirstInvalidField = () => {
+const scrollToFirstInvalidField = (errors?: ValidationErrors) => {
   if (typeof document === "undefined") return;
+  const fieldPath = resolveFirstQcPostCureValidationFocus(errors);
   window.requestAnimationFrame(() => {
+    if (fieldPath && focusQcPostCureField(fieldPath)) return;
     const invalid = document.querySelector<HTMLElement>(
       '[aria-invalid="true"], .Mui-error input, .MuiFormHelperText-root.Mui-error',
     );
@@ -148,7 +154,7 @@ export const PostCureForm = ({
   theme,
 }: PostCureFormProps & { isSubmitMode?: boolean }) => {
   const BRAND = POST_CURE_BRAND;
-  const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
   const [inhibitionTypeEditing, setInhibitionTypeEditing] = useState(false);
@@ -183,9 +189,15 @@ export const PostCureForm = ({
   ) => {
     setValidationErrors(errors);
     setActiveProcessTab((current) => resolveValidationTab(errors, current));
-    const firstError = firstValidationError(errors);
-    showAlert(firstError ? `${message} (${firstError})` : message, "warning");
-    scrollToFirstInvalidField();
+    const focusPath = resolveFirstQcPostCureValidationFocus(errors);
+    const firstError =
+      (focusPath && errors[focusPath]
+        ? `${focusPath}: ${errors[focusPath]}`
+        : undefined) || firstValidationError(errors);
+    showValidationAlert(firstError ? `${message} (${firstError})` : message);
+    window.setTimeout(() => {
+      scrollToFirstInvalidField(errors);
+    }, 80);
   };
 
   useEffect(() => {
@@ -303,7 +315,7 @@ export const PostCureForm = ({
     canChangeInhibitionSetup && activeMotorStatus !== "IN_PROGRESS";
   const showInhibitionPanel =
     inhibitionTypeSelected &&
-    isPostCureInhibitionDetailsRequired(activeMotorSession?.inhibitorType ?? "");
+    isPostCureInhibitionPanelVisible(activeMotorSession?.inhibitorType ?? "");
 
   const finalApprovalRows = useMemo(
     () =>

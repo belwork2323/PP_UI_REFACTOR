@@ -145,6 +145,18 @@ export const subscaleHardwareFieldRules = {
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
+  VACUUM_LEVEL: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
+  BATCH_SIZE: {
+    valueType: "number" as const,
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
 
   // Mixing Cycle Particulars Fields
   rpm: {
@@ -213,8 +225,7 @@ function resolveFieldPaths(data: any) {
 
   if (!isMain) {
     // 2. Subscale Conditional Fields
-    console.log(data);
-
+    paths.push({ path: "BATCH_SIZE", value: data.BATCH_SIZE, ruleKey: "BATCH_SIZE" });
     paths.push({ path: "MIXER_BLDG_NO", value: data.MIXER_BLDG_NO, ruleKey: "MIXER_BLDG_NO" });
     paths.push({ path: "PREMIX_DATE", value: data.PREMIX_DATE, ruleKey: "PREMIX_DATE" });
     paths.push({ path: "FINAL_MIX_DATE", value: data.FINAL_MIX_DATE, ruleKey: "FINAL_MIX_DATE" });

@@ -25,6 +25,7 @@ export function useCasePrepLinerMaterials() {
     return (
       subs.find((sd) => sd.slugs?.subDept === "raw-material")?.subDepartmentId ??
       subs.find((sd) => sd.slugs?.subDept === "case-preparation")?.subDepartmentId ??
+      subs.find((sd) => sd.slugs?.subDept === "post-cure")?.subDepartmentId ??
       null
     );
   }, [user]);

@@ -11,21 +11,15 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import useSubscaleHook from "../../../../../hooks/user/manufacturing/useSubscaleHook";
 import { STRINGS } from "../../../../../app/config/strings";
-import validateSubscale, {
-  firstSubscaleValidationError,
-} from "@/data/validation/adapters/subscale.validation";
-import { useAlertStore } from "../../../../../app/store/alertStore";
 
 const SubscalePage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const S = STRINGS.MANUFACTURING.SUBSCALE;
-  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
 
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const hookState = useSubscaleHook();
 
@@ -50,34 +44,18 @@ const SubscalePage = () => {
     detailsLoading,
     handleBackFromDetails,
     batchDetails,
+    validationErrors,
+    validationFocusRequest,
+    clearFieldError,
+    validateAndPrepareDraft,
+    validateAndPrepareSubmit,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
 
-  const notifySubscaleValidationErrors = (
-    errors: Record<string, string>,
-    intent: "draft" | "submit",
-  ) => {
-    const firstError = firstSubscaleValidationError(errors);
-    const base = intent === "draft" ? S.DRAFT_VALIDATION_FAILED : S.SUBMIT_VALIDATION_FAILED;
-    showValidationAlert(firstError ? `${base} (${firstError})` : base);
-  };
-
-  const buildValidationPayload = () => ({
-    ...formData.schemaFormValues,
-    batchType: activeBatch.batchType,
-    subBatchType: batchDetails.subBatchType,
-  });
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validateSubscale(buildValidationPayload(), "SUBMIT");
-    if (errors && Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      notifySubscaleValidationErrors(errors, "submit");
-      return;
-    }
-    setValidationErrors({});
+    if (!validateAndPrepareSubmit()) return;
     setSubmitConfirmOpen(true);
   };
 
@@ -91,27 +69,11 @@ const SubscalePage = () => {
     setDraftConfirmOpen(false);
   };
 
-  const handleDraftValidation = async () => {
-    // FORMAT: only validate filled values; empty fields do not block draft save.
-    const errors = validateSubscale(buildValidationPayload(), "FORMAT");
-    if (errors && Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      notifySubscaleValidationErrors(errors, "draft");
-      return;
-    }
-    setValidationErrors({});
+  const handleDraftValidation = () => {
+    if (!validateAndPrepareDraft()) return;
     setDraftConfirmOpen(true);
   };
-  const clearFieldError = (ruleKey: string) => {
-    setValidationErrors((prev) => {
-      if (!prev || !Object.prototype.hasOwnProperty.call(prev, ruleKey)) {
-        return prev;
-      }
-      const next = { ...prev };
-      delete next[ruleKey];
-      return next;
-    });
-  };
+
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <WorkflowFormOpeningLoader
@@ -142,7 +104,6 @@ const SubscalePage = () => {
               onBack={handleBack}
               theme={theme}
             />
-            {console.log(formData)}
             <SubscaleForm
               batch={activeBatch}
               formData={formData}
@@ -154,6 +115,7 @@ const SubscalePage = () => {
               isEditMode={isEditMode}
               errors={validationErrors}
               clearFieldError={clearFieldError}
+              validationFocusRequest={validationFocusRequest}
               onRequestSaveDraft={handleDraftValidation}
             />
 
@@ -166,7 +128,6 @@ const SubscalePage = () => {
               cancelLabel={S.UNSAVED_BACK_CONFIRM}
               onConfirm={() => {
                 handleDiscardAndBack();
-                setValidationErrors({});
               }}
               onCancel={() => setBackConfirmOpen(false)}
             />
@@ -182,7 +143,6 @@ const SubscalePage = () => {
               onCancel={() => setDraftConfirmOpen(false)}
             />
 
-            {/* Submit Confirmation Dialog */}
             <ConfirmAlertDialog
               open={submitConfirmOpen}
               severity="warning"

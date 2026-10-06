@@ -12,7 +12,6 @@ import {
   QC_CURING_SECTION_IDS,
   QC_CURING_SUBSCALE_PARAMETER_PRESET_ROWS,
   formatQcSubscaleArticleTypeLabel,
-  subscaleArticleTypeSortOrder,
   normalizeQcCuringType,
   toQcSubscaleArticleTypeApi,
   type QcCuringSetupField,
@@ -197,19 +196,15 @@ const pickApiOptionalString = (row: Record<string, unknown>, keys: readonly stri
   return "";
 };
 
-/** One row per article: Article Type, Parameter, mould no under BEM No. only. */
+/** One row per article: Article Type, Parameter, mould no under BEM No. only.
+ * Preserves API `subscaleDetails.curingTable` order (e.g. 40KG → … → Cartoons). */
 export const mapApiSubscaleCuringTableToParameterRows = (
   curingTable: unknown[],
 ): QcCuringSubscaleParameterRow[] => {
   const presetRows = defaultSubscaleParameterRows();
   const articles = curingTable
     .map((row) => asRecord(row))
-    .filter((row): row is Record<string, unknown> => Boolean(row))
-    .sort(
-      (left, right) =>
-        subscaleArticleTypeSortOrder(left.articleType ?? left.ARTICLE_TYPE) -
-        subscaleArticleTypeSortOrder(right.articleType ?? right.ARTICLE_TYPE),
-    );
+    .filter((row): row is Record<string, unknown> => Boolean(row));
 
   if (!articles.length) return presetRows;
 

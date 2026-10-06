@@ -174,7 +174,6 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   clearFieldError,
 }) => {
   const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
-  console.log(values);
 
   const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
   const mixingCycles = useMemo(
@@ -681,16 +680,20 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             gap: 2,
           }}
         >
-          <FormInput
-            disabled
-            label={<FieldLabelWithAsterisk label={S.BATCH_SIZE} required />}
-            type="number"
-            value={
-              values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ||
-              batchDetails?.identificationSheet?.batchSize ||
-              ""
-            }
-          />
+          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.BATCH_SIZE}>
+            <FormInput
+              disabled
+              label={<FieldLabelWithAsterisk label={S.BATCH_SIZE} required />}
+              type="number"
+              value={
+                values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ||
+                batchDetails?.identificationSheet?.batchSize ||
+                ""
+              }
+              error={Boolean(errors?.[SUBSCALE_BATCH_FIELDS.BATCH_SIZE])}
+              helperText={errors?.[SUBSCALE_BATCH_FIELDS.BATCH_SIZE]}
+            />
+          </Box>
 
           <FormInput
             disabled
@@ -702,32 +705,33 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             }
           />
 
-          <AppDropdown
-            label={S.MIXER_BLDG_NO}
-            // required
-            value={String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim()}
-            onChange={(value) => {
-              clearFieldError?.(SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO);
-              patchValues({ [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: value });
-            }}
-            disabled={loadingBuildings}
-            placeholder={
-              loadingBuildings
-                ? "Loading buildings..."
-                : buildingOptions.length
-                  ? "Select building"
-                  : "No buildings available"
-            }
-            options={buildingOptions}
-            renderValue={(selected) => {
-              const value = String(selected ?? "").trim();
-              if (!value) return null;
-              const opt = buildingOptions.find((o) => o.value === value);
-              return opt?.label || value;
-            }}
-            error={Boolean(errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO])}
-            helperText={errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]}
-          />
+          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO}>
+            <AppDropdown
+              label={S.MIXER_BLDG_NO}
+              value={String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim()}
+              onChange={(value) => {
+                clearFieldError?.(SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO);
+                patchValues({ [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: value });
+              }}
+              disabled={loadingBuildings}
+              placeholder={
+                loadingBuildings
+                  ? "Loading buildings..."
+                  : buildingOptions.length
+                    ? "Select building"
+                    : "No buildings available"
+              }
+              options={buildingOptions}
+              renderValue={(selected) => {
+                const value = String(selected ?? "").trim();
+                if (!value) return null;
+                const opt = buildingOptions.find((o) => o.value === value);
+                return opt?.label || value;
+              }}
+              error={Boolean(errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO])}
+              helperText={errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]}
+            />
+          </Box>
 
           {(() => {
             const premixErrorMsg =
@@ -735,17 +739,19 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               errors?.[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ||
               "";
             return (
-              <DateField
-                label={<FieldLabelWithAsterisk label={S.PREMIX_DATE} required />}
-                value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
-                onChange={(next) => {
-                  clearFieldError?.(SUBSCALE_BATCH_FIELDS.PREMIX_DATE);
-                  patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next });
-                }}
-                placeholder="DD-MM-YYYY"
-                error={Boolean(premixErrorMsg)}
-                helperText={premixErrorMsg}
-              />
+              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.PREMIX_DATE}>
+                <DateField
+                  label={<FieldLabelWithAsterisk label={S.PREMIX_DATE} required />}
+                  value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
+                  onChange={(next) => {
+                    clearFieldError?.(SUBSCALE_BATCH_FIELDS.PREMIX_DATE);
+                    patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next });
+                  }}
+                  placeholder="DD-MM-YYYY"
+                  error={Boolean(premixErrorMsg)}
+                  helperText={premixErrorMsg}
+                />
+              </Box>
             );
           })()}
 
@@ -755,17 +761,19 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               errors?.[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ||
               "";
             return (
-              <DateField
-                label={<FieldLabelWithAsterisk label={S.FINAL_MIX_DATE} required />}
-                value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
-                onChange={(next) => {
-                  clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
-                  patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next });
-                }}
-                placeholder="DD-MM-YYYY"
-                error={Boolean(finalMixErrorMsg)}
-                helperText={finalMixErrorMsg}
-              />
+              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE}>
+                <DateField
+                  label={<FieldLabelWithAsterisk label={S.FINAL_MIX_DATE} required />}
+                  value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
+                  onChange={(next) => {
+                    clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
+                    patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next });
+                  }}
+                  placeholder="DD-MM-YYYY"
+                  error={Boolean(finalMixErrorMsg)}
+                  helperText={finalMixErrorMsg}
+                />
+              </Box>
             );
           })()}
         </Box>
@@ -784,8 +792,6 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
           <Stack spacing={2}>
             {mixingCycles.map((cycle, cycleIndex) => {
-              console.log(mixingCycles);
-
               const stage = String(cycle.stage ?? "").trim();
               const cycleOptions = mixingCycleOptionsByStage[stage] ?? [];
               const cyclesLoading = Boolean(mixingCyclesLoadingByStage[stage]);
@@ -795,6 +801,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                 : cyclesLoading
                   ? S.MIXING_CYCLES_LOADING
                   : S.MIXING_CYCLE_SELECT_PLACEHOLDER;
+              const stageFieldPath = `SUBSCALE_MIXING_CYCLES.${cycleIndex}.stage`;
+              const cycleCodeFieldPath = `SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`;
 
               return (
                 <Box
@@ -826,90 +834,90 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
                       {isExperimental ? (
                         <>
-                          <FormInput
-                            select
-                            label={<FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />}
-                            value={stage}
-                            onChange={(event) => {
-                              clearFieldError?.(`SUBSCALE_MIXING_CYCLES.${cycleIndex}.stage`);
-                              handleMotorStageChange(cycleIndex, event.target.value);
-                            }}
-                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                            sx={{ flex: 1 }}
-                            disabled={motorStagesLoading}
-                            helperText={
-                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.stage`] || ""
-                            }
-                          >
-                            <MenuItem value="">
-                              <em
-                                style={
-                                  {
-                                    ...appDropdownPlaceholderSx,
-                                    fontStyle: "normal",
-                                  } as CSSProperties
-                                }
-                              >
-                                {motorStagesLoading
-                                  ? S.MOTOR_STAGES_LOADING
-                                  : S.MIXING_CYCLE_STAGE_PLACEHOLDER}
-                              </em>
-                            </MenuItem>
-                            {motorStageOptions.map((option) => (
-                              <MenuItem
-                                key={option.motorStage}
-                                value={option.motorStage}
-                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
-                              >
-                                Stage {option.motorStage}
+                          <Box data-ss-field={stageFieldPath} sx={{ flex: 1 }}>
+                            <FormInput
+                              select
+                              label={
+                                <FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />
+                              }
+                              value={stage}
+                              onChange={(event) => {
+                                clearFieldError?.(stageFieldPath);
+                                handleMotorStageChange(cycleIndex, event.target.value);
+                              }}
+                              SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                              disabled={motorStagesLoading}
+                              error={Boolean(errors?.[stageFieldPath])}
+                              helperText={errors?.[stageFieldPath] || ""}
+                            >
+                              <MenuItem value="">
+                                <em
+                                  style={
+                                    {
+                                      ...appDropdownPlaceholderSx,
+                                      fontStyle: "normal",
+                                    } as CSSProperties
+                                  }
+                                >
+                                  {motorStagesLoading
+                                    ? S.MOTOR_STAGES_LOADING
+                                    : S.MIXING_CYCLE_STAGE_PLACEHOLDER}
+                                </em>
                               </MenuItem>
-                            ))}
-                          </FormInput>
+                              {motorStageOptions.map((option) => (
+                                <MenuItem
+                                  key={option.motorStage}
+                                  value={option.motorStage}
+                                  sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                                >
+                                  Stage {option.motorStage}
+                                </MenuItem>
+                              ))}
+                            </FormInput>
+                          </Box>
 
-                          <FormInput
-                            select
-                            label={
-                              <FieldLabelWithAsterisk
-                                label={S.MIXING_CYCLE_SELECT_LABEL}
-                                required
-                              />
-                            }
-                            value={cycle.mixingCycleCode ?? ""}
-                            onChange={(event) => {
-                              handleMixingCycleChange(cycleIndex, event.target.value);
-                              clearFieldError?.(
-                                `SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`,
-                              );
-                            }}
-                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                            sx={{ flex: 1 }}
-                            disabled={!stage || cyclesLoading || cycleOptions.length === 0}
-                            helperText={
-                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`] || ""
-                            }
-                          >
-                            <MenuItem value="">
-                              <em
-                                style={
-                                  {
-                                    ...appDropdownPlaceholderSx,
-                                    fontStyle: "normal",
-                                  } as CSSProperties
-                                }
-                              >
-                                {mixingCyclePlaceholder}
-                              </em>
-                            </MenuItem>
-                            {cycleOptions.map((option) => (
-                              <MenuItem
-                                key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
-                                value={option.mixingCycleCode}
-                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
-                              >
-                                {formatMixingCycleLabel(option)}
+                          <Box data-ss-field={cycleCodeFieldPath} sx={{ flex: 1 }}>
+                            <FormInput
+                              select
+                              label={
+                                <FieldLabelWithAsterisk
+                                  label={S.MIXING_CYCLE_SELECT_LABEL}
+                                  required
+                                />
+                              }
+                              value={cycle.mixingCycleCode ?? ""}
+                              onChange={(event) => {
+                                handleMixingCycleChange(cycleIndex, event.target.value);
+                                clearFieldError?.(cycleCodeFieldPath);
+                              }}
+                              SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                              disabled={!stage || cyclesLoading || cycleOptions.length === 0}
+                              error={Boolean(errors?.[cycleCodeFieldPath])}
+                              helperText={errors?.[cycleCodeFieldPath] || ""}
+                            >
+                              <MenuItem value="">
+                                <em
+                                  style={
+                                    {
+                                      ...appDropdownPlaceholderSx,
+                                      fontStyle: "normal",
+                                    } as CSSProperties
+                                  }
+                                >
+                                  {mixingCyclePlaceholder}
+                                </em>
                               </MenuItem>
-                            ))}
-                          </FormInput>
+                              {cycleOptions.map((option) => (
+                                <MenuItem
+                                  key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
+                                  value={option.mixingCycleCode}
+                                  sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                                >
+                                  {formatMixingCycleLabel(option)}
+                                </MenuItem>
+                              ))}
+                            </FormInput>
+                          </Box>
                         </>
                       ) : (
                         <>
@@ -919,50 +927,48 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                             value={`stage ${batchDetails?.motorStage}`}
                             sx={{ flex: 1 }}
                           />
-                          <FormInput
-                            select
-                            label={
-                              <FieldLabelWithAsterisk
-                                label={S.MIXING_CYCLE_SELECT_LABEL}
-                                required
-                              />
-                            }
-                            value={cycle.mixingCycleCode ?? ""}
-                            onChange={(event) => {
-                              handleMixingCycleChange(cycleIndex, event.target.value);
-                              clearFieldError?.(
-                                `SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`,
-                              );
-                            }}
-                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                            sx={{ flex: 1 }}
-                            disabled={!stage || cyclesLoading || cycleOptions.length === 0}
-                            helperText={
-                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`] || ""
-                            }
-                          >
-                            <MenuItem value="">
-                              <em
-                                style={
-                                  {
-                                    ...appDropdownPlaceholderSx,
-                                    fontStyle: "normal",
-                                  } as CSSProperties
-                                }
-                              >
-                                {mixingCyclePlaceholder}
-                              </em>
-                            </MenuItem>
-                            {cycleOptions.map((option) => (
-                              <MenuItem
-                                key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
-                                value={option.mixingCycleCode}
-                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
-                              >
-                                {formatMixingCycleLabel(option)}
+                          <Box data-ss-field={cycleCodeFieldPath} sx={{ flex: 1 }}>
+                            <FormInput
+                              select
+                              label={
+                                <FieldLabelWithAsterisk
+                                  label={S.MIXING_CYCLE_SELECT_LABEL}
+                                  required
+                                />
+                              }
+                              value={cycle.mixingCycleCode ?? ""}
+                              onChange={(event) => {
+                                handleMixingCycleChange(cycleIndex, event.target.value);
+                                clearFieldError?.(cycleCodeFieldPath);
+                              }}
+                              SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                              disabled={!stage || cyclesLoading || cycleOptions.length === 0}
+                              error={Boolean(errors?.[cycleCodeFieldPath])}
+                              helperText={errors?.[cycleCodeFieldPath] || ""}
+                            >
+                              <MenuItem value="">
+                                <em
+                                  style={
+                                    {
+                                      ...appDropdownPlaceholderSx,
+                                      fontStyle: "normal",
+                                    } as CSSProperties
+                                  }
+                                >
+                                  {mixingCyclePlaceholder}
+                                </em>
                               </MenuItem>
-                            ))}
-                          </FormInput>
+                              {cycleOptions.map((option) => (
+                                <MenuItem
+                                  key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
+                                  value={option.mixingCycleCode}
+                                  sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                                >
+                                  {formatMixingCycleLabel(option)}
+                                </MenuItem>
+                              ))}
+                            </FormInput>
+                          </Box>
                         </>
                       )}
                     </Stack>

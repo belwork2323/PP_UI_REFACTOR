@@ -6,7 +6,8 @@ type SubscaleMainScaleHardwarePanelProps = {
   onChange: (values: SchemaFormValues) => void;
   batchType?: string | null;
   canManageProcessTables?: boolean;
-  clearFieldError?: (path: string) => void; // <-- Add this
+  errors?: Record<string, string> | null;
+  clearFieldError?: (path: string) => void;
 };
 
 const SubscaleMainScaleHardwarePanel = ({
@@ -14,6 +15,7 @@ const SubscaleMainScaleHardwarePanel = ({
   onChange,
   batchType = "MAIN_SCALE",
   canManageProcessTables = true,
+  errors,
   clearFieldError,
 }: SubscaleMainScaleHardwarePanelProps) => (
   <SubscaleHardwareArticlePanel
@@ -21,6 +23,7 @@ const SubscaleMainScaleHardwarePanel = ({
     onChange={onChange}
     batchType={batchType}
     canManageProcessTables={canManageProcessTables}
+    errors={errors}
     clearFieldError={clearFieldError}
   />
 );

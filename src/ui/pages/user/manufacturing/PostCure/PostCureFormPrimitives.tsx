@@ -74,6 +74,7 @@ export const TableTextInput = ({
   helperText,
   placeholder,
   required,
+  fieldPath,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -86,28 +87,31 @@ export const TableTextInput = ({
   helperText?: string;
   placeholder?: string;
   required?: boolean;
+  /** Validation focus target (`data-qc-field`). */
+  fieldPath?: string;
 }) => {
   if (readOnly) {
-    return <WorkflowReadOnlyText value={value} />;
+    const control = <WorkflowReadOnlyText value={value} />;
+    return fieldPath ? <Box data-qc-field={fieldPath}>{control}</Box> : control;
   }
 
-  return (
-    <Box sx={{ width: "100%" }}>
-      <TextField
-        size="small"
-        fullWidth
-        type={type}
-        value={value ?? ""}
-        disabled={disabled}
-        multiline={multiline}
-        minRows={minRows}
-        placeholder={placeholder}
-        error={error}
-        helperText={helperText}
-        required={required}
-        onChange={(e) => onChange(e.target.value)}
-        sx={postCureTableInputSx}
-      />
-    </Box>
+  const control = (
+    <TextField
+      size="small"
+      fullWidth
+      type={type}
+      value={value ?? ""}
+      disabled={disabled}
+      multiline={multiline}
+      minRows={minRows}
+      placeholder={placeholder}
+      error={error}
+      helperText={helperText}
+      required={required}
+      onChange={(e) => onChange(e.target.value)}
+      inputProps={fieldPath ? { "data-qc-field": fieldPath } : undefined}
+      sx={postCureTableInputSx}
+    />
   );
+  return fieldPath ? <Box data-qc-field={fieldPath}>{control}</Box> : control;
 };

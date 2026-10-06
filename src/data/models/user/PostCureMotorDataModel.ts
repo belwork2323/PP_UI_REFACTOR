@@ -51,6 +51,10 @@ export type LocationAppliedRow = {
 export type IngredientQuantityRow = {
   srNo: string | number;
   ingredient: string;
+  /** Materials-master id when resolved from ingredients API. */
+  materialId?: number | null;
+  /** Materials-master code when resolved → MFG Lot dropdown; null → free text. */
+  materialCode?: string | null;
   mfgLot: string;
   partsByWeight: string;
   quantity: string;
@@ -59,6 +63,10 @@ export type IngredientQuantityRow = {
 export type IngredientTakenRow = {
   srNo: string | number;
   ingredient: string;
+  /** Materials-master id when resolved from ingredients API. */
+  materialId?: number | null;
+  /** Materials-master code when resolved → MFG Lot dropdown; null → free text. */
+  materialCode?: string | null;
   mfgLot: string;
   partsByWeight: string;
   qtyTaken: string;
@@ -183,56 +191,6 @@ const locationAppliedRow = (location: string): LocationAppliedRow => ({
   qtyApplied: "",
   observations: "",
 });
-const lfIngredientRows = (): IngredientQuantityRow[] => [
-  { srNo: 1, ingredient: "A-125 Hardener", mfgLot: "", partsByWeight: "60 ±1", quantity: "" },
-  { srNo: 2, ingredient: "GX-257 Resin", mfgLot: "", partsByWeight: "40 ±1", quantity: "" },
-  { srNo: 3, ingredient: "HY-960 Accelerator", mfgLot: "", partsByWeight: "6 ±0.5", quantity: "" },
-  { srNo: 4, ingredient: "DY-026 Diluent", mfgLot: "", partsByWeight: "10 ±0.5", quantity: "" },
-  { srNo: "TOTAL", ingredient: "Total Quantity", mfgLot: "", partsByWeight: "", quantity: "" },
-];
-
-const ir1PremixRows = (): IngredientTakenRow[] => [
-  { srNo: 1, ingredient: "Castor Oil", mfgLot: "", partsByWeight: "60.0±1.0", qtyTaken: "" },
-  { srNo: 2, ingredient: "Asbestos Powder", mfgLot: "", partsByWeight: "38.5±1.0", qtyTaken: "" },
-  { srNo: 3, ingredient: "Nonox-D", mfgLot: "", partsByWeight: "1.0±0.1", qtyTaken: "" },
-  { srNo: 4, ingredient: "Ferric Oxide", mfgLot: "", partsByWeight: "0.5±0.05", qtyTaken: "" },
-  { srNo: "TOTAL", ingredient: "Total Quantity", mfgLot: "", partsByWeight: "", qtyTaken: "" },
-];
-
-const ir1FinalMixRows = (): IngredientTakenRow[] => [
-  { srNo: 1, ingredient: "IR-1 Premix", mfgLot: "", partsByWeight: "100", qtyTaken: "" },
-  { srNo: 2, ingredient: "TDI", mfgLot: "", partsByWeight: "14.5", qtyTaken: "" },
-  {
-    srNo: 3,
-    ingredient: "Catalyst (5% w/w FeAA in benzene)",
-    mfgLot: "",
-    partsByWeight: "2 ml",
-    qtyTaken: "",
-  },
-  { srNo: "TOTAL", ingredient: "Total Quantity", mfgLot: "", partsByWeight: "", qtyTaken: "" },
-];
-
-const hemcoatPremixRows = (): IngredientTakenRow[] => [
-  { srNo: 1, ingredient: "HTPB", mfgLot: "", partsByWeight: "80.00", qtyTaken: "" },
-  { srNo: 2, ingredient: "NBD", mfgLot: "", partsByWeight: "2.80", qtyTaken: "" },
-  { srNo: 3, ingredient: "HT", mfgLot: "", partsByWeight: "2.15", qtyTaken: "" },
-  { srNo: 4, ingredient: "Kaolin", mfgLot: "", partsByWeight: "15.00", qtyTaken: "" },
-  { srNo: 5, ingredient: "Nonox-D", mfgLot: "", partsByWeight: "0.05", qtyTaken: "" },
-  { srNo: "TOTAL", ingredient: "Total Quantity", mfgLot: "", partsByWeight: "", qtyTaken: "" },
-];
-
-const hemcoatFinalMixRows = (): IngredientTakenRow[] => [
-  { srNo: 1, ingredient: "Hemcoat-3K Premix", mfgLot: "", partsByWeight: "98", qtyTaken: "" },
-  { srNo: 2, ingredient: "H12MDI", mfgLot: "", partsByWeight: "2.3", qtyTaken: "" },
-  {
-    srNo: 3,
-    ingredient: "Catalyst (2.5% w/w FeAA in HTPB)",
-    mfgLot: "",
-    partsByWeight: "2 ml",
-    qtyTaken: "",
-  },
-  { srNo: "TOTAL", ingredient: "Total Quantity", mfgLot: "", partsByWeight: "", qtyTaken: "" },
-];
 const qualificationRows = (
   specs: Array<{ parameter: string; specification: string }>,
 ): QualificationRow[] =>
@@ -254,7 +212,8 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
         looseFlapEpoxyPreparation: {
           epoxyBatchNo: "",
           epoxyPreparationDate: "",
-          preparationDetails: lfIngredientRows(),
+          // Seeded from POST /post-cure/ingredients (LOOSE_FLAP_EPOXY).
+          preparationDetails: [],
         },
         qualificationDetails: {
           qualificationBatchNo: "",
@@ -275,12 +234,14 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
         ir1Premix: {
           ir1PremixBatchNo: "",
           ir1PremixDate: "",
-          ir1PremixTable: ir1PremixRows(),
+          // Seeded from POST /post-cure/ingredients (IR1_PREMIX).
+          ir1PremixTable: [],
         },
         ir1FinalMix: {
           ir1FinalMixBatchNo: "",
           ir1FinalMixDate: "",
-          ir1FinalMixTable: ir1FinalMixRows(),
+          // Seeded from POST /post-cure/ingredients (IR1_FINAL_MIX).
+          ir1FinalMixTable: [],
         },
         ir1Qualification: {
           qualificationBatchNo: "",
@@ -306,12 +267,14 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
         hemcoat3kPreparation: {
           hemcoatPremixBatchNo: "",
           hemcoatPremixDate: "",
-          premixPreparationTable: hemcoatPremixRows(),
+          // Seeded from POST /post-cure/ingredients (HEMCOAT_3K_PREMIX).
+          premixPreparationTable: [],
         },
         hemcoat3kFinalMix: {
           hemcoatFinalMixBatchNo: "",
           hemcoatFinalMixDate: "",
-          finalMixTable: hemcoatFinalMixRows(),
+          // Seeded from POST /post-cure/ingredients (HEMCOAT_3K_FINAL_MIX).
+          finalMixTable: [],
         },
         hemcoat3kQualification: {
           qualificationBatchNo: "",
@@ -384,6 +347,14 @@ const parseLocationAppliedRows = (rows: unknown): LocationAppliedRow[] =>
 
 export const POST_CURE_INGREDIENT_TOTAL_SR_LABEL = "Total Quanity";
 
+const isIngredientTotalRow = (srNo: string | number | undefined, ingredient: string): boolean =>
+  String(srNo ?? "")
+    .trim()
+    .toUpperCase() === "TOTAL" ||
+  String(ingredient ?? "")
+    .trim()
+    .toLowerCase() === "total quantity";
+
 const findSavedIngredientRow = (
   savedRows: unknown[],
   presetRow: { srNo: string | number; ingredient: string },
@@ -410,11 +381,60 @@ const findSavedIngredientRow = (
   return asRecord(savedRow) ?? asRecord(savedRows[index]) ?? {};
 };
 
+/** When preset is empty (API-driven seeds), rebuild rows from saved payload. */
+const parseIngredientQuantityRowsFromSaved = (saved: unknown): IngredientQuantityRow[] =>
+  asArray(saved).map((entry, index) => {
+    const rec = asRecord(entry) ?? {};
+    const ingredientRaw = str(pickField(rec, "INGREDIENT", "ingredient"));
+    const materialCodeRaw = str(pickField(rec, "materialCode", "MATERIAL_CODE"));
+    // Case Prep style: payload `ingredient` may be the master code.
+    const materialCode = materialCodeRaw || ingredientRaw || null;
+    const srRaw = pickField(rec, "srNo", "rowKey", "SR_NO");
+    const srNo =
+      str(srRaw).trim().toUpperCase() === "TOTAL" ? "TOTAL" : (srRaw as string | number) ?? index + 1;
+    const resolvedMfgLot = str(pickField(rec, "MFG_LOT", "mfgLot", "Mfg Lot"));
+    const resolvedQuantity = str(
+      pickField(rec, "QUANTITY", "quantity", "quantityTaken", "QTY_TAKEN"),
+    );
+    return {
+      srNo,
+      ingredient: ingredientRaw,
+      materialId: null,
+      materialCode: isIngredientTotalRow(srNo, ingredientRaw) ? null : materialCode,
+      mfgLot: resolvedMfgLot,
+      partsByWeight: str(pickField(rec, "PARTS_BY_WEIGHT", "partsByWeight")),
+      quantity: resolvedQuantity,
+    };
+  });
+
+const parseIngredientTakenRowsFromSaved = (saved: unknown): IngredientTakenRow[] =>
+  asArray(saved).map((entry, index) => {
+    const rec = asRecord(entry) ?? {};
+    const ingredientRaw = str(pickField(rec, "INGREDIENT", "ingredient"));
+    const materialCodeRaw = str(pickField(rec, "materialCode", "MATERIAL_CODE"));
+    const materialCode = materialCodeRaw || ingredientRaw || null;
+    const srRaw = pickField(rec, "srNo", "rowKey", "SR_NO");
+    const srNo =
+      str(srRaw).trim().toUpperCase() === "TOTAL" ? "TOTAL" : (srRaw as string | number) ?? index + 1;
+    return {
+      srNo,
+      ingredient: ingredientRaw,
+      materialId: null,
+      materialCode: isIngredientTotalRow(srNo, ingredientRaw) ? null : materialCode,
+      mfgLot: str(pickField(rec, "MFG_LOT", "mfgLot", "Mfg Lot")),
+      partsByWeight: str(pickField(rec, "PARTS_BY_WEIGHT", "partsByWeight")),
+      qtyTaken: str(pickField(rec, "QTY_TAKEN", "qtyTaken", "quantityTaken", "quantity")),
+    };
+  });
+
 const mergeIngredientQuantityRows = (
   preset: IngredientQuantityRow[],
   saved: unknown,
 ): IngredientQuantityRow[] => {
   const savedRows = asArray(saved);
+  if (!preset.length) {
+    return parseIngredientQuantityRowsFromSaved(saved);
+  }
   return preset.map((presetRow, index) => {
     const savedRow =
       asRecord(
@@ -435,16 +455,16 @@ const mergeIngredientQuantityRows = (
       str(pickField(savedRow, "QUANTITY", "quantity", "quantityTaken", "QTY_TAKEN")) ||
       presetRow.quantity ||
       "";
+    const savedCode = str(pickField(savedRow, "materialCode", "MATERIAL_CODE", "ingredient", "INGREDIENT"));
 
     return {
       ...presetRow,
-      // keep legacy/api uppercase keys for other consumers
+      materialCode: presetRow.materialCode ?? (savedCode || null),
       MFG_LOT: resolvedMfgLot,
       QUANTITY: resolvedQuantity,
-      // also set lowercase keys used by the UI components
       mfgLot: resolvedMfgLot,
       quantity: resolvedQuantity,
-      qtyTaken: resolvedQuantity, // handles qtyTaken variant mapping seamlessly
+      qtyTaken: resolvedQuantity,
     };
   });
 };
@@ -454,10 +474,15 @@ const mergeIngredientTakenRows = (
   saved: unknown,
 ): IngredientTakenRow[] => {
   const savedRows = asArray(saved);
+  if (!preset.length) {
+    return parseIngredientTakenRowsFromSaved(saved);
+  }
   return preset.map((presetRow, index) => {
     const savedRow = findSavedIngredientRow(savedRows, presetRow, index);
+    const savedCode = str(pickField(savedRow, "materialCode", "MATERIAL_CODE", "ingredient", "INGREDIENT"));
     return {
       ...presetRow,
+      materialCode: presetRow.materialCode ?? (savedCode || null),
       mfgLot: str(pickField(savedRow, "MFG_LOT", "mfgLot", "Mfg Lot")) || presetRow.mfgLot,
       qtyTaken:
         str(pickField(savedRow, "QTY_TAKEN", "qtyTaken", "quantityTaken")) || presetRow.qtyTaken,
@@ -704,10 +729,20 @@ const payloadLocationAppliedRows = (rows: LocationAppliedRow[]) =>
     OBSERVATIONS: row.observations.trim() || undefined,
   }));
 
+/** Case Prep style: prefer master code in payload `ingredient` when known. */
+const payloadIngredientValue = (row: {
+  ingredient?: string;
+  materialCode?: string | null;
+}): string => {
+  const code = str(row.materialCode).trim();
+  const name = str(row.ingredient).trim();
+  return code || name;
+};
+
 const payloadIngredientQuantityRows = (rows: IngredientQuantityRow[]) =>
   rows.map((row, index) => ({
     srNo: row.srNo ?? index + 1,
-    INGREDIENT: row.ingredient,
+    INGREDIENT: payloadIngredientValue(row),
     MFG_LOT: row.mfgLot.trim() || undefined,
     PARTS_BY_WEIGHT: row.partsByWeight,
     QUANTITY: toApiNumber(row.quantity),
@@ -716,7 +751,7 @@ const payloadIngredientQuantityRows = (rows: IngredientQuantityRow[]) =>
 const payloadIngredientTakenRows = (rows: IngredientTakenRow[]) =>
   rows.map((row, index) => ({
     srNo: row.srNo ?? index + 1,
-    INGREDIENT: row.ingredient,
+    INGREDIENT: payloadIngredientValue(row),
     MFG_LOT: row.mfgLot.trim() || undefined,
     PARTS_BY_WEIGHT: row.partsByWeight,
     QTY_TAKEN: toApiNumber(row.qtyTaken),
@@ -804,6 +839,7 @@ export type LooseFlapFillingDetailsApi = {
 };
 
 export type InhibitionDetailsApi = {
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
   premixDetails?: {
     batchNo?: string;
     preparationDate?: string;
@@ -895,20 +931,12 @@ const mapLocationAppliedRowsForApi = (rows: LocationAppliedRow[]) =>
 const ingredientRowKey = (srNo: string | number | undefined, index: number): string =>
   String(srNo ?? index + 1);
 
-const isIngredientTotalRow = (srNo: string | number | undefined, ingredient: string): boolean =>
-  String(srNo ?? "")
-    .trim()
-    .toUpperCase() === "TOTAL" ||
-  String(ingredient ?? "")
-    .trim()
-    .toLowerCase() === "total quantity";
-
 const mapIngredientQuantityRowsForApi = (rows: IngredientQuantityRow[]) =>
   rows.map((row, index) => {
     const isTotal = isIngredientTotalRow(row.srNo, row.ingredient);
     const base = {
       rowKey: ingredientRowKey(row.srNo, index),
-      ingredient: row.ingredient,
+      ingredient: payloadIngredientValue(row),
       quantityTaken: toApiNumber(row.quantity),
     };
     if (isTotal) {
@@ -926,7 +954,7 @@ const mapIngredientTakenRowsForApi = (rows: IngredientTakenRow[]) =>
     const isTotal = isIngredientTotalRow(row.srNo, row.ingredient);
     const base = {
       rowKey: ingredientRowKey(row.srNo, index),
-      ingredient: row.ingredient,
+      ingredient: payloadIngredientValue(row),
       quantityTaken: toApiNumber(row.qtyTaken),
     };
     if (isTotal) {
@@ -1049,7 +1077,12 @@ export const buildPostCureMotorDetailsPayload = (
     case "inhibition-hemcoat-3k":
       return { inhibitionDetails: buildInhibitionHemcoatDetailsPayload(data) };
     case "inhibition-not-applicable":
-      return {};
+      return {
+        inhibitionDetails: omitEmpty({
+          inhibitorType: "NOT_APPLICABLE" as const,
+          notApplicableRemarks: str(data.inhibitionNotApplicable?.remarks).trim() || undefined,
+        }) as InhibitionDetailsApi,
+      };
     default:
       return {};
   }
@@ -1080,10 +1113,13 @@ export const buildDualPostCureMotorPayload = (session: {
     payload.inhibitorType = apiInhibitor;
   }
 
-  if (apiInhibitor && apiInhibitor !== "NOT_APPLICABLE" && session.inhibitionData) {
+  if (apiInhibitor && session.inhibitionData) {
     const inhibitionPayload = buildPostCureMotorDetailsPayload(session.inhibitionData);
     if (inhibitionPayload.inhibitionDetails) {
-      payload.inhibitionDetails = inhibitionPayload.inhibitionDetails;
+      payload.inhibitionDetails = {
+        ...inhibitionPayload.inhibitionDetails,
+        inhibitorType: apiInhibitor,
+      };
     }
   }
 
@@ -1174,6 +1210,17 @@ const parseInhibitionFromApi = (
   const qual = asRecord(details.qualificationDetails) ?? {};
   const batch = asRecord(details.inhibitorBatchDetails) ?? {};
   const dispatch = asRecord(details.dispatchDetails) ?? {};
+  // Legacy QC wire stored dispatchDate/dispatchStation flat on inhibitionDetails.
+  const resolveDispatchDate = () =>
+    toUiDate(
+      pickField(dispatch, "dispatchDate", "DISPATCH_DATE") ||
+        pickField(details, "dispatchDate", "DISPATCH_DATE"),
+    );
+  const resolveDispatchStation = () =>
+    str(
+      pickField(dispatch, "dispatchStation", "DISPATCH_STATION") ||
+        pickField(details, "dispatchStation", "DISPATCH_STATION"),
+    );
   const appRows = parseLocationAppliedRows(details.applicationDetails);
 
   if (variant === "inhibition-hemcoat-3k") {
@@ -1227,8 +1274,8 @@ const parseInhibitionFromApi = (
           : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
       },
       dispatchDetails: {
-        dispatchDate: toUiDate(pickField(dispatch, "dispatchDate", "DISPATCH_DATE")),
-        dispatchStation: str(pickField(dispatch, "dispatchStation", "DISPATCH_STATION")),
+        dispatchDate: resolveDispatchDate(),
+        dispatchStation: resolveDispatchStation(),
       },
     };
   }
@@ -1292,8 +1339,8 @@ const parseInhibitionFromApi = (
         : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
     },
     dispatchDetails: {
-      dispatchDate: toUiDate(pickField(dispatch, "dispatchDate", "DISPATCH_DATE")),
-      dispatchStation: str(pickField(dispatch, "dispatchStation", "DISPATCH_STATION")),
+      dispatchDate: resolveDispatchDate(),
+      dispatchStation: resolveDispatchStation(),
     },
   };
 };
@@ -1563,6 +1610,10 @@ export const isPostCureInhibitionDetailsRequired = (inhibitorType: string): bool
   return variant === "inhibition-ir1" || variant === "inhibition-hemcoat-3k";
 };
 
+/** True when any inhibition panel should show (IR1, Hemcoat, or Not Applicable remarks). */
+export const isPostCureInhibitionPanelVisible = (inhibitorType: string): boolean =>
+  resolveInhibitionVariantFromInhibitorType(inhibitorType) != null;
+
 export const parseLooseFlapMotorDataFromApi = (
   motor: Record<string, unknown> | null | undefined,
 ): LooseFlapMotorData => {
@@ -1577,7 +1628,16 @@ export const parseInhibitionMotorDataFromApi = (
   inhibitorType: string,
 ): PostCureMotorData | null => {
   const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
-  if (!variant || variant === "inhibition-not-applicable") return null;
+  if (!variant) return null;
+  if (variant === "inhibition-not-applicable") {
+    const details = asRecord(motor?.inhibitionDetails) ?? {};
+    return {
+      variant: "inhibition-not-applicable",
+      inhibitionNotApplicable: {
+        remarks: str(pickField(details, "notApplicableRemarks", "REMARKS", "remarks")),
+      },
+    };
+  }
   if (!motor?.inhibitionDetails) return null;
   return parsePostCureMotorDataFromApi(motor, variant);
 };

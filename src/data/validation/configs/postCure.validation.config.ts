@@ -77,7 +77,7 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHANUMERIC,
+    pattern: S.PATTERNS.MASTER_CODE,
     maxLength: 50,
   },
   partsByWeight: {

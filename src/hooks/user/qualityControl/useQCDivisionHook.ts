@@ -65,7 +65,7 @@ import {
 } from "./qcDivisionApprovalUnits";
 import {
   getQcPartialNavTabDisabledReason,
-  isQcDivisionEnabledByManufacturing,
+  isQcDivisionEnabledByServerStatus,
   isQcPartialItemEnabledByPreviousDivision,
   resolveQcGateDivisionKey,
   resolveQcPreviousDivisionApprovedUnits,
@@ -321,7 +321,20 @@ import {
   focusQcField,
   resolveFirstQcRawMaterialValidationFocus,
 } from "../../../data/validation/adapters/qcRawMaterial.validation";
+import { resolveFirstQcCastingValidationFocus } from "../../../data/validation/adapters/qcCasting.validation";
+import { resolveFirstQcCuringValidationFocus } from "../../../data/validation/adapters/qcCuring.validation";
+import {
+  focusQcPostCureField,
+  looksLikeQcPostCureValidationErrors,
+  resolveFirstQcPostCureValidationFocus,
+} from "../../../data/validation/adapters/qcPostCure.validation";
+import {
+  focusQcTrimmingField,
+  looksLikeQcTrimmingValidationErrors,
+  resolveFirstQcTrimmingValidationFocus,
+} from "../../../data/validation/adapters/qcTrimming.validation";
 import { focusFieldByPath } from "@/data/validation/utils/fieldPathResolver";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 
 import {
   collectTempFileIdsFromDivisionScope,
@@ -452,10 +465,18 @@ export const useQCDivisionHook = () => {
     let firstPath = "";
     let firstMessage = "";
     for (const entryErrors of Object.values(errorsByEntryId)) {
-      const keys = Object.keys(entryErrors ?? {});
+      const keys = Object.keys(entryErrors ?? {}).filter((k) =>
+        String(entryErrors[k] ?? "").trim(),
+      );
       if (!keys.length) continue;
-      firstPath = keys[0];
-      firstMessage = String(entryErrors[keys[0]] ?? "").trim();
+      if (looksLikeQcPostCureValidationErrors(entryErrors)) {
+        firstPath = resolveFirstQcPostCureValidationFocus(entryErrors) ?? keys[0];
+      } else if (looksLikeQcTrimmingValidationErrors(entryErrors)) {
+        firstPath = resolveFirstQcTrimmingValidationFocus(entryErrors) ?? keys[0];
+      } else {
+        firstPath = keys[0];
+      }
+      firstMessage = String(entryErrors[firstPath] ?? "").trim();
       break;
     }
     const base =
@@ -480,6 +501,8 @@ export const useQCDivisionHook = () => {
     if (!(container instanceof HTMLElement)) return;
 
     let firstFieldPath: string | null = null;
+    let usePostCureFocus = false;
+    let useTrimmingFocus = false;
     for (const entryErrors of Object.values(errorsByEntryId)) {
       const keys = Object.keys(entryErrors ?? {}).filter((k) =>
         String(entryErrors[k] ?? "").trim(),
@@ -488,9 +511,39 @@ export const useQCDivisionHook = () => {
       const looksLikeRevalidation = keys.some(
         (k) => k === "materials" || k.startsWith("rows."),
       );
+      const looksLikeCasting = keys.some(
+        (k) =>
+          k === "ASSEMBLY_DATE" ||
+          k === "DATE_OF_CASTING" ||
+          k.startsWith("MANDREL_ASSEMBLY.") ||
+          k.startsWith("CASTING_TABLE.") ||
+          k.startsWith("WEIGHTMENT_DETAILS.") ||
+          k.startsWith("PRESSURE_PLATE_DETAILS.") ||
+          k === "SOAKING_DURATION" ||
+          k === "PRESSURE_PLATE_ASSEMBLY_REQUIRED",
+      );
+      const looksLikeCuring = keys.some(
+        (k) =>
+          k === "MOTOR_POSITIONING_DATE_TIME" ||
+          k === "CURING_START_DATE" ||
+          k.startsWith("CURING_CYCLE_DETAILS.") ||
+          k.startsWith("CURING_PARAMETER_TABLE.") ||
+          k === "VISUAL_OBSERVATIONS" ||
+          k === "DISPATCH_DATE_TIME",
+      );
       if (looksLikeRevalidation) {
         firstFieldPath =
           resolveFirstQcRawMaterialValidationFocus(entryErrors ?? {})?.fieldPath ?? keys[0];
+      } else if (looksLikeCasting) {
+        firstFieldPath = resolveFirstQcCastingValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeCuring) {
+        firstFieldPath = resolveFirstQcCuringValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeQcPostCureValidationErrors(entryErrors)) {
+        usePostCureFocus = true;
+        firstFieldPath = resolveFirstQcPostCureValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeQcTrimmingValidationErrors(entryErrors)) {
+        useTrimmingFocus = true;
+        firstFieldPath = resolveFirstQcTrimmingValidationFocus(entryErrors ?? {}) ?? keys[0];
       } else {
         firstFieldPath = keys[0];
       }
@@ -498,9 +551,13 @@ export const useQCDivisionHook = () => {
     }
     if (!firstFieldPath) return;
 
-    if (!focusQcField(firstFieldPath, container)) {
-      focusFieldByPath(firstFieldPath, container);
-    }
+    requestAnimationFrame(() => {
+      if (usePostCureFocus && focusQcPostCureField(firstFieldPath!, container)) return;
+      if (useTrimmingFocus && focusQcTrimmingField(firstFieldPath!, container)) return;
+      if (!focusQcField(firstFieldPath!, container)) {
+        focusFieldByPath(firstFieldPath!, container);
+      }
+    });
   };
 
   const subDepartmentId = useMemo(
@@ -571,6 +628,15 @@ export const useQCDivisionHook = () => {
     });
   const hardwareValidationAttemptRef = useRef(hardwareValidationAttempt);
   hardwareValidationAttemptRef.current = hardwareValidationAttempt;
+  /** Post Cure: keep SUBMIT required errors after failed submit (RMP/Mixing parity). */
+  const [postCureValidationAttempt, setPostCureValidationAttempt] =
+    useState<ValidationAttemptFlags>({
+      format: false,
+      unit: false,
+      submit: false,
+    });
+  const postCureValidationAttemptRef = useRef(postCureValidationAttempt);
+  postCureValidationAttemptRef.current = postCureValidationAttempt;
   const [mixingFinalMixDetailsValues, setMixingFinalMixDetailsValues] = useState<
     SchemaFormValues | undefined
   >(defaultSplit.mixingFinalMixDetailsValues);
@@ -923,6 +989,8 @@ export const useQCDivisionHook = () => {
     setWeightmentValidationAttempt({ format: false, unit: false, submit: false });
     setRevalidationValidationAttempt({ format: false, unit: false, submit: false });
     setMixingValidationAttempt({ format: false, unit: false, submit: false });
+    setHardwareValidationAttempt({ format: false, unit: false, submit: false });
+    setPostCureValidationAttempt({ format: false, unit: false, submit: false });
     setReadOnly(false);
     setDetailsRow(null);
     setDetailsData(null);
@@ -1709,7 +1777,7 @@ export const useQCDivisionHook = () => {
           rawMaterialType: tab.rawMaterialType,
           tabKey: tab.tabKey,
         });
-        return isQcDivisionEnabledByManufacturing({
+        return isQcDivisionEnabledByServerStatus({
           divisionKey: gateKey || tab.tabKey,
           stageProgress: batchStageArrays.stageProgress,
           currentStage: batchStageArrays.currentStage,
@@ -4342,6 +4410,24 @@ export const useQCDivisionHook = () => {
     }
   }, [isPartialNavItemEnabled, loadFormForPartialItem, partialNavItems, selectedDivision]);
 
+  const clearEntryFieldError = useCallback((entryId: string, path: string) => {
+    const key = String(path ?? "").trim();
+    if (!entryId || !key) return;
+    setEntryValidationErrors((prev) => {
+      const entryErrors = prev[entryId];
+      if (!entryErrors || !Object.prototype.hasOwnProperty.call(entryErrors, key)) {
+        return prev;
+      }
+      const nextEntry = { ...entryErrors };
+      delete nextEntry[key];
+      if (Object.keys(nextEntry).length === 0) {
+        const { [entryId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [entryId]: nextEntry };
+    });
+  }, []);
+
   const handleDivisionEntryValuesChange = useCallback(
     (
       entryId: string,
@@ -4376,6 +4462,7 @@ export const useQCDivisionHook = () => {
           const isMixing =
             entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX";
           const isHardware = entry.kind === "HARDWARE_PROCESS";
+          const isPostCure = entry.kind === "POST_CURE_MOTOR";
           if (isRevalidation) {
             // FORMAT from the first edit; SUBMIT live only after Submit Division was pressed.
             setRevalidationValidationAttempt((flags) => ({ ...flags, format: true }));
@@ -4434,18 +4521,49 @@ export const useQCDivisionHook = () => {
               }
               return { ...prev, [entryId]: liveErrors };
             });
-          } else {
-            const formatErrors = validateQcDivisionEntry(entry, nextValuesResolved, "FORMAT", {
+          } else if (isPostCure) {
+            // RMP/Mixing parity: keep SUBMIT required highlights after failed unit submit.
+            setPostCureValidationAttempt((flags) =>
+              flags.format ? flags : { ...flags, format: true },
+            );
+            const tier: ValidationTier = postCureValidationAttemptRef.current.submit
+              ? "SUBMIT"
+              : "FORMAT";
+            const liveErrors = validateQcDivisionEntry(entry, nextValuesResolved, tier, {
               finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
               viscosityValues: nextValuesResolved,
             });
             setEntryValidationErrors((prev) => {
-              if (Object.keys(formatErrors).length === 0) {
+              if (Object.keys(liveErrors).length === 0) {
                 if (!prev[entryId]) return prev;
                 const { [entryId]: _removed, ...rest } = prev;
                 return rest;
               }
-              return { ...prev, [entryId]: formatErrors };
+              return { ...prev, [entryId]: liveErrors };
+            });
+          } else {
+            // Sticky live errors (Case Prep / Subscale parity): FORMAT always surfaces;
+            // previously shown SUBMIT required highlights stay until that path is valid.
+            const formatErrors = validateQcDivisionEntry(entry, nextValuesResolved, "FORMAT", {
+              finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
+              viscosityValues: nextValuesResolved,
+            });
+            const fullErrors = validateQcDivisionEntry(entry, nextValuesResolved, "SUBMIT", {
+              finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
+              viscosityValues: nextValuesResolved,
+            });
+            setEntryValidationErrors((prev) => {
+              const merged = reconcileLiveValidationErrors(
+                prev[entryId],
+                formatErrors,
+                fullErrors,
+              );
+              if (Object.keys(merged).length === 0) {
+                if (!prev[entryId]) return prev;
+                const { [entryId]: _removed, ...rest } = prev;
+                return rest;
+              }
+              return { ...prev, [entryId]: merged };
             });
           }
         } catch (error) {
@@ -6566,6 +6684,20 @@ export const useQCDivisionHook = () => {
         hardwareValidationAttemptRef.current = nextFlags;
         setHardwareValidationAttempt(nextFlags);
       }
+      const hasPostCureErrors = entriesToValidate.some(
+        (entry) =>
+          entry.kind === "POST_CURE_MOTOR" &&
+          Object.keys(errorsByEntryId[entry.entryId] ?? {}).length > 0,
+      );
+      if (hasPostCureErrors) {
+        const nextFlags = {
+          format: true,
+          unit: intent === "draft",
+          submit: intent === "submit",
+        };
+        postCureValidationAttemptRef.current = nextFlags;
+        setPostCureValidationAttempt(nextFlags);
+      }
       applyQcValidationFailure(errorsByEntryId, intent === "draft" ? "draft" : "submit");
       return false;
     }
@@ -6591,6 +6723,11 @@ export const useQCDivisionHook = () => {
       const cleared = { format: false, unit: false, submit: false };
       hardwareValidationAttemptRef.current = cleared;
       setHardwareValidationAttempt(cleared);
+    }
+    if (entriesToValidate.some((entry) => entry.kind === "POST_CURE_MOTOR")) {
+      const cleared = { format: false, unit: false, submit: false };
+      postCureValidationAttemptRef.current = cleared;
+      setPostCureValidationAttempt(cleared);
     }
 
     // RMP-parity process (lots) + weighment validation for Raw Material Processing.
@@ -6905,6 +7042,16 @@ export const useQCDivisionHook = () => {
         },
       );
       if (!validation.ok) {
+        const hasPostCureErrors = entries.some(
+          (entry) =>
+            entry.kind === "POST_CURE_MOTOR" &&
+            Object.keys(validation.errorsByEntryId[entry.entryId] ?? {}).length > 0,
+        );
+        if (hasPostCureErrors) {
+          const nextFlags = { format: true, unit: false, submit: true };
+          postCureValidationAttemptRef.current = nextFlags;
+          setPostCureValidationAttempt(nextFlags);
+        }
         applyQcValidationFailure(validation.errorsByEntryId, "division");
         return false;
       }
@@ -6912,13 +7059,18 @@ export const useQCDivisionHook = () => {
       setEntryValidationErrors((prev) => {
         const next = { ...prev };
         entries
-          .filter((e) => e.kind === "REVALIDATION")
+          .filter((e) => e.kind === "REVALIDATION" || e.kind === "POST_CURE_MOTOR")
           .forEach((e) => {
             delete next[e.entryId];
           });
         return next;
       });
       setRevalidationValidationAttempt({ format: false, unit: false, submit: false });
+      {
+        const cleared = { format: false, unit: false, submit: false };
+        postCureValidationAttemptRef.current = cleared;
+        setPostCureValidationAttempt(cleared);
+      }
     }
 
     let payload: ReturnType<typeof mapQualityControlPayload>;
@@ -7099,27 +7251,29 @@ export const useQCDivisionHook = () => {
       map[key] = normalizePartialItemStatus(status);
     });
 
-    // Ensure every catalog tab has a status (default TO_BE_INITIATED).
+    // Ensure every catalog tab has a status (default YET_TO_START = locked until server unlocks).
     // Prefer API divisionStatuses — do not overwrite with aggregated premix/motor nav.
     divisionNavTabs.forEach((tab) => {
       const resolved =
-        map[tab.tabKey] ?? map[tab.rawMaterialType] ?? map[tab.flowKey] ?? "TO_BE_INITIATED";
+        map[tab.tabKey] ?? map[tab.rawMaterialType] ?? map[tab.flowKey] ?? "YET_TO_START";
       map[tab.tabKey] = normalizePartialItemStatus(resolved);
       if (!map[tab.flowKey]) {
         map[tab.flowKey] = map[tab.tabKey];
       }
     });
 
-    // Only fill gaps when API has no status for the active tab.
+    // Only fill gaps when API has no progressed status for the active tab.
     if (partialNavActive && activeDivisionTabKey && partialNavItems.length) {
       const apiStatus = map[activeDivisionTabKey];
-      if (!apiStatus || apiStatus === "TO_BE_INITIATED") {
+      if (!apiStatus || apiStatus === "TO_BE_INITIATED" || apiStatus === "YET_TO_START") {
         const aggregated = aggregatePartialNavStatus(partialNavItems);
-        if (aggregated !== "TO_BE_INITIATED") {
+        if (aggregated !== "TO_BE_INITIATED" && aggregated !== "YET_TO_START") {
           map[activeDivisionTabKey] = aggregated;
           if (
             selectedDivision &&
-            (!map[selectedDivision] || map[selectedDivision] === "TO_BE_INITIATED")
+            (!map[selectedDivision] ||
+              map[selectedDivision] === "TO_BE_INITIATED" ||
+              map[selectedDivision] === "YET_TO_START")
           ) {
             map[selectedDivision] = aggregated;
           }
@@ -7137,11 +7291,11 @@ export const useQCDivisionHook = () => {
   ]);
 
   const activeDivisionStatus = useMemo(() => {
-    if (!activeDivisionTabKey && !selectedDivision) return "TO_BE_INITIATED" as QcPartialItemStatus;
+    if (!activeDivisionTabKey && !selectedDivision) return "YET_TO_START" as QcPartialItemStatus;
     return normalizePartialItemStatus(
       divisionGroupStatusByFlowKey[activeDivisionTabKey] ??
         divisionGroupStatusByFlowKey[selectedDivision] ??
-        "TO_BE_INITIATED",
+        "YET_TO_START",
     );
   }, [activeDivisionTabKey, divisionGroupStatusByFlowKey, selectedDivision]);
 
@@ -7156,7 +7310,7 @@ export const useQCDivisionHook = () => {
         rawMaterialType: tab?.rawMaterialType ?? tabKey,
         tabKey: tab?.tabKey ?? tabKey,
       });
-      return isQcDivisionEnabledByManufacturing({
+      return isQcDivisionEnabledByServerStatus({
         divisionKey: gateKey || tabKey,
         stageProgress: batchStageArrays.stageProgress,
         currentStage: batchStageArrays.currentStage,
@@ -7186,14 +7340,14 @@ export const useQCDivisionHook = () => {
         tabKey: tab?.tabKey ?? tabKey,
       });
       return (
-        isQcDivisionEnabledByManufacturing({
+        isQcDivisionEnabledByServerStatus({
           divisionKey: gateKey || tabKey,
           stageProgress: batchStageArrays.stageProgress,
           currentStage: batchStageArrays.currentStage,
           batchType: batchContext?.batchType,
           subBatchType: batchContext?.subBatchType,
         }).reason ??
-        "This QC division is locked until the corresponding manufacturing unit is approved."
+        "Waiting for manufacturing to unlock this division."
       );
     },
     [
@@ -7520,12 +7674,14 @@ export const useQCDivisionHook = () => {
     postCureSetupOperationLabel,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
+    clearEntryFieldError,
     /** Pass to QCForm as validationErrorsByEntryId */
     validationErrorsByEntryId: entryValidationErrors,
     entryValidationErrors,
     weightmentErrors,
     weightmentValidationAttempt,
     mixingValidationAttempt,
+    postCureValidationAttempt,
     processingFieldErrors,
     processingValidationFocusRequest,
     handleDivisionEntryLiquidValuesChange,

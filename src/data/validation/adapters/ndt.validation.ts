@@ -8,6 +8,7 @@ import { runValidation } from "../runValidation";
 import type { ValidationErrors, ValidationTier } from "../submissionIntent";
 import { legacyIntentToTier, tierToLegacyIntent } from "../submissionIntent";
 import { fieldError, firstValidationError, firstValidationErrorWithPath, hasValidationErrors } from "../validationErrors";
+import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 export type NDTValidationIntent = "DRAFT" | "SUBMIT";
 
@@ -38,6 +39,38 @@ const NDT_FIELD_LABELS: Record<string, string> = {
   signedReport: "Signed report",
   motor: "Motor",
 };
+
+/** Preferred section order for scroll/focus after failed NDT SUBMIT. */
+const NDT_FOCUS_PREFIX_ORDER = [
+  "radiographyPlanRows.",
+  "additionalExposureRows.",
+  "radiographyObservationRows.",
+  "visualInspectionRows.",
+  "signedReport",
+] as const;
+
+/** First error field path for NDT focus/scroll (stable section order). */
+export function resolveFirstNdtValidationFocus(
+  errors: ValidationErrors | null | undefined,
+): string | null {
+  if (!errors) return null;
+  const keys = Object.keys(errors).filter((key) => String(errors[key] ?? "").trim());
+  if (!keys.length) return null;
+
+  for (const prefix of NDT_FOCUS_PREFIX_ORDER) {
+    const match = keys
+      .filter((key) => key === prefix || key.startsWith(prefix))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0];
+    if (match) return match;
+  }
+
+  return keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0] ?? null;
+}
+
+/** Scroll + focus the control tagged with `data-ndt-field`. */
+export function focusNdtField(fieldPath: string, root: ParentNode = document): boolean {
+  return focusFieldByDataAttr("ndt-field", fieldPath, root);
+}
 
 export function formatNdtValidationPath(path: string): string {
   const trimmed = String(path ?? "").trim();

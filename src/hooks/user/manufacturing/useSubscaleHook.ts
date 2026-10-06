@@ -26,6 +26,13 @@ import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
 import { noopTempFileExtractor } from "../../../utils/workflowTempFiles";
 import { flushSubscalePendingDrafts } from "../../../ui/pages/user/manufacturing/Subscale/utils/subscalePendingDrafts";
+import validateSubscale, {
+  firstSubscaleValidationError,
+  focusSubscaleField,
+  resolveFirstSubscaleValidationFocus,
+} from "../../../data/validation/adapters/subscale.validation";
+import type { ValidationErrors } from "../../../data/validation/submissionIntent";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -49,6 +56,7 @@ export const useSubscaleHook = () => {
   const listParams = useSubdepartmentBatches("subscale");
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
 
@@ -72,6 +80,11 @@ export const useSubscaleHook = () => {
   const [detailsRow, setDetailsRow] = useState<SubscaleBatch | null>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    fieldPath: string | null;
+  } | null>(null);
 
   const snapshotStateRef = useRef(formData);
   snapshotStateRef.current = formData;
@@ -107,6 +120,8 @@ export const useSubscaleHook = () => {
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
     setFormData(defaults);
+    setValidationErrors({});
+    setValidationFocusRequest(null);
     syncBaselineFromFormState(defaults);
   }, [syncBaselineFromFormState]);
 
@@ -115,6 +130,77 @@ export const useSubscaleHook = () => {
     if (response?.message) return response.message;
     return fallbackMessage;
   };
+
+  const buildValidationPayload = useCallback(
+    (schemaValues?: SchemaFormValues) => {
+      const values = schemaValues ?? snapshotStateRef.current.schemaFormValues;
+      return {
+        ...values,
+        batchType: activeBatch?.batchType,
+        subBatchType: batchDetails?.subBatchType,
+      };
+    },
+    [activeBatch?.batchType, batchDetails?.subBatchType],
+  );
+
+  const emitSubscaleValidationFocus = useCallback((errors: ValidationErrors) => {
+    const fieldPath = resolveFirstSubscaleValidationFocus(errors);
+    setValidationFocusRequest((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      fieldPath,
+    }));
+    if (fieldPath) {
+      requestAnimationFrame(() => {
+        focusSubscaleField(fieldPath);
+      });
+    }
+  }, []);
+
+  const notifySubscaleValidationErrors = useCallback(
+    (errors: ValidationErrors, intent: "draft" | "submit") => {
+      const firstError = firstSubscaleValidationError(errors);
+      const base =
+        intent === "draft"
+          ? STRINGS.MANUFACTURING.SUBSCALE.DRAFT_VALIDATION_FAILED
+          : STRINGS.MANUFACTURING.SUBSCALE.SUBMIT_VALIDATION_FAILED;
+      showValidationAlert(firstError ? `${base} (${firstError})` : base);
+    },
+    [showValidationAlert],
+  );
+
+  const clearFieldError = useCallback((path: string) => {
+    setValidationErrors((prev) => {
+      if (!prev || !Object.prototype.hasOwnProperty.call(prev, path)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  }, []);
+
+  const validateAndPrepareDraft = useCallback(() => {
+    const errors = validateSubscale(buildValidationPayload(), "FORMAT");
+    if (errors && Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      notifySubscaleValidationErrors(errors, "draft");
+      return false;
+    }
+    setValidationErrors({});
+    return true;
+  }, [buildValidationPayload, notifySubscaleValidationErrors]);
+
+  const validateAndPrepareSubmit = useCallback(() => {
+    const errors = validateSubscale(buildValidationPayload(), "SUBMIT");
+    if (errors && Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      notifySubscaleValidationErrors(errors, "submit");
+      emitSubscaleValidationFocus(errors);
+      return false;
+    }
+    setValidationErrors({});
+    return true;
+  }, [buildValidationPayload, emitSubscaleValidationFocus, notifySubscaleValidationErrors]);
 
   const fetchBatchDetailsData = useCallback(async (batchId: string) => {
     try {
@@ -264,17 +350,27 @@ export const useSubscaleHook = () => {
     resetFormContext();
   }, [deleteTemp, listParams, resetFormContext, subDepartmentId]);
 
-  const handleFormValuesChange = useCallback((values: SchemaFormValues) => {
-    setFormData((prev) => {
-      const next = {
-        ...prev,
-        schemaFormValues: values as typeof prev.schemaFormValues,
-        schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
-      };
-      snapshotStateRef.current = next;
-      return next;
-    });
-  }, []);
+  const handleFormValuesChange = useCallback(
+    (values: SchemaFormValues) => {
+      setFormData((prev) => {
+        const next = {
+          ...prev,
+          schemaFormValues: values as typeof prev.schemaFormValues,
+          schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
+        };
+        snapshotStateRef.current = next;
+        return next;
+      });
+
+      const payload = buildValidationPayload(values);
+      const formatErrors = validateSubscale(payload, "FORMAT") ?? {};
+      const fullErrors = validateSubscale(payload, "SUBMIT") ?? {};
+      setValidationErrors((prev) =>
+        reconcileLiveValidationErrors(prev, formatErrors, fullErrors),
+      );
+    },
+    [buildValidationPayload],
+  );
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
@@ -477,6 +573,11 @@ export const useSubscaleHook = () => {
     detailsRow,
     detailsData,
     detailsLoading,
+    validationErrors,
+    validationFocusRequest,
+    clearFieldError,
+    validateAndPrepareDraft,
+    validateAndPrepareSubmit,
     handleFillForm,
     handleEditForm,
     handleBack,

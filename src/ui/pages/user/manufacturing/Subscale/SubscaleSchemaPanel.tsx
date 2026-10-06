@@ -146,6 +146,7 @@ const SubscaleSchemaPanel = ({
             onChange={handleHardwareChange}
             batchType={batchType}
             canManageProcessTables={canManageProcessTables}
+            errors={errors}
             clearFieldError={clearFieldError}
           />
         </Box>

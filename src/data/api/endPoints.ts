@@ -334,6 +334,7 @@ export const USER_POST_CURE_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/post-cure/form/create`,
   FORM_DETAILS: `${API_BASE}/user/post-cure/form/details`,
   UPDATE_FORM: `${API_BASE}/user/post-cure/form/update`,
+  INGREDIENTS: `${API_BASE}/user/post-cure/ingredients`,
 };
 
 export const USER_SUBSCALE_FORM_ENDPOINTS = {

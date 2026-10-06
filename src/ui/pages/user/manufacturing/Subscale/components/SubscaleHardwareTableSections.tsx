@@ -1,5 +1,6 @@
 import { memo, type ChangeEvent, type CSSProperties, type ComponentType } from "react";
 import {
+  Box,
   MenuItem,
   Table,
   TableBody,
@@ -86,33 +87,35 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                   {formatArticleTypeLabel(row.ARTICLE_TYPE)}
                 </TableCell>
                 <TableCell sx={{ minWidth: 160, ...tableBodyCellSx }}>
-                  <FormInput
-                    select
-                    compact
-                    value={row.RUBBER_MATERIAL ?? ""}
-                    onChange={(e) => {
-                      clearFieldError?.(`ARTICLE_TYPE_TABLE.${idx}.RUBBER_MATERIAL`);
-                      onCellChange(ARTICLE_TYPE_TABLE_ID, idx, "RUBBER_MATERIAL", e.target.value);
-                    }}
-                    error={!!fieldError}
-                    helperText={fieldError || ""}
-                    SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                  >
-                    <MenuItem value="">
-                      <em
-                        style={
-                          { ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties
-                        }
-                      >
-                        Select Rubber Material
-                      </em>
-                    </MenuItem>
-                    {RUBBER_MATERIAL_OPTIONS.map((opt) => (
-                      <MenuItem key={opt} value={opt} sx={{ fontSize: APP_CONTROL_FONT_SIZE }}>
-                        {opt}
+                  <Box data-ss-field={fieldPath}>
+                    <FormInput
+                      select
+                      compact
+                      value={row.RUBBER_MATERIAL ?? ""}
+                      onChange={(e) => {
+                        clearFieldError?.(`ARTICLE_TYPE_TABLE.${idx}.RUBBER_MATERIAL`);
+                        onCellChange(ARTICLE_TYPE_TABLE_ID, idx, "RUBBER_MATERIAL", e.target.value);
+                      }}
+                      error={!!fieldError}
+                      helperText={fieldError || ""}
+                      SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                    >
+                      <MenuItem value="">
+                        <em
+                          style={
+                            { ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties
+                          }
+                        >
+                          Select Rubber Material
+                        </em>
                       </MenuItem>
-                    ))}
-                  </FormInput>
+                      {RUBBER_MATERIAL_OPTIONS.map((opt) => (
+                        <MenuItem key={opt} value={opt} sx={{ fontSize: APP_CONTROL_FONT_SIZE }}>
+                          {opt}
+                        </MenuItem>
+                      ))}
+                    </FormInput>
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -240,9 +243,7 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
                   "LENGTH_BEFORE_INHIBITION",
                 ] as const
               ).map((fieldId) => {
-                const fieldError = (errors?.schemaFormValues as any)?.TRIMMING_TABLE?.[idx]?.[
-                  fieldId
-                ];
+                const fieldError = errors?.[`TRIMMING_TABLE.${idx}.${fieldId}`];
                 return (
                   <TableCell key={fieldId} sx={tableBodyCellSx}>
                     <SubscaleTableTextCell
@@ -253,8 +254,7 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
                       fieldId={fieldId}
                       value={row[fieldId] ?? ""}
                       onCellChange={onCellChange}
-                      error={!!fieldError}
-                      helperText={fieldError?.message || fieldError || ""}
+                      errorMessage={fieldError}
                     />
                   </TableCell>
                 );
@@ -330,30 +330,33 @@ export const CastingTableSection = memo(function CastingTableSection({
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
-                  <TimeField
-                    compact
-                    value={String(row.CASTING_START_TIME ?? "")}
-                    onChange={(next) => {
-                      onCellChange("CASTING_TABLE", idx, "CASTING_START_TIME", next);
-                    }}
-                    placeholder="HH:mm"
-                    error={!!startError}
-                    helperText={startError || ""}
-                  />
+                  <Box data-ss-field={`CASTING_TABLE.${idx}.CASTING_START_TIME`}>
+                    <TimeField
+                      compact
+                      value={String(row.CASTING_START_TIME ?? "")}
+                      onChange={(next) => {
+                        onCellChange("CASTING_TABLE", idx, "CASTING_START_TIME", next);
+                      }}
+                      placeholder="HH:mm"
+                      error={!!startError}
+                      helperText={startError || ""}
+                    />
+                  </Box>
                 </TableCell>
 
-                {/* End Time Field - Cleaned of register */}
                 <TableCell sx={tableBodyCellSx}>
-                  <TimeField
-                    compact
-                    value={String(row.CASTING_END_TIME ?? "")}
-                    onChange={(next) => {
-                      onCellChange("CASTING_TABLE", idx, "CASTING_END_TIME", next);
-                    }}
-                    placeholder="HH:mm"
-                    error={!!endError}
-                    helperText={endError || ""}
-                  />
+                  <Box data-ss-field={`CASTING_TABLE.${idx}.CASTING_END_TIME`}>
+                    <TimeField
+                      compact
+                      value={String(row.CASTING_END_TIME ?? "")}
+                      onChange={(next) => {
+                        onCellChange("CASTING_TABLE", idx, "CASTING_END_TIME", next);
+                      }}
+                      placeholder="HH:mm"
+                      error={!!endError}
+                      helperText={endError || ""}
+                    />
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -567,16 +570,9 @@ export const CuringTableSection = memo(function CuringTableSection({
         </TableHead>
         <TableBody>
           {rows.map((row, idx) => {
-            const startDatePath = `CURING_TABLE.${idx}.CURING_START_DATE`;
-            const endDatePath = `CURING_TABLE.${idx}.CURING_END_DATE`;
-            const decorDatePath = `CURING_TABLE.${idx}.DECORING_DATE`;
-
-            const startError = (errors?.schemaFormValues as any)?.CURING_TABLE?.[idx]
-              ?.CURING_START_DATE;
-            const endError = (errors?.schemaFormValues as any)?.CURING_TABLE?.[idx]
-              ?.CURING_END_DATE;
-            const decorError = (errors?.schemaFormValues as any)?.CURING_TABLE?.[idx]
-              ?.DECORING_DATE;
+            const startError = errors?.[`CURING_TABLE.${idx}.CURING_START_DATE`];
+            const endError = errors?.[`CURING_TABLE.${idx}.CURING_END_DATE`];
+            const decorError = errors?.[`CURING_TABLE.${idx}.DECORING_DATE`];
 
             return (
               <TableRow key={idx}>
@@ -586,28 +582,32 @@ export const CuringTableSection = memo(function CuringTableSection({
                 </TableCell>
                 <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
                 <TableCell sx={tableBodyCellSx}>
-                  <DateField
-                    compact
-                    value={formatToUiDate(String(row.CURING_START_DATE ?? ""))}
-                    onChange={(next) => {
-                      onCellChange("CURING_TABLE", idx, "CURING_START_DATE", next);
-                    }}
-                    placeholder="DD-MM-YYYY"
-                    error={!!startError}
-                    helperText={startError?.message || ""}
-                  />
+                  <Box data-ss-field={`CURING_TABLE.${idx}.CURING_START_DATE`}>
+                    <DateField
+                      compact
+                      value={formatToUiDate(String(row.CURING_START_DATE ?? ""))}
+                      onChange={(next) => {
+                        onCellChange("CURING_TABLE", idx, "CURING_START_DATE", next);
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!startError}
+                      helperText={startError || ""}
+                    />
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
-                  <DateField
-                    compact
-                    value={formatToUiDate(String(row.CURING_END_DATE ?? ""))}
-                    onChange={(next) => {
-                      onCellChange("CURING_TABLE", idx, "CURING_END_DATE", next);
-                    }}
-                    placeholder="DD-MM-YYYY"
-                    error={!!endError}
-                    helperText={endError?.message || ""}
-                  />
+                  <Box data-ss-field={`CURING_TABLE.${idx}.CURING_END_DATE`}>
+                    <DateField
+                      compact
+                      value={formatToUiDate(String(row.CURING_END_DATE ?? ""))}
+                      onChange={(next) => {
+                        onCellChange("CURING_TABLE", idx, "CURING_END_DATE", next);
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!endError}
+                      helperText={endError || ""}
+                    />
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -642,16 +642,18 @@ export const CuringTableSection = memo(function CuringTableSection({
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
-                  <DateField
-                    compact
-                    value={formatToUiDate(String(row.DECORING_DATE ?? ""))}
-                    onChange={(next) => {
-                      onCellChange("CURING_TABLE", idx, "DECORING_DATE", next);
-                    }}
-                    placeholder="DD-MM-YYYY"
-                    error={!!decorError}
-                    helperText={decorError?.message || ""}
-                  />
+                  <Box data-ss-field={`CURING_TABLE.${idx}.DECORING_DATE`}>
+                    <DateField
+                      compact
+                      value={formatToUiDate(String(row.DECORING_DATE ?? ""))}
+                      onChange={(next) => {
+                        onCellChange("CURING_TABLE", idx, "DECORING_DATE", next);
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!decorError}
+                      helperText={decorError || ""}
+                    />
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -719,17 +721,19 @@ export const NdtTableSection = memo(function NdtTableSection({
                 </TableCell>
                 <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
                 <TableCell sx={tableBodyCellSx}>
-                  <DateField
-                    compact
-                    required
-                    value={formatToUiDate(String(row.DATE_OF_NDT ?? ""))}
-                    onChange={(next) => {
-                      onCellChange("NDT_TABLE", idx, "DATE_OF_NDT", next);
-                    }}
-                    placeholder="DD-MM-YYYY"
-                    error={!!ndtError}
-                    helperText={ndtError || ""}
-                  />
+                  <Box data-ss-field={ndtDatePath}>
+                    <DateField
+                      compact
+                      required
+                      value={formatToUiDate(String(row.DATE_OF_NDT ?? ""))}
+                      onChange={(next) => {
+                        onCellChange("NDT_TABLE", idx, "DATE_OF_NDT", next);
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!ndtError}
+                      helperText={ndtError || ""}
+                    />
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell

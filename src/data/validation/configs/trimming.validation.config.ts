@@ -35,7 +35,8 @@ const DEFAULT_READING_KEYS = ["R2T", "R2B", "R1R", "R1L"] as const;
 
 export const trimmingValidationFields: Record<string, FieldRuleConfig> = {
   motorReceivedAt: date(["UNIT", "SUBMIT"]),
-  machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  // Equipment names from /system/equipment-list (e.g. "4 MeV LINAC", "2/6 MeV LINAC").
+  machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   startDate: date(["SUBMIT"]),
   completionDate: date(["SUBMIT"]),
   arborSize: number(["FORMAT", "SUBMIT"]),

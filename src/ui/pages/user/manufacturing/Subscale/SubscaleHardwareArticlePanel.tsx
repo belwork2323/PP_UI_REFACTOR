@@ -379,11 +379,6 @@ const SubscaleHardwareArticlePanel = ({
   // Row Cell Updater Helper
   const updateTableRowCell = useCallback(
     (tableId: string, rowIndex: number, fieldId: string, value: any) => {
-      console.log(tableId);
-      console.log(rowIndex);
-      console.log(fieldId);
-      console.log(value);
-
       const currentValues = valuesRef.current;
       const sourceTable = Array.isArray(currentValues[tableId]) ? currentValues[tableId] : [];
       const tableData = sourceTable.slice();
@@ -415,7 +410,7 @@ const SubscaleHardwareArticlePanel = ({
       clearFieldError?.(`${tableId}.${rowIndex}.${fieldId}`);
       onChange(nextValues);
     },
-    [onChange],
+    [onChange, clearFieldError],
   );
 
   const getSyncedBemNo = (rowIndex: number, fallback?: unknown) =>
@@ -511,18 +506,19 @@ const SubscaleHardwareArticlePanel = ({
               const errKey = `${field.id}`;
               const errorMessage = errors?.[errKey];
               return (
-                <FormInput
-                  key={field.id}
-                  label={<FieldLabelWithAsterisk label={field.label} required />}
-                  type="number"
-                  inputProps={{ min: 0, step: 1 }}
-                  value={values[field.id] ?? ""}
-                  onChange={(e) => {
-                    updateCountField(field.id, e.target.value);
-                  }}
-                  error={Boolean(errorMessage)}
-                  helperText={errorMessage || ""}
-                />
+                <Box key={field.id} data-ss-field={field.id}>
+                  <FormInput
+                    label={<FieldLabelWithAsterisk label={field.label} required />}
+                    type="number"
+                    inputProps={{ min: 0, step: 1 }}
+                    value={values[field.id] ?? ""}
+                    onChange={(e) => {
+                      updateCountField(field.id, e.target.value);
+                    }}
+                    error={Boolean(errorMessage)}
+                    helperText={errorMessage || ""}
+                  />
+                </Box>
               );
             })}
 
@@ -530,34 +526,36 @@ const SubscaleHardwareArticlePanel = ({
               const errKey = `${LINER_TYPE_FIELD.id}`;
               const errorMessage = errors?.[errKey];
               return (
-                <FormInput
-                  select
-                  label={<FieldLabelWithAsterisk label={LINER_TYPE_FIELD.label} required />}
-                  value={values[LINER_TYPE_FIELD.id] ?? ""}
-                  onChange={(e) => {
-                    handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value);
-                  }}
-                  error={Boolean(errorMessage)}
-                  helperText={errorMessage || ""}
-                  SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                >
-                  <MenuItem value="">
-                    <em
-                      style={{ ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties}
-                    >
-                      Select Liner Type
-                    </em>
-                  </MenuItem>
-                  {LINER_TYPE_OPTIONS.map((option) => (
-                    <MenuItem
-                      key={option.value}
-                      value={option.value}
-                      sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
-                    >
-                      {option.label}
+                <Box data-ss-field={LINER_TYPE_FIELD.id}>
+                  <FormInput
+                    select
+                    label={<FieldLabelWithAsterisk label={LINER_TYPE_FIELD.label} required />}
+                    value={values[LINER_TYPE_FIELD.id] ?? ""}
+                    onChange={(e) => {
+                      handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value);
+                    }}
+                    error={Boolean(errorMessage)}
+                    helperText={errorMessage || ""}
+                    SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                  >
+                    <MenuItem value="">
+                      <em
+                        style={{ ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties}
+                      >
+                        Select Liner Type
+                      </em>
                     </MenuItem>
-                  ))}
-                </FormInput>
+                    {LINER_TYPE_OPTIONS.map((option) => (
+                      <MenuItem
+                        key={option.value}
+                        value={option.value}
+                        sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                      >
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </FormInput>
+                </Box>
               );
             })()}
 
@@ -566,15 +564,17 @@ const SubscaleHardwareArticlePanel = ({
               const errKey = `${LINER_BATCH_NO_FIELD.id}`;
               const errorMessage = errors?.[errKey];
               return (
-                <FormInput
-                  label={<FieldLabelWithAsterisk label={LINER_BATCH_NO_FIELD.label} required />}
-                  value={values[LINER_BATCH_NO_FIELD.id] ?? ""}
-                  onChange={(e) => {
-                    handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
-                  }}
-                  error={Boolean(errorMessage)}
-                  helperText={errorMessage || ""}
-                />
+                <Box data-ss-field={LINER_BATCH_NO_FIELD.id}>
+                  <FormInput
+                    label={<FieldLabelWithAsterisk label={LINER_BATCH_NO_FIELD.label} required />}
+                    value={values[LINER_BATCH_NO_FIELD.id] ?? ""}
+                    onChange={(e) => {
+                      handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
+                    }}
+                    error={Boolean(errorMessage)}
+                    helperText={errorMessage || ""}
+                  />
+                </Box>
               );
             })()}
 
@@ -583,16 +583,18 @@ const SubscaleHardwareArticlePanel = ({
               const errKey = `${LINER_BATCH_DATE_FIELD.id}`;
               const errorMessage = errors?.[errKey];
               return (
-                <DateField
-                  label={<FieldLabelWithAsterisk label={LINER_BATCH_DATE_FIELD.label} required />}
-                  value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
-                  onChange={(next) => {
-                    handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
-                  }}
-                  placeholder="DD-MM-YYYY"
-                  error={Boolean(errorMessage)}
-                  helperText={errorMessage || ""}
-                />
+                <Box data-ss-field={LINER_BATCH_DATE_FIELD.id}>
+                  <DateField
+                    label={<FieldLabelWithAsterisk label={LINER_BATCH_DATE_FIELD.label} required />}
+                    value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
+                    onChange={(next) => {
+                      handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
+                    }}
+                    placeholder="DD-MM-YYYY"
+                    error={Boolean(errorMessage)}
+                    helperText={errorMessage || ""}
+                  />
+                </Box>
               );
             })()}
           </Box>
@@ -661,18 +663,20 @@ const SubscaleHardwareArticlePanel = ({
                   const errKey = "DATE_OF_CASTING";
                   const errorMessage = errors?.[errKey];
                   return (
-                    <DateField
-                      required
-                      label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
-                      value={formatToUiDate(String(values.DATE_OF_CASTING ?? ""))}
-                      onChange={(next) => {
-                        clearFieldError?.("DATE_OF_CASTING");
-                        patchFormValues({ DATE_OF_CASTING: next });
-                      }}
-                      placeholder="DD-MM-YYYY"
-                      error={Boolean(errorMessage)}
-                      helperText={errorMessage || ""}
-                    />
+                    <Box data-ss-field="DATE_OF_CASTING">
+                      <DateField
+                        required
+                        label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
+                        value={formatToUiDate(String(values.DATE_OF_CASTING ?? ""))}
+                        onChange={(next) => {
+                          clearFieldError?.("DATE_OF_CASTING");
+                          patchFormValues({ DATE_OF_CASTING: next });
+                        }}
+                        placeholder="DD-MM-YYYY"
+                        error={Boolean(errorMessage)}
+                        helperText={errorMessage || ""}
+                      />
+                    </Box>
                   );
                 })()}
               </Box>
@@ -742,17 +746,19 @@ const SubscaleHardwareArticlePanel = ({
                   const errKey = "IR_BATCH_NO";
                   const errorMessage = errors?.[errKey];
                   return (
-                    <FormInput
-                      required
-                      label={<FieldLabelWithAsterisk label="IR Batch No" required />}
-                      value={values.IR_BATCH_NO ?? ""}
-                      onChange={(e) => {
-                        clearFieldError?.("IR_BATCH_NO");
-                        patchFormValues({ IR_BATCH_NO: e.target.value });
-                      }}
-                      error={Boolean(errorMessage)}
-                      helperText={errorMessage || ""}
-                    />
+                    <Box data-ss-field="IR_BATCH_NO" sx={{ flex: 1 }}>
+                      <FormInput
+                        required
+                        label={<FieldLabelWithAsterisk label="IR Batch No" required />}
+                        value={values.IR_BATCH_NO ?? ""}
+                        onChange={(e) => {
+                          clearFieldError?.("IR_BATCH_NO");
+                          patchFormValues({ IR_BATCH_NO: e.target.value });
+                        }}
+                        error={Boolean(errorMessage)}
+                        helperText={errorMessage || ""}
+                      />
+                    </Box>
                   );
                 })()}
 
@@ -760,18 +766,20 @@ const SubscaleHardwareArticlePanel = ({
                   const errKey = "DATE_OF_MFG";
                   const errorMessage = errors?.[errKey];
                   return (
-                    <DateField
-                      required
-                      label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
-                      value={formatToUiDate(String(values.DATE_OF_MFG ?? ""))}
-                      onChange={(next) => {
-                        clearFieldError?.("DATE_OF_MFG");
-                        patchFormValues({ DATE_OF_MFG: next });
-                      }}
-                      placeholder="DD-MM-YYYY"
-                      error={Boolean(errorMessage)}
-                      helperText={errorMessage || ""}
-                    />
+                    <Box data-ss-field="DATE_OF_MFG" sx={{ flex: 1 }}>
+                      <DateField
+                        required
+                        label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
+                        value={formatToUiDate(String(values.DATE_OF_MFG ?? ""))}
+                        onChange={(next) => {
+                          clearFieldError?.("DATE_OF_MFG");
+                          patchFormValues({ DATE_OF_MFG: next });
+                        }}
+                        placeholder="DD-MM-YYYY"
+                        error={Boolean(errorMessage)}
+                        helperText={errorMessage || ""}
+                      />
+                    </Box>
                   );
                 })()}
               </Stack>
@@ -870,22 +878,24 @@ const SubscaleHardwareArticlePanel = ({
                             <FormInput compact disabled value={row.PROPELLANT_WEIGHT ?? ""} />
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
-                            <DateField
-                              compact
-                              required
-                              value={formatToUiDate(String(row.DATE_OF_APPLICATION ?? ""))}
-                              onChange={(next) => {
-                                updateTableRowCell(
-                                  "INHIBITION_TABLE",
-                                  idx,
-                                  "DATE_OF_APPLICATION",
-                                  next,
-                                );
-                              }}
-                              placeholder="DD-MM-YYYY"
-                              error={Boolean(errorMessage)}
-                              helperText={errorMessage || ""}
-                            />
+                            <Box data-ss-field={errKey}>
+                              <DateField
+                                compact
+                                required
+                                value={formatToUiDate(String(row.DATE_OF_APPLICATION ?? ""))}
+                                onChange={(next) => {
+                                  updateTableRowCell(
+                                    "INHIBITION_TABLE",
+                                    idx,
+                                    "DATE_OF_APPLICATION",
+                                    next,
+                                  );
+                                }}
+                                placeholder="DD-MM-YYYY"
+                                error={Boolean(errorMessage)}
+                                helperText={errorMessage || ""}
+                              />
+                            </Box>
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
                             <SubscaleTableTextCell

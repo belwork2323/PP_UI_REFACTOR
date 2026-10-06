@@ -2,6 +2,7 @@ import type { QualityControlFormState } from "../../../data/models/user/QualityC
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 export type QcPartialItemStatus =
+  | "YET_TO_START"
   | "TO_BE_INITIATED"
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
@@ -29,6 +30,12 @@ export const PARTIAL_ITEM_STATUS_CHIP: Record<
   QcPartialItemStatus,
   { label: string; bg: string; color: string; border: string }
 > = {
+  YET_TO_START: {
+    label: "Yet To Start",
+    bg: "rgba(148,163,184,0.14)",
+    color: "#64748b",
+    border: "rgba(148,163,184,0.32)",
+  },
   TO_BE_INITIATED: {
     label: "To Be Initiated",
     bg: "rgba(100,116,139,0.12)",
@@ -79,6 +86,7 @@ export const normalizePartialItemStatus = (value: unknown): QcPartialItemStatus 
     .toUpperCase()
     .replace(/\s+/g, "_");
   if (
+    raw === "YET_TO_START" ||
     raw === "IN_PROGRESS" ||
     raw === "WAITING_FOR_APPROVAL" ||
     raw === "APPROVED" ||
@@ -90,6 +98,7 @@ export const normalizePartialItemStatus = (value: unknown): QcPartialItemStatus 
   if (raw.includes("PARTIAL") || raw === "WAITING_FOR_PARTIAL_APPROVAL") {
     return "WAITING_FOR_APPROVAL";
   }
+  // Empty / unknown unit statuses stay "to be initiated"; locked catalog uses YET_TO_START explicitly.
   return "TO_BE_INITIATED";
 };
 

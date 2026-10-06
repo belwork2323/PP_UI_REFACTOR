@@ -2,6 +2,7 @@ import { runValidation } from "../runValidation";
 import type { ValidationTier, ValidationErrors } from "../submissionIntent";
 import subscaleHardwareValidationConfig from "../configs/subscale.validation.config";
 import { firstValidationErrorWithPath } from "../validationErrors";
+import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 const SUBSCALE_FIELD_LABELS: Record<string, string> = {
   NO_OF_40KG_BEMS: "No. of 40kg BEMs",
@@ -13,6 +14,8 @@ const SUBSCALE_FIELD_LABELS: Record<string, string> = {
   LINER_TYPE: "Liner Type",
   LINER_BATCH_NO: "Liner Batch No.",
   LINER_BATCH_DATE: "Liner Batch Date",
+  BATCH_SIZE: "Batch Size (KG)",
+  MIXER_BLDG_NO: "Bldg No.",
   PREMIX_DATE: "Premix Date",
   FINAL_MIX_DATE: "Final Mix Date",
   DATE_OF_CASTING: "Date of Casting",
@@ -44,6 +47,33 @@ const TABLE_SECTION_LABELS: Record<string, string> = {
   STATIC_TESTING_TABLE: "Static Testing",
   MECHANICAL_PROPERTIES_TABLE: "Mechanical Properties",
 };
+
+/** Preferred section order for scroll/focus after failed SUBMIT. */
+const SUBSCALE_FOCUS_PREFIX_ORDER = [
+  "NO_OF_40KG_BEMS",
+  "NO_OF_10KG_BEMS",
+  "NO_OF_2KG_BEMS",
+  "NO_OF_WHEEL_PEEL",
+  "NO_OF_SBS_TBS",
+  "NO_OF_CARTOONS",
+  "LINER_",
+  "BATCH_SIZE",
+  "MIXER_BLDG_NO",
+  "PREMIX_DATE",
+  "FINAL_MIX_DATE",
+  "SUBSCALE_MIXING_CYCLES.",
+  "DATE_OF_CASTING",
+  "IR_BATCH_NO",
+  "DATE_OF_MFG",
+  "ARTICLE_TYPE_TABLE.",
+  "CASTING_TABLE.",
+  "CURING_TABLE.",
+  "NDT_TABLE.",
+  "TRIMMING_TABLE.",
+  "INHIBITION_TABLE.",
+  "STATIC_TESTING_TABLE.",
+  "MECHANICAL_PROPERTIES_TABLE.",
+] as const;
 
 export function formatSubscaleValidationPath(path: string): string {
   const trimmed = String(path ?? "").trim();
@@ -82,7 +112,34 @@ export function formatSubscaleValidationPath(path: string): string {
 }
 
 export function firstSubscaleValidationError(errors: ValidationErrors): string | undefined {
+  const focusPath = resolveFirstSubscaleValidationFocus(errors);
+  if (focusPath && errors[focusPath]) {
+    return `${formatSubscaleValidationPath(focusPath)}: ${errors[focusPath]}`;
+  }
   return firstValidationErrorWithPath(errors, formatSubscaleValidationPath);
+}
+
+/** First error field path for Subscale focus/scroll (stable section order). */
+export function resolveFirstSubscaleValidationFocus(
+  errors: ValidationErrors | null | undefined,
+): string | null {
+  if (!errors) return null;
+  const keys = Object.keys(errors);
+  if (!keys.length) return null;
+
+  for (const prefix of SUBSCALE_FOCUS_PREFIX_ORDER) {
+    const match = keys
+      .filter((key) => key === prefix || key.startsWith(prefix))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0];
+    if (match) return match;
+  }
+
+  return keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))[0] ?? null;
+}
+
+/** Scroll + focus the control tagged with `data-ss-field`. */
+export function focusSubscaleField(fieldPath: string, root: ParentNode = document): boolean {
+  return focusFieldByDataAttr("ss-field", fieldPath, root);
 }
 
 export function validateSubscale(data: unknown, tier: ValidationTier): ValidationErrors {

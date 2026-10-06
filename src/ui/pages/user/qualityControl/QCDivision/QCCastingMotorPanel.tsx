@@ -186,7 +186,13 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
     );
   };
 
-  const renderInput = (row: T, index: number, column: ColumnDef<T>): ReactNode => {
+  const renderInput = (
+    row: T,
+    index: number,
+    column: ColumnDef<T>,
+    fieldPath: string,
+    hasError: boolean,
+  ): ReactNode => {
     const value = String(row[column.id] ?? "");
     if (readOnly) {
       const display =
@@ -202,48 +208,57 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
 
     if (column.fieldType === "date") {
       return (
-        <DateField
-          compact
-          value={value}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="DD-MM-YYYY"
-          inputSx={tableDateFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <DateField
+            compact
+            value={value}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="DD-MM-YYYY"
+            inputSx={tableDateFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "time") {
       return (
-        <TimeField
-          compact
-          value={normalizeTimeValue(value)}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="HH:mm"
-          inputSx={tableTimeFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <TimeField
+            compact
+            value={normalizeTimeValue(value)}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="HH:mm"
+            inputSx={tableTimeFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "select" && column.options) {
       return (
-        <TextField
-          select
-          size="small"
-          fullWidth
-          value={value}
-          onChange={(event) => updateRow(index, column.id, event.target.value)}
-          sx={tableFieldSx}
-          SelectProps={{ displayEmpty: true }}
-        >
-          <MenuItem value="">
-            <em>Select</em>
-          </MenuItem>
-          {column.options.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
+        <Box data-qc-field={fieldPath}>
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={value}
+            onChange={(event) => updateRow(index, column.id, event.target.value)}
+            sx={tableFieldSx}
+            error={hasError}
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value="">
+              <em>Select</em>
             </MenuItem>
-          ))}
-        </TextField>
+            {column.options.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
       );
     }
 
@@ -256,9 +271,11 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
         type="text"
         value={value}
         onChange={(event) => updateRow(index, column.id, event.target.value)}
-        inputProps={
-          column.fieldType === "number" ? { inputMode: "decimal" as const } : undefined
-        }
+        error={hasError}
+        inputProps={{
+          "data-qc-field": fieldPath,
+          ...(column.fieldType === "number" ? { inputMode: "decimal" as const } : {}),
+        }}
         sx={tableFieldSx}
       />
     );
@@ -326,7 +343,7 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
                   const message = fieldError(validationErrors ?? undefined, path);
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
-                      {renderInput(row, index, column)}
+                      {renderInput(row, index, column, path, Boolean(message))}
                       {!readOnly ? <FieldErrorText message={message} /> : null}
                     </TableCell>
                   );
@@ -410,31 +427,34 @@ const renderSelectField = (
   readOnly: boolean,
   placeholder = "Select",
   error = false,
+  fieldPath?: string,
 ) => {
   if (readOnly) {
     const label = options.find((option) => option.value === value)?.label ?? value;
     return <QCDivisionReadOnlyValue value={label} muted={!String(label ?? "").trim()} />;
   }
   return (
-    <TextField
-      select
-      size="small"
-      fullWidth
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      error={error}
-      sx={tableFieldSx}
-      SelectProps={{ displayEmpty: true }}
-    >
-      <MenuItem value="">
-        <em>{placeholder}</em>
-      </MenuItem>
-      {options.map((option) => (
-        <MenuItem key={option.value} value={option.value}>
-          {option.label}
+    <Box data-qc-field={fieldPath || undefined}>
+      <TextField
+        select
+        size="small"
+        fullWidth
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        error={error}
+        sx={tableFieldSx}
+        SelectProps={{ displayEmpty: true }}
+      >
+        <MenuItem value="">
+          <em>{placeholder}</em>
         </MenuItem>
-      ))}
-    </TextField>
+        {options.map((option) => (
+          <MenuItem key={option.value} value={option.value}>
+            {option.label}
+          </MenuItem>
+        ))}
+      </TextField>
+    </Box>
   );
 };
 
@@ -664,14 +684,16 @@ const QCCastingMotorPanel = ({
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={assemblyDate} muted={!assemblyDate.trim()} />
               ) : (
-                <DateField
-                  compact
-                  value={assemblyDate}
-                  onChange={(next) => onChange(setCastingAssemblyDate(values, next))}
-                  placeholder="DD-MM-YYYY"
-                  inputSx={tableDateFieldSx}
-                  error={Boolean(err("ASSEMBLY_DATE"))}
-                />
+                <Box data-qc-field="ASSEMBLY_DATE">
+                  <DateField
+                    compact
+                    value={assemblyDate}
+                    onChange={(next) => onChange(setCastingAssemblyDate(values, next))}
+                    placeholder="DD-MM-YYYY"
+                    inputSx={tableDateFieldSx}
+                    error={Boolean(err("ASSEMBLY_DATE"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <CastingEditableTable
@@ -700,16 +722,18 @@ const QCCastingMotorPanel = ({
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={dateOfCasting} muted={!dateOfCasting.trim()} />
               ) : (
-                <DateField
-                  compact
-                  value={dateOfCasting}
-                  onChange={(next) =>
-                    onChange(setCastingPropellantField(values, "DATE_OF_CASTING", next))
-                  }
-                  placeholder="DD-MM-YYYY"
-                  inputSx={tableDateFieldSx}
-                  error={Boolean(err("DATE_OF_CASTING"))}
-                />
+                <Box data-qc-field="DATE_OF_CASTING">
+                  <DateField
+                    compact
+                    value={dateOfCasting}
+                    onChange={(next) =>
+                      onChange(setCastingPropellantField(values, "DATE_OF_CASTING", next))
+                    }
+                    placeholder="DD-MM-YYYY"
+                    inputSx={tableDateFieldSx}
+                    error={Boolean(err("DATE_OF_CASTING"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="RH %" readOnly={readOnly} required error={err("RH_PERCENT")}>
@@ -726,6 +750,7 @@ const QCCastingMotorPanel = ({
                   }
                   sx={tableFieldSx}
                   error={Boolean(err("RH_PERCENT"))}
+                  inputProps={{ "data-qc-field": "RH_PERCENT" }}
                 />
               )}
             </FieldRow>
@@ -745,6 +770,7 @@ const QCCastingMotorPanel = ({
                   }
                   sx={tableFieldSx}
                   error={Boolean(err("VACUUM_MAINTAINED"))}
+                  inputProps={{ "data-qc-field": "VACUUM_MAINTAINED" }}
                 />
               )}
             </FieldRow>
@@ -802,16 +828,18 @@ const QCCastingMotorPanel = ({
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={soakingDuration} muted={!soakingDuration.trim()} />
               ) : (
-                <TimeField
-                  compact
-                  value={soakingDuration}
-                  onChange={(next) =>
-                    onChange(setCastingPostCastField(values, "SOAKING_DURATION", next))
-                  }
-                  placeholder="HH:mm"
-                  inputSx={tableTimeFieldSx}
-                  error={Boolean(err("SOAKING_DURATION"))}
-                />
+                <Box data-qc-field="SOAKING_DURATION">
+                  <TimeField
+                    compact
+                    value={soakingDuration}
+                    onChange={(next) =>
+                      onChange(setCastingPostCastField(values, "SOAKING_DURATION", next))
+                    }
+                    placeholder="HH:mm"
+                    inputSx={tableTimeFieldSx}
+                    error={Boolean(err("SOAKING_DURATION"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="Pressure Plate Assembly Applicable" readOnly={readOnly} required error={err("PRESSURE_PLATE_ASSEMBLY_REQUIRED")}>
@@ -823,6 +851,7 @@ const QCCastingMotorPanel = ({
                 readOnly,
                 "Select",
                 Boolean(err("PRESSURE_PLATE_ASSEMBLY_REQUIRED")),
+                "PRESSURE_PLATE_ASSEMBLY_REQUIRED",
               )}
             </FieldRow>
             {pressureRequired === "YES" ? (

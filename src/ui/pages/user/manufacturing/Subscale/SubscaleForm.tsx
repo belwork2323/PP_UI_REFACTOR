@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import type { SubscaleFormState } from "../../../../../data/models/user/SubscaleFormModel";
+import { focusSubscaleField } from "@/data/validation/adapters/subscale.validation";
 import {
   getSubscaleProcessingLabel,
   isMainScaleSubscaleBatch,
@@ -36,7 +37,8 @@ type SubscaleFormProps = {
   onRequestSaveDraft?: () => void;
   onRequestSubmit?: () => void;
   errors?: Record<string, string>;
-  clearFieldError?: (path: string) => void; // <-- Add this
+  clearFieldError?: (path: string) => void;
+  validationFocusRequest?: { id: number; fieldPath: string | null } | null;
 };
 
 const SubscaleForm = ({
@@ -51,14 +53,22 @@ const SubscaleForm = ({
   onRequestSaveDraft,
   errors,
   clearFieldError,
+  validationFocusRequest = null,
 }: SubscaleFormProps) => {
   const BRAND = SUBSCALE_BRAND;
   const isMainScale = isMainScaleSubscaleBatch(batch?.batchType);
   const processingLabel = getSubscaleProcessingLabel(batch?.batchType);
   const isFormLoaded = Boolean(formData.schemaFormValues?.IS_PROCESS_FORM_LOADED);
   const batchStatus = batch?.ssStatus ?? batch?.status;
-  console.log(formData);
-  console.log(batch);
+
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const path = validationFocusRequest.fieldPath;
+    const timer = window.setTimeout(() => {
+      focusSubscaleField(path);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
 
   return (
     <Box>

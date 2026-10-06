@@ -366,7 +366,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                   <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
                     <TableCell sx={TD}>{row.srNo}</TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.sections`}>
                         <CNumericInput
                           fieldSx={fieldSx}
                           value={row.sections}
@@ -378,7 +378,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.orientations`}>
                         <CNumericInput
                           fieldSx={fieldSx}
                           value={row.orientations}
@@ -390,7 +390,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.sfd`}>
                         <CNumericInput
                           fieldSx={fieldSx}
                           value={row.sfd}
@@ -402,7 +402,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.normalExposures`}>
                         <CNumericInput
                           fieldSx={fieldSx}
                           value={row.normalExposures}
@@ -414,7 +414,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.tangentialExposures`}>
                         <CNumericInput
                           fieldSx={fieldSx}
                           value={row.tangentialExposures}
@@ -426,7 +426,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <Box>
+                      <Box data-ndt-field={`radiographyPlanRows.${index}.detectorType`}>
                         <CSelect
                           fieldSx={fieldSx}
                           value={row.detectorType}
@@ -471,7 +471,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 return (
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`additionalExposureRows.${index}.sectionNumber`}>
                       <CNumericInput
                         fieldSx={fieldSx}
                         value={row.sectionNumber}
@@ -483,7 +483,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`additionalExposureRows.${index}.orientation`}>
                       <CInput
                         fieldSx={fieldSx}
                         value={row.orientation}
@@ -495,7 +495,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`additionalExposureRows.${index}.exposureCount`}>
                       <CNumericInput
                         fieldSx={fieldSx}
                         value={row.exposureCount}
@@ -577,7 +577,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>{index + 1}</TableCell>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`radiographyObservationRows.${index}.section`}>
                       <CNumericInput
                         fieldSx={fieldSx}
                         value={row.section}
@@ -589,7 +589,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`radiographyObservationRows.${index}.orientation`}>
                       <CInput
                         fieldSx={fieldSx}
                         value={row.orientation}
@@ -601,7 +601,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <Box>
+                    <Box data-ndt-field={`radiographyObservationRows.${index}.observations`}>
                       <CInput
                         fieldSx={fieldSx}
                         value={row.observations}
@@ -696,7 +696,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
                           {row.observation}
                         </Typography>
-                        <Box>
+                        <Box data-ndt-field={observationPath}>
                           <CInput
                             fieldSx={fieldSx}
                             value={row.observationNotes ?? ""}
@@ -709,7 +709,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         </Box>
                       </Stack>
                     ) : (
-                      <Box>
+                      <Box data-ndt-field={observationPath}>
                         <CInput
                           fieldSx={fieldSx}
                           value={row.observation}
@@ -815,7 +815,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
           theme={theme}
         />
         <Box sx={{ px: 1.75, py: 1.25 }}>
-          <Box>
+          <Box data-ndt-field="signedReport">
             <NdtFileField
               files={motor.signedReport ? [motor.signedReport] : []}
               onChange={(next) => onChange({ signedReport: next[0] ?? null })}

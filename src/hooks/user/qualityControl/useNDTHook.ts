@@ -36,9 +36,12 @@ import {
 import {
   validateNDTMotorSession,
   firstNdtValidationError,
+  resolveFirstNdtValidationFocus,
+  focusNdtField,
   type ValidationErrors as NDTValidationErrors,
 } from "../../../data/validation/adapters/ndt.validation";
 import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
+import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
@@ -316,6 +319,14 @@ export const useNDTHook = () => {
     const base =
       intent === "draft" ? messages.DRAFT_VALIDATION_FAILED : messages.SUBMIT_VALIDATION_FAILED;
     showValidationAlert(firstError ? `${base} (${firstError})` : base);
+  };
+
+  const emitNdtValidationFocus = (fieldErrors: NDTValidationErrors) => {
+    const fieldPath = resolveFirstNdtValidationFocus(fieldErrors);
+    if (!fieldPath) return;
+    requestAnimationFrame(() => {
+      focusNdtField(fieldPath);
+    });
   };
 
   const refreshBatchLocks = useCallback(
@@ -606,15 +617,21 @@ export const useNDTHook = () => {
         });
         const updated = nextMotors.find((m) => m.motorId === motorId);
         if (updated) {
-          const live = validateNDTMotorSession(updated, "FORMAT");
+          const formatErrors = validateNDTMotorSession(updated, "FORMAT");
+          const fullErrors = validateNDTMotorSession(updated, "SUBMIT");
           setMotorValidationErrors((errs) => {
-            if (Object.keys(live).length === 0) {
+            const merged = reconcileLiveValidationErrors(
+              errs[motorId],
+              formatErrors,
+              fullErrors,
+            );
+            if (Object.keys(merged).length === 0) {
               if (!errs[motorId]) return errs;
               const copy = { ...errs };
               delete copy[motorId];
               return copy;
             }
-            return { ...errs, [motorId]: live };
+            return { ...errs, [motorId]: merged };
           });
         }
         return normalizeNDTFormState({
@@ -764,6 +781,7 @@ export const useNDTHook = () => {
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
           notifyNdtValidationErrors(fieldErrors, intent);
+          emitNdtValidationFocus(fieldErrors);
           return false;
         }
         setMotorValidationErrors((prev) => {

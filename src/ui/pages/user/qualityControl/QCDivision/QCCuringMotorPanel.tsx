@@ -185,7 +185,13 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
     );
   };
 
-  const renderInput = (row: T, index: number, column: ColumnDef<T>): ReactNode => {
+  const renderInput = (
+    row: T,
+    index: number,
+    column: ColumnDef<T>,
+    fieldPath: string,
+    hasError: boolean,
+  ): ReactNode => {
     const rawValue = String(row[column.id] ?? "");
     const value =
       column.id === "PARAMETER" && rawValue === QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER
@@ -213,48 +219,57 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
 
     if (column.fieldType === "date") {
       return (
-        <DateField
-          compact
-          value={value}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="DD-MM-YYYY"
-          inputSx={tableDateFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <DateField
+            compact
+            value={value}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="DD-MM-YYYY"
+            inputSx={tableDateFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "time") {
       return (
-        <TimeField
-          compact
-          value={normalizeTimeValue(value)}
-          onChange={(next) => updateRow(index, column.id, next)}
-          placeholder="HH:mm"
-          inputSx={tableTimeFieldSx}
-        />
+        <Box data-qc-field={fieldPath}>
+          <TimeField
+            compact
+            value={normalizeTimeValue(value)}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="HH:mm"
+            inputSx={tableTimeFieldSx}
+            error={hasError}
+          />
+        </Box>
       );
     }
 
     if (column.fieldType === "select" && column.options) {
       return (
-        <TextField
-          select
-          size="small"
-          fullWidth
-          value={value}
-          onChange={(event) => updateRow(index, column.id, event.target.value)}
-          sx={tableFieldSx}
-          SelectProps={{ displayEmpty: true }}
-        >
-          <MenuItem value="">
-            <em>Select</em>
-          </MenuItem>
-          {column.options.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
+        <Box data-qc-field={fieldPath}>
+          <TextField
+            select
+            size="small"
+            fullWidth
+            value={value}
+            onChange={(event) => updateRow(index, column.id, event.target.value)}
+            sx={tableFieldSx}
+            error={hasError}
+            SelectProps={{ displayEmpty: true }}
+          >
+            <MenuItem value="">
+              <em>Select</em>
             </MenuItem>
-          ))}
-        </TextField>
+            {column.options.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
       );
     }
 
@@ -268,9 +283,11 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
         value={value}
         onChange={(event) => updateRow(index, column.id, event.target.value)}
         placeholder={placeholder}
-        inputProps={
-          column.fieldType === "number" ? { inputMode: "decimal" as const } : undefined
-        }
+        error={hasError}
+        inputProps={{
+          "data-qc-field": fieldPath,
+          ...(column.fieldType === "number" ? { inputMode: "decimal" as const } : {}),
+        }}
         sx={tableFieldSx}
       />
     );
@@ -340,7 +357,7 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
                   const message = fieldError(validationErrors ?? undefined, path);
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
-                      {renderInput(row, index, column)}
+                      {renderInput(row, index, column, path, Boolean(message))}
                       {!readOnly ? <FieldErrorText message={message} /> : null}
                     </TableCell>
                   );
@@ -477,7 +494,7 @@ const renderTextField = (
   value: string,
   onChange: (value: string) => void,
   readOnly: boolean,
-  options?: { multiline?: boolean; number?: boolean },
+  options?: { multiline?: boolean; number?: boolean; error?: boolean; fieldPath?: string },
 ) => {
   if (readOnly) {
     return <QCDivisionReadOnlyValue value={value} muted={!value.trim()} />;
@@ -491,6 +508,8 @@ const renderTextField = (
       type={options?.number ? "number" : "text"}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      error={Boolean(options?.error)}
+      inputProps={options?.fieldPath ? { "data-qc-field": options.fieldPath } : undefined}
       sx={tableFieldSx}
     />
   );
@@ -755,15 +774,17 @@ const QCCuringMotorPanel = ({
                   muted={!motorPositioningDateTime.trim()}
                 />
               ) : (
-                <DateTimeField
-                  compact
-                  value={motorPositioningDateTime}
-                  onChange={(next) =>
-                    onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
-                  }
-                  inputSx={setupDateTimeFieldSx}
-                  error={Boolean(err("MOTOR_POSITIONING_DATE_TIME"))}
-                />
+                <Box data-qc-field="MOTOR_POSITIONING_DATE_TIME">
+                  <DateTimeField
+                    compact
+                    value={motorPositioningDateTime}
+                    onChange={(next) =>
+                      onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
+                    }
+                    inputSx={setupDateTimeFieldSx}
+                    error={Boolean(err("MOTOR_POSITIONING_DATE_TIME"))}
+                  />
+                </Box>
               )}
             </SetupFieldCell>
           </Stack>
@@ -797,7 +818,11 @@ const QCCuringMotorPanel = ({
                 visualObservations,
                 (next) => onChange(setCuringPostField(values, "VISUAL_OBSERVATIONS", next)),
                 readOnly,
-                { multiline: true },
+                {
+                  multiline: true,
+                  error: Boolean(err("VISUAL_OBSERVATIONS")),
+                  fieldPath: "VISUAL_OBSERVATIONS",
+                },
               )}
             </FieldRow>
             <FieldRow label="Date/Time for removal of pressure plate" readOnly={readOnly}>
@@ -806,6 +831,7 @@ const QCCuringMotorPanel = ({
                 (next) =>
                   onChange(setCuringPostField(values, "PRESSURE_PLATE_REMOVAL_DATE_TIME", next)),
                 readOnly,
+                { fieldPath: "PRESSURE_PLATE_REMOVAL_DATE_TIME" },
               )}
             </FieldRow>
             <FieldRow label="Shore A Hardness" readOnly={readOnly} required error={err("SHORE_A_HARDNESS")}>
@@ -813,7 +839,11 @@ const QCCuringMotorPanel = ({
                 shoreAHardness,
                 (next) => onChange(setCuringPostField(values, "SHORE_A_HARDNESS", next)),
                 readOnly,
-                { number: true },
+                {
+                  number: true,
+                  error: Boolean(err("SHORE_A_HARDNESS")),
+                  fieldPath: "SHORE_A_HARDNESS",
+                },
               )}
             </FieldRow>
             <FieldRow label="Date/Time of Dispatch of motor for De-coring" readOnly={readOnly} required error={err("DISPATCH_DATE_TIME")}>
@@ -821,6 +851,10 @@ const QCCuringMotorPanel = ({
                 dispatchDateTime,
                 (next) => onChange(setCuringPostField(values, "DISPATCH_DATE_TIME", next)),
                 readOnly,
+                {
+                  error: Boolean(err("DISPATCH_DATE_TIME")),
+                  fieldPath: "DISPATCH_DATE_TIME",
+                },
               )}
             </FieldRow>
           </Stack>
@@ -862,15 +896,18 @@ const QCCuringMotorPanel = ({
                   muted={!curingStartDate.trim()}
                 />
               ) : (
-                <DateField
-                  compact
-                  value={curingStartDate}
-                  onChange={(next) =>
-                    onChange(setCuringSubscaleField(values, "CURING_START_DATE", next))
-                  }
-                  placeholder="DD-MM-YYYY"
-                  inputSx={tableDateFieldSx}
-                />
+                <Box data-qc-field="CURING_START_DATE">
+                  <DateField
+                    compact
+                    value={curingStartDate}
+                    onChange={(next) =>
+                      onChange(setCuringSubscaleField(values, "CURING_START_DATE", next))
+                    }
+                    placeholder="DD-MM-YYYY"
+                    inputSx={tableDateFieldSx}
+                    error={Boolean(err("CURING_START_DATE"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="Cycle Start Time" readOnly={readOnly} required error={err("CYCLE_START_TIME")}>
@@ -880,15 +917,18 @@ const QCCuringMotorPanel = ({
                   muted={!cycleStartTime.trim()}
                 />
               ) : (
-                <TimeField
-                  compact
-                  value={normalizeTimeValue(cycleStartTime)}
-                  onChange={(next) =>
-                    onChange(setCuringSubscaleField(values, "CYCLE_START_TIME", next))
-                  }
-                  placeholder="HH:mm"
-                  inputSx={tableTimeFieldSx}
-                />
+                <Box data-qc-field="CYCLE_START_TIME">
+                  <TimeField
+                    compact
+                    value={normalizeTimeValue(cycleStartTime)}
+                    onChange={(next) =>
+                      onChange(setCuringSubscaleField(values, "CYCLE_START_TIME", next))
+                    }
+                    placeholder="HH:mm"
+                    inputSx={tableTimeFieldSx}
+                    error={Boolean(err("CYCLE_START_TIME"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="Curing Complete Date" readOnly={readOnly} required error={err("CURING_COMPLETE_DATE")}>
@@ -898,15 +938,18 @@ const QCCuringMotorPanel = ({
                   muted={!curingCompleteDate.trim()}
                 />
               ) : (
-                <DateField
-                  compact
-                  value={curingCompleteDate}
-                  onChange={(next) =>
-                    onChange(setCuringSubscaleField(values, "CURING_COMPLETE_DATE", next))
-                  }
-                  placeholder="DD-MM-YYYY"
-                  inputSx={tableDateFieldSx}
-                />
+                <Box data-qc-field="CURING_COMPLETE_DATE">
+                  <DateField
+                    compact
+                    value={curingCompleteDate}
+                    onChange={(next) =>
+                      onChange(setCuringSubscaleField(values, "CURING_COMPLETE_DATE", next))
+                    }
+                    placeholder="DD-MM-YYYY"
+                    inputSx={tableDateFieldSx}
+                    error={Boolean(err("CURING_COMPLETE_DATE"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="Cycle End Time" readOnly={readOnly} required error={err("CYCLE_END_TIME")}>
@@ -916,15 +959,18 @@ const QCCuringMotorPanel = ({
                   muted={!cycleEndTime.trim()}
                 />
               ) : (
-                <TimeField
-                  compact
-                  value={normalizeTimeValue(cycleEndTime)}
-                  onChange={(next) =>
-                    onChange(setCuringSubscaleField(values, "CYCLE_END_TIME", next))
-                  }
-                  placeholder="HH:mm"
-                  inputSx={tableTimeFieldSx}
-                />
+                <Box data-qc-field="CYCLE_END_TIME">
+                  <TimeField
+                    compact
+                    value={normalizeTimeValue(cycleEndTime)}
+                    onChange={(next) =>
+                      onChange(setCuringSubscaleField(values, "CYCLE_END_TIME", next))
+                    }
+                    placeholder="HH:mm"
+                    inputSx={tableTimeFieldSx}
+                    error={Boolean(err("CYCLE_END_TIME"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="All BEM Average Shore A Hardness" readOnly={readOnly} required error={err("BEM_AVERAGE_SHORE_A_HARDNESS")}>
@@ -933,7 +979,11 @@ const QCCuringMotorPanel = ({
                 (next) =>
                   onChange(setCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS", next)),
                 readOnly,
-                { number: true },
+                {
+                  number: true,
+                  error: Boolean(err("BEM_AVERAGE_SHORE_A_HARDNESS")),
+                  fieldPath: "BEM_AVERAGE_SHORE_A_HARDNESS",
+                },
               )}
             </FieldRow>
             <FieldRow label="All Carton Average Shore A Hardness" readOnly={readOnly} required error={err("CARTON_AVERAGE_SHORE_A_HARDNESS")}>
@@ -944,7 +994,11 @@ const QCCuringMotorPanel = ({
                     setCuringSubscaleField(values, "CARTON_AVERAGE_SHORE_A_HARDNESS", next),
                   ),
                 readOnly,
-                { number: true },
+                {
+                  number: true,
+                  error: Boolean(err("CARTON_AVERAGE_SHORE_A_HARDNESS")),
+                  fieldPath: "CARTON_AVERAGE_SHORE_A_HARDNESS",
+                },
               )}
             </FieldRow>
             <FieldRow label="Visual Observations (if any)" readOnly={readOnly} required error={err("SUBSCALE_VISUAL_OBSERVATIONS")}>
@@ -953,7 +1007,11 @@ const QCCuringMotorPanel = ({
                 (next) =>
                   onChange(setCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS", next)),
                 readOnly,
-                { multiline: true },
+                {
+                  multiline: true,
+                  error: Boolean(err("SUBSCALE_VISUAL_OBSERVATIONS")),
+                  fieldPath: "SUBSCALE_VISUAL_OBSERVATIONS",
+                },
               )}
             </FieldRow>
           </Stack>
