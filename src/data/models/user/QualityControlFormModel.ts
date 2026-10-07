@@ -1033,7 +1033,7 @@ export const mapQualityControlPayload = (
 
         if (division === "PROPELLANT_PROPERTIES" || division === "QC") {
           return {
-            division: "PROPELLANT_PROPERTIES" as const,
+            division: "QC" as const,
             subType: null,
             divisionSubmissionType,
             data: wrapPropellantDivisionDataFromEntries(form, entries, options),
@@ -1098,6 +1098,8 @@ export const mapQualityControlDivisionSubmitPayload = (params: {
     subType = "RAW_MATERIAL_PROCESSING";
   } else if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
     division = "POST_CURE";
+  } else if (division === "PROPELLANT_PROPERTIES") {
+    division = "QC";
   }
 
   return {

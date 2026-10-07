@@ -57,20 +57,27 @@ const CompactDate = ({
   onChange,
   disabled,
   readOnly,
+  fieldPath,
+  error,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  fieldPath?: string;
+  error?: boolean;
 }) => (
-  <DateField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    inputSx={postCureTableInputSx}
-  />
+  <Box {...(fieldPath ? { "data-stf-field": fieldPath } : {})}>
+    <DateField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      inputSx={postCureTableInputSx}
+      error={error}
+    />
+  </Box>
 );
 
 const CompactDateTime = ({
@@ -78,20 +85,27 @@ const CompactDateTime = ({
   onChange,
   disabled,
   readOnly,
+  fieldPath,
+  error,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  fieldPath?: string;
+  error?: boolean;
 }) => (
-  <DateTimeField
-    value={value}
-    onChange={onChange}
-    disabled={disabled}
-    readOnly={readOnly}
-    compact
-    inputSx={postCureTableInputSx}
-  />
+  <Box {...(fieldPath ? { "data-stf-field": fieldPath } : {})}>
+    <DateTimeField
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      readOnly={readOnly}
+      compact
+      inputSx={postCureTableInputSx}
+      error={error}
+    />
+  </Box>
 );
 
 const ScalarFields = <T extends Record<string, string>>({
@@ -121,13 +135,18 @@ const ScalarFields = <T extends Record<string, string>>({
       const path = pathPrefix ? `${pathPrefix}.${key}` : key;
       const message = fieldError(validationErrors, path);
       return (
-        <Box key={key} sx={multiline ? { gridColumn: { xs: "1", md: "1 / -1" } } : undefined}>
+        <Box
+          key={key}
+          data-stf-field={path}
+          sx={multiline ? { gridColumn: { xs: "1", md: "1 / -1" } } : undefined}
+        >
           <FieldLabel>{formatFieldLabel(key)}</FieldLabel>
           <TableTextInput
             value={section[key]}
             onChange={(val) => onChange(patchSection(section, key, val))}
             disabled={disabled}
             readOnly={readOnly}
+            error={Boolean(message)}
             {...(multiline ? { multiline: true, minRows: 2 } : {})}
           />
           <FieldErrorText message={message} />
@@ -190,20 +209,22 @@ const MainSensorTable = ({
                   {readonly ? (
                     row.CHANNEL
                   ) : (
-                    <Box>
-                      <TableTextInput
-                        value={row[key]}
-                        onChange={(val) => updateRow(index, key, val)}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                      />
-                      <FieldErrorText
-                        message={fieldError(
-                          validationErrors,
-                          `SENSOR_CONFIGURATION.${index}.${key}`,
-                        )}
-                      />
-                    </Box>
+                    (() => {
+                      const path = `SENSOR_CONFIGURATION.${index}.${key}`;
+                      const message = fieldError(validationErrors, path);
+                      return (
+                        <Box data-stf-field={path}>
+                          <TableTextInput
+                            value={row[key]}
+                            onChange={(val) => updateRow(index, key, val)}
+                            disabled={disabled}
+                            readOnly={readOnly}
+                            error={Boolean(message)}
+                          />
+                          <FieldErrorText message={message} />
+                        </Box>
+                      );
+                    })()
                   )}
                 </TableCell>
               ))}
@@ -268,20 +289,22 @@ const BemSensorTable = ({
                   {readonly ? (
                     row.CHANNEL
                   ) : (
-                    <Box>
-                      <TableTextInput
-                        value={row[key]}
-                        onChange={(val) => updateRow(index, key, val)}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                      />
-                      <FieldErrorText
-                        message={fieldError(
-                          validationErrors,
-                          `SENSOR_CONFIGURATION.${index}.${key}`,
-                        )}
-                      />
-                    </Box>
+                    (() => {
+                      const path = `SENSOR_CONFIGURATION.${index}.${key}`;
+                      const message = fieldError(validationErrors, path);
+                      return (
+                        <Box data-stf-field={path}>
+                          <TableTextInput
+                            value={row[key]}
+                            onChange={(val) => updateRow(index, key, val)}
+                            disabled={disabled}
+                            readOnly={readOnly}
+                            error={Boolean(message)}
+                          />
+                          <FieldErrorText message={message} />
+                        </Box>
+                      );
+                    })()
                   )}
                 </TableCell>
               ))}
@@ -342,17 +365,22 @@ const GrainDimensionTable = ({
                   {readonly ? (
                     row.SIDE
                   ) : (
-                    <Box>
-                      <TableTextInput
-                        value={row[key]}
-                        onChange={(val) => updateRow(index, key, val)}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                      />
-                      <FieldErrorText
-                        message={fieldError(validationErrors, `GRAIN_DIMENSION.${index}.${key}`)}
-                      />
-                    </Box>
+                    (() => {
+                      const path = `GRAIN_DIMENSION.${index}.${key}`;
+                      const message = fieldError(validationErrors, path);
+                      return (
+                        <Box data-stf-field={path}>
+                          <TableTextInput
+                            value={row[key]}
+                            onChange={(val) => updateRow(index, key, val)}
+                            disabled={disabled}
+                            readOnly={readOnly}
+                            error={Boolean(message)}
+                          />
+                          <FieldErrorText message={message} />
+                        </Box>
+                      );
+                    })()
                   )}
                 </TableCell>
               ))}
@@ -475,22 +503,24 @@ const MainMotorPanel = ({
     </SectionCard>
 
     <SectionCard title="Upload PT Curve" theme={theme}>
-      <FieldLabel>{formatFieldLabel("PT_CURVE_FILE")}</FieldLabel>
-      <StfFileField
-        files={data.UPLOAD_PT_CURVE.PT_CURVE_FILE}
-        onChange={(next) =>
-          onChange({
-            ...data,
-            UPLOAD_PT_CURVE: { PT_CURVE_FILE: next },
-          })
-        }
-        multiple={false}
-        acceptMode="imageVideoPdf"
-        subDeptSlug={subDeptSlug}
-        disabled={disabled}
-        readOnly={readOnly}
-      />
-      <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_FILE")} />
+      <Box data-stf-field="UPLOAD_PT_CURVE.PT_CURVE_FILE">
+        <FieldLabel>{formatFieldLabel("PT_CURVE_FILE")}</FieldLabel>
+        <StfFileField
+          files={data.UPLOAD_PT_CURVE.PT_CURVE_FILE}
+          onChange={(next) =>
+            onChange({
+              ...data,
+              UPLOAD_PT_CURVE: { PT_CURVE_FILE: next },
+            })
+          }
+          multiple={false}
+          acceptMode="imageVideoPdf"
+          subDeptSlug={subDeptSlug}
+          disabled={disabled}
+          readOnly={readOnly}
+        />
+        <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_FILE")} />
+      </Box>
     </SectionCard>
   </Box>
 );
@@ -515,7 +545,7 @@ const BemMotorPanel = ({
   <Box>
     <SectionCard title="Conditioning Details" theme={theme}>
       <FieldGrid columns={3}>
-        <Box>
+        <Box data-stf-field="CONDITIONING_DETAILS.FROM_DATE_TIME">
           <FieldLabel>{formatFieldLabel("FROM_DATE_TIME")}</FieldLabel>
           <CompactDateTime
             value={data.CONDITIONING_DETAILS.FROM_DATE_TIME}
@@ -531,12 +561,16 @@ const BemMotorPanel = ({
             }
             disabled={disabled}
             readOnly={readOnly}
+            fieldPath="CONDITIONING_DETAILS.FROM_DATE_TIME"
+            error={Boolean(
+              fieldError(validationErrors, "CONDITIONING_DETAILS.FROM_DATE_TIME"),
+            )}
           />
           <FieldErrorText
             message={fieldError(validationErrors, "CONDITIONING_DETAILS.FROM_DATE_TIME")}
           />
         </Box>
-        <Box>
+        <Box data-stf-field="CONDITIONING_DETAILS.TO_DATE_TIME">
           <FieldLabel>{formatFieldLabel("TO_DATE_TIME")}</FieldLabel>
           <CompactDateTime
             value={data.CONDITIONING_DETAILS.TO_DATE_TIME}
@@ -548,12 +582,14 @@ const BemMotorPanel = ({
             }
             disabled={disabled}
             readOnly={readOnly}
+            fieldPath="CONDITIONING_DETAILS.TO_DATE_TIME"
+            error={Boolean(fieldError(validationErrors, "CONDITIONING_DETAILS.TO_DATE_TIME"))}
           />
           <FieldErrorText
             message={fieldError(validationErrors, "CONDITIONING_DETAILS.TO_DATE_TIME")}
           />
         </Box>
-        <Box>
+        <Box data-stf-field="CONDITIONING_DETAILS.TEMPERATURE">
           <FieldLabel>{formatFieldLabel("TEMPERATURE")}</FieldLabel>
           <TableTextInput
             value={data.CONDITIONING_DETAILS.TEMPERATURE}
@@ -565,12 +601,13 @@ const BemMotorPanel = ({
             }
             disabled={disabled}
             readOnly={readOnly}
+            error={Boolean(fieldError(validationErrors, "CONDITIONING_DETAILS.TEMPERATURE"))}
           />
           <FieldErrorText
             message={fieldError(validationErrors, "CONDITIONING_DETAILS.TEMPERATURE")}
           />
         </Box>
-        <Box>
+        <Box data-stf-field="CONDITIONING_DETAILS.RH">
           <FieldLabel>{formatFieldLabel("RH")}</FieldLabel>
           <TableTextInput
             value={data.CONDITIONING_DETAILS.RH}
@@ -582,10 +619,14 @@ const BemMotorPanel = ({
             }
             disabled={disabled}
             readOnly={readOnly}
+            error={Boolean(fieldError(validationErrors, "CONDITIONING_DETAILS.RH"))}
           />
           <FieldErrorText message={fieldError(validationErrors, "CONDITIONING_DETAILS.RH")} />
         </Box>
-        <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
+        <Box
+          data-stf-field="CONDITIONING_DETAILS.OBSERVATION"
+          sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}
+        >
           <FieldLabel>{formatFieldLabel("OBSERVATION")}</FieldLabel>
           <TableTextInput
             value={data.CONDITIONING_DETAILS.OBSERVATION}
@@ -599,6 +640,7 @@ const BemMotorPanel = ({
             readOnly={readOnly}
             multiline
             minRows={2}
+            error={Boolean(fieldError(validationErrors, "CONDITIONING_DETAILS.OBSERVATION"))}
           />
           <FieldErrorText
             message={fieldError(validationErrors, "CONDITIONING_DETAILS.OBSERVATION")}
@@ -728,22 +770,24 @@ const BemMotorPanel = ({
     </SectionCard>
 
     <SectionCard title="Upload PT Curve" theme={theme}>
-      <FieldLabel>{formatFieldLabel("PT_CURVE_UPLOAD")}</FieldLabel>
-      <StfFileField
-        files={data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD}
-        onChange={(next) =>
-          onChange({
-            ...data,
-            UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: next },
-          })
-        }
-        multiple={false}
-        acceptMode="imageVideoPdf"
-        subDeptSlug={subDeptSlug}
-        disabled={disabled}
-        readOnly={readOnly}
-      />
-      <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD")} />
+      <Box data-stf-field="UPLOAD_PT_CURVE.PT_CURVE_UPLOAD">
+        <FieldLabel>{formatFieldLabel("PT_CURVE_UPLOAD")}</FieldLabel>
+        <StfFileField
+          files={data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD}
+          onChange={(next) =>
+            onChange({
+              ...data,
+              UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: next },
+            })
+          }
+          multiple={false}
+          acceptMode="imageVideoPdf"
+          subDeptSlug={subDeptSlug}
+          disabled={disabled}
+          readOnly={readOnly}
+        />
+        <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD")} />
+      </Box>
     </SectionCard>
   </Box>
 );

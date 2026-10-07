@@ -46,7 +46,8 @@ export const qcPostCureValidationFields: Record<string, FieldRuleConfig> = {
   toDate: date(["SUBMIT"]),
   batchNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   preparationDate: date(["SUBMIT"]),
-  specification: number(["SUBMIT"]),
+  // Specs allow ranges/tolerances (e.g. "99 - 100") — Mixing / manufacturing Post Cure parity.
+  specification: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
   result: number(["SUBMIT"]),
   qtyFilled: number(["SUBMIT"]),
   qtyApplied: number(["SUBMIT"]),

@@ -528,9 +528,9 @@ export const resolveManufacturingGateForQcDivision = (params: {
  * QC unit tabs: prefer manufacturing stageProgress APPROVED / COMPLETELY_APPROVED.
  * Fall back to QC divisionStatuses only when the manufacturing stage row is missing.
  *
- * For motor divisions, do not merge divisionStatuses unlocks when manufacturing stage exists —
- * corrupted TO_BE_INITIATED rows must not bypass manufacturing APPROVED.
- * Mixing still merges premix/final-mix unlocks (Final Mix can lag in stageProgress).
+ * For motor / Mixing / RMP divisions, do not merge divisionStatuses unlocks when the
+ * manufacturing stage exists — corrupted TO_BE_INITIATED rows must not bypass
+ * manufacturing APPROVED (only approved Premix / Final Mix / motors unlock).
  */
 export const resolveQcPreviousDivisionApprovedUnits = (params: {
   currentDivisionKey: string;
@@ -563,21 +563,12 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
     candidateMotorIds: params.candidateMotorIds,
   });
 
-  // QC divisionStatuses: manufacturing Mixing Final Mix / Premix approval unlocks QC units
-  // to TO_BE_INITIATED via unlockQcMixingFromManufacturing. Merge so Final Mix unlocks even
-  // when stageProgress finalMixStatuses are sparse.
+  // QC divisionStatuses fallback only when manufacturing stage row is missing.
+  // Do not OR-merge divisionStatuses into manufacturing — that unlocked every Premix /
+  // Final Mix after one unit was approved (corrupted TO_BE_INITIATED rows).
   const fromDivisionStatuses = resolveGateFromQcDivisionStatuses(params, currentKey);
 
   if (fromManufacturing) {
-    if (currentKey === "MIXING" && fromDivisionStatuses && !fromDivisionStatuses.enableAll) {
-      fromDivisionStatuses.approvedPremixNos.forEach((n) =>
-        fromManufacturing.approvedPremixNos.add(n),
-      );
-      const finalNos =
-        fromManufacturing.approvedFinalMixNos ??
-        (fromManufacturing.approvedFinalMixNos = new Set<number>());
-      fromDivisionStatuses.approvedFinalMixNos?.forEach((n) => finalNos.add(n));
-    }
     return fromManufacturing;
   }
 
@@ -779,39 +770,11 @@ const resolveGateFromQcDivisionStatuses = (
       if (isUnitUnlockedStatus(premixStatusFromRow(rec))) approvedFinalMixNos.add(premixNo);
     });
 
-    // Form-details unit maps (Mix Navigation) — unlock after manufacturing Mixing approval.
-    asArray(params.premixStatuses).forEach((entry) => {
-      const rec = asRecord(entry);
-      if (!rec) return;
-      const stageType = String(rec.stageType ?? rec.stage_type ?? "")
-        .trim()
-        .toUpperCase();
-      if (stageType === "FINAL_MIX") {
-        const premixNo = premixNoFromRow(rec);
-        if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
-          approvedFinalMixNos.add(premixNo);
-        }
-        return;
-      }
-      const premixNo = premixNoFromRow(rec);
-      if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
-        approvedPremixNos.add(premixNo);
-      }
-    });
-    asArray(params.finalMixStatuses).forEach((entry) => {
-      const rec = asRecord(entry);
-      if (!rec) return;
-      const premixNo = premixNoFromRow(rec);
-      if (premixNo != null && isUnitUnlockedStatus(premixStatusFromRow(rec))) {
-        approvedFinalMixNos.add(premixNo);
-      }
-    });
-
+    // Prefer divisionStatuses unit rows only (form-details maps can report every
+    // Premix as TO_BE_INITIATED once the division workflow unlocks).
     const hasUnitRows =
       asArray(divisionRow.premixStatuses).length > 0 ||
-      asArray(divisionRow.finalMixStatuses).length > 0 ||
-      asArray(params.premixStatuses).length > 0 ||
-      asArray(params.finalMixStatuses).length > 0;
+      asArray(divisionRow.finalMixStatuses).length > 0;
     if (!hasUnitRows) {
       return emptyGate("premix", false, "QC division statuses");
     }

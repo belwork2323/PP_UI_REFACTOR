@@ -313,7 +313,9 @@ export async function hydrateQcDivisionFormFromDetails(
         entryId,
         flowKey: getEntryKind(division, entrySubType).flowKey,
         kind: entryKind,
-        apiDivision: division,
+        // Persist canonical API name (legacy PROPELLANT_PROPERTIES → QC).
+        apiDivision:
+          division === "PROPELLANT_PROPERTIES" ? "QC" : (division as QcApiDivision),
         subType: entrySubType,
         label,
         savedSections: entrySections,

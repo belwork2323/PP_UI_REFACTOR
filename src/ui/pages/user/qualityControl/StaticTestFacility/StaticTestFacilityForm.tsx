@@ -17,7 +17,6 @@ import type {
   StfMotorOption,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import {
-  shouldShowStfBemMotorSelection,
   buildStfMotorNavGateHelpers,
   STF_FLOW_LABELS,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
@@ -35,10 +34,9 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
-import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
-import STFFlowBar from "./STFFlowBar";
 import StfMotorPanel from "./StfMotorPanel";
 import AppTextField from "../../../../components/common/AppTextField";
+import { focusStfField } from "@/data/validation/adapters/stf.validation";
 
 const S = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 const { rocketLaunch: RocketLaunchRoundedIcon, warning: WarningAmberRoundedIcon } =
@@ -86,6 +84,11 @@ type StaticTestFacilityFormProps = {
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
   motorValidationErrors?: Record<string, Record<string, string>>;
+  validationFocusRequest?: {
+    id: number;
+    motorId: string;
+    fieldPath: string;
+  } | null;
   theme: any;
 };
 
@@ -94,15 +97,8 @@ const StaticTestFacilityForm = ({
   formData,
   subDepartmentId,
   selectedMotorType,
-  motorCount,
-  draftMotorIds,
-  draftBemNo,
   addedMotors,
   autoMotorEntries,
-  availableMotorOptions,
-  availableBemMotorOptions = [],
-  maxMotorCount,
-  approvedMotorsLoading = false,
   motorStatusById = {},
   getMotorStatus,
   isMotorEditable,
@@ -110,19 +106,12 @@ const StaticTestFacilityForm = ({
   isStfTestNoLocked,
   actionLoading = false,
   isEditMode = false,
-  flowBarTheme,
-  onMotorTypeChange,
-  onMotorCountChange,
-  onDraftMotorIdChange,
-  onDraftBemNoChange,
-  onLoadStfForm,
-  onAddMotors,
   onFormValuesChange,
   onStfTestNoChange,
-  onRemoveMotor,
   onSaveMotorDraft,
   onSubmitMotor,
   motorValidationErrors = {},
+  validationFocusRequest = null,
   theme,
 }: StaticTestFacilityFormProps) => {
   const BRAND = STATIC_TEST_FACILITY_BRAND;
@@ -137,6 +126,43 @@ const StaticTestFacilityForm = ({
     () => resolveStfNavigationMotors(addedMotors, autoMotorEntries),
     [addedMotors, autoMotorEntries],
   );
+
+  // Switch motor tab when submit validation fails on a different motor, then scroll/focus.
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const targetMotorId = String(validationFocusRequest.motorId ?? "").trim();
+    if (targetMotorId) {
+      const idx = motorCards.findIndex((motor) => motor.motorId === targetMotorId);
+      if (idx >= 0 && idx !== activeMotorIndex) {
+        setActiveMotorIndex(idx);
+      }
+    }
+
+    const fieldPath = validationFocusRequest.fieldPath;
+    let tries = 0;
+    let cancelled = false;
+    const retryTimers: number[] = [];
+    const tryFocus = () => {
+      if (cancelled) return;
+      tries += 1;
+      if (focusStfField(fieldPath)) return;
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const t = window.setTimeout(tryFocus, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      retryTimers.forEach((id) => clearTimeout(id));
+    };
+  }, [
+    validationFocusRequest?.id,
+    validationFocusRequest?.fieldPath,
+    validationFocusRequest?.motorId,
+    motorCards,
+    activeMotorIndex,
+  ]);
 
   const resolveMotorStatus = useCallback(
     (motorId: string) =>
@@ -166,7 +192,6 @@ const StaticTestFacilityForm = ({
   );
 
   const hasMotors = motorCards.length > 0;
-  const showBemFlowBar = shouldShowStfBemMotorSelection(batch?.batchType, batch?.subBatchType);
 
   const activeMotorTypes = useMemo(() => {
     const types = new Set(motorCards.map((motor) => motor.subType));
@@ -250,8 +275,6 @@ const StaticTestFacilityForm = ({
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
   const activeStfTestNoLocked = activeMotorId ? Boolean(isStfTestNoLocked?.(activeMotorId)) : false;
-  const canRemoveActiveMotor =
-    activeMotorEntry?.subType === "BEM" && activeMotorStatus === "TO_BE_INITIATED";
   const isCurrentMotorFormReady = Boolean(activeMotorSession?.formLoaded);
 
   const finalApprovalRows = useMemo(
@@ -374,30 +397,6 @@ const StaticTestFacilityForm = ({
         </Stack>
       </Box>
 
-      {/* Subscale: add BEM motors via dropdown. Main: batch motors are seeded into navigation. */}
-      {showBemFlowBar ? (
-        <STFFlowBar
-          key={`${motorCards.map((motor) => motor.motorId).join("|")}-${selectedMotorType}`}
-          selectedMotorType={selectedMotorType || "BEM"}
-          motorCount={motorCount}
-          draftMotorIds={draftMotorIds}
-          draftBemNo={draftBemNo}
-          addedMotors={addedMotors}
-          availableMotorOptions={availableMotorOptions}
-          availableBemMotorOptions={availableBemMotorOptions}
-          maxMotorCount={maxMotorCount}
-          approvedMotorsLoading={approvedMotorsLoading}
-          lockMotorTypeToBem
-          onMotorTypeChange={onMotorTypeChange}
-          onMotorCountChange={onMotorCountChange}
-          onDraftMotorIdChange={onDraftMotorIdChange}
-          onDraftBemNoChange={onDraftBemNoChange}
-          onLoadForm={onLoadStfForm}
-          onAddMotors={onAddMotors}
-          theme={flowBarTheme}
-        />
-      ) : null}
-
       {hasMotors && activeMotorEntry ? (
         <Stack spacing={1.25} sx={{ mt: 2 }}>
           <UserWorkflowNavPanel palette={navPalette}>
@@ -449,13 +448,6 @@ const StaticTestFacilityForm = ({
               onClick={() => setFinalApprovalOpen(true)}
               label={S.VIEW_STATUS}
             />
-            {canRemoveActiveMotor ? (
-              <RemoveProcessButton
-                onClick={() => onRemoveMotor?.(activeMotorEntry.motorId)}
-                dangerColor={BRAND.danger}
-                tooltip={S.DELETE_MOTOR_TOOLTIP}
-              />
-            ) : null}
           </Stack>
 
           <Box
@@ -516,7 +508,7 @@ const StaticTestFacilityForm = ({
               </Alert>
             ) : null}
 
-            <Box sx={{ mb: 1.5, maxWidth: 360 }}>
+            <Box sx={{ mb: 1.5, maxWidth: 360 }} data-stf-field="stfTestNo">
               <AppTextField
                 label={S.STF_TEST_NO_LABEL}
                 value={activeMotorSession?.stfTestNo || ""}

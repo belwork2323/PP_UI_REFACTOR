@@ -28,15 +28,16 @@ export type QcPropellantValidationTarget = {
 
 export const qcPropellantValidationFields: Record<string, FieldRuleConfig> = {
   // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
-  specification: number(["SUBMIT"]),
-  /** At least one FM sample value per row. */
+  // Specs allow ranges/tolerances (e.g. "99 - 100") — Mixing / manufacturing Post Cure parity.
+  specification: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
+  /** Every FM sample column is required on SUBMIT. */
   fmValue: number(["SUBMIT"]),
-  /** Extra FM columns beyond the first filled sample — format only. */
-  fmValueOptional: number([]),
   avg: number(["SUBMIT"]),
   stdDev: number(["SUBMIT"]),
+  /** Std Dev is blank with a single FM sample (auto-stat); format-only until ≥2 samples. */
+  stdDevOptional: number([]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  ballisticSpec: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  ballisticSpec: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
   // Ballistic FM/BEM cells are optional notes-style values (UI has no required asterisks)
   ballisticValue: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
@@ -80,7 +81,8 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
       if ("PROPERTY" in sample || "SPECIFICATION" in sample) {
         arr.forEach((item, i) => {
           const row = asRecord(item) ?? {};
-          if (row.kind === "mean" || row.kind === "std" || row.locked) return;
+          // Skip aggregate rows only — `locked` marks SSBR property labels, not skipped validation.
+          if (row.kind === "mean" || row.kind === "std") return;
           const base = `${sectionId}.${i}`;
 
           fields.push({
@@ -90,14 +92,13 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
           });
 
           const fmCols = sortFmCols(Object.keys(row).filter(isFmColumn));
-          const hasAnyFm = fmCols.some((col) => str(row[col]));
+          const filledFmCount = fmCols.filter((col) => str(row[col])).length;
           fmCols.forEach((col) => {
-            const filled = Boolean(str(row[col]));
-            // Require values until at least one FM is present; empty extras stay optional.
+            // All FM columns are required on SUBMIT (headers show asterisk on every FM).
             fields.push({
               path: `${base}.${col}`,
               value: row[col],
-              ruleKey: filled || !hasAnyFm ? "fmValue" : "fmValueOptional",
+              ruleKey: "fmValue",
             });
           });
 
@@ -112,7 +113,8 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
             fields.push({
               path: `${base}.STD_DEV`,
               value: row.STD_DEV ?? row.STD,
-              ruleKey: "stdDev",
+              // Auto-stat leaves STD blank with a single sample.
+              ruleKey: filledFmCount >= 2 ? "stdDev" : "stdDevOptional",
             });
           }
           if ("REMARKS" in row) {
@@ -125,7 +127,6 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
       if ("DETAILS" in sample) {
         arr.forEach((item, i) => {
           const row = asRecord(item) ?? {};
-          if (row.locked) return;
           const base = `${sectionId}.${i}`;
           fields.push({
             path: `${base}.SPECIFICATION`,

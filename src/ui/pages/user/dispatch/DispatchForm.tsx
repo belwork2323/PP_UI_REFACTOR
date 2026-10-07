@@ -34,6 +34,7 @@ import {
 } from "../../../components/custom/UserWorkflowStepPager";
 import DispatchFlowBar from "./DispatchFlowBar";
 import DispatchMotorDetailsCard from "./DispatchMotorDetailsCard";
+import { focusDispatchField } from "@/data/validation/adapters/dispatch.validation";
 
 const S = STRINGS.DISPATCH;
 const { localShipping: LocalShippingRoundedIcon } = icons.user.dispatch.form;
@@ -64,6 +65,11 @@ type DispatchFormProps = {
   onSubmitMotor?: (motorId: string) => void;
   theme: any;
   motorValidationErrors?: Record<string, Record<string, string>>;
+  validationFocusRequest?: {
+    id: number;
+    motorId: string;
+    fieldPath: string;
+  } | null;
 };
 
 const DispatchForm: React.FC<DispatchFormProps> = ({
@@ -89,6 +95,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   onSubmitMotor,
   theme,
   motorValidationErrors = {},
+  validationFocusRequest = null,
 }) => {
   const dispatchTheme = getDispatchTheme(theme);
   const panel = dispatchTheme.panel;
@@ -110,6 +117,43 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
     }
     return Array.isArray(addedMotors) ? addedMotors : [];
   }, [addedMotors, autoMotorEntries, availableMotors]);
+
+  // Switch motor tab on validation failure, then scroll/focus the first error field.
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const targetMotorId = String(validationFocusRequest.motorId ?? "").trim();
+    if (targetMotorId) {
+      const idx = motorCards.findIndex((motor) => motor.motorId === targetMotorId);
+      if (idx >= 0 && idx !== activeMotorIndex) {
+        setActiveMotorIndex(idx);
+      }
+    }
+
+    const fieldPath = validationFocusRequest.fieldPath;
+    let tries = 0;
+    let cancelled = false;
+    const retryTimers: number[] = [];
+    const tryFocus = () => {
+      if (cancelled) return;
+      tries += 1;
+      if (focusDispatchField(fieldPath)) return;
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const t = window.setTimeout(tryFocus, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      retryTimers.forEach((id) => clearTimeout(id));
+    };
+  }, [
+    validationFocusRequest?.id,
+    validationFocusRequest?.fieldPath,
+    validationFocusRequest?.motorId,
+    motorCards,
+    activeMotorIndex,
+  ]);
 
   const motorNavGate = useMemo(() => {
     const resolveMotorStatus = (motorId: string) =>
@@ -378,6 +422,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
                 onLoadForm={() => onLoadDispatchForm(activeMotorEntry.motorId)}
                 theme={flowBarTheme}
                 dispatchTheme={dispatchTheme}
+                validationErrors={motorValidationErrors[activeMotorEntry.motorId]}
               />
             ) : (
               activeMotorData && (

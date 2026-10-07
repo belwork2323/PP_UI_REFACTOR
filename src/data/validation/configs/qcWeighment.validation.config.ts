@@ -57,6 +57,12 @@ const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unkn
   return undefined;
 };
 
+/** `MOTOR_WEIGHT_DETAILS::MOTOR_WEIGHT_DETAILS` → `MOTOR_WEIGHT_DETAILS` (matches panel error paths). */
+const sectionPathId = (formKey: string): string => {
+  if (formKey.includes("::")) return formKey.split("::")[0] || formKey;
+  return formKey;
+};
+
 export const qcWeighmentValidationConfig: SubDeptValidationConfig<QcWeighmentValidationTarget> = {
   id: "qc-weighment",
   fields: qcWeighmentValidationFields,
@@ -75,31 +81,23 @@ export const qcWeighmentValidationConfig: SubDeptValidationConfig<QcWeighmentVal
       ruleKey: "calibrationDueDate",
     });
 
-    const walkWeights = (node: unknown, prefix: string, depth = 0) => {
-      if (depth > 6 || node == null) return;
-      const arr = asArray(node);
-      if (arr.length) {
-        const sample = asRecord(arr[0]);
-        if (sample && ("WEIGHT_KG" in sample || "WEIGHT_PARAMETER" in sample)) {
-          arr.forEach((item, i) => {
-            const row = asRecord(item) ?? {};
-            if (row.locked && !str(row.WEIGHT_KG)) return;
-            fields.push({
-              path: `${prefix}.${i}.WEIGHT_KG`,
-              value: row.WEIGHT_KG,
-              ruleKey: "weightKg",
-            });
-          });
-          return;
-        }
-      }
-      const rec = asRecord(node);
-      if (!rec) return;
-      Object.entries(rec).forEach(([key, val]) => {
-        walkWeights(val, prefix ? `${prefix}.${key}` : key, depth + 1);
+    for (const [key, val] of Object.entries(values)) {
+      const arr = asArray(val);
+      if (!arr.length) continue;
+      const sample = asRecord(arr[0]);
+      if (!sample || !("WEIGHT_KG" in sample || "WEIGHT_PARAMETER" in sample)) continue;
+      const sectionId = sectionPathId(key);
+      arr.forEach((item, i) => {
+        const row = asRecord(item) ?? {};
+        // Computed propellant row (locked) — skip until a value is present.
+        if (row.locked && !str(row.WEIGHT_KG)) return;
+        fields.push({
+          path: `${sectionId}.${i}.WEIGHT_KG`,
+          value: row.WEIGHT_KG,
+          ruleKey: "weightKg",
+        });
       });
-    };
-    walkWeights(values, "");
+    }
 
     return fields;
   },

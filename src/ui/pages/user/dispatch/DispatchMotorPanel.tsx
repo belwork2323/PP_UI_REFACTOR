@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import {
   Box,
   Button,
@@ -10,7 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -50,12 +49,20 @@ type Props = {
   validationErrors?: DispatchValidationErrors;
 };
 
-const withFieldError = (node: ReactNode, message?: string) => (
-  <Box>
-    {node}
-    <FieldErrorText message={message} />
-  </Box>
-);
+const withFieldError = (node: ReactNode, message?: string, fieldPath?: string) => {
+  const control =
+    React.isValidElement(node) && message
+      ? React.cloneElement(node as React.ReactElement<{ error?: boolean }>, {
+          error: true,
+        })
+      : node;
+  return (
+    <Box {...(fieldPath ? { "data-dispatch-field": fieldPath } : {})}>
+      {control}
+      <FieldErrorText message={message} />
+    </Box>
+  );
+};
 
 const patch = <K extends keyof DispatchMotorData>(
   value: DispatchMotorData,
@@ -185,6 +192,7 @@ const PropellantTable = ({
                         readOnly={readOnly}
                       />,
                       errors?.[`PROPELLANT_PROPERTIES.rows.${index}.SPECIFICATION`],
+                      `PROPELLANT_PROPERTIES.rows.${index}.SPECIFICATION`,
                     )}
                   </TableCell>
                   {value.fmColumns.map((col) => (
@@ -197,6 +205,7 @@ const PropellantTable = ({
                           readOnly={readOnly}
                         />,
                         errors?.[`PROPELLANT_PROPERTIES.rows.${index}.fmValues.${col}`],
+                        `PROPELLANT_PROPERTIES.rows.${index}.fmValues.${col}`,
                       )}
                     </TableCell>
                   ))}
@@ -277,6 +286,7 @@ const ObservationTable = ({
                       minRows={2}
                     />,
                     errors?.[`${errorPrefix}.${index}.OBSERVATION`],
+                    `${errorPrefix}.${index}.OBSERVATION`,
                   )}
                 </TableCell>
               </TableRow>
@@ -322,6 +332,7 @@ const DispatchMotorPanel = ({
           placeholder="Enter waiver details"
         />,
         validationErrors?.["WAIVER_DETAILS.WAIVER_AVAILABLE"],
+        "WAIVER_DETAILS.WAIVER_AVAILABLE",
       )}
     </SectionCard>
 
@@ -392,6 +403,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["ROCKET_MOTOR_PACKING.NITROGEN_GAS_PURGING"],
+            "ROCKET_MOTOR_PACKING.NITROGEN_GAS_PURGING",
           )}
         </Box>
         {value.ROCKET_MOTOR_PACKING.NITROGEN_GAS_PURGING === "YES" ? (
@@ -407,6 +419,7 @@ const DispatchMotorPanel = ({
                 readOnly={readOnly}
               />,
               validationErrors?.["ROCKET_MOTOR_PACKING.NITROGEN_PURGING_PRESSURE"],
+              "ROCKET_MOTOR_PACKING.NITROGEN_PURGING_PRESSURE",
             )}
           </Box>
         ) : null}
@@ -423,6 +436,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["ROCKET_MOTOR_PACKING.LABELLING_OF_MOTOR"],
+            "ROCKET_MOTOR_PACKING.LABELLING_OF_MOTOR",
           )}
         </Box>
       </FieldGrid>
@@ -440,6 +454,7 @@ const DispatchMotorPanel = ({
             acceptMode="imageVideo"
           />,
           validationErrors?.["ROCKET_MOTOR_PACKING.DISPATCH_PHOTOS"],
+          "ROCKET_MOTOR_PACKING.DISPATCH_PHOTOS",
         )}
       </Box>
     </SectionCard>
@@ -459,6 +474,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["SAFETY_CLEARANCE.SAFETY_CLEARANCE_STATUS"],
+            "SAFETY_CLEARANCE.SAFETY_CLEARANCE_STATUS",
           )}
         </Box>
         <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
@@ -476,6 +492,7 @@ const DispatchMotorPanel = ({
               emptyLabel={STRINGS.DISPATCH.FILE_EMPTY_CERTIFICATE}
             />,
             validationErrors?.["SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE"],
+            "SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE",
           )}
         </Box>
       </FieldGrid>
@@ -495,6 +512,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["DISPATCH_TEAM.QA_REPRESENTATIVE"],
+            "DISPATCH_TEAM.QA_REPRESENTATIVE",
           )}
         </Box>
         <Box>
@@ -509,6 +527,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["DISPATCH_TEAM.SAFETY_REPRESENTATIVE"],
+            "DISPATCH_TEAM.SAFETY_REPRESENTATIVE",
           )}
         </Box>
         <Box>
@@ -523,6 +542,7 @@ const DispatchMotorPanel = ({
               readOnly={readOnly}
             />,
             validationErrors?.["DISPATCH_TEAM.PROJECT_REPRESENTATIVE"],
+            "DISPATCH_TEAM.PROJECT_REPRESENTATIVE",
           )}
         </Box>
       </FieldGrid>

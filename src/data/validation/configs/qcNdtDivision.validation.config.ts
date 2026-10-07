@@ -68,6 +68,12 @@ const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unkn
   return undefined;
 };
 
+/** `RADIOGRAPHY_DETAILS::RADIOGRAPHY_DETAILS` → `RADIOGRAPHY_DETAILS` (matches panel error paths). */
+const sectionPathId = (formKey: string): string => {
+  if (formKey.includes("::")) return formKey.split("::")[0] || formKey;
+  return formKey;
+};
+
 export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisionValidationTarget> =
   {
     id: "qc-ndt-division",
@@ -92,32 +98,33 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
         if (!arr.length) continue;
         const sample = asRecord(arr[0]);
         if (!sample) continue;
+        const sectionId = sectionPathId(key);
 
         if ("MACHINE_NO" in sample || "NO_OF_SECTIONS" in sample) {
           arr.forEach((item, i) => {
             const row = asRecord(item) ?? {};
             fields.push({
-              path: `${key}.${i}.MACHINE_NO`,
+              path: `${sectionId}.${i}.MACHINE_NO`,
               value: row.MACHINE_NO,
               ruleKey: "machineNo",
             });
             fields.push({
-              path: `${key}.${i}.NO_OF_SECTIONS`,
+              path: `${sectionId}.${i}.NO_OF_SECTIONS`,
               value: row.NO_OF_SECTIONS,
               ruleKey: "noOfSections",
             });
             fields.push({
-              path: `${key}.${i}.NO_OF_ORIENTATIONS`,
+              path: `${sectionId}.${i}.NO_OF_ORIENTATIONS`,
               value: row.NO_OF_ORIENTATIONS,
               ruleKey: "noOfOrientations",
             });
             fields.push({
-              path: `${key}.${i}.NORMAL_EXPOSURES`,
+              path: `${sectionId}.${i}.NORMAL_EXPOSURES`,
               value: row.NORMAL_EXPOSURES,
               ruleKey: "normalExposures",
             });
             fields.push({
-              path: `${key}.${i}.TANGENTIAL_EXPOSURES`,
+              path: `${sectionId}.${i}.TANGENTIAL_EXPOSURES`,
               value: row.TANGENTIAL_EXPOSURES,
               ruleKey: "tangentialExposures",
             });
@@ -128,17 +135,17 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
           arr.forEach((item, i) => {
             const row = asRecord(item) ?? {};
             fields.push({
-              path: `${key}.${i}.TYPE_OF_DEFECT`,
+              path: `${sectionId}.${i}.TYPE_OF_DEFECT`,
               value: row.TYPE_OF_DEFECT,
               ruleKey: "typeOfDefect",
             });
             fields.push({
-              path: `${key}.${i}.OBSERVATIONS`,
+              path: `${sectionId}.${i}.OBSERVATIONS`,
               value: row.OBSERVATIONS,
               ruleKey: "observations",
             });
             fields.push({
-              path: `${key}.${i}.LOCATION`,
+              path: `${sectionId}.${i}.LOCATION`,
               value: row.LOCATION,
               ruleKey: "location",
             });
@@ -149,17 +156,17 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
           arr.forEach((item, i) => {
             const row = asRecord(item) ?? {};
             fields.push({
-              path: `${key}.${i}.OBSERVATION`,
+              path: `${sectionId}.${i}.OBSERVATION`,
               value: row.OBSERVATION,
               ruleKey: "visualObservation",
             });
             fields.push({
-              path: `${key}.${i}.LOCATION`,
+              path: `${sectionId}.${i}.LOCATION`,
               value: row.LOCATION,
               ruleKey: "location",
             });
             fields.push({
-              path: `${key}.${i}.UPLOAD_IMAGE`,
+              path: `${sectionId}.${i}.UPLOAD_IMAGE`,
               value: row.UPLOAD_IMAGE,
               ruleKey: "uploadImage",
             });

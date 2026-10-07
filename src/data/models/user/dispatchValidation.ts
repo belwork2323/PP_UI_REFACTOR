@@ -9,11 +9,16 @@ export {
   validateDispatchMotorData,
   isDispatchUnitComplete,
   fieldError as dispatchFieldError,
-  firstValidationError as firstDispatchValidationError,
+  firstDispatchValidationError,
+  firstValidationError as firstDispatchValidationErrorLegacy,
+  resolveFirstDispatchValidationFocus,
+  focusDispatchField,
+  formatDispatchValidationPath,
   hasValidationErrors,
   type ValidationErrors as DispatchValidationErrors,
   type ValidationTier,
-  type DispatchValidationIntent} from "@/data/validation/adapters/dispatch.validation";
+  type DispatchValidationIntent,
+} from "@/data/validation/adapters/dispatch.validation";
 
 import {
   validateDispatchBlocks,

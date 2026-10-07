@@ -30,6 +30,9 @@ import {
 } from "../../../data/models/user/DispatchFormModel";
 import type { DispatchMotorData } from "../../../data/models/user/DispatchMotorDataModel";
 import {
+  firstDispatchValidationError,
+  focusDispatchField,
+  resolveFirstDispatchValidationFocus,
   validateDispatchMotorSession,
   type ValidationErrors as DispatchValidationErrors,
 } from "../../../data/validation/adapters/dispatch.validation";
@@ -162,6 +165,7 @@ export const useDispatchHook = () => {
   const listParams = useSubdepartmentBatches("dispatch");
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
 
@@ -197,6 +201,37 @@ export const useDispatchHook = () => {
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, DispatchValidationErrors>
   >({});
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    motorId: string;
+    fieldPath: string;
+  } | null>(null);
+
+  const notifyDispatchValidationErrors = useCallback(
+    (fieldErrors: DispatchValidationErrors, intent: "draft" | "submit") => {
+      const firstError = firstDispatchValidationError(fieldErrors);
+      const base =
+        intent === "draft" ? messages.DRAFT_VALIDATION_FAILED : messages.SUBMIT_VALIDATION_FAILED;
+      showValidationAlert(firstError ? `${base} (${firstError})` : base);
+    },
+    [showValidationAlert],
+  );
+
+  const emitDispatchValidationFocus = useCallback(
+    (motorId: string, fieldErrors: DispatchValidationErrors) => {
+      const fieldPath = resolveFirstDispatchValidationFocus(fieldErrors);
+      if (!fieldPath) return;
+      setValidationFocusRequest((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        motorId: String(motorId ?? "").trim(),
+        fieldPath,
+      }));
+      requestAnimationFrame(() => {
+        focusDispatchField(fieldPath);
+      });
+    },
+    [],
+  );
 
   const resetFlowDraft = useCallback(() => {
     setDraftMotorId("");
@@ -242,6 +277,7 @@ export const useDispatchHook = () => {
     setMotorStatusById({});
     setPreviousStageGate(null);
     setMotorValidationErrors({});
+    setValidationFocusRequest(null);
     resetFlowDraft();
   }, [resetFlowDraft]);
 
@@ -613,12 +649,14 @@ export const useDispatchHook = () => {
         return false;
       }
 
-      // UNIT on draft; SUBMIT on submit. Red under fields; no field toast.
+      // UNIT on draft; SUBMIT on submit — snackbar + field highlights + focus/scroll.
       {
         const tier = intent === "draft" ? "UNIT" : "SUBMIT";
         const fieldErrors = validateDispatchMotorSession(motor, tier);
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          notifyDispatchValidationErrors(fieldErrors, intent);
+          emitDispatchValidationFocus(motorId, fieldErrors);
           return false;
         }
         setMotorValidationErrors((prev) => {
@@ -827,11 +865,13 @@ export const useDispatchHook = () => {
       addedMotors,
       bumpBatchRefresh,
       checkMotorEditable,
+      emitDispatchValidationFocus,
       formData,
       getMotorStatus,
       isEditMode,
       listParams,
       motorStatusById,
+      notifyDispatchValidationErrors,
       openFormWithResolvedData,
       previousStageGate,
       showAlert,
@@ -871,6 +911,7 @@ export const useDispatchHook = () => {
     backConfirmOpen,
     subDepartmentId,
     motorValidationErrors,
+    validationFocusRequest,
     handleFillForm,
     handleEditForm,
     handleBack,

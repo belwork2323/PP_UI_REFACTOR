@@ -144,6 +144,8 @@ const CellInput = ({
   readOnly,
   multiline = false,
   type = "text",
+  fieldPath,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -151,6 +153,8 @@ const CellInput = ({
   readOnly?: boolean;
   multiline?: boolean;
   type?: "text" | "number";
+  fieldPath?: string;
+  error?: boolean;
 }) => {
   if (readOnly) {
     return <QCDivisionReadOnlyValue value={value} muted={!String(value).trim()} />;
@@ -162,9 +166,11 @@ const CellInput = ({
       type={type === "number" ? "number" : "text"}
       value={value}
       disabled={disabled}
+      error={error}
       onChange={(event) => onChange(event.target.value)}
       multiline={multiline}
       minRows={multiline ? 2 : undefined}
+      inputProps={fieldPath ? { "data-qc-field": fieldPath } : undefined}
       sx={tableFieldSx}
     />
   );
@@ -252,11 +258,11 @@ const PropertyTable = ({
                   sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
                 />
               </TableCell>
-              {columns.map((columnId, columnIndex) => (
+              {columns.map((columnId) => (
                 <TableCell key={columnId} sx={headerSx}>
                   <FieldLabelWithAsterisk
                     label={getQcPropellantFmColumnLabel(columnId)}
-                    required={columnIndex === 0}
+                    required
                     sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
                   />
                 </TableCell>
@@ -319,71 +325,110 @@ const PropertyTable = ({
                     )}
                   </TableCell>
                   <TableCell sx={bodyCellSx}>
-                    <CellInput
-                      value={String(row.SPECIFICATION ?? "")}
-                      onChange={(value) => updateCell(index, "SPECIFICATION", value)}
-                      disabled={inputsDisabled}
-                      readOnly={readOnly}
-                    />
-                    {!readOnly ? (
-                      <FieldErrorText
-                        message={fieldError(
-                          validationErrors ?? undefined,
-                          `${sectionId}.${index}.SPECIFICATION`,
-                        )}
-                      />
-                    ) : null}
+                    {(() => {
+                      const path = `${sectionId}.${index}.SPECIFICATION`;
+                      const message = fieldError(validationErrors ?? undefined, path);
+                      return (
+                        <>
+                          <CellInput
+                            value={String(row.SPECIFICATION ?? "")}
+                            onChange={(value) => updateCell(index, "SPECIFICATION", value)}
+                            disabled={inputsDisabled}
+                            readOnly={readOnly}
+                            fieldPath={path}
+                            error={Boolean(message)}
+                          />
+                          {!readOnly ? <FieldErrorText message={message} /> : null}
+                        </>
+                      );
+                    })()}
                   </TableCell>
-                  {columns.map((columnId) => (
-                    <TableCell key={columnId} sx={bodyCellSx}>
-                      <CellInput
-                        value={displayValue(row, columnId)}
-                        onChange={(value) => updateCell(index, columnId, value)}
-                        disabled={inputsDisabled}
-                        readOnly={readOnly}
-                        type="number"
-                      />
-                      {!readOnly ? (
-                        <FieldErrorText
-                          message={fieldError(
-                            validationErrors ?? undefined,
-                            `${sectionId}.${index}.${columnId}`,
-                          )}
+                  {columns.map((columnId) => {
+                    const path = `${sectionId}.${index}.${columnId}`;
+                    const message = fieldError(validationErrors ?? undefined, path);
+                    return (
+                      <TableCell key={columnId} sx={bodyCellSx}>
+                        <CellInput
+                          value={displayValue(row, columnId)}
+                          onChange={(value) => updateCell(index, columnId, value)}
+                          disabled={inputsDisabled}
+                          readOnly={readOnly}
+                          type="number"
+                          fieldPath={path}
+                          error={Boolean(message)}
                         />
-                      ) : null}
-                    </TableCell>
-                  ))}
+                        {!readOnly ? <FieldErrorText message={message} /> : null}
+                      </TableCell>
+                    );
+                  })}
                   {includeRowStats ? (
                     <>
                       <TableCell sx={bodyCellSx}>
-                        <CellInput
-                          value={String(row[QC_PROPELLANT_AVG_COLUMN] ?? "")}
-                          onChange={(value) => updateCell(index, QC_PROPELLANT_AVG_COLUMN, value)}
-                          disabled={inputsDisabled}
-                          readOnly={readOnly}
-                          type="number"
-                        />
+                        {(() => {
+                          const path = `${sectionId}.${index}.${QC_PROPELLANT_AVG_COLUMN}`;
+                          const message = fieldError(validationErrors ?? undefined, path);
+                          return (
+                            <>
+                              <CellInput
+                                value={String(row[QC_PROPELLANT_AVG_COLUMN] ?? "")}
+                                onChange={(value) =>
+                                  updateCell(index, QC_PROPELLANT_AVG_COLUMN, value)
+                                }
+                                disabled={inputsDisabled}
+                                readOnly={readOnly}
+                                type="number"
+                                fieldPath={path}
+                                error={Boolean(message)}
+                              />
+                              {!readOnly ? <FieldErrorText message={message} /> : null}
+                            </>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell sx={bodyCellSx}>
-                        <CellInput
-                          value={String(row[QC_PROPELLANT_STD_COLUMN] ?? "")}
-                          onChange={(value) => updateCell(index, QC_PROPELLANT_STD_COLUMN, value)}
-                          disabled={inputsDisabled}
-                          readOnly={readOnly}
-                          type="number"
-                        />
+                        {(() => {
+                          const path = `${sectionId}.${index}.${QC_PROPELLANT_STD_COLUMN}`;
+                          const message = fieldError(validationErrors ?? undefined, path);
+                          return (
+                            <>
+                              <CellInput
+                                value={String(row[QC_PROPELLANT_STD_COLUMN] ?? "")}
+                                onChange={(value) =>
+                                  updateCell(index, QC_PROPELLANT_STD_COLUMN, value)
+                                }
+                                disabled={inputsDisabled}
+                                readOnly={readOnly}
+                                type="number"
+                                fieldPath={path}
+                                error={Boolean(message)}
+                              />
+                              {!readOnly ? <FieldErrorText message={message} /> : null}
+                            </>
+                          );
+                        })()}
                       </TableCell>
                     </>
                   ) : null}
                   {includeRemarks ? (
                     <TableCell sx={bodyCellSx}>
-                      <CellInput
-                        value={String(row.REMARKS ?? "")}
-                        onChange={(value) => updateCell(index, "REMARKS", value)}
-                        disabled={inputsDisabled}
-                        readOnly={readOnly}
-                        multiline
-                      />
+                      {(() => {
+                        const path = `${sectionId}.${index}.REMARKS`;
+                        const message = fieldError(validationErrors ?? undefined, path);
+                        return (
+                          <>
+                            <CellInput
+                              value={String(row.REMARKS ?? "")}
+                              onChange={(value) => updateCell(index, "REMARKS", value)}
+                              disabled={inputsDisabled}
+                              readOnly={readOnly}
+                              multiline
+                              fieldPath={path}
+                              error={Boolean(message)}
+                            />
+                            {!readOnly ? <FieldErrorText message={message} /> : null}
+                          </>
+                        );
+                      })()}
                     </TableCell>
                   ) : null}
                   {includeRowUpload ? (
@@ -424,6 +469,7 @@ const BallisticTable = ({
   onRemoveBem,
   readOnly = false,
   disabled = false,
+  validationErrors = null,
 }: {
   rows: QcPropellantBallisticRow[];
   columns: string[];
@@ -432,11 +478,13 @@ const BallisticTable = ({
   onRemoveBem: (columnId: string) => void;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string> | null;
 }) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
   const inputsDisabled = disabled || readOnly;
   const groups = groupQcPropellantBemColumns(columns);
+  const sectionId = QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION;
 
   const updateCell = (index: number, field: string, value: string) => {
     onRowsChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
@@ -548,23 +596,41 @@ const BallisticTable = ({
                   {readOnly ? <QCDivisionReadOnlyValue value={row.DETAILS} /> : row.DETAILS}
                 </TableCell>
                 <TableCell sx={bodyCellSx}>
-                  <CellInput
-                    value={String(row.SPECIFICATION ?? "")}
-                    onChange={(value) => updateCell(index, "SPECIFICATION", value)}
-                    disabled={inputsDisabled}
-                    readOnly={readOnly}
-                  />
+                  {(() => {
+                    const path = `${sectionId}.${index}.SPECIFICATION`;
+                    const message = fieldError(validationErrors ?? undefined, path);
+                    return (
+                      <>
+                        <CellInput
+                          value={String(row.SPECIFICATION ?? "")}
+                          onChange={(value) => updateCell(index, "SPECIFICATION", value)}
+                          disabled={inputsDisabled}
+                          readOnly={readOnly}
+                          fieldPath={path}
+                          error={Boolean(message)}
+                        />
+                        {!readOnly ? <FieldErrorText message={message} /> : null}
+                      </>
+                    );
+                  })()}
                 </TableCell>
-                {columns.map((columnId) => (
-                  <TableCell key={columnId} sx={bodyCellSx}>
-                    <CellInput
-                      value={String(row[columnId] ?? "")}
-                      onChange={(value) => updateCell(index, columnId, value)}
-                      disabled={inputsDisabled}
-                      readOnly={readOnly}
-                    />
-                  </TableCell>
-                ))}
+                {columns.map((columnId) => {
+                  const path = `${sectionId}.${index}.${columnId}`;
+                  const message = fieldError(validationErrors ?? undefined, path);
+                  return (
+                    <TableCell key={columnId} sx={bodyCellSx}>
+                      <CellInput
+                        value={String(row[columnId] ?? "")}
+                        onChange={(value) => updateCell(index, columnId, value)}
+                        disabled={inputsDisabled}
+                        readOnly={readOnly}
+                        fieldPath={path}
+                        error={Boolean(message)}
+                      />
+                      {!readOnly ? <FieldErrorText message={message} /> : null}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))}
           </TableBody>
@@ -796,6 +862,7 @@ const QCPropellantMotorPanel = ({
             }
             readOnly={readOnly}
             disabled={inputsDisabled}
+            validationErrors={validationErrors}
           />
         </SectionCard>
       </Stack>

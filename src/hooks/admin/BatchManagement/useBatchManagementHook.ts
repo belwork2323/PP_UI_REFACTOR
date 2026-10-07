@@ -41,10 +41,7 @@ import {
 import { getDashboardFilterBounds, toDashboardApiFilterType } from "@utils/dateUtils";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
-import type {
-  SubscaleArticleOption,
-  SystemMasterOption,
-} from "@data/api/common/generalAPI";
+import type { SubscaleArticleOption, SystemMasterOption } from "@data/api/common/generalAPI";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 

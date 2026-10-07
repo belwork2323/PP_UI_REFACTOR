@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, CircularProgress, IconButton, Stack, Tooltip, alpha } from "@mui/material";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
@@ -23,6 +23,7 @@ import WorkflowCreateButton from "@/ui/components/common/WorkflowCreateButton";
 import UserWorkflowFormHeader from "@/ui/components/custom/UserWorkflowFormHeader";
 import { resolveWorkflowFormHeaderStatus } from "@/ui/components/custom/workflowFormHeaderStatus";
 import AppTextField from "@/ui/components/common/AppTextField";
+import { focusStfField } from "@/data/validation/adapters/stf.validation";
 
 const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 const S = STRINGS.QUALITY_CONTROL;
@@ -82,7 +83,30 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     activeBemMotor,
     isStfTestNoLocked,
     motorValidationErrors = {},
+    validationFocusRequest = null,
   } = hookState;
+
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const fieldPath = validationFocusRequest.fieldPath;
+    let tries = 0;
+    let cancelled = false;
+    const retryTimers: number[] = [];
+    const tryFocus = () => {
+      if (cancelled) return;
+      tries += 1;
+      if (focusStfField(fieldPath)) return;
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const t = window.setTimeout(tryFocus, 80);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      retryTimers.forEach((id) => clearTimeout(id));
+    };
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
 
   const bemMotorSession = useMemo(() => {
     const found = formData?.motors?.[0];
@@ -240,7 +264,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
               width: "100%",
             }}
           >
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1 }} data-stf-field="motorId">
               <AppTextField
                 label={strings.OTHER_BEM_MOTOR_NO_LABEL}
                 value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
@@ -255,7 +279,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 }}
               />
             </Box>
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1 }} data-stf-field="stfTestNo">
               <AppTextField
                 label={strings.STF_TEST_NO_LABEL}
                 value={stfTestNoValue}

@@ -205,24 +205,26 @@ const WeightDetailsTable = ({
                     {readOnly || computed ? (
                       <QCDivisionReadOnlyValue value={row.WEIGHT_KG} muted={!row.WEIGHT_KG.trim()} />
                     ) : (
-                      <Box>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={row.WEIGHT_KG}
-                          disabled={inputsDisabled}
-                          onChange={(event) => updateWeight(index, event.target.value)}
-                          inputProps={{ step: "any" }}
-                          sx={tableFieldSx}
-                          error={Boolean(
-                            fieldError(validationErrors ?? undefined, `${index}.WEIGHT_KG`),
-                          )}
-                        />
-                        <FieldErrorText
-                          message={fieldError(validationErrors ?? undefined, `${index}.WEIGHT_KG`)}
-                        />
-                      </Box>
+                      (() => {
+                        const path = `MOTOR_WEIGHT_DETAILS.${index}.WEIGHT_KG`;
+                        const message = fieldError(validationErrors ?? undefined, path);
+                        return (
+                          <Box data-qc-field={path}>
+                            <TextField
+                              size="small"
+                              fullWidth
+                              type="number"
+                              value={row.WEIGHT_KG}
+                              disabled={inputsDisabled}
+                              onChange={(event) => updateWeight(index, event.target.value)}
+                              inputProps={{ step: "any", "data-qc-field": path }}
+                              sx={tableFieldSx}
+                              error={Boolean(message)}
+                            />
+                            <FieldErrorText message={message} />
+                          </Box>
+                        );
+                      })()
                     )}
                   </TableCell>
                 </TableRow>
@@ -306,7 +308,7 @@ const QCWeighmentMotorPanel = ({
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={weighscaleNo} muted={!weighscaleNo.trim()} />
               ) : (
-                <Box>
+                <Box data-qc-field="WEIGHSCALE_NO">
                   <TextField
                     size="small"
                     fullWidth
@@ -316,6 +318,7 @@ const QCWeighmentMotorPanel = ({
                     onChange={(event) =>
                       patchValues((prev) => setWeighmentWeighscaleNo(prev, event.target.value))
                     }
+                    inputProps={{ "data-qc-field": "WEIGHSCALE_NO" }}
                     sx={tableFieldSx}
                     error={Boolean(err("WEIGHSCALE_NO"))}
                   />
@@ -334,7 +337,7 @@ const QCWeighmentMotorPanel = ({
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={calibrationDueDate} muted={!calibrationDueDate.trim()} />
               ) : (
-                <Box>
+                <Box data-qc-field="CALIBRATION_DUE_DATE">
                   <DateField
                     compact
                     value={calibrationDueDate}

@@ -650,9 +650,25 @@ export const hydratePropellantValuesFromSections = (
     }
 
     if (sectionId === QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION) {
-      const nextColumns = resolveHydrateFmColumns(rows, fmCount, true, bemColumns);
-      values[columnsKey(sectionId)] = nextColumns;
-      values[tableKey(sectionId)] = overlayBallisticRows(rows, nextColumns);
+      const sectionData = extractSectionDataRecord(section);
+      const savedBemColumns = asArray(sectionData?.bemColumns)
+        .map((item) => String(item ?? "").trim())
+        .filter(isQcPropellantBemColumnId);
+      const fromRows = resolveHydrateFmColumns(rows, fmCount, true, bemColumns);
+      const nextColumns = sortQcPropellantBemColumns([
+        ...new Set([
+          ...savedBemColumns,
+          ...fromRows.filter(isQcPropellantBemColumnId),
+        ]),
+      ]);
+      const mergedColumns = nextColumns.length
+        ? buildQcPropellantBallisticColumns(
+            Math.max(fmCount ?? 1, maxFmIndexFromColumnIds(nextColumns, true)),
+            nextColumns,
+          )
+        : fromRows;
+      values[columnsKey(sectionId)] = mergedColumns;
+      values[tableKey(sectionId)] = overlayBallisticRows(rows, mergedColumns);
     }
   }
 
@@ -762,9 +778,11 @@ const serializeBallisticDetails = (values: SchemaFormValues | undefined) => {
     const payload: Record<string, unknown> = { DETAILS: row.DETAILS };
     const specification = String(row.SPECIFICATION ?? "").trim();
     if (specification) payload.SPECIFICATION = specification;
+    // Always emit every BEM column key so FM_1_BEM_NO_2+ survive save/reload
+    // even when some cells are blank.
     columns.forEach((columnId) => {
       const value = toApiScalar(row[columnId], false);
-      if (value !== undefined) payload[columnId] = value;
+      payload[columnId] = value !== undefined ? value : "";
     });
     return payload;
   });
@@ -809,6 +827,7 @@ export const buildPropellantMotorPayload = (
         processType: QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION,
         data: {
           ballisticDetails: serializeBallisticDetails(values),
+          bemColumns: getPropellantBallisticColumns(values),
         },
       },
     ],
@@ -919,17 +938,22 @@ export const propellantMotorDetailToSections = (
     }
 
     if (processType === QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION) {
+      const ballisticRows = readProcessRows(
+        data,
+        "ballisticDetails",
+        "ballisticEvaluation",
+      );
+      const bemColumns = asArray(data.bemColumns)
+        .map((item) => String(item ?? "").trim())
+        .filter(isQcPropellantBemColumnId);
       return [
         withMotor({
           sectionId: QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION,
           subType: QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION,
           sectionData: [
             {
-              [QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION]: readProcessRows(
-                data,
-                "ballisticDetails",
-                "ballisticEvaluation",
-              ),
+              [QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION]: ballisticRows,
+              ...(bemColumns.length ? { bemColumns } : {}),
             },
           ],
         }),

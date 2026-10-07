@@ -182,6 +182,7 @@ const DispatchPage = () => {
     handleSaveMotorDraft,
     handleSubmitMotor,
     motorValidationErrors,
+    validationFocusRequest,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -268,6 +269,7 @@ const DispatchPage = () => {
                 setMotorSubmitConfirmOpen(true);
               }}
               motorValidationErrors={motorValidationErrors}
+              validationFocusRequest={validationFocusRequest}
               theme={dispatchTheme}
             />
         </>

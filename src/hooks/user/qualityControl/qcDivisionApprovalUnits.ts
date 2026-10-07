@@ -491,7 +491,13 @@ export const hasPartialChildNav = (items: QcPartialNavItem[] | null | undefined)
 /** Same lock rule as RMP premix / Case Prep motor / Mixing mix-card. */
 export const isQcUnitLocked = (status?: QcPartialItemStatus | string | null) => {
   const normalized = normalizePartialItemStatus(status);
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  // YET_TO_START = not unlocked by manufacturing yet (cannot edit).
+  // WAITING_FOR_APPROVAL / APPROVED = submitted or done (cannot edit).
+  return (
+    normalized === "YET_TO_START" ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 /** Details theme applies only after approval — not while waiting for approval. */
@@ -507,6 +513,8 @@ export const isQcPartialItemEnabledByDivisionDetails = (
 ): boolean => {
   if (!item || item.kind === "DIVISION") return true;
   const qcStatus = normalizePartialItemStatus(item.status);
+  // Not unlocked yet — never treat as started.
+  if (qcStatus === "YET_TO_START") return false;
   // QC unit already started or resubmitted — keep accessible regardless of seed status.
   if (qcStatus !== "TO_BE_INITIATED" && qcStatus !== "REJECTED") return true;
   const prerequisite = item.divisionDetailsStatus ?? item.status;

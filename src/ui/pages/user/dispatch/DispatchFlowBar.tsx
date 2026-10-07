@@ -23,6 +23,7 @@ type DispatchFlowBarProps = {
   onLoadForm: () => void;
   theme: any;
   dispatchTheme: ReturnType<typeof getDispatchTheme>;
+  validationErrors?: Record<string, string>;
 };
 
 const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
@@ -34,6 +35,7 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
   onLoadForm,
   theme,
   dispatchTheme,
+  validationErrors = {},
 }) => {
   const flowBar = dispatchTheme.flowBar;
   const casePrepFlowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
@@ -63,63 +65,93 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
             theme={selectTheme}
           />
 
-          <CasePrepDateField
-            label={L.dispatchDate}
-            value={setup.dispatchDate ?? ""}
-            onChange={(val) => onSetupChange("dispatchDate", val)}
-            theme={selectTheme}
-          />
+          <Box data-dispatch-field="setup.dispatchDate">
+            <CasePrepDateField
+              label={L.dispatchDate}
+              value={setup.dispatchDate ?? ""}
+              onChange={(val) => onSetupChange("dispatchDate", val)}
+              theme={selectTheme}
+              required
+              error={Boolean(validationErrors["setup.dispatchDate"])}
+              helperText={validationErrors["setup.dispatchDate"]}
+            />
+          </Box>
 
-          <CasePrepTextField
-            label={L.dispatchLocation}
-            value={setup.dispatchLocation ?? ""}
-            placeholder={L.dispatchLocationPlaceholder}
-            width={240}
-            theme={selectTheme}
-            onChange={(val) => onSetupChange("dispatchLocation", val)}
-          />
+          <Box data-dispatch-field="setup.dispatchLocation">
+            <CasePrepTextField
+              label={L.dispatchLocation}
+              value={setup.dispatchLocation ?? ""}
+              placeholder={L.dispatchLocationPlaceholder}
+              width={240}
+              theme={selectTheme}
+              required
+              error={Boolean(validationErrors["setup.dispatchLocation"])}
+              helperText={validationErrors["setup.dispatchLocation"]}
+              onChange={(val) => onSetupChange("dispatchLocation", val)}
+            />
+          </Box>
         </Box>
 
         {/* Row 2: Clearances & Action */}
         <Box sx={flowBar.topRow}>
-          <CasePrepSelect
-            label={L.ndtClearance}
-            value={setup.ndtClearance ?? ""}
-            placeholder="Select"
-            options={DISPATCH_YES_NO_OPTIONS}
-            width={200}
-            theme={selectTheme}
-            onChange={(val) => onSetupChange("ndtClearance", val)}
-          />
+          <Box data-dispatch-field="setup.ndtClearance">
+            <CasePrepSelect
+              label={L.ndtClearance}
+              value={setup.ndtClearance ?? ""}
+              placeholder="Select"
+              options={DISPATCH_YES_NO_OPTIONS}
+              width={200}
+              theme={selectTheme}
+              required
+              error={Boolean(validationErrors["setup.ndtClearance"])}
+              helperText={validationErrors["setup.ndtClearance"]}
+              onChange={(val) => onSetupChange("ndtClearance", val)}
+            />
+          </Box>
 
           {setup.ndtClearance === "YES" && (
-            <CasePrepTextField
-              label={L.ndtMomNo}
-              value={setup.ndtMomNo ?? ""}
-              placeholder={L.ndtMomNoPlaceholder}
-              theme={selectTheme}
-              onChange={(val) => onSetupChange("ndtMomNo", val)}
-            />
+            <Box data-dispatch-field="setup.ndtMomNo">
+              <CasePrepTextField
+                label={L.ndtMomNo}
+                value={setup.ndtMomNo ?? ""}
+                placeholder={L.ndtMomNoPlaceholder}
+                theme={selectTheme}
+                required
+                error={Boolean(validationErrors["setup.ndtMomNo"])}
+                helperText={validationErrors["setup.ndtMomNo"]}
+                onChange={(val) => onSetupChange("ndtMomNo", val)}
+              />
+            </Box>
           )}
 
-          <CasePrepSelect
-            label={L.finalAcceptanceClearance}
-            value={setup.finalAcceptanceClearance ?? ""}
-            placeholder="Select"
-            options={DISPATCH_YES_NO_OPTIONS}
-            width={240}
-            theme={selectTheme}
-            onChange={(val) => onSetupChange("finalAcceptanceClearance", val)}
-          />
+          <Box data-dispatch-field="setup.finalAcceptanceClearance">
+            <CasePrepSelect
+              label={L.finalAcceptanceClearance}
+              value={setup.finalAcceptanceClearance ?? ""}
+              placeholder="Select"
+              options={DISPATCH_YES_NO_OPTIONS}
+              width={240}
+              theme={selectTheme}
+              required
+              error={Boolean(validationErrors["setup.finalAcceptanceClearance"])}
+              helperText={validationErrors["setup.finalAcceptanceClearance"]}
+              onChange={(val) => onSetupChange("finalAcceptanceClearance", val)}
+            />
+          </Box>
 
           {setup.finalAcceptanceClearance === "YES" && (
-            <CasePrepTextField
-              label={L.finalAcceptanceMomNo}
-              value={setup.finalAcceptanceMomNo ?? ""}
-              placeholder={L.finalAcceptanceMomNoPlaceholder}
-              theme={selectTheme}
-              onChange={(val) => onSetupChange("finalAcceptanceMomNo", val)}
-            />
+            <Box data-dispatch-field="setup.finalAcceptanceMomNo">
+              <CasePrepTextField
+                label={L.finalAcceptanceMomNo}
+                value={setup.finalAcceptanceMomNo ?? ""}
+                placeholder={L.finalAcceptanceMomNoPlaceholder}
+                theme={selectTheme}
+                required
+                error={Boolean(validationErrors["setup.finalAcceptanceMomNo"])}
+                helperText={validationErrors["setup.finalAcceptanceMomNo"]}
+                onChange={(val) => onSetupChange("finalAcceptanceMomNo", val)}
+              />
+            </Box>
           )}
 
           <Box sx={{ ...flowBar.actionRow, ml: "auto" }}>

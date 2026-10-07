@@ -333,6 +333,21 @@ import {
   looksLikeQcTrimmingValidationErrors,
   resolveFirstQcTrimmingValidationFocus,
 } from "../../../data/validation/adapters/qcTrimming.validation";
+import {
+  focusQcPropellantField,
+  looksLikeQcPropellantValidationErrors,
+  resolveFirstQcPropellantValidationFocus,
+} from "../../../data/validation/adapters/qcPropellant.validation";
+import {
+  focusQcWeighmentField,
+  looksLikeQcWeighmentValidationErrors,
+  resolveFirstQcWeighmentValidationFocus,
+} from "../../../data/validation/adapters/qcWeighment.validation";
+import {
+  focusQcNdtField,
+  looksLikeQcNdtValidationErrors,
+  resolveFirstQcNdtValidationFocus,
+} from "../../../data/validation/adapters/qcNdtDivision.validation";
 import { focusFieldByPath } from "@/data/validation/utils/fieldPathResolver";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 
@@ -473,6 +488,12 @@ export const useQCDivisionHook = () => {
         firstPath = resolveFirstQcPostCureValidationFocus(entryErrors) ?? keys[0];
       } else if (looksLikeQcTrimmingValidationErrors(entryErrors)) {
         firstPath = resolveFirstQcTrimmingValidationFocus(entryErrors) ?? keys[0];
+      } else if (looksLikeQcPropellantValidationErrors(entryErrors)) {
+        firstPath = resolveFirstQcPropellantValidationFocus(entryErrors) ?? keys[0];
+      } else if (looksLikeQcWeighmentValidationErrors(entryErrors)) {
+        firstPath = resolveFirstQcWeighmentValidationFocus(entryErrors) ?? keys[0];
+      } else if (looksLikeQcNdtValidationErrors(entryErrors)) {
+        firstPath = resolveFirstQcNdtValidationFocus(entryErrors) ?? keys[0];
       } else {
         firstPath = keys[0];
       }
@@ -503,6 +524,9 @@ export const useQCDivisionHook = () => {
     let firstFieldPath: string | null = null;
     let usePostCureFocus = false;
     let useTrimmingFocus = false;
+    let usePropellantFocus = false;
+    let useWeighmentFocus = false;
+    let useNdtFocus = false;
     for (const entryErrors of Object.values(errorsByEntryId)) {
       const keys = Object.keys(entryErrors ?? {}).filter((k) =>
         String(entryErrors[k] ?? "").trim(),
@@ -544,6 +568,15 @@ export const useQCDivisionHook = () => {
       } else if (looksLikeQcTrimmingValidationErrors(entryErrors)) {
         useTrimmingFocus = true;
         firstFieldPath = resolveFirstQcTrimmingValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeQcPropellantValidationErrors(entryErrors)) {
+        usePropellantFocus = true;
+        firstFieldPath = resolveFirstQcPropellantValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeQcWeighmentValidationErrors(entryErrors)) {
+        useWeighmentFocus = true;
+        firstFieldPath = resolveFirstQcWeighmentValidationFocus(entryErrors ?? {}) ?? keys[0];
+      } else if (looksLikeQcNdtValidationErrors(entryErrors)) {
+        useNdtFocus = true;
+        firstFieldPath = resolveFirstQcNdtValidationFocus(entryErrors ?? {}) ?? keys[0];
       } else {
         firstFieldPath = keys[0];
       }
@@ -554,6 +587,9 @@ export const useQCDivisionHook = () => {
     requestAnimationFrame(() => {
       if (usePostCureFocus && focusQcPostCureField(firstFieldPath!, container)) return;
       if (useTrimmingFocus && focusQcTrimmingField(firstFieldPath!, container)) return;
+      if (usePropellantFocus && focusQcPropellantField(firstFieldPath!, container)) return;
+      if (useWeighmentFocus && focusQcWeighmentField(firstFieldPath!, container)) return;
+      if (useNdtFocus && focusQcNdtField(firstFieldPath!, container)) return;
       if (!focusQcField(firstFieldPath!, container)) {
         focusFieldByPath(firstFieldPath!, container);
       }
@@ -2737,7 +2773,14 @@ export const useQCDivisionHook = () => {
         const manufacturing =
           (auto as any)?.__manufacturingDivisionData ??
           (auto && !(auto as any).__qcFormDivisionData ? auto : null);
-        if (manufacturing) return manufacturing;
+        if (
+          manufacturing &&
+          !isEmptyManufacturingDivisionDetailsPayload({
+            __manufacturingDivisionData: manufacturing,
+          })
+        ) {
+          return manufacturing;
+        }
 
         const batchId = String(activeBatch?.batchId ?? "").trim();
         const divisionId = resolveQcManufacturingDivisionDetailsId(
@@ -4322,8 +4365,17 @@ export const useQCDivisionHook = () => {
     (item: QcPartialNavItem | undefined) => {
       if (!item) return false;
       const qcStatus = normalizePartialItemStatus(item.status);
-      if (qcStatus !== "TO_BE_INITIATED" && qcStatus !== "REJECTED") return true;
-      return isQcPartialItemEnabledByPreviousDivision(item, qcPreviousDivisionGate);
+      // Locked until manufacturing unlocks (YET_TO_START) or still at seed (TO_BE_INITIATED) /
+      // rejected — must pass the previous-stage gate. Do not treat YET_TO_START as "started".
+      if (
+        qcStatus === "YET_TO_START" ||
+        qcStatus === "TO_BE_INITIATED" ||
+        qcStatus === "REJECTED"
+      ) {
+        return isQcPartialItemEnabledByPreviousDivision(item, qcPreviousDivisionGate);
+      }
+      // IN_PROGRESS / WAITING_FOR_APPROVAL / APPROVED — unit already in QC workflow.
+      return true;
     },
     [qcPreviousDivisionGate],
   );
@@ -7418,9 +7470,15 @@ export const useQCDivisionHook = () => {
   const formLockMessage = useMemo(() => {
     if (readOnly) return null;
     if (isActivePartialReadOnly && activePartialItem) {
-      return activePartialItem.status === "APPROVED"
-        ? messages.UNIT_LOCKED_APPROVED
-        : messages.UNIT_LOCKED_WAITING;
+      const unitStatus = normalizePartialItemStatus(activePartialItem.status);
+      if (unitStatus === "APPROVED") return messages.UNIT_LOCKED_APPROVED;
+      if (unitStatus === "YET_TO_START") {
+        return (
+          messages.PREVIOUS_STAGE_UNIT_DISABLED ??
+          "This unit was not approved in the previous division and cannot be filled yet."
+        );
+      }
+      return messages.UNIT_LOCKED_WAITING;
     }
     if (!partialNavActive && isRevalidationDivisionActive && isActiveDivisionReadOnly) {
       return activeDivisionStatus === "APPROVED"
@@ -7436,6 +7494,7 @@ export const useQCDivisionHook = () => {
     isRevalidationDivisionActive,
     messages.DIVISION_LOCKED_APPROVED,
     messages.DIVISION_LOCKED_WAITING,
+    messages.PREVIOUS_STAGE_UNIT_DISABLED,
     messages.UNIT_LOCKED_APPROVED,
     messages.UNIT_LOCKED_WAITING,
     partialNavActive,

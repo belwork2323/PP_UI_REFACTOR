@@ -74,26 +74,34 @@ export const dispatchValidationFields: Record<string, FieldRuleConfig> = {
   waiverDetails: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
-const resolveSetupFields = (setup: DispatchMotorSetup) => [
-  { path: "setup.dispatchDate", value: setup.dispatchDate, ruleKey: "setup.dispatchDate" },
-  {
-    path: "setup.dispatchLocation",
-    value: setup.dispatchLocation,
-    ruleKey: "setup.dispatchLocation",
-  },
-  { path: "setup.ndtClearance", value: setup.ndtClearance, ruleKey: "setup.ndtClearance" },
-  { path: "setup.ndtMomNo", value: setup.ndtMomNo, ruleKey: "setup.ndtMomNo" },
-  {
-    path: "setup.finalAcceptanceClearance",
-    value: setup.finalAcceptanceClearance,
-    ruleKey: "setup.finalAcceptanceClearance",
-  },
-  {
-    path: "setup.finalAcceptanceMomNo",
-    value: setup.finalAcceptanceMomNo,
-    ruleKey: "setup.finalAcceptanceMomNo",
-  },
-];
+const resolveSetupFields = (setup: DispatchMotorSetup) => {
+  const fields = [
+    { path: "setup.dispatchDate", value: setup.dispatchDate, ruleKey: "setup.dispatchDate" },
+    {
+      path: "setup.dispatchLocation",
+      value: setup.dispatchLocation,
+      ruleKey: "setup.dispatchLocation",
+    },
+    { path: "setup.ndtClearance", value: setup.ndtClearance, ruleKey: "setup.ndtClearance" },
+    {
+      path: "setup.finalAcceptanceClearance",
+      value: setup.finalAcceptanceClearance,
+      ruleKey: "setup.finalAcceptanceClearance",
+    },
+  ];
+  // MOM numbers only required when their clearance is YES (matches FlowBar visibility).
+  if (String(setup.ndtClearance ?? "").trim().toUpperCase() === "YES") {
+    fields.push({ path: "setup.ndtMomNo", value: setup.ndtMomNo, ruleKey: "setup.ndtMomNo" });
+  }
+  if (String(setup.finalAcceptanceClearance ?? "").trim().toUpperCase() === "YES") {
+    fields.push({
+      path: "setup.finalAcceptanceMomNo",
+      value: setup.finalAcceptanceMomNo,
+      ruleKey: "setup.finalAcceptanceMomNo",
+    });
+  }
+  return fields;
+};
 
 const resolveMotorDataFields = (data: DispatchMotorData) => {
   const fields: Array<{ path: string; value: unknown; ruleKey: string }> = [];
@@ -153,11 +161,13 @@ const resolveMotorDataFields = (data: DispatchMotorData) => {
       value: packing.NITROGEN_GAS_PURGING,
       ruleKey: "nitrogenPurging",
     });
-    fields.push({
-      path: "ROCKET_MOTOR_PACKING.NITROGEN_PRESSURE",
-      value: packing.NITROGEN_PRESSURE,
-      ruleKey: "nitrogenPressure",
-    });
+    if (String(packing.NITROGEN_GAS_PURGING ?? "").trim().toUpperCase() === "YES") {
+      fields.push({
+        path: "ROCKET_MOTOR_PACKING.NITROGEN_PURGING_PRESSURE",
+        value: packing.NITROGEN_PURGING_PRESSURE,
+        ruleKey: "nitrogenPressure",
+      });
+    }
     fields.push({
       path: "ROCKET_MOTOR_PACKING.LABELLING_OF_MOTOR",
       value: packing.LABELLING_OF_MOTOR,

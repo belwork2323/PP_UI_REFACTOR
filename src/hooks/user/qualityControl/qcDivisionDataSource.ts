@@ -36,9 +36,11 @@ const pickString = (...values: unknown[]): string => {
   return "";
 };
 
-/** Unit/division still waiting for first QC entry — seed from division-details. */
-export const isQcStatusAwaitingInitiation = (status: unknown): boolean =>
-  normalizePartialItemStatus(status) === "TO_BE_INITIATED";
+/** Unit/division not yet in QC workflow — seed from /qc-division/division-details, not saved form details. */
+export const isQcStatusAwaitingInitiation = (status: unknown): boolean => {
+  const normalized = normalizePartialItemStatus(status);
+  return normalized === "TO_BE_INITIATED" || normalized === "YET_TO_START";
+};
 
 /** Apply known API key aliases onto a division status map (nav tabs / form details). */
 export const applyQcDivisionStatusAliases = (
@@ -362,7 +364,7 @@ export const resolvePremixQcStatusFromFormDetails = (
 
 /**
  * Data-source gate for all QC divisions and batch types:
- * - TO_BE_INITIATED → seed from `/qc-division/division-details`
+ * - TO_BE_INITIATED / YET_TO_START → seed from `/qc-division/division-details`
  * - IN_PROGRESS / WAITING_FOR_APPROVAL / APPROVED / REJECTED → load `/qc-division/details`
  */
 export const shouldUseQcFormDetailsData = (status: unknown): boolean =>

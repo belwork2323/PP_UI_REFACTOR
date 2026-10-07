@@ -4,6 +4,7 @@ import type { DispatchMotorSession } from "../../../../data/models/user/Dispatch
 import type { DispatchMotorData } from "../../../../data/models/user/DispatchMotorDataModel";
 import DispatchMotorPanel from "./DispatchMotorPanel";
 import getDispatchTheme from "../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 
 type DispatchMotorDetailsCardProps = {
   motor: DispatchMotorSession;
@@ -52,6 +53,9 @@ const DispatchMotorDetailsCard = ({
   const panel = getDispatchTheme(theme).panel;
   const setup = motor.setup;
 
+  const setupFieldPath = (id: string) =>
+    id.startsWith("setup.") ? id : `setup.${id}`;
+
   const summaryItems = [
     { id: "stage", label: L.stage, value: formatStageLabel(setup.motorStage) },
     { id: "castingDate", label: L.castingDate, value: setup.castingDate },
@@ -80,12 +84,29 @@ const DispatchMotorDetailsCard = ({
           useFlexGap
           sx={{ columnGap: 2.5, rowGap: 1.25 }}
         >
-          {summaryItems.map((item) => (
-            <Box key={item.id} sx={{ minWidth: { xs: "100%", sm: 180 } }}>
-              <Typography sx={panel.setupLabel}>{item.label}</Typography>
-              <Typography sx={panel.setupValue}>{item.value?.trim() ? item.value : "—"}</Typography>
-            </Box>
-          ))}
+          {summaryItems.map((item) => {
+            const path = setupFieldPath(item.id);
+            const message = validationErrors?.[path];
+            const isSetupField = item.id !== "stage" && item.id !== "castingDate";
+            return (
+              <Box
+                key={item.id}
+                sx={{ minWidth: { xs: "100%", sm: 180 } }}
+                {...(isSetupField ? { "data-dispatch-field": path } : {})}
+              >
+                <Typography sx={panel.setupLabel}>{item.label}</Typography>
+                <Typography
+                  sx={{
+                    ...panel.setupValue,
+                    ...(message ? { color: "error.main", fontWeight: 700 } : {}),
+                  }}
+                >
+                  {item.value?.trim() ? item.value : "—"}
+                </Typography>
+                <FieldErrorText message={message} />
+              </Box>
+            );
+          })}
         </Stack>
       </Box>
 

@@ -78,6 +78,7 @@ const STFPage = () => {
     handleSaveMotorDraft,
     handleSubmitMotor,
     motorValidationErrors,
+    validationFocusRequest,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -213,6 +214,7 @@ const STFPage = () => {
               setMotorSubmitConfirmOpen(true);
             }}
             motorValidationErrors={motorValidationErrors}
+            validationFocusRequest={validationFocusRequest}
             theme={theme}
           />
         </>
