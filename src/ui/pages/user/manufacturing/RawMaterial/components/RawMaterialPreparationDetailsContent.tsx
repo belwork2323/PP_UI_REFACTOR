@@ -41,6 +41,8 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
+import { formatRmpMaterialNavLabel } from "../../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
+import { resolveWeightmentRowDisplay } from "../../../../../../data/models/user/rawMaterialWeightmentValidation";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -246,17 +248,18 @@ export const buildRawMaterialPrepMaterialTabs = (
 ): MaterialTab[] => [
   ...solidProcesses.map((process, index) => ({
     key: `solid-${process.materialCode}-${index}`,
-    label: premixNo
-      ? `Premix-${premixNo} ${process.materialCode}${process.gradeCode ? ` (${process.gradeCode})` : ""}`
-      : `Premix-${process.materialCode}${process.gradeCode ? ` (${process.gradeCode})` : ""}`,
+    label: formatRmpMaterialNavLabel({
+      materialCode: process.materialCode,
+      gradeCode: process.gradeCode,
+    }),
     slot: "solid" as const,
     process,
   })),
   ...liquidProcesses.map((process, index) => ({
     key: `liquid-${process.materialCode}-${index}`,
-    label: premixNo
-      ? `Premix-${premixNo} ${process.materialCode}`
-      : `Premix-${process.materialCode}`,
+    label: formatRmpMaterialNavLabel({
+      materialCode: process.materialCode,
+    }),
     slot: "liquid" as const,
     process,
   })),
@@ -458,17 +461,34 @@ export const WeightmentSheetDetailBlock = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {weightmentSheet.weightmentDetails.map((entry, rowIndex) => (
+              {weightmentSheet.weightmentDetails.map((entry, rowIndex) => {
+                const display = resolveWeightmentRowDisplay(entry);
+                return (
                 <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
-                  <TableCell sx={dt.tableCell}>{entry.materialCode || "—"}</TableCell>
-                  <TableCell sx={dt.tableCell}>{entry.materialName || "—"}</TableCell>
+                  <TableCell sx={dt.tableCell}>
+                    {display.primaryCode || "—"}
+                    {display.secondaryCode ? (
+                      <Typography sx={{ fontSize: "0.68rem", color: palette.textSub, mt: 0.25 }}>
+                        ({display.secondaryCode})
+                      </Typography>
+                    ) : null}
+                  </TableCell>
+                  <TableCell sx={dt.tableCell}>
+                    {display.primaryName || "—"}
+                    {display.secondaryName ? (
+                      <Typography sx={{ fontSize: "0.68rem", color: palette.textSub, mt: 0.25 }}>
+                        ({display.secondaryName})
+                      </Typography>
+                    ) : null}
+                  </TableCell>
                   <TableCell sx={dt.tableCell}>{entry.containerType || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.containerNumber || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.weighScaleNumber || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.weightTransferred || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{formatDateTime(entry.weighingDateTime)}</TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

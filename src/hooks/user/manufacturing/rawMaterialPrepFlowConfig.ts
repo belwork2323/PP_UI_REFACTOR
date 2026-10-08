@@ -13,6 +13,11 @@ import {
   type MaterialsListGrade,
   type MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
+import {
+  AP_GRADE_OPTIONS,
+  isApRmpFormTemplate,
+  normalizeApGradeCode,
+} from "../../../data/models/user/rmp/rmpMaterialUiRegistry";
 
 export const PREMIX_COUNT = 15;
 
@@ -55,6 +60,40 @@ export const RAW_MATERIAL_PREP_PROCESSES = [
 ];
 
 export const getPremixLabel = (n: number) => `Premix - ${n}`;
+
+/** Premix material nav: `AP - COARSE` when a grade is present; otherwise material code only. */
+export const formatRmpMaterialNavLabel = (entry: {
+  solidMaterialCode?: string;
+  liquidMaterialCode?: string;
+  solidGradeCode?: string;
+  solidGradeName?: string;
+  materialCode?: string;
+  gradeCode?: string;
+  gradeName?: string;
+}) => {
+  const material = String(
+    entry.solidMaterialCode || entry.liquidMaterialCode || entry.materialCode || "",
+  ).trim();
+  const gradeCode = String(entry.solidGradeCode || entry.gradeCode || "").trim();
+  const normalizedAp = normalizeApGradeCode(gradeCode);
+  const apOption = AP_GRADE_OPTIONS.find((option) => option.value === normalizedAp);
+  const isApGrade = Boolean(apOption);
+  const grade = isApGrade
+    ? normalizedAp.replace(/_/g, " ")
+    : String(entry.solidGradeName || entry.gradeName || gradeCode).trim();
+  if (!material) return grade;
+  if (!grade) return material;
+  const materialUpper = material.toUpperCase();
+  const gradeUpper = grade.toUpperCase();
+  if (
+    gradeUpper === materialUpper ||
+    gradeUpper.startsWith(`${materialUpper} - `) ||
+    gradeUpper.startsWith(`${materialUpper}-`)
+  ) {
+    return grade;
+  }
+  return `${material} - ${grade}`;
+};
 
 export const normalizeBatchScale = (batchType?: string) => {
   const normalized = String(batchType ?? "").toLowerCase().replace(/\s+/g, "");
@@ -115,14 +154,17 @@ export const sheetMaterialToPrepOption = (
   const materialCode = String(row.materialCode ?? "").trim();
   const gradeCode = String(row.gradeCode ?? row.gradeName ?? "").trim();
   const template = String(row.rmpFormTemplate ?? "").trim().toUpperCase();
-  const isAp = template === "AP";
+  const inferredAp = ["COARSE", "FINE", "ULTRA_FINE"].includes(
+    normalizeApGradeCode(gradeCode),
+  );
+  const isAp = template === "AP" || inferredAp;
   return {
     materialId: Number(row.materialId ?? 0),
     materialCode,
     materialName: String(row.materialName ?? materialCode).trim() || materialCode,
     rawMaterialType: "NORMAL",
     preparationType: null,
-    rmpFormTemplate: template || "DEFAULT",
+    rmpFormTemplate: template || (inferredAp ? "AP" : "DEFAULT"),
     specCount: 0,
     grades: isAp
       ? [
@@ -213,6 +255,7 @@ export const createEmptyPremixSelection = (premix: number) => ({
   selectedProcesses: { solid: false, liquid: false },
   solidMaterialCode: "",
   solidGradeCode: "",
+  solidGradeName: "",
   solidMaterialId: undefined as number | undefined,
   solidRmpFormTemplate: null as string | null,
   liquidMaterialCode: "",
@@ -314,6 +357,19 @@ const resolveGradeFromSheetRow = (
       grade.gradeName.toUpperCase() === raw.toUpperCase(),
   );
 
+  const isAp =
+    isApRmpFormTemplate(row.rmpFormTemplate) ||
+    isApRmpFormTemplate(solidMaterial?.rmpFormTemplate);
+  if (isAp) {
+    const normalized = normalizeApGradeCode(match?.gradeCode || raw);
+    const apOption = AP_GRADE_OPTIONS.find((option) => option.value === normalized);
+    return {
+      gradeCode: normalized || (match?.gradeCode ?? raw),
+      gradeName: apOption?.label ?? match?.gradeName ?? String(row.gradeName ?? raw).trim(),
+      gradeId: match?.gradeId,
+    };
+  }
+
   if (match) {
     return {
       gradeCode: match.gradeCode,
@@ -356,7 +412,11 @@ export const buildMaterialSelectionFromSheetRow = (
   const lotIds = (row.lotIds ?? [])
     .map((id) => String(id ?? "").trim())
     .filter(Boolean);
-  const template = String(row.rmpFormTemplate ?? "").trim() || "DEFAULT";
+  const inferredAp = ["COARSE", "FINE", "ULTRA_FINE"].includes(
+    normalizeApGradeCode(grade.gradeCode),
+  );
+  const template =
+    String(row.rmpFormTemplate ?? "").trim() || (inferredAp ? "AP" : "DEFAULT");
   const materialId =
     row.materialId != null && Number.isFinite(Number(row.materialId))
       ? Number(row.materialId)
@@ -376,6 +436,7 @@ export const buildMaterialSelectionFromSheetRow = (
     selectedProcesses,
     solidMaterialCode: selectedProcesses.solid ? materialCode : "",
     solidGradeCode: selectedProcesses.solid ? grade.gradeCode : "",
+    solidGradeName: selectedProcesses.solid ? grade.gradeName : "",
     solidMaterialId: selectedProcesses.solid ? materialId : undefined,
     solidGradeId: grade.gradeId,
     solidRmpFormTemplate: selectedProcesses.solid ? template : null,
@@ -810,6 +871,7 @@ export const applyMaterialOptionToPremix = (
     selectedProcesses,
     solidMaterialCode: hasSolid ? option.materialCode : "",
     solidGradeCode: hasSolid ? option.gradeCode : "",
+    solidGradeName: hasSolid ? option.gradeName || solidGrade?.gradeName || "" : "",
     solidMaterialId: option.materialId ?? solidMaterial?.materialId ?? listMaterial?.materialId,
     solidGradeId: option.gradeId ?? solidGrade?.gradeId,
     liquidMaterialCode: hasLiquid ? option.materialCode : "",

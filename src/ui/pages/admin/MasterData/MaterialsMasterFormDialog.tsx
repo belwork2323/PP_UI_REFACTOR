@@ -398,12 +398,7 @@ const MaterialsMasterFormDialog = ({
     isEdit ||
     form.rawMaterialType === "NORMAL" ||
     (form.rawMaterialType === "ACEM" && Boolean(form.preparationType));
-  const hasGrades = form.grades.length > 0;
-  const hasTopSpecs = form.specifications.length > 0;
-  // Mutual exclusivity: lock the empty side when the other has rows.
-  // If both somehow exist (legacy), keep both editable so one side can be cleared.
-  const gradesDisabled = saving || (hasTopSpecs && !hasGrades);
-  const specsDisabled = saving || (hasGrades && !hasTopSpecs);
+  const nestedEditorsDisabled = saving;
   const fieldErrors = useMemo(
     () => getMaterialsFormFieldErrors(form, isEdit, existingCodes),
     [form, isEdit, existingCodes],
@@ -591,18 +586,13 @@ const MaterialsMasterFormDialog = ({
                 {S.MATERIALS.STRUCTURE_HINT}
               </Typography>
             )}
-            {gradesDisabled && !saving ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {S.MATERIALS.GRADES_LOCKED_HINT}
-              </Typography>
-            ) : null}
             {showErrors && fieldErrors.form ? (
               <Typography variant="body2" color="error" sx={{ mb: 1 }}>{fieldErrors.form}</Typography>
             ) : null}
-            <Box sx={{ opacity: gradesDisabled && !saving ? 0.55 : 1, pointerEvents: gradesDisabled ? "none" : "auto" }}>
+            <Box>
               <GradeEditor
                 grades={form.grades}
-                disabled={gradesDisabled}
+                disabled={nestedEditorsDisabled}
                 isEdit={isEdit}
                 showErrors={showErrors}
                 gradeErrors={fieldErrors.grades}
@@ -615,15 +605,13 @@ const MaterialsMasterFormDialog = ({
 
           <Box>
             <Typography sx={modal.fieldLabel}>Specifications</Typography>
-            {specsDisabled && !saving ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {S.MATERIALS.SPECS_LOCKED_HINT}
-              </Typography>
-            ) : null}
-            <Box sx={{ opacity: specsDisabled && !saving ? 0.55 : 1, pointerEvents: specsDisabled ? "none" : "auto" }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {S.MATERIALS.SPECS_REQUIRED_HINT}
+            </Typography>
+            <Box>
               <SpecEditor
                 specs={form.specifications}
-                disabled={specsDisabled}
+                disabled={nestedEditorsDisabled}
                 isEdit={isEdit}
                 showErrors={showErrors}
                 specErrors={fieldErrors.specifications}

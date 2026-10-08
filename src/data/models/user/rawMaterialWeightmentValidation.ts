@@ -81,8 +81,29 @@ export const numbersApproximatelyEqual = (
 export const formatSheetMaterialLabel = (material: MaterialItem): string => {
   const code = String(material.materialCode ?? "").trim();
   const name = String(material.materialName ?? code).trim();
-  const grade = String(material.gradeCode ?? material.gradeName ?? "").trim();
-  return grade ? `${code} — ${name} (${grade})` : `${code} — ${name}`;
+  const gradeCode = String(material.gradeCode ?? "").trim();
+  const gradeName = String(material.gradeName ?? "").trim();
+  const grade = [gradeCode, gradeName].filter(Boolean).join(" — ");
+  return grade ? `${grade} (${code} — ${name})` : `${code} — ${name}`;
+};
+
+export const resolveWeightmentRowDisplay = (
+  row: RawMaterialPrepWeightmentDetail,
+  sheetMaterials: MaterialItem[] = [],
+) => {
+  const sheet = findSheetMaterialForWeightmentRow(row, sheetMaterials);
+  const materialCode = String(row.materialCode ?? "").trim();
+  const materialName = String(row.materialName ?? "").trim() || materialCode;
+  const gradeCode = String(row.gradeCode ?? sheet?.gradeCode ?? "").trim();
+  const gradeName = String(row.gradeName ?? sheet?.gradeName ?? "").trim();
+  const hasGrade = Boolean(gradeCode || gradeName);
+  return {
+    hasGrade,
+    primaryCode: hasGrade ? gradeCode || gradeName : materialCode,
+    primaryName: hasGrade ? gradeName || gradeCode : materialName,
+    secondaryCode: hasGrade ? materialCode : "",
+    secondaryName: hasGrade ? materialName : "",
+  };
 };
 
 /** API may send plain numbers or `{ source, parsedValue }` wrappers. */
@@ -171,6 +192,17 @@ export const findSheetMaterialForWeightmentRow = (
   );
   if (matches.length === 0) return undefined;
   if (matches.length === 1) return matches[0];
+
+  const rowGrade = String(row.gradeCode ?? row.gradeName ?? "").trim().toUpperCase();
+  if (rowGrade) {
+    const byGrade = matches.filter((material) => {
+      const gradeCode = String(material.gradeCode ?? "").trim().toUpperCase();
+      const gradeName = String(material.gradeName ?? "").trim().toUpperCase();
+      return gradeCode === rowGrade || gradeName === rowGrade;
+    });
+    if (byGrade.length === 1) return byGrade[0];
+    if (byGrade.length > 1) return byGrade[0];
+  }
 
   const name = String(row.materialName ?? "").trim().toUpperCase();
   if (name) {

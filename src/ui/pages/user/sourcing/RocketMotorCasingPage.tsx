@@ -16,6 +16,7 @@ import RocketMotorBatchList, {
 import RocketMotorCasingDetailsView from "./components/RocketMotorCasingDetailsView";
 import { STRINGS } from "../../../../app/config/strings";
 import { OPERATION_STATUS } from "../../../../hooks/operationStatus";
+import { isRocketMotorCasingMasterFrozen } from "../../../../data/models/user/RocketMotorCasingProcurementModel";
 
 const RocketMotorCasing = () => {
   const mode = useThemeStore((state) => state.mode);
@@ -196,6 +197,7 @@ const RocketMotorCasing = () => {
               deleteLoading={deleteLoading}
               validationErrors={validationErrors}
               validationFocusRequest={validationFocusRequest}
+              freezeMasterRows={isRocketMotorCasingMasterFrozen(activeBatch?.rmStatus)}
               theme={theme}
             />
           </Box>

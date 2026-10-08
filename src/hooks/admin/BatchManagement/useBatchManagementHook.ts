@@ -23,8 +23,8 @@ import {
 } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
-  RawMaterialLotListGrade,
   toRawMaterialLotListApiStatus,
+  type RawMaterialLotListRow,
 } from "@data/models/user/RawMaterialProcurementModel";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
@@ -74,23 +74,7 @@ type BatchFilters = {
   startDate?: string;
 };
 
-export type RawMaterialLotListRow = {
-  id: string | number;
-  lotId: string[];
-  sourcingId: string;
-  materialCode: string;
-  materialName: string;
-  grade: RawMaterialLotListGrade | null;
-  supplyOrderNo: string;
-  receiptDate: string;
-  manufacturerName: string;
-  status: string;
-  createdBy?: { id: string; fullName: string } | null;
-  createdOn: string;
-  rmStatus: string;
-  formId?: string | null;
-  rejectionReason?: string;
-};
+export type { RawMaterialLotListRow };
 
 function useBatchListSection(dateFilter: {
   filterType: string;
@@ -489,7 +473,7 @@ function useBatchFormSection(onRefresh: () => void) {
   const [implBaselineSnapshot, setImplBaselineSnapshot] = useState(
     createEmptyImplementationFormState(),
   );
-  const batchModalCloseCallbackRef = useRef<(() => void) | undefined>();
+  const batchModalCloseCallbackRef = useRef<(() => void) | undefined>(undefined);
 
   const serializeFormSnapshot = (value: unknown) => JSON.stringify(value);
 
@@ -1120,10 +1104,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
       if (trimmedIds.length === 0) return [];
 
       const lots = getLotsForMaterial(materialCode);
-      return lots.filter((lot) => {
-        const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
-        return lotIdValue ? trimmedIds.includes(String(lotIdValue).trim()) : false;
-      });
+      return lots.filter((lot) => trimmedIds.includes(String(lot.lotId ?? "").trim()));
     },
     [getLotsForMaterial],
   );
@@ -1143,31 +1124,19 @@ function useBatchImplementationSection(implModalOpen: boolean) {
       : [];
 
     const filtered = base.filter((lot) => {
-      if (gradeKey) {
-        const lotGrade = String(lot.grade?.gradeCode ?? "").trim();
-        if (lotGrade && lotGrade !== gradeKey) return false;
-      }
-
-      // Handle case where lot.lotId might be an array or string in the current interface
-      const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
-
+      // Lots belong to the parent material and are available to every grade.
+      const lotIdValue = String(lot.lotId ?? "").trim();
       if (lotIdValue && activeLotIds.includes(lotIdValue)) return true;
       return lotIdValue ? !selectedElsewhere.has(lotIdValue) : false;
     });
 
-    // Inject individual fallback rows for any selected lot ID not found in the base list
     const missingLots: RawMaterialLotListRow[] = [];
     for (const lotId of activeLotIds) {
-      const exists = filtered.some((lot) => {
-        const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
-        return lotIdValue === lotId;
-      });
-
+      const exists = filtered.some((lot) => String(lot.lotId ?? "").trim() === lotId);
       if (!exists) {
         missingLots.push({
           id: lotId,
-          // Match the type definition: cast or provide as array if RawMaterialLotListRow expects string[]
-          lotId: [lotId] as any,
+          lotId,
           sourcingId: "",
           materialCode,
           materialName: "",
@@ -1175,8 +1144,8 @@ function useBatchImplementationSection(implModalOpen: boolean) {
           supplyOrderNo: "",
           receiptDate: "",
           manufacturerName: "",
-          status: "APPROVED" as any,
-          rmStatus: "Approved",
+          status: OPERATION_STATUS.APPROVED,
+          rmStatus: OPERATION_STATUS.APPROVED,
           createdOn: "",
         });
       }

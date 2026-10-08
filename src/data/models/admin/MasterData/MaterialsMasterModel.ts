@@ -428,16 +428,13 @@ export const getMaterialsFormFieldErrors = (
   }
   if (!form.rmpFormTemplate || !isRmpFormTemplateAllowed(form.rmpFormTemplate, form.materialType)) {
     errors.rmpFormTemplate = "RMP process form is required";
-  } else if (form.rmpFormTemplate === "AP" && form.grades.length === 0) {
-    errors.rmpFormTemplate = "AP Form Template requires at least one grade";
   }
-  if (form.grades.length === 0 && form.specifications.length === 0) {
-    errors.form = "Add at least one grade or top-level specification";
+  if (form.specifications.length === 0) {
+    errors.form = "Add at least one top-level specification";
     return errors;
   }
-  if (form.grades.length > 0 && form.specifications.length > 0) {
-    errors.form = "Use either grades or top-level specifications, not both";
-    return errors;
+  if (form.rmpFormTemplate === "AP" && form.grades.length === 0) {
+    errors.form = "AP Form Template requires at least one grade";
   }
 
   const gradeCodes = new Set<string>();

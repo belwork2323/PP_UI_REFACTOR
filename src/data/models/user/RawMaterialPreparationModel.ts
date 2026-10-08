@@ -11,6 +11,7 @@ import {
 import { buildProcessFromTypedForm } from "./rmp/buildProcessFromTypedForm";
 import {
   createEmptyProcessFormForUiKey,
+  ensureProcessFormMatchesUiKey,
   processFormHasUserData,
   type RmpMaterialProcessForm,
 } from "./rmp/defaultSolidProcessForm";
@@ -175,6 +176,9 @@ export type RawMaterialPreparationSubmitResponse = {
 export type RawMaterialPrepWeightmentDetail = {
   materialCode: string;
   materialName: string;
+  /** Identification-sheet grade — shown as the primary weighment identity when present. */
+  gradeCode?: string;
+  gradeName?: string;
   /** Premix this row belongs to — weighment is per material × premix. */
   premixNo?: number | null;
   /**
@@ -229,6 +233,8 @@ export const createEmptyWeightmentDetail = (
 ): RawMaterialPrepWeightmentDetail => ({
   materialCode: "",
   materialName: "",
+  gradeCode: "",
+  gradeName: "",
   premixNo: null,
   scopeMaterialCode: null,
   fromIdentificationSheet: false,
@@ -362,6 +368,8 @@ const mapWeightmentDetailFromApi = (
   return {
     materialCode: String(row.materialCode ?? ""),
     materialName: String(row.materialName ?? row.materialCode ?? ""),
+    gradeCode: String(row.gradeCode ?? row.grade_code ?? ""),
+    gradeName: String(row.gradeName ?? row.grade_name ?? ""),
     premixNo,
     percentage:
       unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
@@ -433,6 +441,12 @@ export const mapWeightmentSheetToApi = (
     weightmentDetails: rows.map((row) => ({
       materialCode: String(row.materialCode ?? "").trim(),
       materialName: String(row.materialName ?? "").trim() || String(row.materialCode ?? "").trim(),
+      ...(String(row.gradeCode ?? "").trim()
+        ? { gradeCode: String(row.gradeCode).trim() }
+        : {}),
+      ...(String(row.gradeName ?? "").trim()
+        ? { gradeName: String(row.gradeName).trim() }
+        : {}),
       ...(row.premixNo != null && Number.isFinite(Number(row.premixNo))
         ? { premixNo: Number(row.premixNo) }
         : {}),
@@ -465,6 +479,7 @@ export type RawMaterialPrepPremixSelection = {
   selectedProcesses: { solid: boolean; liquid: boolean };
   solidMaterialCode: string;
   solidGradeCode: string;
+  solidGradeName?: string;
   solidMaterialId?: number;
   solidGradeId?: number;
   solidRmpFormTemplate?: string | null;
@@ -577,15 +592,20 @@ export const hydratePremixProcessSlot = (
   gradeCode?: string,
   rmpFormTemplate?: string | null,
 ): RawMaterialPrepMaterialProcessSlot => {
-  const resolvedGrade = gradeCode ?? entry?.gradeCode ?? "";
-  const uiKey = entry?.processType
-    ? processTypeToUiKey(entry.processType)
-    : resolveMaterialUiKey({
-        materialCode,
-        slot,
-        gradeCode: resolvedGrade,
-        rmpFormTemplate,
-      });
+  const resolvedGrade =
+    normalizeApGradeCode(gradeCode ?? entry?.gradeCode ?? "") ||
+    String(gradeCode ?? entry?.gradeCode ?? "");
+  const fromGrade = resolveMaterialUiKey({
+    materialCode,
+    slot,
+    gradeCode: resolvedGrade,
+    rmpFormTemplate,
+  });
+  const fromType = entry?.processType ? processTypeToUiKey(entry.processType) : null;
+  const uiKey =
+    fromGrade !== "defaultSolid" && fromGrade !== "defaultLiquid"
+      ? fromGrade
+      : (fromType ?? fromGrade);
   return {
     uiKey,
     processForm: hydrateProcessFormFromEntry(uiKey, entry),
@@ -600,12 +620,19 @@ export const normalizeMaterialProcessSlot = (
   rmpFormTemplate?: string | null,
 ): RawMaterialPrepMaterialProcessSlot => {
   const code = String(materialCode ?? "").trim();
-  const uiKey =
-    partial?.uiKey ??
-    resolveMaterialUiKey({ materialCode: code, slot, gradeCode, rmpFormTemplate });
-  const processForm = partial?.processForm
-    ? (cloneValue(partial.processForm) as RmpMaterialProcessForm)
-    : createEmptyProcessFormForUiKey(uiKey);
+  const resolvedGrade = normalizeApGradeCode(gradeCode) || gradeCode;
+  const uiKey = resolveMaterialUiKey({
+    materialCode: code,
+    slot,
+    gradeCode: resolvedGrade,
+    rmpFormTemplate,
+  });
+  const processForm = ensureProcessFormMatchesUiKey(
+    uiKey,
+    partial?.processForm
+      ? (cloneValue(partial.processForm) as RmpMaterialProcessForm)
+      : undefined,
+  );
   return { uiKey, processForm };
 };
 
@@ -787,39 +814,67 @@ export const mapPreparationDetailsPayload = (params: {
         const apSlots = Array.isArray(session.apGradeSlots) ? session.apGradeSlots : [];
 
         if (isAp) {
-          // Host-managed AP grades (may be empty after user deleted all).
-          // Backend only allows AP_COARSE | AP_FINE | AP_ULTRA_FINE — never DEFAULT_SOLID.
-          apSlots.forEach((gradeSlot) => {
-            const gradeCode = String(gradeSlot.gradeCode ?? "").trim();
-            if (!gradeCode) return;
-            const apUiKey = resolveMaterialUiKey({
+          // Host-managed AP grades. If cards were never seeded, fall back to session.solid
+          // so filled AP / lot details are not dropped on draft or submit.
+          const resolvedApSlots =
+            apSlots.length > 0
+              ? apSlots
+              : [
+                  {
+                    gradeCode:
+                      normalizeApGradeCode(
+                        session.solidGradeCode || entry.solidGradeCode || "",
+                      ) ||
+                      gradeCodeFromApProcessType(uiKeyToProcessType(session.solid.uiKey)) ||
+                      "COARSE",
+                    slot: session.solid,
+                  },
+                ];
+
+          resolvedApSlots.forEach((gradeSlot) => {
+            const gradeCode =
+              normalizeApGradeCode(gradeSlot.gradeCode) ||
+              String(gradeSlot.gradeCode ?? "").trim() ||
+              gradeCodeFromApProcessType(uiKeyToProcessType(gradeSlot.slot?.uiKey)) ||
+              "COARSE";
+            const fromForm = gradeSlot.slot?.processForm?.uiKey;
+            const fromSlot = gradeSlot.slot?.uiKey;
+            const fromGrade = resolveMaterialUiKey({
               materialCode: entry.solidMaterialCode,
               slot: "solid",
               gradeCode,
               rmpFormTemplate: "AP",
             });
-            // Guard: AP without a recognized grade must not emit DEFAULT_SOLID.
+            const apUiKey =
+              fromForm === "apCoarse" || fromForm === "apFine" || fromForm === "apUltraFine"
+                ? fromForm
+                : fromSlot === "apCoarse" || fromSlot === "apFine" || fromSlot === "apUltraFine"
+                  ? fromSlot
+                  : fromGrade === "apCoarse" ||
+                      fromGrade === "apFine" ||
+                      fromGrade === "apUltraFine"
+                    ? fromGrade
+                    : "apCoarse";
             const processType = uiKeyToProcessType(apUiKey);
-            if (
-              processType !== "AP_COARSE" &&
-              processType !== "AP_FINE" &&
-              processType !== "AP_ULTRA_FINE"
-            ) {
-              return;
-            }
             const process =
               buildProcessFromTypedForm({
                 uiKey: apUiKey,
-                processForm: gradeSlot.slot.processForm,
+                processForm:
+                  gradeSlot.slot?.processForm ?? createEmptyProcessFormForUiKey(apUiKey),
                 material: solidMaterial,
                 gradeCode,
                 fallback: {
-                  materialId: entry.solidMaterialId,
+                  materialId: entry.solidMaterialId ?? solidFallback.materialId,
                   materialCode: entry.solidMaterialCode,
                   materialName: solidMaterial?.materialName ?? entry.materialName,
-                  gradeId: entry.solidGradeId,
+                  gradeId: entry.solidGradeId ?? solidFallback.gradeId,
                 },
               }) ??
+              buildProcessFromPending(
+                session.pendingSolidProcess,
+                { ...solidFallback, gradeCode },
+                processType,
+              ) ??
               (!isSubmit &&
               weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode, premixNo)
                 ? buildWeightmentOnlyProcessEntry(
@@ -828,13 +883,12 @@ export const mapPreparationDetailsPayload = (params: {
                   )
                 : null);
             if (process) {
-              // Force allowed AP processType even if typed form carried a stale DEFAULT_SOLID.
               process.processType = processType;
+              process.gradeCode = process.gradeCode || gradeCode;
               solidProcess.push(process);
               solidAdded += 1;
             }
           });
-          // Empty AP grades: omit solidProcess row (weightment sheet still keeps AP identity).
         } else {
           const process =
             buildProcessFromTypedForm({
@@ -1340,8 +1394,12 @@ export const mapPreparationDetailsFromApi = (
 };
 
 export const premixSessionHasData = (session: RawMaterialPrepPremixSession) => {
+  const apFilled = (session.apGradeSlots ?? []).some((card) =>
+    processFormHasUserData(card.slot.processForm),
+  );
   const solidFilled =
-    session.selectedProcesses.solid && processFormHasUserData(session.solid.processForm);
+    session.selectedProcesses.solid &&
+    (processFormHasUserData(session.solid.processForm) || apFilled);
   const liquidFilled =
     session.selectedProcesses.liquid && processFormHasUserData(session.liquid.processForm);
   return solidFilled || liquidFilled;

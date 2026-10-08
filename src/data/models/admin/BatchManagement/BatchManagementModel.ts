@@ -12,7 +12,7 @@ import {
   normalizeStageProgressArray,
   parseParallelFlowEnabled,
 } from "../../../../utils/batchStageUtils";
-import { RawMaterialLotListRow } from "@/hooks/admin/BatchManagement/useBatchManagementHook";
+import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -1337,7 +1337,7 @@ const serializeMaterialForCompare = (material: MaterialItem): string =>
     materialName: material.materialName,
     gradeCode: material.gradeCode ?? "",
     gradeName: material.gradeName ?? "",
-    lotId: material.lotId ?? [],
+    lotIds: material.lotIds ?? [],
     manufacturerName: material.manufacturerName ?? material.make ?? "",
     requiredComposition: material.requiredComposition ?? 0,
     quantityPerPremix: material.quantityPerPremix ?? 0,

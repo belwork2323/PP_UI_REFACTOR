@@ -31,6 +31,7 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../components/custom/UserWorkflowStepPager";
+import { formatRmpMaterialNavLabel } from "../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const {
@@ -51,13 +52,18 @@ const buildMaterialTabs = (
 ): MaterialTab[] => [
   ...solidProcesses.map((process, index) => ({
     key: `solid-${process.materialCode}-${index}`,
-    label: `Premix-${process.materialCode}${process.gradeCode ? ` (${process.gradeCode})` : ""}`,
+    label: formatRmpMaterialNavLabel({
+      materialCode: process.materialCode,
+      gradeCode: process.gradeCode,
+    }),
     slot: "solid" as const,
     process,
   })),
   ...liquidProcesses.map((process, index) => ({
     key: `liquid-${process.materialCode}-${index}`,
-    label: `Premix-${process.materialCode}`,
+    label: formatRmpMaterialNavLabel({
+      materialCode: process.materialCode,
+    }),
     slot: "liquid" as const,
     process,
   })),

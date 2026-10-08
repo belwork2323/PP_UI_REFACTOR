@@ -344,6 +344,63 @@ export const applyCuringCycleConfigRows = (
   };
 };
 
+/**
+ * Keep master cycle steps as the row list. Copy user-entered cells from matching
+ * existing rows (srNo, then index). New master steps are appended empty.
+ */
+export const mergeCuringCycleConfigRows = (
+  data: CuringMotorData,
+  rowsFromConfig: Array<Partial<CuringCycleRow> & Record<string, unknown>>,
+): CuringMotorData => {
+  if (!rowsFromConfig.length) return data;
+
+  const existing = data.CURING_CYCLES?.CURING_TABLE ?? [];
+  const existingBySr = new Map(
+    existing.map((row) => [String(row.srNo ?? "").trim(), row] as const),
+  );
+
+  const CURING_TABLE = rowsFromConfig.map((row, index) => {
+    const base = createEmptyCuringCycleRow(index + 1);
+    const srNo = str(row.srNo ?? row.SR_NO ?? row.sequenceNo ?? index + 1);
+    const fromMaster: CuringCycleRow = {
+      ...base,
+      srNo,
+      TEMPERATURE: str(row.TEMPERATURE ?? row.temperature ?? base.TEMPERATURE),
+      TIME: str(row.TIME ?? row.durationMinutes ?? row.DURATION ?? base.TIME),
+      START_DATE: toUiDate(row.START_DATE ?? row.startDate ?? base.START_DATE),
+      START_TIME: toUiTime(row.START_TIME ?? row.startTime ?? base.START_TIME),
+      END_DATE: toUiDate(row.END_DATE ?? row.endDate ?? base.END_DATE),
+      END_TIME: toUiTime(row.END_TIME ?? row.endTime ?? base.END_TIME),
+      PROPELLANT_PRESSURE: str(
+        row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? base.PROPELLANT_PRESSURE,
+      ),
+      HOT_WATER_STATUS: str(
+        row.HOT_WATER_STATUS ?? row.hotWaterCirculation ?? base.HOT_WATER_STATUS,
+      ),
+      REMARKS: str(row.REMARKS ?? row.remarks ?? base.REMARKS),
+    };
+    const prior = existingBySr.get(String(srNo).trim()) ?? existing[index];
+    if (!prior) return fromMaster;
+    return {
+      ...fromMaster,
+      TEMPERATURE: prior.TEMPERATURE || fromMaster.TEMPERATURE,
+      TIME: prior.TIME || fromMaster.TIME,
+      START_DATE: prior.START_DATE || fromMaster.START_DATE,
+      START_TIME: prior.START_TIME || fromMaster.START_TIME,
+      END_DATE: prior.END_DATE || fromMaster.END_DATE,
+      END_TIME: prior.END_TIME || fromMaster.END_TIME,
+      PROPELLANT_PRESSURE: prior.PROPELLANT_PRESSURE || fromMaster.PROPELLANT_PRESSURE,
+      HOT_WATER_STATUS: prior.HOT_WATER_STATUS || fromMaster.HOT_WATER_STATUS,
+      REMARKS: prior.REMARKS || fromMaster.REMARKS,
+    };
+  });
+
+  return {
+    ...data,
+    CURING_CYCLES: { CURING_TABLE },
+  };
+};
+
 export const collectCastingCuringFileRefsFromMotorData = (
   data: CuringMotorData | null | undefined,
 ): FileRef[] => data?.DECORING_DETAILS?.DECORING_VISUAL_OBSERVATION ?? [];

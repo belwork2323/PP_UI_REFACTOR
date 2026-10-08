@@ -24,6 +24,7 @@ import {
   type CastingCuringMotorSubmissionStatus,
   mapCastingCuringMotorStatusesFromApi,
   isCastingCuringMotorEditable,
+  isCastingCuringMotorLocked,
   areAllCastingCuringMotorsApproved,
   normalizeCastingCuringMotorStatus,
   normalizeCastingCuringMotorSubmissionType,
@@ -31,6 +32,7 @@ import {
 import type { CuringCycleConfig } from "../../../data/models/user/CuringCycleConfigModel";
 import {
   applyCuringCycleConfigRows,
+  mergeCuringCycleConfigRows,
   createEmptyCuringMotorData,
   buildCuringSectionsPayload,
   hasIncompleteCastingCuringUploads,
@@ -296,6 +298,47 @@ export const useCastingAndCuringHook = () => {
         if (!silent) setLoadingFormDetails(false);
       }
 
+      const statuses = detailsResponse?.data
+        ? mapCastingCuringMotorStatusesFromApi(detailsResponse.data)
+        : {};
+
+      if (Object.keys(statuses).length || (nextFormData.motors ?? []).length) {
+        const projectId = String(nextBatch.projectId ?? "").trim();
+        const motorStage = resolveMotorStage(nextBatch);
+        const motors = nextFormData.motors ?? [];
+        const mergedMotors = await Promise.all(
+          motors.map(async (motor) => {
+            const motorId = normalizeCastingCuringMotorId(motor.motorId);
+            const status =
+              statuses[motorId]?.motorSubmissionStatus ?? motor.motorSubmissionStatus;
+            if (isCastingCuringMotorLocked(status) || !motor.curingFormLoaded) {
+              return motor;
+            }
+            const curingType = String(motor.curingSetup?.curingType ?? "").trim();
+            if (!projectId || !curingType) return motor;
+            try {
+              const response = await castingCuringController.fetchCuringCycles({
+                projectId,
+                motorStage,
+                curingType,
+              });
+              const cycles = response?.success ? response.data?.cycles : undefined;
+              if (!cycles?.length) return motor;
+              return {
+                ...motor,
+                curingData: mergeCuringCycleConfigRows(
+                  motor.curingData ?? createEmptyCuringMotorData(),
+                  cycles,
+                ),
+              };
+            } catch {
+              return motor;
+            }
+          }),
+        );
+        nextFormData = { ...nextFormData, motors: mergedMotors };
+      }
+
       const formMotors = buildAddedMotorsFromForm(nextFormData);
 
       setActiveBatch(nextBatch);
@@ -303,7 +346,6 @@ export const useCastingAndCuringHook = () => {
       setFormData(nextFormData);
 
       if (detailsResponse?.data) {
-        const statuses = mapCastingCuringMotorStatusesFromApi(detailsResponse.data);
         setMotorStatusById(statuses);
       } else {
         setMotorStatusById({});
@@ -553,10 +595,16 @@ export const useCastingAndCuringHook = () => {
         (motor) => normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId,
       );
       if (!targetMotor) return;
+      const motorStatus =
+        motorStatusById[normalizedMotorId]?.motorSubmissionStatus ??
+        targetMotor.motorSubmissionStatus;
+      if (isCastingCuringMotorLocked(motorStatus)) return;
 
       const baseCuringData = targetMotor.curingData ?? createEmptyCuringMotorData();
       const nextCuringData = cycleConfig?.cycles?.length
-        ? applyCuringCycleConfigRows(baseCuringData, cycleConfig.cycles)
+        ? targetMotor.curingFormLoaded
+          ? mergeCuringCycleConfigRows(baseCuringData, cycleConfig.cycles)
+          : applyCuringCycleConfigRows(baseCuringData, cycleConfig.cycles)
         : baseCuringData;
 
       setFormData((prev) => ({
@@ -580,7 +628,7 @@ export const useCastingAndCuringHook = () => {
         [normalizedMotorId]: createDefaultCuringProcessSetup(),
       }));
     },
-    [activeBatch, curingSetupDrafts, fetchCuringCycleConfig, formData],
+    [activeBatch, curingSetupDrafts, fetchCuringCycleConfig, formData, motorStatusById],
   );
 
   const handleRemoveMotor = useCallback((motorId: string) => {

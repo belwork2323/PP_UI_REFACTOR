@@ -1,16 +1,11 @@
-import React, { useMemo, useState } from "react";
-import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import CasePrepSelect from "../../CasePreparation/CasePrepSelect";
+import React from "react";
+import { Box } from "@mui/material";
 import type { RawMaterialPrepMaterialProcessSlot } from "../../../../../../data/models/user/RawMaterialPreparationModel";
 import {
-  AP_GRADE_OPTIONS,
   normalizeApGradeCode,
   resolveMaterialUiKey,
   type RmpMaterialUiKey,
 } from "../../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
-import { createEmptyProcessFormForUiKey } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
 import type { RmpMaterialProcessForm } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
 import ApGradeMaterialProcessPanel, { isApGradeUiKey } from "./ApGradeMaterialProcessPanel";
 import DefaultSolidMaterialProcessPanel from "./DefaultSolidMaterialProcessPanel";
@@ -28,22 +23,6 @@ type Props = {
   readOnly?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
-};
-
-const gradeLabel = (gradeCode: string) =>
-  AP_GRADE_OPTIONS.find((o) => o.value === gradeCode)?.label ?? gradeCode;
-
-const makeSlotForGrade = (gradeCode: string): RawMaterialPrepMaterialProcessSlot => {
-  const uiKey = resolveMaterialUiKey({
-    materialCode: "",
-    slot: "solid",
-    gradeCode,
-    rmpFormTemplate: "AP",
-  });
-  return {
-    uiKey,
-    processForm: createEmptyProcessFormForUiKey(uiKey),
-  };
 };
 
 const filterErrorsForGrade = (
@@ -65,8 +44,8 @@ const filterErrorsForGrade = (
 };
 
 /**
- * Host for AP material: pick Coarse / Fine / Ultra Fine, add/delete grade cards until locked.
- * Grade-specific process UI is rendered by ApGradeMaterialProcessPanel.
+ * Host for AP material: one process card per identification-sheet grade.
+ * Grades are not added or removed here — each tab is already a sheet grade.
  */
 const ApMaterialHostPanel = ({
   cards,
@@ -77,34 +56,6 @@ const ApMaterialHostPanel = ({
   theme,
   validationErrors,
 }: Props) => {
-  const [pendingGrade, setPendingGrade] = useState("");
-
-  const usedGrades = useMemo(
-    () => new Set(cards.map((c) => normalizeApGradeCode(c.gradeCode))),
-    [cards],
-  );
-
-  const availableOptions = AP_GRADE_OPTIONS.filter((o) => !usedGrades.has(o.value)).map((o) => ({
-    value: o.value,
-    label: o.label,
-  }));
-
-  const addGrade = (gradeCode: string) => {
-    const grade = normalizeApGradeCode(gradeCode);
-    if (!grade || usedGrades.has(grade) || readOnly) return;
-    onCardsChange([...cards, { gradeCode: grade, slot: makeSlotForGrade(grade) }]);
-    setPendingGrade("");
-  };
-
-  const removeGrade = (gradeCode: string) => {
-    if (readOnly) return;
-    onCardsChange(
-      cards.filter(
-        (c) => normalizeApGradeCode(c.gradeCode) !== normalizeApGradeCode(gradeCode),
-      ),
-    );
-  };
-
   const updateCard = (gradeCode: string, nextSlot: RawMaterialPrepMaterialProcessSlot) => {
     onCardsChange(
       cards.map((c) =>
@@ -117,48 +68,6 @@ const ApMaterialHostPanel = ({
 
   return (
     <Box>
-      {cards.length === 0 ? (
-        <Box
-          sx={{
-            border: "1px dashed",
-            borderColor: validationErrors?.apGrade ? "error.main" : "divider",
-            borderRadius: 1,
-            p: 1.5,
-            mb: 1.5,
-          }}
-        >
-          <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, mb: 1 }}>
-            Select AP grade to begin
-          </Typography>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-end">
-            <Box sx={{ minWidth: 220, flex: 1 }} data-rmp-field="apGrade">
-              <CasePrepSelect
-                label="AP Grade"
-                value={pendingGrade}
-                placeholder="Select Coarse / Fine / Ultra Fine"
-                options={AP_GRADE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                disabled={readOnly}
-                width="100%"
-                theme={theme}
-                required
-                error={Boolean(validationErrors?.apGrade)}
-                helperText={validationErrors?.apGrade ?? null}
-                onChange={setPendingGrade}
-              />
-            </Box>
-            <Button
-              size="small"
-              variant="contained"
-              disabled={readOnly || !pendingGrade}
-              onClick={() => addGrade(pendingGrade)}
-              sx={{ textTransform: "none", fontWeight: 700 }}
-            >
-              Add
-            </Button>
-          </Stack>
-        </Box>
-      ) : null}
-
       {cards.map((card) => {
         const grade = normalizeApGradeCode(card.gradeCode);
         const gradeErrors = filterErrorsForGrade(
@@ -166,44 +75,19 @@ const ApMaterialHostPanel = ({
           grade,
           cards.length === 1,
         );
+        const resolvedUiKey = isApGradeUiKey(card.slot.uiKey)
+          ? card.slot.uiKey
+          : resolveMaterialUiKey({
+              materialCode: "",
+              slot: "solid",
+              gradeCode: grade,
+              rmpFormTemplate: "AP",
+            });
         return (
-          <Box
-            key={grade}
-            sx={{
-              mb: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 1,
-              p: 1.25,
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 1,
-                mb: 1,
-              }}
-            >
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 800 }}>
-                {gradeLabel(grade)}
-              </Typography>
-              {!readOnly ? (
-                <IconButton
-                  size="small"
-                  color="error"
-                  onClick={() => removeGrade(grade)}
-                  aria-label={`Remove ${gradeLabel(grade)}`}
-                >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
-                </IconButton>
-              ) : null}
-            </Box>
-
-            {isApGradeUiKey(card.slot.uiKey) ? (
+          <Box key={grade || card.gradeCode} sx={{ mb: cards.length > 1 ? 2 : 0 }}>
+            {isApGradeUiKey(resolvedUiKey) ? (
               <ApGradeMaterialProcessPanel
-                uiKey={card.slot.uiKey}
+                uiKey={resolvedUiKey}
                 value={card.slot.processForm as any}
                 lotOptions={lotOptions}
                 quantityPerPremix={quantityPerPremix}
@@ -211,7 +95,7 @@ const ApMaterialHostPanel = ({
                 theme={theme}
                 validationErrors={gradeErrors}
                 onChange={(processForm) =>
-                  updateCard(grade, { uiKey: card.slot.uiKey, processForm })
+                  updateCard(grade, { uiKey: resolvedUiKey, processForm })
                 }
               />
             ) : (
@@ -224,7 +108,7 @@ const ApMaterialHostPanel = ({
                 validationErrors={gradeErrors}
                 onChange={(processForm: RmpMaterialProcessForm) =>
                   updateCard(grade, {
-                    uiKey: card.slot.uiKey as RmpMaterialUiKey,
+                    uiKey: resolvedUiKey as RmpMaterialUiKey,
                     processForm,
                   })
                 }
@@ -233,37 +117,6 @@ const ApMaterialHostPanel = ({
           </Box>
         );
       })}
-
-      {cards.length > 0 && availableOptions.length > 0 && !readOnly ? (
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1}
-          alignItems="flex-end"
-          sx={{ mt: 1 }}
-        >
-          <Box sx={{ minWidth: 220, flex: 1 }}>
-            <CasePrepSelect
-              label="Add AP grade"
-              value={pendingGrade}
-              placeholder="Select grade"
-              options={availableOptions}
-              width="100%"
-              theme={theme}
-              onChange={setPendingGrade}
-            />
-          </Box>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddRoundedIcon fontSize="small" />}
-            disabled={!pendingGrade}
-            onClick={() => addGrade(pendingGrade)}
-            sx={{ textTransform: "none", fontWeight: 700 }}
-          >
-            Add grade
-          </Button>
-        </Stack>
-      ) : null}
     </Box>
   );
 };

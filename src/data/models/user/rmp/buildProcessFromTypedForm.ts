@@ -6,7 +6,7 @@ import {
   type PreparationProcessEntry,
 } from "./rmpProcessTypes";
 import type { RmpMaterialUiKey } from "./rmpMaterialUiRegistry";
-import type { RmpMaterialProcessForm } from "./defaultSolidProcessForm";
+import { ensureProcessFormMatchesUiKey, type RmpMaterialProcessForm } from "./defaultSolidProcessForm";
 import { processFormToTypedFields } from "./processFormMapper";
 
 /** Build typed API process entry from UI form. Liquid always emits an entry. */
@@ -48,7 +48,7 @@ export const buildProcessFromTypedForm = (params: {
         }
       : undefined);
 
-  const typed = processFormToTypedFields(processForm);
+  const typed = processFormToTypedFields(ensureProcessFormMatchesUiKey(uiKey, processForm));
 
   return {
     materialId: resolvedMaterial.materialId,
@@ -56,7 +56,7 @@ export const buildProcessFromTypedForm = (params: {
     materialName: resolvedMaterial.materialName,
     gradeId: grade?.gradeId ?? null,
     gradeCode: grade?.gradeCode ?? (gradeCode.trim() ? gradeCode : null),
-    processType: typed.processType || uiKeyToProcessType(uiKey),
+    processType: uiKeyToProcessType(uiKey) || typed.processType,
     lotDetails: typed.lotDetails ?? [],
     drying: typed.drying ?? null,
     sieving: typed.sieving ?? null,

@@ -303,6 +303,32 @@ const getDrawerTheme = (mode = "light") => {
         color: "inherit",
       },
     },
+
+    // ── Version (below logout) ────────────────────────────────────
+    version: {
+      wrapper: {
+        mx: 1.5,
+        mt: 0.5,
+        mb: 0.25,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "1px",
+      },
+      label: {
+        fontSize: fonts.size?.xs ?? "0.72rem",
+        fontWeight: fonts.weight?.bold ?? 700,
+        color: d.textPrimary,
+        lineHeight: 1.3,
+        letterSpacing: "0.03em",
+      },
+      date: {
+        fontSize: fonts.size?.xs ?? "0.68rem",
+        fontWeight: fonts.weight?.medium ?? 500,
+        color: d.textMuted,
+        lineHeight: 1.3,
+      },
+    },
   };
 };
 

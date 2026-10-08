@@ -117,7 +117,6 @@ const MaterialFormGroupCard = ({
           <Box>
             <Typography sx={specStyles.blockTitle}>
               {group.material}
-              {group.gradeName ? ` · ${group.gradeName}` : group.gradeCode ? ` · ${group.gradeCode}` : ""}
             </Typography>
             <Typography sx={specStyles.blockMeta}>
               {specCount}{" "}

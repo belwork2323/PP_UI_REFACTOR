@@ -42,6 +42,19 @@ const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
 const materialTrackingKey = (material: Material) =>
   `${material.srNo}-${normalizeMaterialCodeKey(material.materialCode)}-${material.gradeCode ?? ""}`;
 
+const materialGradeSelectionKey = (materialCode: string, grade?: string | null) => {
+  const code = normalizeMaterialCodeKey(materialCode);
+  const gradeKey = String(grade ?? "").trim().toLowerCase();
+  return gradeKey ? `${code}__${gradeKey}` : code;
+};
+
+const sheetGradeTokens = (material: Material): string[] => {
+  const nested = (material as Material & { grade?: { gradeCode?: string; gradeName?: string } }).grade;
+  return [material.gradeCode, material.gradeName, nested?.gradeCode, nested?.gradeName]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+};
+
 interface Material {
   srNo: number;
   materialCode: string;
@@ -128,8 +141,6 @@ export default function BatchImplementationForm({
   onCompositionChange,
   setConfirmOpen,
 }: any) {
-  console.log(form);
-
   const { modal, input, materialSelectField, materialsTable } = t;
   const [selectedMaterialCode, setSelectedMaterialCode] = useState("");
   const [selectedGradeCode, setSelectedGradeCode] = useState("");
@@ -184,16 +195,19 @@ export default function BatchImplementationForm({
     };
   });
 
-  const selectedLotIdsElsewhere = useMemo(() => {
+  const lotIdsSelectedByOtherMaterials = (materialCode: string) => {
+    const current = normalizeMaterialCodeKey(materialCode);
     const ids = new Set<string>();
     for (const material of form.identificationSheet?.materials ?? []) {
+      if (normalizeMaterialCodeKey(material.materialCode) === current) continue;
       const lotIds = material.lotIds ?? [];
       for (const lotId of lotIds) {
-        if (lotId) ids.add(lotId);
+        const id = String(lotId ?? "").trim();
+        if (id) ids.add(id);
       }
     }
     return ids;
-  }, [form.identificationSheet?.materials]);
+  };
 
   const selectedMaterialOption = useMemo(
     () =>
@@ -215,28 +229,32 @@ export default function BatchImplementationForm({
     const set = new Set<string>();
     const materials = form.identificationSheet?.materials ?? [];
     for (const m of materials) {
-      if (m.gradeCode) {
-        set.add(`${m.materialCode}__${m.gradeCode}`);
-      } else {
-        set.add(m.materialCode);
+      const tokens = sheetGradeTokens(m);
+      if (tokens.length === 0) {
+        set.add(materialGradeSelectionKey(m.materialCode));
+        continue;
+      }
+      for (const token of tokens) {
+        set.add(materialGradeSelectionKey(m.materialCode, token));
       }
     }
     return set;
   }, [form.identificationSheet?.materials]);
 
+  const isGradeAlreadyAdded = (materialCode: string, gradeCode?: string, gradeName?: string) =>
+    Boolean(gradeCode && addedMaterialKeys.has(materialGradeSelectionKey(materialCode, gradeCode))) ||
+    Boolean(gradeName && addedMaterialKeys.has(materialGradeSelectionKey(materialCode, gradeName)));
+
   const selectableMaterials = useMemo(() => {
     return (materialOptions as BatchMaterialOption[]).filter((item) => {
       const grades = item.grades ?? [];
       if (grades.length === 0) {
-        // Without grade: disable if already added
-        return !addedMaterialKeys.has(item.materialCode);
-      } else {
-        // With grade: disable only if ALL grades are added
-        const allGradesAdded = grades.every((g) =>
-          addedMaterialKeys.has(`${item.materialCode}__${g.gradeCode}`),
-        );
-        return !allGradesAdded;
+        return !addedMaterialKeys.has(materialGradeSelectionKey(item.materialCode));
       }
+      const allGradesAdded = grades.every((g) =>
+        isGradeAlreadyAdded(item.materialCode, g.gradeCode, g.gradeName),
+      );
+      return !allGradesAdded;
     });
   }, [materialOptions, addedMaterialKeys]);
 
@@ -244,7 +262,7 @@ export default function BatchImplementationForm({
     if (!showGradeSelect || !selectedMaterialOption) return [];
     const grades = selectedMaterialOption.grades ?? [];
     return grades.filter(
-      (g) => !addedMaterialKeys.has(`${selectedMaterialOption.materialCode}__${g.gradeCode}`),
+      (g) => !isGradeAlreadyAdded(selectedMaterialOption.materialCode, g.gradeCode, g.gradeName),
     );
   }, [selectedMaterialOption, showGradeSelect, addedMaterialKeys]);
 
@@ -263,6 +281,12 @@ export default function BatchImplementationForm({
   };
 
   useEffect(() => {
+    if (!selectedGradeCode) return;
+    const stillAvailable = selectableGrades.some((grade) => grade.gradeCode === selectedGradeCode);
+    if (!stillAvailable) setSelectedGradeCode("");
+  }, [selectedGradeCode, selectableGrades]);
+
+  useEffect(() => {
     if (!open || loadingLots) return;
 
     const materials = form.identificationSheet?.materials ?? [];
@@ -270,10 +294,13 @@ export default function BatchImplementationForm({
 
     let changed = false;
     const synced = materials.map((material: Material) => {
-      const lotId = String(material.lotIds ?? "").trim();
-      if (!lotId) return material;
+      const lotIds = Array.isArray(material.lotIds) ? material.lotIds : [];
+      if (lotIds.length === 0) return material;
 
-      const fromApi = getLotByMaterialAndId(material.materialCode, lotId)?.manufacturerName ?? "";
+      const fromApi = getLotByMaterialAndId(material.materialCode, lotIds)
+        .map((lot: { manufacturerName?: string }) => String(lot.manufacturerName ?? "").trim())
+        .filter(Boolean)
+        .join(", ");
       const current = materialManufacturer(material);
       if (!fromApi || fromApi === current) return material;
 
@@ -306,6 +333,20 @@ export default function BatchImplementationForm({
     const grade = showGradeSelect
       ? selectableGrades.find((item) => item.gradeCode === selectedGradeCode)
       : undefined;
+
+    if (showGradeSelect) {
+      if (
+        isGradeAlreadyAdded(
+          selectedMaterialOption.materialCode,
+          grade?.gradeCode || selectedGradeCode,
+          grade?.gradeName,
+        )
+      ) {
+        return;
+      }
+    } else if (addedMaterialKeys.has(materialGradeSelectionKey(selectedMaterialOption.materialCode))) {
+      return;
+    }
 
     const current = form.identificationSheet?.materials ?? [];
     const newMaterial: Material = {
@@ -362,10 +403,9 @@ export default function BatchImplementationForm({
     // Map directly based on the order of lotIdsArray to preserve selection order
     const manufacturerNames = lotIdsArray
       .map((lotId) => {
-        const foundLot = matchedLots.find((lot) => {
-          const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
-          return String(lotIdValue).trim() === lotId;
-        });
+        const foundLot = matchedLots.find(
+          (lot) => String(lot.lotId ?? "").trim() === lotId,
+        );
         return foundLot?.manufacturerName;
       })
       .filter((name): name is string => Boolean(name && String(name).trim() !== ""))
@@ -789,7 +829,6 @@ export default function BatchImplementationForm({
                       {form.identificationSheet?.materials?.map(
                         (material: Material, idx: number) => {
                           const rowLocked = isBaselineMaterial(material);
-                          console.log(material);
 
                           const currentMaterialLotIds = Array.isArray(material.lotIds)
                             ? material.lotIds
@@ -800,11 +839,7 @@ export default function BatchImplementationForm({
                           const lotOptionsForRow = getLotOptionsForRow(
                             material.materialCode,
                             currentMaterialLotIds,
-                            new Set(
-                              [...selectedLotIdsElsewhere].filter(
-                                (id) => !currentMaterialLotIds.includes(id),
-                              ),
-                            ),
+                            lotIdsSelectedByOtherMaterials(material.materialCode),
                             material.gradeCode,
                           );
                           const lotPlaceholder = getLotSelectPlaceholder(

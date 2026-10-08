@@ -656,43 +656,65 @@ export const ensureWeightmentRowsForPremixMaterials = (
 
   const filtered = filterWeightmentSheetForPremix(sheet, premix);
   const existing = filtered.weightmentDetails ?? [];
-  const presentCodes = new Set(
-    existing
-      .map((row) => String(row.materialCode ?? "").trim().toUpperCase())
-      .filter(Boolean),
-  );
+  const materialCodeOf = (value: { materialCode?: string } | null | undefined) =>
+    String(value?.materialCode ?? "").trim().toUpperCase();
+  const gradeKeyOf = (value: {
+    gradeCode?: string;
+    gradeName?: string;
+  } | null | undefined) =>
+    String(value?.gradeCode ?? value?.gradeName ?? "").trim().toUpperCase();
 
-  const toSeed =
-    existing.length === 0
-      ? sheetMaterials
-      : sheetMaterials.filter(
-          (material) => !presentCodes.has(String(material.materialCode ?? "").trim().toUpperCase()),
-        );
+  const assignSheetMaterials = (rows: typeof existing) => {
+    const materialByRowIndex = new Map<number, (typeof sheetMaterials)[number]>();
+    const reserved = new Set<number>();
+    const unused = sheetMaterials.map((material) => material);
+    const claim = (
+      predicate: (row: (typeof existing)[number], material: (typeof sheetMaterials)[number]) => boolean,
+    ) => {
+      unused.forEach((material, materialIndex) => {
+        if (!material) return;
+        const matchIndex = rows.findIndex((row, index) => {
+          if (reserved.has(index)) return false;
+          return predicate(row, material);
+        });
+        if (matchIndex < 0) return;
+        reserved.add(matchIndex);
+        materialByRowIndex.set(matchIndex, material);
+        unused[materialIndex] = null as unknown as (typeof sheetMaterials)[number];
+      });
+    };
+    claim(
+      (row, material) =>
+        Boolean(gradeKeyOf(row) && gradeKeyOf(material)) &&
+        materialCodeOf(row) === materialCodeOf(material) &&
+        gradeKeyOf(row) === gradeKeyOf(material),
+    );
+    claim((row, material) => materialCodeOf(row) === materialCodeOf(material));
+    return {
+      materialByRowIndex,
+      toSeed: unused.filter(Boolean),
+    };
+  };
+
+  const { toSeed } = assignSheetMaterials(existing);
 
   const stampIdentificationLocks = (
     rows: typeof existing,
   ): typeof existing => {
-    const sheetCodes = new Set(
-      sheetMaterials.map((m) => String(m.materialCode ?? "").trim().toUpperCase()).filter(Boolean),
-    );
-    const lockedOnce = new Set<string>();
-    return rows.map((row) => {
-      const code = String(row.materialCode ?? "").trim().toUpperCase();
-      if (!code || !sheetCodes.has(code) || lockedOnce.has(code)) {
+    const { materialByRowIndex } = assignSheetMaterials(rows);
+    return rows.map((row, index) => {
+      const matchedMaterial = materialByRowIndex.get(index);
+      if (!matchedMaterial) {
         return {
           ...row,
           fromIdentificationSheet: row.fromIdentificationSheet === true,
         };
       }
-      lockedOnce.add(code);
-      const sheetMaterial = sheetMaterials.find(
-        (m) => String(m.materialCode ?? "").trim().toUpperCase() === code,
-      );
-      const expectedWeight = Number(sheetMaterial?.quantityPerPremix ?? NaN);
-      const expectedPct = Number(sheetMaterial?.requiredComposition ?? NaN);
+      const code = String(matchedMaterial.materialCode ?? row.materialCode ?? "").trim();
+      const expectedWeight = Number(matchedMaterial.quantityPerPremix ?? NaN);
+      const expectedPct = Number(matchedMaterial.requiredComposition ?? NaN);
       const currentWeight = Number(String(row.weightTransferred ?? "").replace(/,/g, ""));
       const currentPct = Number(String(row.percentage ?? "").replace(/,/g, ""));
-      // Drop values that were previously auto-filled from the identification sheet.
       const wasAutoWeight =
         Number.isFinite(expectedWeight) &&
         Number.isFinite(currentWeight) &&
@@ -704,11 +726,13 @@ export const ensureWeightmentRowsForPremixMaterials = (
       return {
         ...row,
         fromIdentificationSheet: true,
-        materialCode: String(sheetMaterial?.materialCode ?? row.materialCode).trim() || code,
+        materialCode: code,
         materialName:
-          String(sheetMaterial?.materialName ?? "").trim() ||
+          String(matchedMaterial.materialName ?? "").trim() ||
           String(row.materialName ?? "").trim() ||
           code,
+        gradeCode: String(matchedMaterial.gradeCode ?? "").trim(),
+        gradeName: String(matchedMaterial.gradeName ?? "").trim(),
         scopeMaterialCode: String(row.scopeMaterialCode ?? "").trim() || code,
         weightTransferred: wasAutoWeight ? "" : row.weightTransferred,
         percentage: wasAutoPct ? "" : row.percentage,
@@ -736,6 +760,8 @@ export const ensureWeightmentRowsForPremixMaterials = (
     return createEmptyWeightmentDetail({
       materialCode: code,
       materialName: name,
+      gradeCode: String(material.gradeCode ?? "").trim(),
+      gradeName: String(material.gradeName ?? "").trim(),
       premixNo: premix,
       scopeMaterialCode: code,
       fromIdentificationSheet: true,

@@ -131,6 +131,17 @@ export const createEmptyProcessFormForUiKey = (uiKey: RmpMaterialUiKey): RmpMate
   return createEmptyDefaultSolidProcessForm();
 };
 
+/** Keep lot rows when the slot uiKey and form.uiKey have drifted (legacy defaultSolid on AP). */
+export const ensureProcessFormMatchesUiKey = (
+  uiKey: RmpMaterialUiKey,
+  form: RmpMaterialProcessForm | null | undefined,
+): RmpMaterialProcessForm => {
+  if (form && form.uiKey === uiKey) return form;
+  const next = createEmptyProcessFormForUiKey(uiKey);
+  const lots = form?.lotDetails?.length ? form.lotDetails : next.lotDetails;
+  return { ...next, lotDetails: lots };
+};
+
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
 export const defaultSolidFormHasUserData = (form: DefaultSolidProcessForm): boolean => {

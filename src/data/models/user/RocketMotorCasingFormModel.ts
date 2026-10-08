@@ -939,6 +939,40 @@ export function createInitialThermalProperties(
   return Object.fromEntries(entries);
 }
 
+export function mergeMechanicalProperties(
+  specificationModel: InsulationSpecificationModel,
+  current: Record<string, MechPropFormRow> = {},
+): Record<string, MechPropFormRow> {
+  const next = createInitialMechanicalProperties(specificationModel);
+  for (const key of Object.keys(next)) {
+    const existing = current[key];
+    if (!existing) continue;
+    next[key] = {
+      ...next[key],
+      reported: existing.reported ?? "",
+      acemSpec: existing.acemSpec ?? "",
+    };
+  }
+  return next;
+}
+
+export function mergeThermalProperties(
+  specificationModel: InsulationSpecificationModel,
+  current: Record<string, ThermalPropFormRow> = {},
+): Record<string, ThermalPropFormRow> {
+  const next = createInitialThermalProperties(specificationModel);
+  for (const key of Object.keys(next)) {
+    const existing = current[key];
+    if (!existing) continue;
+    next[key] = {
+      ...next[key],
+      reported: existing.reported ?? "",
+      acemSpec: existing.acemSpec ?? "",
+    };
+  }
+  return next;
+}
+
 export function createInitialVisualInspection(): VisualInspectionFormRow[] {
   return VISUAL_INSPECTION_TEMPLATE.map((t) => ({
     ...t,

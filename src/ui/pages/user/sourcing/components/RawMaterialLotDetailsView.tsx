@@ -102,10 +102,6 @@ const RawMaterialLotDetailsView = ({
     { label: BL.COL_LOT_ID, value: row.lotId },
     { label: BL.COL_SOURCING_ID, value: row.sourcingId || "—" },
     { label: BL.COL_MATERIAL_CODE, value: row.materialCode || block?.material || "—" },
-    {
-      label: BL.COL_GRADE,
-      value: row.grade?.gradeName || row.grade?.gradeCode || "—",
-    },
     { label: BL.COL_MATERIAL_NAME, value: row.materialName || "—" },
     { label: BL.COL_SUPPLY_ORDER, value: block?.supplyOrderNo || row.supplyOrderNo || "—" },
     { label: BL.COL_RECEIPT_DATE, value: formatDate(block?.receiptDate || row.receiptDate) },

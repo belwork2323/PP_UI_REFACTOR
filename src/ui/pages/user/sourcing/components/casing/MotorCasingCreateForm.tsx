@@ -35,6 +35,8 @@ import {
   createEmptyMockTrialSlot,
   createInitialThermalProperties,
   createInitialMechanicalProperties,
+  mergeMechanicalProperties,
+  mergeThermalProperties,
   isThermalSpecificationCategory,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import {
@@ -106,6 +108,7 @@ type Props = {
     id: number;
     target: RmcValidationFocusTarget | null;
   } | null;
+  freezeMasterRows?: boolean;
   theme: any;
 };
 
@@ -124,6 +127,7 @@ const MotorCasingCreateForm = ({
   deleteLoading = false,
   validationErrors = {},
   validationFocusRequest = null,
+  freezeMasterRows = false,
   theme,
 }: Props) => {
   const req = isCasingFieldRequired;
@@ -164,30 +168,40 @@ const MotorCasingCreateForm = ({
   useEffect(() => {
     const insulationType = form.insulationType;
     if (!insulationType) return;
-    if (form.insulationSpecifications?.insulationType === insulationType) return;
+    if (freezeMasterRows && form.insulationSpecifications?.insulationType === insulationType) {
+      return;
+    }
 
     let cancelled = false;
 
     const loadSpecifications = async () => {
       const response = await rocketMotorCasingController.fetchSpecification(insulationType);
       if (cancelled || !response.success) return;
+      const spec = response.data;
+      if (!spec) return;
 
       setForm((prev) => {
-        const spec = response.data;
-        const hasMech =
-          prev.mechanicalProperties && Object.keys(prev.mechanicalProperties).length > 0;
-        const hasThermal =
-          prev.thermalProperties && Object.keys(prev.thermalProperties).length > 0;
+        if (freezeMasterRows) {
+          if (prev.insulationSpecifications?.insulationType === insulationType) return prev;
+          return {
+            ...prev,
+            insulationSpecifications: spec,
+            mechanicalProperties:
+              Object.keys(prev.mechanicalProperties ?? {}).length > 0
+                ? prev.mechanicalProperties
+                : createInitialMechanicalProperties(spec),
+            thermalProperties:
+              Object.keys(prev.thermalProperties ?? {}).length > 0
+                ? prev.thermalProperties
+                : createInitialThermalProperties(spec),
+          };
+        }
 
         return {
           ...prev,
           insulationSpecifications: spec,
-          mechanicalProperties: hasMech
-            ? prev.mechanicalProperties
-            : createInitialMechanicalProperties(spec),
-          thermalProperties: hasThermal
-            ? prev.thermalProperties
-            : createInitialThermalProperties(spec),
+          mechanicalProperties: mergeMechanicalProperties(spec, prev.mechanicalProperties),
+          thermalProperties: mergeThermalProperties(spec, prev.thermalProperties),
         };
       });
     };
@@ -197,7 +211,7 @@ const MotorCasingCreateForm = ({
     return () => {
       cancelled = true;
     };
-  }, [form.insulationType, form.insulationSpecifications, setForm]);
+  }, [form.insulationType, freezeMasterRows, setForm]);
   const updateMech = (
     paramKey: string,
     field: "specification" | "reported" | "acemSpec",

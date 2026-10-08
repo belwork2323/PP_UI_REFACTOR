@@ -240,15 +240,6 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => <Chip label={v} size="small" sx={theme.batchList.batchTypeChip} />,
       },
       {
-        key: "grade.gradeName",
-        label: STRINGS.SOURCING.BATCH_LIST.COL_GRADE,
-        render: (_v: string, row: { grade?: { gradeName?: string; gradeCode?: string } | null }) => (
-          <Typography sx={theme.batchList.subtleText}>
-            {row.grade?.gradeName || row.grade?.gradeCode || "—"}
-          </Typography>
-        ),
-      },
-      {
         key: "materialName",
         label: STRINGS.SOURCING.BATCH_LIST.COL_MATERIAL_NAME,
         render: (v: string) => <Typography sx={theme.batchList.normalText}>{v}</Typography>,

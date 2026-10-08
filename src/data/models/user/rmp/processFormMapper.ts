@@ -177,23 +177,23 @@ const sievingDtoFromForm = (sieving: SievingForm): SievingDto | null => {
 };
 
 const apCoarseDtoFromForm = (form: ApCoarseProcessForm): ApCoarseProcessDto => ({
-  equipmentType: form.equipmentType.trim() || "RVD",
+  equipmentType: str(form.equipmentType) || "RVD",
   blendingDryingParameters: (form.blendingDryingParameters ?? []).map((row) => ({
-    operation: row.operation.trim() || null,
-    setParameter: row.setParameter.trim() || null,
-    actualParameter: row.actualParameter.trim() || null,
+    operation: str(row?.operation) || null,
+    setParameter: str(row?.setParameter) || null,
+    actualParameter: str(row?.actualParameter) || null,
   })),
   dryingOperationRvd: (form.dryingOperationRvd ?? []).map((row) => ({
-    operation: row.operation.trim() || null,
-    setParameter: row.setParameter.trim() || null,
-    actualParameter: row.actualParameter.trim() || null,
-    startTime: row.startTime.trim() || null,
-    endTime: row.endTime.trim() || null,
+    operation: str(row?.operation) || null,
+    setParameter: str(row?.setParameter) || null,
+    actualParameter: str(row?.actualParameter) || null,
+    startTime: str(row?.startTime) || null,
+    endTime: str(row?.endTime) || null,
   })),
   particleSizeDistribution: (form.particleSizeDistribution ?? []).map((row) => ({
-    psdRequirement: row.psdRequirement.trim() || null,
-    specification: row.specification.trim() || null,
-    result: row.result.trim() || null,
+    psdRequirement: str(row?.psdRequirement) || null,
+    specification: str(row?.specification) || null,
+    result: str(row?.result) || null,
   })),
 });
 

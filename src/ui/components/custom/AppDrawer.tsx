@@ -20,6 +20,7 @@ import { images } from "@app/assets/images";
 import { useMemo } from "react";
 
 const S = STRINGS.APP_HEADER;
+const FOOTER = STRINGS.APP_FOOTER;
 const ROLE_ICON_MAP = {
   ADMIN: icons.userMgmt.adminRole,
   CENTRE_HEAD: icons.userMgmt.adminRole,
@@ -162,6 +163,11 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
             </ListItemButton>
           </ListItem>
         </List>
+
+        <Box sx={t.version.wrapper}>
+          <Typography sx={t.version.label}>{FOOTER.VERSION}</Typography>
+          <Typography sx={t.version.date}>{FOOTER.VERSION_DATE}</Typography>
+        </Box>
       </Box>
     </Drawer>
   );

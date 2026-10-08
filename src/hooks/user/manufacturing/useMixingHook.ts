@@ -17,6 +17,7 @@ import {
   createEmptyPremixEntry,
   hasMixCardValue,
   isMixCardEditable,
+  isMixCardLocked,
   mapMixingDetailsToFormState,
   mapMixingFormStateToPayload,
   mapBackendQualityChecksToRows,
@@ -360,11 +361,10 @@ export const useMixingHook = () => {
         snapshotStateRef.current = nextFormData;
         setFormData(nextFormData);
         setInitialSnapshot(JSON.stringify(nextFormData));
-        setMixCardStatusById(
-          detailsPayload
-            ? buildMixCardStatusMapFromDetails(detailsPayload)
-            : buildMixCardStatusMapFromForm(nextFormData),
-        );
+        const mixCardStatusMap = detailsPayload
+          ? buildMixCardStatusMapFromDetails(detailsPayload)
+          : buildMixCardStatusMapFromForm(nextFormData);
+        setMixCardStatusById(mixCardStatusMap);
         setView("form");
         // Remount MixingForm so local card state hydrates from this load (not a stale echo).
         setFormHydrationKey((value) => value + 1);
@@ -434,6 +434,11 @@ export const useMixingHook = () => {
             const updated: MixingFormState = {
               ...nextFormData,
               premixCards: nextFormData.premixCards.map((card) => {
+                const cardStatus =
+                  card.mixCardSubmissionStatus ??
+                  mixCardStatusMap[buildMixCardId("PREMIX", card.premixNo)]
+                    ?.mixCardSubmissionStatus;
+                if (isMixCardLocked(cardStatus)) return card;
                 const code = String(card.mixingCycleCode ?? "").trim();
                 const details = code ? cycleDetailsByCode.get(code) : undefined;
                 if (!details) return card;
@@ -452,6 +457,11 @@ export const useMixingHook = () => {
                 };
               }),
               finalMixCards: nextFormData.finalMixCards.map((card) => {
+                const cardStatus =
+                  card.mixCardSubmissionStatus ??
+                  mixCardStatusMap[buildMixCardId("FINAL_MIX", card.mixNo)]
+                    ?.mixCardSubmissionStatus;
+                if (isMixCardLocked(cardStatus)) return card;
                 const code = String(card.mixingCycleCode ?? "").trim();
                 const details = code ? cycleDetailsByCode.get(code) : undefined;
                 if (!details) return card;

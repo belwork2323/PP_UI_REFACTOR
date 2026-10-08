@@ -20,6 +20,7 @@ import {
   normalizeDimensionalRow,
   mapCasingFormDataToDetailBlocks,
   normalizeRocketCasingListStatus,
+  isRocketMotorCasingMasterFrozen,
   resolveMotorCasingIdFromSubmitData,
   INITIAL_ROCKET_MOTOR_CASING_FORM,
   RocketMotorCasingDetailsModel,
@@ -214,7 +215,12 @@ export const useRocketMotorCasingHook = () => {
       const stage = resolvedForm.motorStageApi || "";
       const projectId = String(resolvedForm.projectId ?? "").trim();
 
-      await loadDimensionalForStage(projectId, stage, resolvedForm.dimensionalData);
+      await loadDimensionalForStage(
+        projectId,
+        stage,
+        resolvedForm.dimensionalData,
+        isRocketMotorCasingMasterFrozen(detailsModel.status),
+      );
 
       setActiveBatch((prev) =>
         prev
@@ -345,6 +351,7 @@ export const useRocketMotorCasingHook = () => {
     projectId: string,
     stage: string,
     currentRows: RocketMotorCasingFormData["dimensionalData"],
+    freezeMasterRows = false,
   ) => {
     if (!projectId || !stage) {
       setDimensionalParameters([]);
@@ -354,13 +361,12 @@ export const useRocketMotorCasingHook = () => {
     const { parameters, errorMessage } = await fetchDimensionalParameters(projectId, stage);
     setDimensionalParameters(parameters);
     setDimensionalParametersErrorMessage(errorMessage ?? "");
-    if (parameters.length) {
-      setCasingForm((prev) => {
-        const aligned = alignDimensionalRows(parameters, currentRows);
-        if (dimensionalRowsEqual(prev.dimensionalData, aligned)) return prev;
-        return { ...prev, dimensionalData: aligned };
-      });
-    }
+    if (freezeMasterRows || !parameters.length) return;
+    setCasingForm((prev) => {
+      const aligned = alignDimensionalRows(parameters, currentRows);
+      if (dimensionalRowsEqual(prev.dimensionalData, aligned)) return prev;
+      return { ...prev, dimensionalData: aligned };
+    });
   };
 
   const openForm = async (batch: RocketMotorBatch, editMode: boolean) => {
@@ -420,7 +426,12 @@ export const useRocketMotorCasingHook = () => {
 
     const stage = resolvedForm.motorStageApi || resolvedBatch.motorType || "";
     const projectId = String(resolvedForm.projectId ?? resolvedBatch.projectId ?? "").trim();
-    await loadDimensionalForStage(projectId, stage, resolvedForm.dimensionalData);
+    await loadDimensionalForStage(
+      projectId,
+      stage,
+      resolvedForm.dimensionalData,
+      isRocketMotorCasingMasterFrozen(resolvedBatch.rmStatus),
+    );
 
     setActiveBatch(resolvedBatch);
     setIsEditMode(editMode);
@@ -542,7 +553,10 @@ export const useRocketMotorCasingHook = () => {
         if (cancelled) return;
         setDimensionalParameters(parameters);
         setDimensionalParametersErrorMessage(errorMessage ?? "");
-        if (parameters.length) {
+        if (
+          parameters.length &&
+          !isRocketMotorCasingMasterFrozen(activeBatch?.rmStatus)
+        ) {
           startTransition(() => {
             setCasingForm((prev) => {
               const aligned = alignDimensionalRows(parameters, prev.dimensionalData);
@@ -559,7 +573,13 @@ export const useRocketMotorCasingHook = () => {
     return () => {
       cancelled = true;
     };
-  }, [casingForm.motorStageApi, casingForm.projectId, view, fetchDimensionalParameters]);
+  }, [
+    activeBatch?.rmStatus,
+    casingForm.motorStageApi,
+    casingForm.projectId,
+    view,
+    fetchDimensionalParameters,
+  ]);
 
   const handleFillForm = async (batch: RocketMotorBatch) => openForm(batch, false);
   const handleEditForm = async (batch: RocketMotorBatch) => openForm(batch, true);

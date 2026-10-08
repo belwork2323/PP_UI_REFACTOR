@@ -12,15 +12,13 @@ import { useAlertStore } from "../../../app/store/alertStore";
 import { useThemeStore } from "../../../app/store/themeStore";
 import getSourcingTheme from "../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import { operationsController } from "../../../controllers/user/operationsController";
+import { parsePreparationType } from "../../../data/models/admin/MasterData/MaterialsMasterModel";
 import type {
   MaterialsListGrade,
   MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
 import {
   findMaterialByCode,
-  getMaterialGrades,
-  isMaterialSelectionUsed,
-  materialRequiresGradeSelection,
   materialSelectionKey,
 } from "../../../data/models/user/MaterialsListModel";
 import { MaterialSpecificationItemModel } from "../../../data/models/user/MaterialSpecificationModel";
@@ -105,13 +103,13 @@ function specRowsFromApi(targetSpecs: MaterialSpecificationItemModel[] = []): Sp
 
 function resolveMaterialMeta(material?: MaterialsListItem) {
   const rawMaterialType = material?.rawMaterialType ?? "NORMAL";
-  const preparationType = material?.preparationType ?? null;
+  const preparationType = parsePreparationType(material?.preparationType);
   const isAcemAdduct = isAcemAdductMaterial(rawMaterialType, preparationType);
   const isAcemHtpbBlending = isAcemHtpbBlendingMaterial(rawMaterialType, preparationType);
 
   return {
     rawMaterialType,
-    preparationType: preparationType ?? undefined,
+    preparationType: preparationType || undefined,
     manufacturerName: rawMaterialType === "ACEM" ? "ACEM" : "",
     adductPreparation: isAcemAdduct ? emptyAdductPreparationDetails() : undefined,
     htpbBlendingPreparation: isAcemHtpbBlending ? emptyHtpbBlendingPreparationDetails() : undefined,
@@ -268,12 +266,11 @@ export const useRawMaterialSpecificationForm = ({
   const fetchMaterialSpecifications = useCallback(
     async (
       materialCode: string,
-      gradeCode?: string,
     ): Promise<MaterialSpecificationItemModel[]> => {
       const code = materialCode.trim();
       if (!code) return [];
 
-      const cacheKey = materialSelectionKey(code, gradeCode);
+      const cacheKey = materialSelectionKey(code);
       const cached = specificationCache[cacheKey];
       if (cached !== undefined) {
         if (!cached.length) {
@@ -287,7 +284,7 @@ export const useRawMaterialSpecificationForm = ({
       try {
         const response = await operationsController.fetchMaterialSpecificationList({
           materialCode: code,
-          gradeCode: gradeCode?.trim() || null,
+          gradeCode: null,
         });
 
         if (!response?.success || !response.data) {
@@ -437,10 +434,7 @@ export const useRawMaterialSpecificationForm = ({
   );
 
   const usedMaterialKeys = useMemo(
-    () =>
-      new Set(
-        materialGroups.map((group) => materialSelectionKey(group.material, group.gradeCode)),
-      ),
+    () => new Set(materialGroups.map((group) => String(group.material ?? "").trim()).filter(Boolean)),
     [materialGroups],
   );
 
@@ -448,22 +442,14 @@ export const useRawMaterialSpecificationForm = ({
     () =>
       createLotMode
         ? availableMaterials.filter(
-            (material) => !isMaterialSelectionUsed(availableMaterials, material.materialCode, usedMaterialKeys),
+            (material) => !usedMaterialKeys.has(String(material.materialCode ?? "").trim()),
           )
         : availableMaterials,
     [availableMaterials, createLotMode, usedMaterialKeys],
   );
 
-  const showGradeSelect = Boolean(
-    createLotMode && selectedMaterial && materialRequiresGradeSelection(availableMaterials, selectedMaterial),
-  );
-
-  const selectableGrades = useMemo(() => {
-    if (!showGradeSelect || !selectedMaterial) return [];
-    return getMaterialGrades(availableMaterials, selectedMaterial).filter(
-      (grade) => !usedMaterialKeys.has(materialSelectionKey(selectedMaterial, grade.gradeCode)),
-    );
-  }, [availableMaterials, selectedMaterial, showGradeSelect, usedMaterialKeys]);
+  const showGradeSelect = false;
+  const selectableGrades: MaterialsListGrade[] = [];
 
   const handleMaterialChange = useCallback((materialCode: string) => {
     setSelectedMaterial(materialCode);
@@ -547,9 +533,8 @@ export const useRawMaterialSpecificationForm = ({
 
   const canAddSelection =
     Boolean(selectedMaterial) &&
-    (!showGradeSelect || Boolean(selectedGrade)) &&
     !addingMaterial &&
-    !isMaterialLoading(materialSelectionKey(selectedMaterial, selectedGrade || undefined));
+    !isMaterialLoading(materialSelectionKey(selectedMaterial));
 
   const actionHelperText = useMemo(() => {
     if (!hasBlocks) {
@@ -586,28 +571,18 @@ export const useRawMaterialSpecificationForm = ({
 
   const handleAdd = useCallback(async () => {
     if (!selectedMaterial || addingMaterial) return;
-    if (showGradeSelect && !selectedGrade) return;
 
     setAddingMaterial(true);
 
     try {
-      const grade = showGradeSelect
-        ? selectableGrades.find((item) => item.gradeCode === selectedGrade) ??
-          getMaterialGrades(availableMaterials, selectedMaterial).find(
-            (item) => item.gradeCode === selectedGrade,
-          )
-        : null;
       const materialMeta = findMaterialByCode(availableMaterials, selectedMaterial);
-      const specifications = await fetchMaterialSpecifications(
-        selectedMaterial,
-        grade?.gradeCode,
-      );
+      const specifications = await fetchMaterialSpecifications(selectedMaterial);
       if (!specifications.length) return;
 
       if (createLotMode) {
         updateMaterialGroups((previous) => [
           ...previous,
-          createMaterialGroup(selectedMaterial, specifications, grade, materialMeta),
+          createMaterialGroup(selectedMaterial, specifications, null, materialMeta),
         ]);
       } else {
         updateBlocks((previous) => [
@@ -625,10 +600,7 @@ export const useRawMaterialSpecificationForm = ({
     availableMaterials,
     createLotMode,
     fetchMaterialSpecifications,
-    selectableGrades,
-    selectedGrade,
     selectedMaterial,
-    showGradeSelect,
     updateBlocks,
     updateMaterialGroups,
   ]);

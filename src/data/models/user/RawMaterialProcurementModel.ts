@@ -427,8 +427,9 @@ export type ReferenceRangeShape = {
   unit: string | null;
 };
 
+/** True when both min and max are absent (N/A / unbound spec). Accepts any range shape with min/max. */
 export function isReferenceRangeNotApplicable(
-  referenceRange?: ReferenceRangeShape | null,
+  referenceRange?: Pick<ReferenceRangeShape, "minValue" | "maxValue"> | null,
 ): boolean {
   if (!referenceRange) return true;
   return referenceRange.minValue == null && referenceRange.maxValue == null;
@@ -1466,7 +1467,7 @@ export function mapMaterialGroupsToCreateMaterials(
     .filter((g) => (g.material ?? "").trim())
     .map((group) => ({
       materialCode: group.material.trim(),
-      grade: resolveGradeCode(group.gradeCode),
+      grade: null,
       supplyOrderNo: (group.supplyOrderNo ?? "").trim(),
       receiptDate: (group.receiptDate ?? "").trim(),
       manufacturerName: (group.manufacturerName ?? "").trim(),
@@ -1494,7 +1495,7 @@ export function mapFirstBlockToLotUpdatePayload(
     receiptDate: (block.receiptDate ?? "").trim(),
     manufacturerName: (block.manufacturerName ?? "").trim(),
     materialCode: (block.material ?? "").trim(),
-    grade: resolveGradeCode(block.gradeCode),
+    grade: null,
     specifications: (block.rows ?? [])
       .filter((row) => (row.specificationCode ?? "").trim())
       .map((row) => ({

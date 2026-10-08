@@ -391,6 +391,29 @@ const getAppHeaderTheme = (mode = "light") => {
         color: "#b71c1c",
         fontWeight: fonts.weight?.bold ?? 700,
       },
+      versionWrapper: {
+        px: 2,
+        pt: 0.5,
+        pb: 1.25,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "1px",
+      },
+      versionLabel: {
+        fontSize: fonts.size?.xs ?? "0.72rem",
+        fontWeight: fonts.weight?.bold ?? 700,
+        color: h.menuText,
+        lineHeight: 1.3,
+        letterSpacing: "0.03em",
+      },
+      versionDate: {
+        fontSize: fonts.size?.xs ?? "0.68rem",
+        fontWeight: fonts.weight?.medium ?? 500,
+        color: h.menuText,
+        opacity: 0.75,
+        lineHeight: 1.3,
+      },
     },
 
     // ─── SPACER (pushes page content below fixed bar) ─────────────

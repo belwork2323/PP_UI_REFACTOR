@@ -14,10 +14,11 @@ import {
   isLiquidDispatchUiKey,
   liquidDispatchSectionTitle,
 } from "../../../../../../data/models/user/rmp/doaProcessForm";
-import type {
-  DryingTrayOvenForm,
-  RmpMaterialProcessForm,
-  SievingForm,
+import {
+  ensureProcessFormMatchesUiKey,
+  type DryingTrayOvenForm,
+  type RmpMaterialProcessForm,
+  type SievingForm,
 } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
 import {
   isTypedSolidUiKey,
@@ -75,37 +76,42 @@ const ApGradeMaterialProcessPanel = ({
   theme,
   validationErrors,
 }: Props) => {
+  const aligned = useMemo(
+    () => ensureProcessFormMatchesUiKey(uiKey, value) as TypedSolidForm,
+    [uiKey, value],
+  );
+
   const lotErrors = useMemo(
     () => splitFieldErrors(validationErrors, "lotDetails"),
     [validationErrors],
   );
 
   const patchCoarse = (partial: Partial<ApCoarseProcessForm>) => {
-    if (value.uiKey !== "apCoarse") return;
-    onChange({ ...value, ...partial });
+    if (aligned.uiKey !== "apCoarse") return;
+    onChange({ ...aligned, ...partial });
   };
   const patchFine = (partial: Partial<ApFineProcessForm>) => {
-    if (value.uiKey !== "apFine") return;
-    onChange({ ...value, ...partial });
+    if (aligned.uiKey !== "apFine") return;
+    onChange({ ...aligned, ...partial });
   };
   const patchUltra = (partial: Partial<ApUltraFineProcessForm>) => {
-    if (value.uiKey !== "apUltraFine") return;
-    onChange({ ...value, ...partial });
+    if (aligned.uiKey !== "apUltraFine") return;
+    onChange({ ...aligned, ...partial });
   };
   const patchAluminum = (partial: Partial<AluminumProcessForm>) => {
-    if (value.uiKey !== "aluminum") return;
-    onChange({ ...value, ...partial });
+    if (aligned.uiKey !== "aluminum") return;
+    onChange({ ...aligned, ...partial });
   };
   const patchDoa = (partial: Partial<DoaProcessForm>) => {
-    if (!isLiquidDispatchUiKey(value.uiKey)) return;
-    onChange({ ...value, ...partial });
+    if (!isLiquidDispatchUiKey(aligned.uiKey)) return;
+    onChange({ ...aligned, ...partial });
   };
 
   return (
     <>
       <LotDetailsSection
-        value={value.lotDetails}
-        onChange={(lotDetails) => onChange({ ...value, lotDetails } as TypedSolidForm)}
+        value={aligned.lotDetails}
+        onChange={(lotDetails) => onChange({ ...aligned, lotDetails } as TypedSolidForm)}
         lotOptions={lotOptions}
         quantityPerPremix={quantityPerPremix}
         disabled={disabled}
@@ -113,7 +119,7 @@ const ApGradeMaterialProcessPanel = ({
         fieldErrors={lotErrors}
       />
 
-      {uiKey === "apCoarse" && value.uiKey === "apCoarse" ? (
+      {uiKey === "apCoarse" && aligned.uiKey === "apCoarse" ? (
         <>
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, mb: 1 }}>Equipment</Typography>
@@ -128,7 +134,7 @@ const ApGradeMaterialProcessPanel = ({
             >
               <CasePrepTextField
                 label="Equipment Type"
-                value={value.equipmentType || "RVD"}
+                value={aligned.equipmentType || "RVD"}
                 disabled
                 width="100%"
                 theme={theme}
@@ -137,21 +143,21 @@ const ApGradeMaterialProcessPanel = ({
             </Box>
           </Box>
           <ApBlendingTable
-            rows={value.blendingDryingParameters}
+            rows={aligned.blendingDryingParameters}
             onChange={(rows) => patchCoarse({ blendingDryingParameters: rows })}
             disabled={disabled}
             theme={theme}
             validationErrors={validationErrors}
           />
           <ApRvdTable
-            rows={value.dryingOperationRvd}
+            rows={aligned.dryingOperationRvd}
             onChange={(rows) => patchCoarse({ dryingOperationRvd: rows })}
             disabled={disabled}
             theme={theme}
             validationErrors={validationErrors}
           />
           <ApPsdTable
-            rows={value.particleSizeDistribution}
+            rows={aligned.particleSizeDistribution}
             onChange={(rows) => patchCoarse({ particleSizeDistribution: rows })}
             disabled={disabled}
             theme={theme}
@@ -160,12 +166,12 @@ const ApGradeMaterialProcessPanel = ({
         </>
       ) : null}
 
-      {uiKey === "apFine" && value.uiKey === "apFine" ? (
+      {uiKey === "apFine" && aligned.uiKey === "apFine" ? (
         <>
           <ApSectionCard title="Grinding">
             <CasePrepTextField
               label="ACM Equipment Id"
-              value={value.acmEquipmentId}
+              value={aligned.acmEquipmentId}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -202,7 +208,7 @@ const ApGradeMaterialProcessPanel = ({
             </Box>
             <CasePrepTextField
               label="Set Pressure"
-              value={value.setPressure}
+              value={aligned.setPressure}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -221,7 +227,7 @@ const ApGradeMaterialProcessPanel = ({
                   Start Date/ Time
                 </Typography>
                 <DateTimeField
-                  value={value.grindingStartDatetime}
+                  value={aligned.grindingStartDatetime}
                   onChange={(v) => patchFine({ grindingStartDatetime: v })}
                   disabled={disabled}
                   compact
@@ -232,7 +238,7 @@ const ApGradeMaterialProcessPanel = ({
                   End Date/ Time
                 </Typography>
                 <DateTimeField
-                  value={value.grindingEndDatetime}
+                  value={aligned.grindingEndDatetime}
                   onChange={(v) => patchFine({ grindingEndDatetime: v })}
                   disabled={disabled}
                   compact
@@ -241,7 +247,7 @@ const ApGradeMaterialProcessPanel = ({
             </Box>
             <CasePrepTextField
               label="Any other observation"
-              value={value.grindingObservation}
+              value={aligned.grindingObservation}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -250,7 +256,7 @@ const ApGradeMaterialProcessPanel = ({
             <ApPsdTable
               title="Particle size Distribution"
               requirementLabel="PSD / Spec band"
-              rows={value.particleSizeDistribution}
+              rows={aligned.particleSizeDistribution}
               onChange={(rows) => patchFine({ particleSizeDistribution: rows })}
               disabled={disabled}
               theme={theme}
@@ -259,7 +265,7 @@ const ApGradeMaterialProcessPanel = ({
             />
             <CasePrepTextField
               label="Qty. (kg) qualified"
-              value={value.qtyKgQualified}
+              value={aligned.qtyKgQualified}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -270,14 +276,14 @@ const ApGradeMaterialProcessPanel = ({
 
           <ApBlendingTable
             title="Blending cum Drying"
-            rows={value.blendingDryingParameters}
+            rows={aligned.blendingDryingParameters}
             onChange={(rows) => patchFine({ blendingDryingParameters: rows })}
             disabled={disabled}
             theme={theme}
             validationErrors={validationErrors}
           />
           <ApRvdTable
-            rows={value.dryingOperationRvd}
+            rows={aligned.dryingOperationRvd}
             onChange={(rows) => patchFine({ dryingOperationRvd: rows })}
             disabled={disabled}
             theme={theme}
@@ -285,7 +291,7 @@ const ApGradeMaterialProcessPanel = ({
           />
           <DryingTrayOvenSection
             title="Storage in Tray Oven"
-            value={value.trayOvenStorage as DryingTrayOvenForm}
+            value={aligned.trayOvenStorage as DryingTrayOvenForm}
             onChange={(trayOvenStorage) =>
               patchFine({
                 trayOvenStorage: trayOvenStorage as ApFineProcessForm["trayOvenStorage"],
@@ -296,7 +302,7 @@ const ApGradeMaterialProcessPanel = ({
             fieldErrors={splitFieldErrors(validationErrors, "trayOvenStorage")}
           />
           <SievingSection
-            value={value.sieving as SievingForm}
+            value={aligned.sieving as SievingForm}
             onChange={(sieving) => patchFine({ sieving: sieving as ApFineProcessForm["sieving"] })}
             disabled={disabled}
             theme={theme}
@@ -305,12 +311,12 @@ const ApGradeMaterialProcessPanel = ({
         </>
       ) : null}
 
-      {uiKey === "apUltraFine" && value.uiKey === "apUltraFine" ? (
+      {uiKey === "apUltraFine" && aligned.uiKey === "apUltraFine" ? (
         <>
           <ApSectionCard title="Grinding">
             <CasePrepTextField
               label="Equipment Id"
-              value={value.equipmentId}
+              value={aligned.equipmentId}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -319,7 +325,7 @@ const ApGradeMaterialProcessPanel = ({
             />
             <CasePrepTextField
               label="Set Screw Feeder RPM"
-              value={value.screwFeederRpm}
+              value={aligned.screwFeederRpm}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -328,7 +334,7 @@ const ApGradeMaterialProcessPanel = ({
             />
             <CasePrepTextField
               label="Set Feed Pressure"
-              value={value.feedPressure}
+              value={aligned.feedPressure}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -337,7 +343,7 @@ const ApGradeMaterialProcessPanel = ({
             />
             <CasePrepTextField
               label="Set Grinding Pressure"
-              value={value.grindingPressure}
+              value={aligned.grindingPressure}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -356,7 +362,7 @@ const ApGradeMaterialProcessPanel = ({
                   Start Date/ Time
                 </Typography>
                 <DateTimeField
-                  value={value.grindingStartDatetime}
+                  value={aligned.grindingStartDatetime}
                   onChange={(v) => patchUltra({ grindingStartDatetime: v })}
                   disabled={disabled}
                   compact
@@ -367,7 +373,7 @@ const ApGradeMaterialProcessPanel = ({
                   End Date/ Time
                 </Typography>
                 <DateTimeField
-                  value={value.grindingEndDatetime}
+                  value={aligned.grindingEndDatetime}
                   onChange={(v) => patchUltra({ grindingEndDatetime: v })}
                   disabled={disabled}
                   compact
@@ -376,7 +382,7 @@ const ApGradeMaterialProcessPanel = ({
             </Box>
             <CasePrepTextField
               label="Any other observation"
-              value={value.grindingObservation}
+              value={aligned.grindingObservation}
               disabled={disabled}
               width="100%"
               theme={theme}
@@ -392,7 +398,7 @@ const ApGradeMaterialProcessPanel = ({
             >
               <CasePrepTextField
                 label={`Particle Size (${AP_ULTRA_FINE_PARTICLE_SIZE_SPEC})`}
-                value={value.particleSizeResult}
+                value={aligned.particleSizeResult}
                 disabled={disabled}
                 width="100%"
                 theme={theme}
@@ -401,7 +407,7 @@ const ApGradeMaterialProcessPanel = ({
               />
               <CasePrepTextField
                 label="Qty. (kg) qualified"
-                value={value.qtyKgQualified}
+                value={aligned.qtyKgQualified}
                 disabled={disabled}
                 width="100%"
                 theme={theme}
@@ -413,7 +419,7 @@ const ApGradeMaterialProcessPanel = ({
 
           <DryingTrayOvenSection
             title="Drying in Tray Oven"
-            value={value.drying as DryingTrayOvenForm}
+            value={aligned.drying as DryingTrayOvenForm}
             onChange={(drying) =>
               patchUltra({ drying: drying as ApUltraFineProcessForm["drying"] })
             }
@@ -422,7 +428,7 @@ const ApGradeMaterialProcessPanel = ({
             fieldErrors={splitFieldErrors(validationErrors, "drying")}
           />
           <SievingSection
-            value={value.sieving as SievingForm}
+            value={aligned.sieving as SievingForm}
             onChange={(sieving) =>
               patchUltra({ sieving: sieving as ApUltraFineProcessForm["sieving"] })
             }
@@ -433,11 +439,11 @@ const ApGradeMaterialProcessPanel = ({
         </>
       ) : null}
 
-      {uiKey === "aluminum" && value.uiKey === "aluminum" ? (
+      {uiKey === "aluminum" && aligned.uiKey === "aluminum" ? (
         <ApSectionCard title="Aluminum Powder Processing">
           <CasePrepTextField
             label="Equipment Id"
-            value={value.equipmentId}
+            value={aligned.equipmentId}
             disabled={disabled}
             width="100%"
             theme={theme}
@@ -446,7 +452,7 @@ const ApGradeMaterialProcessPanel = ({
           />
           <CasePrepTextField
             label="Set RPM"
-            value={value.setRpm}
+            value={aligned.setRpm}
             disabled={disabled}
             width="100%"
             theme={theme}
@@ -465,7 +471,7 @@ const ApGradeMaterialProcessPanel = ({
                 Start Date/ Time
               </Typography>
               <DateTimeField
-                value={value.startDatetime}
+                value={aligned.startDatetime}
                 onChange={(v) => patchAluminum({ startDatetime: v })}
                 disabled={disabled}
                 compact
@@ -476,7 +482,7 @@ const ApGradeMaterialProcessPanel = ({
                 End Date/ Time
               </Typography>
               <DateTimeField
-                value={value.endDatetime}
+                value={aligned.endDatetime}
                 onChange={(v) => patchAluminum({ endDatetime: v })}
                 disabled={disabled}
                 compact
@@ -485,7 +491,7 @@ const ApGradeMaterialProcessPanel = ({
           </Box>
           <CasePrepTextField
             label="Any other observation"
-            value={value.observation}
+            value={aligned.observation}
             disabled={disabled}
             width="100%"
             theme={theme}
@@ -493,7 +499,7 @@ const ApGradeMaterialProcessPanel = ({
           />
           <CasePrepTextField
             label="Qty. (kg) qualified"
-            value={value.qtyKgQualified}
+            value={aligned.qtyKgQualified}
             disabled={disabled}
             width="100%"
             theme={theme}
@@ -505,7 +511,7 @@ const ApGradeMaterialProcessPanel = ({
               Date/ Time of dispatch
             </Typography>
             <DateTimeField
-              value={value.dispatchDatetime}
+              value={aligned.dispatchDatetime}
               onChange={(v) => patchAluminum({ dispatchDatetime: v })}
               disabled={disabled}
               compact
@@ -514,12 +520,12 @@ const ApGradeMaterialProcessPanel = ({
         </ApSectionCard>
       ) : null}
 
-      {isLiquidDispatchUiKey(uiKey) && isLiquidDispatchUiKey(value.uiKey) ? (
+      {isLiquidDispatchUiKey(uiKey) && isLiquidDispatchUiKey(aligned.uiKey) ? (
         <DoaFormatSection
           title={liquidDispatchSectionTitle(uiKey)}
-          dispatchDatetime={value.dispatchDatetime}
-          observation={value.observation}
-          totalQtySentForPremix={value.totalQtySentForPremix}
+          dispatchDatetime={aligned.dispatchDatetime}
+          observation={aligned.observation}
+          totalQtySentForPremix={aligned.totalQtySentForPremix}
           onDispatchDatetimeChange={(dispatchDatetime) => patchDoa({ dispatchDatetime })}
           onObservationChange={(observation) => patchDoa({ observation })}
           onTotalQtySentForPremixChange={(totalQtySentForPremix) =>

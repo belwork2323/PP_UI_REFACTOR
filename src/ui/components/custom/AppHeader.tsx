@@ -29,6 +29,7 @@ import AdminDrawer from "./AppDrawer";
 import ConfirmAlertDialog from "../common/ConfirmAlertDialog";
 
 const S = STRINGS.APP_HEADER;
+const FOOTER = STRINGS.APP_FOOTER;
 
 const ROLE_ICON_MAP = {
   ADMIN: icons.userMgmt.adminRole,
@@ -278,6 +279,11 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
             primaryTypographyProps={t.profileMenu.logoutLabelProps}
           />
         </MenuItem>
+
+        <Box sx={t.profileMenu.versionWrapper}>
+          <Typography sx={t.profileMenu.versionLabel}>{FOOTER.VERSION}</Typography>
+          <Typography sx={t.profileMenu.versionDate}>{FOOTER.VERSION_DATE}</Typography>
+        </Box>
       </Menu>
 
       {showDrawer && (

@@ -29,7 +29,10 @@ import {
   focusRmpField,
   type RmpValidationFocusTarget,
 } from "../../../../../data/validation/adapters/rawMaterialPreparation.validation";
-import { getPremixMaterialSessionKey } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
+import {
+  formatRmpMaterialNavLabel,
+  getPremixMaterialSessionKey,
+} from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import {
   ensureWeightmentRowsForPremixMaterials,
   filterWeightmentSheetForPremix,
@@ -335,7 +338,7 @@ const RawMaterialBuilderForm = ({
     () =>
       activePremixMaterials.map((entry) => ({
         id: `premix-material-${entry.premix}-${entry.materialKey}`,
-        label: `Premix-${entry.premix} ${entry.solidMaterialCode || entry.liquidMaterialCode}`,
+        label: formatRmpMaterialNavLabel(entry),
       })),
     [activePremixMaterials],
   );

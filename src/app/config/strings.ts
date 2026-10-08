@@ -185,6 +185,8 @@ export const STRINGS = {
     COPYRIGHT:
       "Copyright © 2026 Defence Research & Development Organisation (DRDO). All rights reserved.",
     CREDITS: "Content & Maintenance - DRDO  |  Design & Development - Bharat Electronics Ltd.",
+    VERSION: "v 1.0",
+    VERSION_DATE: "08 Oct 2026",
     BEL_LABEL: "BEL",
     BEL_ALT: "Bharat Electronics Limited",
   },
@@ -3507,7 +3509,7 @@ export const STRINGS = {
 
     // ── Blockchain Events Timeline ───────────────────────────────
     BLOCKCHAIN_EVENTS: {
-      SECTION_TITLE: "Blockchain Events",
+      SECTION_TITLE: "Blockchain View",
     },
 
     // ── Date Filter ──────────────────────────────────────────────
@@ -3767,9 +3769,10 @@ export const STRINGS = {
       EDIT_NESTED_HINT:
         "Existing grades and specifications can only be enabled or disabled. Add new rows to extend this material.",
       STRUCTURE_HINT:
-        "Choose either grades (with nested specifications) or top-level specifications — not both.",
+        "Material-level specifications are required. Grades are optional, and grade specifications are optional.",
       GRADES_LOCKED_HINT: "Clear top-level specifications to add grades.",
       SPECS_LOCKED_HINT: "Clear grades to add top-level specifications.",
+      SPECS_REQUIRED_HINT: "At least one material-level specification is required.",
     },
     MOTOR_STAGES: {
       PROJECT_FILTER_LABEL: "Project",

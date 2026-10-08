@@ -101,6 +101,15 @@ export function normalizeRocketCasingListStatus(status: string): OperationStatus
   return OPERATION_STATUS.TO_BE_INITIATED;
 }
 
+/** Submitted / approved casing forms keep persisted master-data rows (no live append). */
+export const isRocketMotorCasingMasterFrozen = (status?: string | null) => {
+  const normalized = normalizeRocketCasingListStatus(String(status ?? ""));
+  return (
+    normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
+    normalized === OPERATION_STATUS.APPROVED
+  );
+};
+
 /** Column keys searched by the rocket motor casing list search bar */
 export const ROCKET_MOTOR_CASING_SEARCH_FIELDS = [
   "motorCasingId",
@@ -848,7 +857,7 @@ const buildMockTrialDetailContent = (
         Object.fromEntries(
           MOCK_TRIAL_MANDREL_COLUMNS.map((col) => {
             const raw = row[col.key as keyof typeof row];
-            return [col.key, raw == null || raw === "" ? "—" : String(raw)];
+            return [col.key, raw == null ? "—" : String(raw)];
           }),
         ),
       ),

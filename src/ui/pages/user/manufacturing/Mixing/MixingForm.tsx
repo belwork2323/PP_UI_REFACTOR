@@ -1297,6 +1297,7 @@ const MixingForm = ({
   // When active Final Mix has cycle but empty process rows → load only that card
   useEffect(() => {
     if (!activeFinalMix) return;
+    if (isMixCardLocked(activeFinalMix.mixCardSubmissionStatus)) return;
 
     const pairedPremix = premixCards.find(
       (p) => String(p.premixNo) === String(activeFinalMix.mixNo),

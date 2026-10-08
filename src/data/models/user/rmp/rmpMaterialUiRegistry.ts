@@ -76,12 +76,35 @@ export const normalizeApGradeCode = (gradeCode: string | null | undefined): stri
   const raw = String(gradeCode ?? "")
     .trim()
     .toUpperCase()
-    .replace(/\s+/g, "_");
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
   if (!raw) return "";
-  if (raw.includes("ULTRA")) return "ULTRA_FINE";
-  if (raw.includes("FINE") && !raw.includes("COARSE")) return "FINE";
-  if (raw.includes("COARSE")) return "COARSE";
-  if (raw === "UF" || raw === "ULTRAFINE") return "ULTRA_FINE";
+  if (
+    raw === "APC" ||
+    raw === "AP_C" ||
+    raw === "AP_COARSE" ||
+    raw.includes("COARSE")
+  ) {
+    return "COARSE";
+  }
+  if (
+    raw === "APUF" ||
+    raw === "AP_UF" ||
+    raw === "AP_ULTRA_FINE" ||
+    raw === "UF" ||
+    raw === "ULTRAFINE" ||
+    raw.includes("ULTRA")
+  ) {
+    return "ULTRA_FINE";
+  }
+  if (
+    raw === "APF" ||
+    raw === "AP_F" ||
+    raw === "AP_FINE" ||
+    (raw.includes("FINE") && !raw.includes("COARSE"))
+  ) {
+    return "FINE";
+  }
   return raw;
 };
 

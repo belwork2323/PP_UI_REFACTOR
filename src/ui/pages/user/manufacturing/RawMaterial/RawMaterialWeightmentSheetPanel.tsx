@@ -34,6 +34,7 @@ import {
   getSheetMaterialSelectKey,
   getWeightmentRowSheetKey,
   normalizeSheetMaterialsForWeightmentCompare,
+  resolveWeightmentRowDisplay,
   validateWeightmentRowAgainstSheet,
   weightmentRowsHaveSheetDeviations,
   type WeightmentRowFieldErrors,
@@ -299,10 +300,13 @@ const RawMaterialWeightmentSheetPanel = ({
     }));
   };
 
+  const canDeleteRow = (row: RawMaterialPrepWeightmentDetail) =>
+    allowAddRemoveRows && row.fromIdentificationSheet !== true;
+
   const removeRow = (index: number) => {
     updateSheet((prev) => {
-      // Keep at least one row so the material still has a weighment slot.
-      if (prev.weightmentDetails.length <= 1) return {};
+      const row = prev.weightmentDetails[index];
+      if (!row || row.fromIdentificationSheet === true) return {};
       return {
         weightmentDetails: prev.weightmentDetails.filter((_, rowIndex) => rowIndex !== index),
       };
@@ -330,6 +334,8 @@ const RawMaterialWeightmentSheetPanel = ({
       updateRow(index, {
         materialCode: "",
         materialName: "",
+        gradeCode: "",
+        gradeName: "",
         scopeMaterialCode: null,
       });
       return;
@@ -339,6 +345,8 @@ const RawMaterialWeightmentSheetPanel = ({
     updateRow(index, {
       materialCode: code,
       materialName: String(material.materialName ?? code).trim() || code,
+      gradeCode: String(material.gradeCode ?? "").trim(),
+      gradeName: String(material.gradeName ?? "").trim(),
       scopeMaterialCode: code,
       // Weight is user-entered — never auto-fill from identification sheet.
       premixNo:
@@ -358,56 +366,75 @@ const RawMaterialWeightmentSheetPanel = ({
 
   const containerOptions = CONTAINER_TYPES.map((type) => ({ value: type, label: type }));
 
+  const renderIdentityCaption = (text: string) => {
+    if (!text) return null;
+    return (
+      <Typography sx={{ fontSize: "0.65rem", color: palette.textSub, mt: 0.45, lineHeight: 1.35 }}>
+        ({text})
+      </Typography>
+    );
+  };
+
   const renderMaterialCodeField = (row: RawMaterialPrepWeightmentDetail, index: number) => {
     const materialCodeError = getRowFieldError(index, "materialCode");
     const fieldPath = weightmentPath(resolveErrorRowIndex(index), "materialCode");
     const lockedFromSheet = row.fromIdentificationSheet === true;
+    const display = resolveWeightmentRowDisplay(row, sheetMaterials);
 
     // Identification-sheet seeded rows: fixed code (no dropdown).
     // Add Row / QC free-text: dropdown when sheet materials exist.
     if (lockedFromSheet) {
       return (
-        <WeightmentTableInput
-          value={row.materialCode}
-          onChange={() => undefined}
-          placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
-          error={Boolean(materialCodeError)}
-          helperText={materialCodeError}
-          palette={palette}
-          disabled={disabled}
-          readOnly
-          fieldPath={fieldPath}
-        />
+        <>
+          <WeightmentTableInput
+            value={display.primaryCode}
+            onChange={() => undefined}
+            placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
+            error={Boolean(materialCodeError)}
+            helperText={materialCodeError}
+            palette={palette}
+            disabled={disabled}
+            readOnly
+            fieldPath={fieldPath}
+          />
+          {renderIdentityCaption(display.secondaryCode)}
+        </>
       );
     }
 
     if (compareHighlightOnly !== true && sheetMaterials.length > 0) {
       return (
-        <WeightmentTableInput
-          value={getWeightmentRowSheetKey(row, sheetMaterials)}
-          onChange={(next) => handleMaterialSelect(index, next)}
-          placeholder={RM.WEIGHTMENT_SELECT_MATERIAL}
-          error={Boolean(materialCodeError)}
-          helperText={materialCodeError}
-          palette={palette}
-          selectOptions={getMaterialSelectOptionsForRow(index)}
-          disabled={disabled}
-          fieldPath={fieldPath}
-        />
+        <>
+          <WeightmentTableInput
+            value={getWeightmentRowSheetKey(row, sheetMaterials)}
+            onChange={(next) => handleMaterialSelect(index, next)}
+            placeholder={RM.WEIGHTMENT_SELECT_MATERIAL}
+            error={Boolean(materialCodeError)}
+            helperText={materialCodeError}
+            palette={palette}
+            selectOptions={getMaterialSelectOptionsForRow(index)}
+            disabled={disabled}
+            fieldPath={fieldPath}
+          />
+          {renderIdentityCaption(display.secondaryCode)}
+        </>
       );
     }
 
     return (
-      <WeightmentTableInput
-        value={row.materialCode}
-        onChange={(next) => updateRow(index, { materialCode: next })}
-        placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
-        error={Boolean(materialCodeError)}
-        helperText={materialCodeError}
-        palette={palette}
-        disabled={disabled}
-        fieldPath={fieldPath}
-      />
+      <>
+        <WeightmentTableInput
+          value={display.primaryCode}
+          onChange={(next) => updateRow(index, { materialCode: next })}
+          placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
+          error={Boolean(materialCodeError)}
+          helperText={materialCodeError}
+          palette={palette}
+          disabled={disabled}
+          fieldPath={fieldPath}
+        />
+        {renderIdentityCaption(display.secondaryCode)}
+      </>
     );
   };
 
@@ -571,6 +598,7 @@ const RawMaterialWeightmentSheetPanel = ({
               </TableHead>
               <TableBody>
                 {value.weightmentDetails.map((row, index) => {
+                  const display = resolveWeightmentRowDisplay(row, sheetMaterials);
                   return (
                     <TableRow key={index} sx={dt.tableRow ? dt.tableRow(index) : undefined}>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 190, py: 1.1, verticalAlign: "top" }}>
@@ -579,11 +607,11 @@ const RawMaterialWeightmentSheetPanel = ({
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 240, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
-                          value={row.materialName}
+                          value={display.primaryName}
                           onChange={(next) => updateRow(index, { materialName: next })}
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_NAME}
-                          // Seeded ID-sheet rows: name is fixed. Add-row / QC: editable.
                           readOnly={
+                            display.hasGrade ||
                             row.fromIdentificationSheet === true ||
                             (compareEnabled && !compareHighlightOnly)
                           }
@@ -593,6 +621,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           palette={palette}
                           fieldPath={weightmentPath(resolveErrorRowIndex(index), "materialName")}
                         />
+                        {renderIdentityCaption(display.secondaryName)}
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 140, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
@@ -658,18 +687,20 @@ const RawMaterialWeightmentSheetPanel = ({
                       </TableCell>
                       {allowAddRemoveRows ? (
                         <TableCell align="center" sx={{ ...(dt.tableCell ?? {}), verticalAlign: "top", py: 1.1 }}>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled={disabled || value.weightmentDetails.length <= 1}
-                            onClick={() => removeRow(index)}
-                            sx={{
-                              border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.2)}`,
-                              background: alpha(palette.danger ?? "#C0392B", 0.04),
-                            }}
-                          >
-                            <DeleteOutlineRoundedIcon fontSize="small" />
-                          </IconButton>
+                          {canDeleteRow(row) ? (
+                            <IconButton
+                              size="small"
+                              color="error"
+                              disabled={disabled}
+                              onClick={() => removeRow(index)}
+                              sx={{
+                                border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.2)}`,
+                                background: alpha(palette.danger ?? "#C0392B", 0.04),
+                              }}
+                            >
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            </IconButton>
+                          ) : null}
                         </TableCell>
                       ) : null}
                     </TableRow>
