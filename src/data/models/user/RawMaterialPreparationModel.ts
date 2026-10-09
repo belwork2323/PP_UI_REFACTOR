@@ -40,6 +40,8 @@ export type PremixSubmissionStatus =
 export type PremixStatusMeta = {
   premixSubmissionType?: PremixSubmissionType;
   premixSubmissionStatus: PremixSubmissionStatus;
+  /** true when WAITING_FOR_APPROVAL / APPROVED — form fields are read-only. */
+  locked?: boolean | null;
   submittedAt?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
@@ -538,6 +540,7 @@ export type RawMaterialPreparationDetails = {
     premixNo: number;
     premixSubmissionType?: PremixSubmissionType;
     premixSubmissionStatus?: PremixSubmissionStatus;
+    locked?: boolean | null;
     submittedAt?: string | null;
     reviewedBy?: string | null;
     reviewedAt?: string | null;
@@ -1230,26 +1233,43 @@ export const mapPreparationDetailsFromApi = (
         apProcesses.some((process) => Boolean(gradeCodeFromApProcessType(process.processType)));
 
       if (isApMaterial) {
-        if (apProcesses.length > 0) {
-          apGradeSlots = apProcesses.map((process) => {
-            const gradeCode =
-              normalizeApGradeCode(
-                process.gradeCode ||
-                  gradeCodeFromApProcessType(process.processType) ||
-                  selection.solidGradeCode ||
-                  "",
-              ) || "COARSE";
-            return {
+        // Each identification-sheet grade is its own material tab. Seed only the
+        // process that matches this tab so approved premix reload keeps one card.
+        const matchingProcess =
+          solidEntry ??
+          apProcesses.find((process) => {
+            const processGrade = String(
+              process.gradeCode || gradeCodeFromApProcessType(process.processType) || "",
+            ).trim();
+            const selectionGrade = String(selection.solidGradeCode ?? "").trim();
+            if (!processGrade || !selectionGrade) return false;
+            return gradesReferToSame(
+              processGrade,
+              selectionGrade,
+              findMaterialInList(solidMaterials, selection.solidMaterialCode),
+            );
+          });
+
+        if (matchingProcess) {
+          const gradeCode =
+            normalizeApGradeCode(
+              matchingProcess.gradeCode ||
+                gradeCodeFromApProcessType(matchingProcess.processType) ||
+                selection.solidGradeCode ||
+                "",
+            ) || selection.solidGradeCode || "COARSE";
+          apGradeSlots = [
+            {
               gradeCode,
               slot: hydratePremixProcessSlot(
                 "solid",
                 selection.solidMaterialCode,
-                process,
+                matchingProcess,
                 gradeCode,
                 solidMaterial?.rmpFormTemplate ?? selection.solidRmpFormTemplate ?? "AP",
               ),
-            };
-          });
+            },
+          ];
         } else if (selection.solidGradeCode) {
           apGradeSlots = [
             {
@@ -1346,9 +1366,12 @@ export const mapPreparationDetailsFromApi = (
 
   rootPremixStatuses.forEach((entry) => {
     if (!entry?.premixNo) return;
+    const status = entry.premixSubmissionStatus ?? "TO_BE_INITIATED";
     premixStatusByNo[entry.premixNo] = {
       premixSubmissionType: entry.premixSubmissionType,
-      premixSubmissionStatus: entry.premixSubmissionStatus ?? "TO_BE_INITIATED",
+      premixSubmissionStatus: status,
+      locked:
+        typeof entry.locked === "boolean" ? entry.locked : isPremixLocked(status),
       submittedAt: entry.submittedAt ?? null,
       reviewedBy: typeof entry.reviewedBy === "string" ? entry.reviewedBy : null,
       reviewedAt: entry.reviewedAt ?? null,
@@ -1360,14 +1383,19 @@ export const mapPreparationDetailsFromApi = (
   apiPremixes.forEach((premix) => {
     const premixNo = Number(premix.premixNo ?? 0);
     if (!premixNo) return;
+    const status =
+      premix.premixSubmissionStatus ??
+      premixStatusByNo[premixNo]?.premixSubmissionStatus ??
+      "TO_BE_INITIATED";
     premixStatusByNo[premixNo] = {
       ...premixStatusByNo[premixNo],
       premixSubmissionType:
         premix.premixSubmissionType ?? premixStatusByNo[premixNo]?.premixSubmissionType,
-      premixSubmissionStatus:
-        premix.premixSubmissionStatus ??
-        premixStatusByNo[premixNo]?.premixSubmissionStatus ??
-        "TO_BE_INITIATED",
+      premixSubmissionStatus: status,
+      locked:
+        typeof premixStatusByNo[premixNo]?.locked === "boolean"
+          ? premixStatusByNo[premixNo].locked
+          : isPremixLocked(status),
       submittedAt: premix.submittedAt ?? premixStatusByNo[premixNo]?.submittedAt ?? null,
       reviewedBy:
         typeof premix.reviewedBy === "string"
@@ -1381,7 +1409,7 @@ export const mapPreparationDetailsFromApi = (
   });
   for (let i = 1; i <= premixCount; i++) {
     if (!premixStatusByNo[i]) {
-      premixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
+      premixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED", locked: false };
     }
   }
 

@@ -2029,21 +2029,24 @@ export const useQCDivisionHook = () => {
     [selectedDivision, selectedMixingStage, selectedProcessingType, selectedRawMaterialType],
   );
 
-  const loadRevalidationSpecificationOptions = useCallback(async (materialCode: string) => {
-    const response = await operationsController.fetchMaterialSpecificationList({
-      materialCode,
-      gradeCode: null,
-    });
-    const model =
-      response?.data instanceof MaterialSpecificationListModel
-        ? response.data
-        : MaterialSpecificationListModel.fromApi(response?.data ?? response);
-    return (model.specifications ?? []).map((spec) => ({
-      specificationName: spec.specificationName,
-      specificationCode: spec.specificationCode,
-      specsLabel: spec.formattedReferenceRange,
-    }));
-  }, []);
+  const loadRevalidationSpecificationOptions = useCallback(
+    async (materialCode: string, gradeCode?: string | null) => {
+      const response = await operationsController.fetchMaterialSpecificationList({
+        materialCode,
+        gradeCode: String(gradeCode ?? "").trim() || null,
+      });
+      const model =
+        response?.data instanceof MaterialSpecificationListModel
+          ? response.data
+          : MaterialSpecificationListModel.fromApi(response?.data ?? response);
+      return (model.specifications ?? []).map((spec) => ({
+        specificationName: spec.specificationName,
+        specificationCode: spec.specificationCode,
+        specsLabel: spec.formattedReferenceRange,
+      }));
+    },
+    [],
+  );
 
   const ensureRevalidationDivisionLoaded = useCallback(async () => {
     if (!isRawMaterialRevalidationType(selectedRawMaterialType)) return;
@@ -2055,10 +2058,16 @@ export const useQCDivisionHook = () => {
     const existingValues = existingEntry
       ? formDataRef.current.divisionEntryValues?.[existingEntry.entryId]?.schemaValues
       : null;
-    if (existingEntry && hasRevalidationTableData(existingValues)) {
-      navigateToEntry(formDataRef.current.divisionEntries ?? [], existingEntry.entryId);
-      syncDivisionBaselineRef.current();
-      return;
+    // Stop once an entry exists — even empty tables must not re-trigger infinite loads
+    // (AP/graded materials can return empty specs and previously looped forever).
+    if (existingEntry) {
+      if (hasRevalidationTableData(existingValues)) {
+        navigateToEntry(formDataRef.current.divisionEntries ?? [], existingEntry.entryId);
+        syncDivisionBaselineRef.current();
+        return;
+      }
+      // Entry already created (e.g. Fill Details prefetch) with empty/partial rows —
+      // still allow one enrichment pass below, but the effect once-key prevents repeats.
     }
 
     const requestId = ++revalidationLoadRequestIdRef.current;
@@ -2664,6 +2673,13 @@ export const useQCDivisionHook = () => {
 
     if (isRawMaterialRevalidationType(selectedRawMaterialType)) {
       if (divisionAutoPopulateLoading) return;
+      const requestKey = [
+        "REVALIDATION",
+        activeDivisionTabKey,
+        String(activeBatch?.batchId ?? ""),
+      ].join("|");
+      if (autoLoadRequestKeyRef.current === requestKey) return;
+      autoLoadRequestKeyRef.current = requestKey;
       void ensureRevalidationDivisionLoaded();
       return;
     }
@@ -2689,6 +2705,7 @@ export const useQCDivisionHook = () => {
     autoLoadRequestKeyRef.current = requestKey;
     void handleLoadQcForm();
   }, [
+    activeBatch?.batchId,
     activeDivisionTabKey,
     divisionFlowState,
     divisionUiMode,
@@ -2709,7 +2726,6 @@ export const useQCDivisionHook = () => {
     trimmingMotorReceivedDate,
     view,
     divisionAutoPopulateLoading,
-    divisionAutoPopulateData,
     ensureRevalidationDivisionLoaded,
   ]);
 

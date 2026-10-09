@@ -717,6 +717,8 @@ export const createRevalidationSchemaValuesFromAutoPopulate = (
 export type QcRevalidationMaterialSeed = {
   materialCode: string;
   lotId: string;
+  /** Required for graded materials (e.g. AP) when specs are grade-scoped. */
+  gradeCode?: string;
 };
 
 /** Ingredient/lot pairs from division-details when nested specs are not included. */
@@ -741,10 +743,17 @@ export const extractRevalidationMaterialSeeds = (
     const lotId = String(
       record.LOT_BATCH_NUMBER ?? record.lotId ?? record.lotNo ?? record.lotBatchNumber ?? "",
     ).trim();
-    const key = `${materialCode}::${lotId}`;
+    const gradeCode = String(
+      record.gradeCode ?? record.grade_code ?? record.GRADE_CODE ?? record.grade ?? "",
+    ).trim();
+    const key = `${materialCode}::${lotId}::${gradeCode}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    seeds.push({ materialCode, lotId });
+    seeds.push({
+      materialCode,
+      lotId,
+      ...(gradeCode ? { gradeCode } : {}),
+    });
   }
   return seeds;
 };
@@ -755,7 +764,10 @@ export const extractRevalidationMaterialSeeds = (
  */
 export const buildRevalidationValuesFromDivisionDetails = async (
   payload: unknown,
-  loadSpecs: (materialCode: string) => Promise<QcRevalidationSpecOption[]>,
+  loadSpecs: (
+    materialCode: string,
+    gradeCode?: string | null,
+  ) => Promise<QcRevalidationSpecOption[]>,
 ): Promise<SchemaFormValues> => {
   const mapped = mapDivisionDetailsToRevalidationValues(payload);
   if (mapped) return mapped;
@@ -766,9 +778,9 @@ export const buildRevalidationValuesFromDivisionDetails = async (
   const expanded: QcRevalidationRow[] = [];
   for (const [index, seed] of seeds.entries()) {
     try {
-      const specs = await loadSpecs(seed.materialCode);
+      const specs = await loadSpecs(seed.materialCode, seed.gradeCode ?? null);
       if (!specs.length) continue;
-      const groupId = `${seed.materialCode}-${index}`;
+      const groupId = `${seed.materialCode}-${seed.gradeCode ?? "NONE"}-${index}`;
       for (const spec of specs) {
         expanded.push({
           SR_NO: 0,

@@ -49,10 +49,22 @@ const RawMaterialMaterialProcessPanel = ({
 
   const apCards: ApGradeCardState[] = useMemo(() => {
     if (!isAp) return [];
-    return Array.isArray(session?.apGradeSlots) ? session.apGradeSlots : [];
-  }, [isAp, session?.apGradeSlots]);
+    const fromSession = Array.isArray(session?.apGradeSlots) ? session.apGradeSlots : [];
+    if (fromSession.length > 0) return fromSession;
+    // Approved / reloaded premixes may have process data on `solid` while
+    // apGradeSlots was never seeded — still render the grade panel.
+    if (rmpUiKeyShowsProcessPanel(slotState.uiKey) || session?.solidGradeCode) {
+      return [
+        {
+          gradeCode: String(session?.solidGradeCode ?? "").trim() || "COARSE",
+          slot: slotState,
+        },
+      ];
+    }
+    return [];
+  }, [isAp, session?.apGradeSlots, session?.solidGradeCode, slotState]);
 
-  if (isAp && onApGradeSlotsChange) {
+  if (isAp && onApGradeSlotsChange && apCards.length > 0) {
     return (
       <ApMaterialHostPanel
         cards={apCards}

@@ -500,6 +500,8 @@ export const useRawMaterialPrepHook = () => {
 
   const checkPremixEditable = useCallback(
     (premixNo: number): boolean => {
+      const statusMeta = premixStatusByNo[premixNo];
+      if (statusMeta?.locked === true) return false;
       if (!isPremixEditable(getPremixStatus(premixNo))) return false;
       if (activeBatch && usesParallelUnitLocks(activeBatch)) {
         const unit = findPremixUnit(
@@ -510,7 +512,7 @@ export const useRawMaterialPrepHook = () => {
       }
       return true;
     },
-    [activeBatch, getPremixStatus, subDepartmentId],
+    [activeBatch, getPremixStatus, premixStatusByNo, subDepartmentId],
   );
 
   const premixGroups = useMemo(
