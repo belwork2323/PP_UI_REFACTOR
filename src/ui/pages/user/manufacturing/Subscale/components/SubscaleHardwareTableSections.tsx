@@ -192,7 +192,6 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
 export const TrimmingTableSection = memo(function TrimmingTableSection({
   rows,
   onCellChange,
-  getSyncedBemNo = () => "",
   errors,
 }: RowsProps) {
   return (
@@ -227,7 +226,11 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
               <TableCell sx={articleTypeCellSx}>
                 {formatArticleTypeLabel(row.ARTICLE_TYPE)}
               </TableCell>
-              <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
+              <TableCell sx={bemNoTextSx}>
+                <Box data-ss-field={`TRIMMING_TABLE.${idx}.BEM_NO`}>
+                  {String(row.BEM_NO ?? "").trim() || "—"}
+                </Box>
+              </TableCell>
               {(
                 [
                   "HE_OD",
@@ -282,7 +285,10 @@ export const CastingTableSection = memo(function CastingTableSection({
               <FieldLabelWithAsterisk label="Article Type" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>
-              <FieldLabelWithAsterisk label="BEM Mould No" required sx={tableHeaderCellSx} />
+              <FieldLabelWithAsterisk label="Article No / BEM No" required sx={tableHeaderCellSx} />
+            </TableCell>
+            <TableCell sx={tableHeaderCellSx}>
+              <FieldLabelWithAsterisk label="Mould No" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>Casting Pit No</TableCell>
             <TableCell sx={tableHeaderCellSx}>Start Time</TableCell>
@@ -297,6 +303,7 @@ export const CastingTableSection = memo(function CastingTableSection({
           {rows.map((row, idx) => {
             const errMap = errors as Record<string, any>;
 
+            const bemNoError = errMap?.[`CASTING_TABLE.${idx}.BEM_NO`];
             const bemMouldError = errMap?.[`CASTING_TABLE.${idx}.BEM_MOULD_NO`];
             const startError = errMap?.[`CASTING_TABLE.${idx}.CASTING_START_TIME`];
             const endError = errMap?.[`CASTING_TABLE.${idx}.CASTING_END_TIME`];
@@ -306,6 +313,18 @@ export const CastingTableSection = memo(function CastingTableSection({
                 <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
                 <TableCell sx={articleTypeCellSx}>
                   {formatArticleTypeLabel(row.ARTICLE_TYPE)}
+                </TableCell>
+                <TableCell sx={tableBodyCellSx}>
+                  <SubscaleTableTextCell
+                    compact
+                    tableId="CASTING_TABLE"
+                    rowIndex={idx}
+                    fieldId="BEM_NO"
+                    value={row.BEM_NO ?? ""}
+                    onCellChange={onCellChange}
+                    required
+                    errorMessage={bemNoError}
+                  />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -397,7 +416,7 @@ type StaticTestingProps = RowsProps & {
 export const StaticTestingTableSection = memo(function StaticTestingTableSection({
   rows,
   onCellChange,
-  getSyncedBemNo = () => "",
+  errors,
   onFileUpload,
   FileUploadButton,
 }: StaticTestingProps) {
@@ -424,49 +443,64 @@ export const StaticTestingTableSection = memo(function StaticTestingTableSection
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row, idx) => (
-            <TableRow key={idx}>
-              <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
-              <TableCell sx={articleTypeCellSx}>
-                {formatArticleTypeLabel(row.ARTICLE_TYPE)}
-              </TableCell>
-              <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
-              {(
-                [
-                  "PROPELLANT_MASS",
-                  "DT",
-                  "WEB_THICKNESS",
-                  "N_VALUE",
-                  "PRESSURE_AVG",
-                  "THRUST_AVG",
-                  "BURN_RATE",
-                ] as const
-              ).map((fieldId) => (
-                <TableCell key={fieldId} sx={tableBodyCellSx}>
-                  <SubscaleTableTextCell
-                    compact
-                    type="number"
-                    tableId="STATIC_TESTING_TABLE"
-                    rowIndex={idx}
-                    fieldId={fieldId}
-                    value={row[fieldId] ?? ""}
-                    onCellChange={onCellChange}
+          {rows.map((row, idx) => {
+            const bemError = errors?.[`STATIC_TESTING_TABLE.${idx}.BEM_NO`];
+            return (
+              <TableRow key={idx}>
+                <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
+                <TableCell sx={articleTypeCellSx}>
+                  {formatArticleTypeLabel(row.ARTICLE_TYPE)}
+                </TableCell>
+                <TableCell
+                  sx={{
+                    ...bemNoTextSx,
+                    ...(bemError
+                      ? { color: "error.main", outline: "1px solid", outlineColor: "error.main" }
+                      : null),
+                  }}
+                >
+                  <Box data-ss-field={`STATIC_TESTING_TABLE.${idx}.BEM_NO`}>
+                    {String(row.BEM_NO ?? "").trim() || "—"}
+                  </Box>
+                </TableCell>
+                {(
+                  [
+                    "PROPELLANT_MASS",
+                    "DT",
+                    "WEB_THICKNESS",
+                    "N_VALUE",
+                    "PRESSURE_AVG",
+                    "THRUST_AVG",
+                    "BURN_RATE",
+                  ] as const
+                ).map((fieldId) => (
+                  <TableCell key={fieldId} sx={tableBodyCellSx}>
+                    <SubscaleTableTextCell
+                      compact
+                      type="number"
+                      tableId="STATIC_TESTING_TABLE"
+                      rowIndex={idx}
+                      fieldId={fieldId}
+                      value={row[fieldId] ?? ""}
+                      onCellChange={onCellChange}
+                      errorMessage={errors?.[`STATIC_TESTING_TABLE.${idx}.${fieldId}`]}
+                    />
+                  </TableCell>
+                ))}
+                <TableCell sx={{ minWidth: 180 }}>
+                  <FileUploadButton
+                    icon={UploadFileIcon}
+                    label={row.GRAPH_UPLOAD ? row.GRAPH_UPLOAD.name : "Upload Graph"}
+                    accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const file = e.target.files?.[0];
+                      if (file) onFileUpload(idx, file);
+                    }}
                   />
                 </TableCell>
-              ))}
-              <TableCell sx={{ minWidth: 180 }}>
-                <FileUploadButton
-                  icon={UploadFileIcon}
-                  label={row.GRAPH_UPLOAD ? row.GRAPH_UPLOAD.name : "Upload Graph"}
-                  accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    const file = e.target.files?.[0];
-                    if (file) onFileUpload(idx, file);
-                  }}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>
@@ -477,6 +511,7 @@ export const MechanicalPropertiesTableSection = memo(function MechanicalProperti
   rows,
   onCellChange,
   getSyncedBemNo = () => "",
+  errors,
 }: RowsProps) {
   return (
     <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 2 }}>
@@ -501,13 +536,26 @@ export const MechanicalPropertiesTableSection = memo(function MechanicalProperti
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row, idx) => (
+          {rows.map((row, idx) => {
+            const bemError = errors?.[`MECHANICAL_PROPERTIES_TABLE.${idx}.BEM_NO`];
+            return (
             <TableRow key={idx}>
               <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
               <TableCell sx={articleTypeCellSx}>
                 {formatArticleTypeLabel(row.ARTICLE_TYPE)}
               </TableCell>
-              <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
+              <TableCell
+                sx={{
+                  ...bemNoTextSx,
+                  ...(bemError
+                    ? { color: "error.main", outline: "1px solid", outlineColor: "error.main" }
+                    : null),
+                }}
+              >
+                <Box data-ss-field={`MECHANICAL_PROPERTIES_TABLE.${idx}.BEM_NO`}>
+                  {getSyncedBemNo(idx) || "—"}
+                </Box>
+              </TableCell>
               {(
                 [
                   ["TS", true],
@@ -529,11 +577,13 @@ export const MechanicalPropertiesTableSection = memo(function MechanicalProperti
                     fieldId={fieldId}
                     value={row[fieldId] ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errors?.[`MECHANICAL_PROPERTIES_TABLE.${idx}.${fieldId}`]}
                   />
                 </TableCell>
               ))}
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </TableContainer>
@@ -556,7 +606,7 @@ export const CuringTableSection = memo(function CuringTableSection({
               <FieldLabelWithAsterisk label="Article Type" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>
-              <FieldLabelWithAsterisk label="BEM Mould No" required sx={tableHeaderCellSx} />
+              <FieldLabelWithAsterisk label="Article No / BEM No" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>Curing Start Date</TableCell>
             <TableCell sx={tableHeaderCellSx}>Curing End Date</TableCell>

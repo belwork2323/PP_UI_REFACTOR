@@ -680,10 +680,12 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             gap: 2,
           }}
         >
-          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.BATCH_SIZE}>
+          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.BATCH_SIZE} sx={{ minWidth: 0 }}>
             <FormInput
+              fullWidth
               disabled
-              label={<FieldLabelWithAsterisk label={S.BATCH_SIZE} required />}
+              label={S.BATCH_SIZE}
+              required
               type="number"
               value={
                 values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ||
@@ -692,22 +694,27 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               }
               error={Boolean(errors?.[SUBSCALE_BATCH_FIELDS.BATCH_SIZE])}
               helperText={errors?.[SUBSCALE_BATCH_FIELDS.BATCH_SIZE]}
+              sx={{ mb: 0 }}
             />
           </Box>
 
           <FormInput
+            fullWidth
             disabled
-            label={<FieldLabelWithAsterisk label="Mixer Type" required />}
+            label="Mixer Type"
+            required
             value={
               values.mixerType ||
               resolveMasterDataName(batchDetails?.identificationSheet?.mixerType) ||
               ""
             }
+            sx={{ mb: 0 }}
           />
 
-          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO}>
+          <Box data-ss-field={SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO} sx={{ minWidth: 0 }}>
             <AppDropdown
               label={S.MIXER_BLDG_NO}
+              required
               value={String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim()}
               onChange={(value) => {
                 clearFieldError?.(SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO);
@@ -722,6 +729,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                     : "No buildings available"
               }
               options={buildingOptions}
+              sx={{ mb: 0 }}
               renderValue={(selected) => {
                 const value = String(selected ?? "").trim();
                 if (!value) return null;
@@ -739,9 +747,10 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               errors?.[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ||
               "";
             return (
-              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.PREMIX_DATE}>
+              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.PREMIX_DATE} sx={{ minWidth: 0 }}>
                 <DateField
-                  label={<FieldLabelWithAsterisk label={S.PREMIX_DATE} required />}
+                  label={S.PREMIX_DATE}
+                  required
                   value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
                   onChange={(next) => {
                     clearFieldError?.(SUBSCALE_BATCH_FIELDS.PREMIX_DATE);
@@ -749,7 +758,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                   }}
                   placeholder="DD-MM-YYYY"
                   error={Boolean(premixErrorMsg)}
-                  helperText={premixErrorMsg}
+                  helperText={premixErrorMsg || undefined}
+                  sx={{ mb: 0 }}
                 />
               </Box>
             );
@@ -761,9 +771,10 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               errors?.[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ||
               "";
             return (
-              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE}>
+              <Box data-ss-field={SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE} sx={{ minWidth: 0 }}>
                 <DateField
-                  label={<FieldLabelWithAsterisk label={S.FINAL_MIX_DATE} required />}
+                  label={S.FINAL_MIX_DATE}
+                  required
                   value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
                   onChange={(next) => {
                     clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
@@ -771,7 +782,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                   }}
                   placeholder="DD-MM-YYYY"
                   error={Boolean(finalMixErrorMsg)}
-                  helperText={finalMixErrorMsg}
+                  helperText={finalMixErrorMsg || undefined}
+                  sx={{ mb: 0 }}
                 />
               </Box>
             );

@@ -15,8 +15,7 @@ import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtil
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
 import { RefreshRounded } from "@mui/icons-material";
-import useApproverSubDepartmentBatchList from "@/hooks/approver/useApproverSubDepartmentBatchList";
-import { ApproverDepartmentKey } from "@/app/theme/approver";
+import { useApproverListRefreshStore } from "@/app/store/approverListRefreshStore";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -38,20 +37,14 @@ type FilterBarTheme = {
 type UseApproverSubdepartmentBatchListFilterBarArgs = {
   mode?: string;
   theme: FilterBarTheme;
-  refresh?: () => void;
-  department: ApproverDepartmentKey;
-  subDepartment: string;
-  items?: Record<string, unknown>[];
 };
 
 export const useApproverSubdepartmentBatchListFilterBar = ({
   mode = "light",
   theme,
-  department,
-  subDepartment,
-  items,
 }: UseApproverSubdepartmentBatchListFilterBarArgs) => {
   const filterStyles = useMemo(() => getApproverManufacturingFilterStyles(mode), [mode]);
+  const bumpListVersion = useApproverListRefreshStore((state) => state.bumpVersion);
   const {
     appliedFilters,
     applyPanelFilters,
@@ -70,16 +63,6 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     ensureProjectOptions,
     applyClientFilters,
   } = useApproverSubdepartmentBatchListFilters();
-
-  const { items: fetchedItems, refresh } = useApproverSubDepartmentBatchList({
-    allLabel: filterAllLabel,
-    department,
-    extraFilters: listFiltersRecord,
-    items,
-    searchText: "", // Pass search text if managed here, or leave empty/handled elsewhere
-    status: statusFilter,
-    subDepartment,
-  });
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftBatchId, setDraftBatchId] = useState("");
@@ -211,7 +194,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
       <Stack direction="row" spacing={1} alignItems="center">
         <RefreshIconButton
           onClick={() => {
-            void refresh();
+            bumpListVersion();
           }}
           tooltip={STRINGS.USER_BATCH_LIST.REFRESH_TOOLTIP}
           icon={<RefreshRounded fontSize="small" />}

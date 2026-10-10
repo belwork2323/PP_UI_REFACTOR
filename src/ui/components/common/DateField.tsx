@@ -11,8 +11,7 @@ import {
 import { formatToUiDate, UI_DATETIME_FORMAT, UI_DATE_PLACEHOLDER } from "../../../utils/dateUtils";
 import { toUiDateTime, toUiTime } from "../../../data/models/user/castingCuringFieldCodec";
 import { WorkflowReadOnlyText } from "./WorkflowReadOnlyText";
-import React, { ReactNode } from "react";
-import { FieldLabelWithAsterisk } from "./FieldLabelWithAsterisk";
+import React from "react";
 
 const UI_TIME_PLACEHOLDER = "HH:mm";
 
@@ -57,18 +56,23 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
 
     const dateValue = parseUiDate(value);
 
-    const formattedLabel =
-      typeof label === "string" && required ? (
-        <FieldLabelWithAsterisk label={label} required />
-      ) : (
-        label
-      );
+    // String labels use shared appDropdownLabelProps via DatePickerTextField.
+    // Native MUI `required` draws the asterisk (same as AppTextField / AppDropdown).
+    const pickerSlotProps = buildAppDatePickerSlotProps({
+      required: typeof label === "string" ? required : false,
+      error,
+      helperText,
+      compact,
+      placeholder: placeholder ?? UI_DATE_PLACEHOLDER,
+      sx,
+      inputSx,
+    });
 
     return (
       <AppDatePickerProvider>
         <DatePicker
           {...appDatePickerFieldSlots}
-          label={formattedLabel}
+          label={label}
           format={UI_DATE_FORMAT}
           value={dateValue}
           disabled={disabled}
@@ -77,16 +81,13 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
               onChange(next && next.isValid() ? next.format(UI_DATE_FORMAT) : "");
             }
           }}
-          slotProps={buildAppDatePickerSlotProps({
-            required: false, // Set to false here so native MUI doesn't draw a duplicate/non-red asterisk
-            error,
-            helperText,
-            compact,
-            placeholder: placeholder ?? UI_DATE_PLACEHOLDER,
-            sx,
-            inputSx,
-            inputRef: ref,
-          })}
+          slotProps={{
+            ...pickerSlotProps,
+            textField: {
+              ...pickerSlotProps.textField,
+              inputRef: ref ?? inputRef,
+            },
+          }}
           sx={{ width: "100%", ...sx }}
         />
       </AppDatePickerProvider>

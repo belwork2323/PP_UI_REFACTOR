@@ -1,9 +1,6 @@
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
-  ARTICLE_TYPE_TABLE_ID,
   createDefaultHardwareValues,
-  HARDWARE_COUNT_FIELDS,
-  LINER_TYPE_FIELD,
   mergeHardwareFormValues,
 } from "./subscaleHardwareConfig";
 

@@ -84,7 +84,7 @@ const SubscalePage = () => {
         accentColor={SUBSCALE_BRAND.ssLight}
       />
 
-      <form onSubmit={handleFormSubmit}>
+      <form noValidate onSubmit={handleFormSubmit}>
         {view === "list" && !listLoading && <SubscaleList hookState={hookState} />}
 
         {view === "details" && detailsRow && (

@@ -5,12 +5,7 @@ import { firstValidationErrorWithPath } from "../validationErrors";
 import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 const SUBSCALE_FIELD_LABELS: Record<string, string> = {
-  NO_OF_40KG_BEMS: "No. of 40kg BEMs",
-  NO_OF_10KG_BEMS: "No. of 10kg BEMs",
-  NO_OF_2KG_BEMS: "No. of 2kg BEMs",
-  NO_OF_WHEEL_PEEL: "No. of Wheel Peel",
-  NO_OF_SBS_TBS: "No. of SBS/TBS",
-  NO_OF_CARTOONS: "No. of Cartoons",
+  HARDWARE_ARTICLE_SELECTIONS: "Selected Articles",
   LINER_TYPE: "Liner Type",
   LINER_BATCH_NO: "Liner Batch No.",
   LINER_BATCH_DATE: "Liner Batch Date",
@@ -25,8 +20,8 @@ const SUBSCALE_FIELD_LABELS: Record<string, string> = {
   RUBBER_MATERIAL: "Rubber Material",
   SLEEVE_NO: "Sleeve No.",
   MOULD_NO: "Mould No.",
-  BEM_MOULD_NO: "BEM Mould No.",
-  BEM_NO: "BEM No.",
+  BEM_MOULD_NO: "Mould No.",
+  BEM_NO: "Article No / BEM No",
   DATE_OF_NDT: "Date of NDT",
   VACUUM_LEVEL: "Vacuum Level",
   rpm: "RPM",
@@ -50,12 +45,7 @@ const TABLE_SECTION_LABELS: Record<string, string> = {
 
 /** Preferred section order for scroll/focus after failed SUBMIT. */
 const SUBSCALE_FOCUS_PREFIX_ORDER = [
-  "NO_OF_40KG_BEMS",
-  "NO_OF_10KG_BEMS",
-  "NO_OF_2KG_BEMS",
-  "NO_OF_WHEEL_PEEL",
-  "NO_OF_SBS_TBS",
-  "NO_OF_CARTOONS",
+  "HARDWARE_ARTICLE_SELECTIONS",
   "LINER_",
   "BATCH_SIZE",
   "MIXER_BLDG_NO",

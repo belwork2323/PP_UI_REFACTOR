@@ -16,3 +16,18 @@ export const hasProcessTableData = (rows: unknown[] | undefined): boolean => {
     ),
   );
 };
+
+/** True when any error key matches a section prefix (or equals an exact key). */
+export const hasValidationErrorsForPrefixes = (
+  errors: Record<string, string> | null | undefined,
+  prefixes: string[],
+  focusPath?: string | null,
+): boolean => {
+  if (focusPath && prefixes.some((p) => focusPath === p || focusPath.startsWith(p))) {
+    return true;
+  }
+  if (!errors) return false;
+  return Object.keys(errors).some((key) =>
+    prefixes.some((prefix) => key === prefix || key.startsWith(prefix)),
+  );
+};

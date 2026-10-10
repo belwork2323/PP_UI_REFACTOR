@@ -51,7 +51,7 @@ import type {
   MaterialBlock,
 } from "../../../../data/models/user/RawMaterialProcurementModel";
 import RawMaterialPreparationDetailsView from "./components/RawMaterialPreparationDetailsView";
-import useApproverSubDepartmentBatchList from "@/hooks/approver/useApproverSubDepartmentBatchList";
+import { useApproverListRefreshStore } from "@/app/store/approverListRefreshStore";
 import { RefreshRounded } from "@mui/icons-material";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
 
@@ -471,14 +471,7 @@ const RawMaterialApproverPage = () => {
     filterAllLabel,
   } = useRawMaterialApproverHook();
 
-  const { refresh } = useApproverSubDepartmentBatchList({
-    allLabel: filterAllLabel,
-    department: "sourcing",
-    extraFilters: listFiltersRecord,
-    searchText: "", // Pass search text if managed here, or leave empty/handled elsewhere
-    status: statusFilter,
-    subDepartment: "raw-material",
-  });
+  const bumpListVersion = useApproverListRefreshStore((state) => state.bumpVersion);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftMaterial, setDraftMaterial] = useState(filterAllLabel);
@@ -594,15 +587,13 @@ const RawMaterialApproverPage = () => {
         chevronSx={filterToggleSx.filterBtnChevron}
       />
 
-      {typeof refresh === "function" ? (
-        <RefreshIconButton
-          onClick={() => {
-            void refresh();
-          }}
-          tooltip={STRINGS.SOURCING.BATCH_LIST.REFRESH_TOOLTIP}
-          icon={<RefreshRounded fontSize="small" />}
-        />
-      ) : null}
+      <RefreshIconButton
+        onClick={() => {
+          bumpListVersion();
+        }}
+        tooltip={STRINGS.SOURCING.BATCH_LIST.REFRESH_TOOLTIP}
+        icon={<RefreshRounded fontSize="small" />}
+      />
     </Stack>
   );
 

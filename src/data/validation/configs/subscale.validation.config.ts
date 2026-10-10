@@ -6,41 +6,10 @@ const S = VALIDATIONSTRING;
 
 export const subscaleHardwareFieldRules = {
   // Hardware Preparation Fields
-  NO_OF_40KG_BEMS: {
-    valueType: "number" as const,
+  HARDWARE_ARTICLE_SELECTIONS: {
+    valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
-  },
-  NO_OF_10KG_BEMS: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
-  },
-  NO_OF_2KG_BEMS: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
-  },
-  NO_OF_WHEEL_PEEL: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
-  },
-  NO_OF_SBS_TBS: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
-  },
-  NO_OF_CARTOONS: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ONLY_DIGITS,
   },
   LINER_TYPE: {
     valueType: "text" as const,
@@ -97,12 +66,11 @@ export const subscaleHardwareFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 
-  // Table Row Fields (Generic / Reused across tables)
+  // System-generated labels (MDM article names) — presence only, no pattern.
   ARTICLE_TYPE: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: [] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
     maxLength: S.LENGTH.MAX_STANDARD,
   },
   RUBBER_MATERIAL: {
@@ -207,19 +175,21 @@ function resolveFieldPaths(data: any) {
   const subType = String(data?.subBatchType ?? "").toUpperCase();
   const isExperimental = subType === "EXPERIMENTAL";
 
-  // 1. Hardware Preparation Scalar Fields
-  const prepFields = [
-    "NO_OF_40KG_BEMS",
-    "NO_OF_10KG_BEMS",
-    "NO_OF_2KG_BEMS",
-    "NO_OF_WHEEL_PEEL",
-    "NO_OF_SBS_TBS",
-    "NO_OF_CARTOONS",
-    "LINER_TYPE",
-    "LINER_BATCH_NO",
-    "LINER_BATCH_DATE",
-  ];
-  prepFields.forEach((field) => {
+  // 1. Hardware Preparation — article selections + liner fields
+  const selections = Array.isArray(data.HARDWARE_ARTICLE_SELECTIONS)
+    ? data.HARDWARE_ARTICLE_SELECTIONS
+    : [];
+  const hasValidSelection = selections.some(
+    (row: { noOfArticles?: unknown; subscaleArticleName?: unknown }) =>
+      Number(row?.noOfArticles ?? 0) > 0 && String(row?.subscaleArticleName ?? "").trim(),
+  );
+  paths.push({
+    path: "HARDWARE_ARTICLE_SELECTIONS",
+    value: hasValidSelection ? "ok" : "",
+    ruleKey: "HARDWARE_ARTICLE_SELECTIONS",
+  });
+
+  ["LINER_TYPE", "LINER_BATCH_NO", "LINER_BATCH_DATE"].forEach((field) => {
     paths.push({ path: field, value: data[field], ruleKey: field });
   });
 
@@ -283,16 +253,16 @@ function resolveFieldPaths(data: any) {
     }
   }
 
-  // 4. Table Traversals (Article Type, Casting, Curing, NDT, Trimming, Inhibition, etc.)
+  // 4. Table Traversals — skip SR_NO / ARTICLE_TYPE (system-generated, display-only).
   const tableMappings: Record<string, string[]> = {
-    ARTICLE_TYPE_TABLE: ["SR_NO", "ARTICLE_TYPE", "RUBBER_MATERIAL", "SLEEVE_NO", "MOULD_NO"],
-    CASTING_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_MOULD_NO", "VACUUM_LEVEL"],
-    CURING_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_MOULD_NO"],
-    NDT_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_NO", "DATE_OF_NDT"],
-    TRIMMING_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_NO"],
-    INHIBITION_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_NO"],
-    STATIC_TESTING_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_NO"],
-    MECHANICAL_PROPERTIES_TABLE: ["SR_NO", "ARTICLE_TYPE", "BEM_NO"],
+    ARTICLE_TYPE_TABLE: ["RUBBER_MATERIAL", "SLEEVE_NO", "MOULD_NO"],
+    CASTING_TABLE: ["BEM_NO", "BEM_MOULD_NO", "VACUUM_LEVEL"],
+    CURING_TABLE: ["BEM_MOULD_NO"],
+    NDT_TABLE: ["BEM_NO", "DATE_OF_NDT"],
+    TRIMMING_TABLE: ["BEM_NO"],
+    INHIBITION_TABLE: ["BEM_NO"],
+    STATIC_TESTING_TABLE: ["BEM_NO"],
+    MECHANICAL_PROPERTIES_TABLE: ["BEM_NO"],
   };
 
   Object.entries(tableMappings).forEach(([tableName, fields]) => {
@@ -303,7 +273,7 @@ function resolveFieldPaths(data: any) {
           paths.push({
             path: `${tableName}.${i}.${fld}`,
             value: row[fld],
-            ruleKey: fld === "SR_NO" ? "ARTICLE_TYPE" : fld, // Fallback/map rule keys as needed
+            ruleKey: fld,
           });
         });
       });

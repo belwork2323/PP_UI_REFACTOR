@@ -61,13 +61,16 @@ const SubscaleForm = ({
   const isFormLoaded = Boolean(formData.schemaFormValues?.IS_PROCESS_FORM_LOADED);
   const batchStatus = batch?.ssStatus ?? batch?.status;
 
+  // Retry focus after section expand / lazy-mount (Case Prep–style scroll + highlight).
   useEffect(() => {
     if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
     const path = validationFocusRequest.fieldPath;
-    const timer = window.setTimeout(() => {
-      focusSubscaleField(path);
-    }, 50);
-    return () => window.clearTimeout(timer);
+    const timers = [50, 150, 350].map((delay) =>
+      window.setTimeout(() => {
+        focusSubscaleField(path);
+      }, delay),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
 
   return (
@@ -171,6 +174,7 @@ const SubscaleForm = ({
           batchDetails={batchDetails}
           errors={errors}
           clearFieldError={clearFieldError}
+          validationFocusPath={validationFocusRequest?.fieldPath ?? null}
         />
       </Box>
     </Box>

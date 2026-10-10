@@ -1,4 +1,4 @@
-import { useState, type ElementType, type ReactNode, type SyntheticEvent } from "react";
+import { useEffect, useState, type ElementType, type ReactNode, type SyntheticEvent } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -17,6 +17,11 @@ type SubscaleProcessSectionProps = {
   defaultExpanded?: boolean;
   /** When true, table content mounts only after the section is expanded once. */
   lazyMount?: boolean;
+  /**
+   * Force-expand (and mount) when this section has validation errors or is the
+   * focus target — same UX as Case Prep scrolling to the first invalid field.
+   */
+  forceExpand?: boolean;
   children: ReactNode;
 };
 
@@ -26,10 +31,17 @@ const SubscaleProcessSection = ({
   icon: Icon,
   defaultExpanded = false,
   lazyMount = true,
+  forceExpand = false,
   children,
 }: SubscaleProcessSectionProps) => {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const [hasMounted, setHasMounted] = useState(!lazyMount || defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || forceExpand);
+  const [hasMounted, setHasMounted] = useState(!lazyMount || defaultExpanded || forceExpand);
+
+  useEffect(() => {
+    if (!forceExpand) return;
+    setExpanded(true);
+    setHasMounted(true);
+  }, [forceExpand]);
 
   const handleChange = (_event: SyntheticEvent, nextExpanded: boolean) => {
     setExpanded(nextExpanded);

@@ -184,11 +184,12 @@ export const useSubscaleHook = () => {
     if (errors && Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       notifySubscaleValidationErrors(errors, "draft");
+      emitSubscaleValidationFocus(errors);
       return false;
     }
     setValidationErrors({});
     return true;
-  }, [buildValidationPayload, notifySubscaleValidationErrors]);
+  }, [buildValidationPayload, emitSubscaleValidationFocus, notifySubscaleValidationErrors]);
 
   const validateAndPrepareSubmit = useCallback(() => {
     const errors = validateSubscale(buildValidationPayload(), "SUBMIT");

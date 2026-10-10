@@ -2,17 +2,17 @@ import {
   memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEventHandler,
-  type CSSProperties,
   type ElementType,
 } from "react";
 import {
   Box,
   Button,
   CircularProgress,
-  MenuItem,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -35,6 +35,8 @@ import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 
 import FormInput from "../../../../components/common/FormInput";
+import AppTextField from "../../../../components/common/AppTextField";
+import AppDropdown from "../../../../components/common/AppDropdown";
 import {
   ArticleTypeTableSection,
   CastingTableSection,
@@ -47,7 +49,11 @@ import {
 import { applySubscaleFormScopePatch, syncProcessTableScope } from "./utils/subscaleFormScopeSync";
 import { SubscaleTableTextCell } from "./components/SubscaleTableCells";
 import SubscaleProcessSection from "./components/SubscaleProcessSection";
-import { hasProcessTableData, scheduleIdleWork } from "./utils/subscaleTableUtils";
+import {
+  hasProcessTableData,
+  hasValidationErrorsForPrefixes,
+  scheduleIdleWork,
+} from "./utils/subscaleTableUtils";
 import {
   sectionCardSx,
   sectionHeaderSx,
@@ -60,19 +66,14 @@ import {
 } from "./utils/subscaleHardwareTableStyles";
 import DateField from "../../../../components/common/DateField";
 import { AppDatePickerProvider } from "../../../../components/common/datePickerShared";
-import {
-  APP_CONTROL_FONT_SIZE,
-  appDropdownMenuProps,
-  appDropdownPlaceholderSx,
-} from "../../../../components/common/fieldStyles";
+import { APP_CONTROL_HEIGHT } from "../../../../components/common/fieldStyles";
 import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import fonts from "../../../../../app/theme/fonts";
 import {
   ARTICLE_TYPE_TABLE_ID,
-  ARTICLE_TYPE_SPECS,
-  HARDWARE_COUNT_FIELDS,
+  HARDWARE_ARTICLE_SELECTIONS_ID,
   LINER_TYPE_FIELD,
   isHardwarePreparationComplete,
   syncHardwareArticleTable,
@@ -80,17 +81,26 @@ import {
   LINER_BATCH_DATE_FIELD,
   LINER_TYPE_OPTIONS,
   isMainScaleSubscaleBatch,
+  getHardwareArticleSelections,
+  getArticleTypesFromSelections,
+  buildTrimmingRowsFromCasting,
+  buildStaticTestingRowsFromTrimming,
+  parseCount,
+  type HardwareArticleOption,
+  type HardwareArticleSelection,
+  type TrimmingTableRow,
+  type StaticTestingTableRow,
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { generalController } from "@/controllers/admin/common/generalController";
+import type { SubscaleArticleOption } from "@/data/api/common/generalAPI";
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.HARDWARE;
 const BEM_NO_SYNC_TARGETS = [
   { tableId: "CURING_TABLE", fieldId: "BEM_MOULD_NO" },
   { tableId: "NDT_TABLE", fieldId: "BEM_NO" },
-  { tableId: "TRIMMING_TABLE", fieldId: "BEM_NO" },
   { tableId: "INHIBITION_TABLE", fieldId: "BEM_NO" },
-  { tableId: "STATIC_TESTING_TABLE", fieldId: "BEM_NO" },
   { tableId: "MECHANICAL_PROPERTIES_TABLE", fieldId: "BEM_NO" },
 ] as const;
 
@@ -174,25 +184,120 @@ type SubscaleHardwareArticlePanelProps = {
   hardwareFieldsDisabled?: boolean;
   /** When MAIN / MAIN_SCALE, Static Testing + Mechanical tables are hidden. */
   batchType?: string | null;
+  batchDetails?: {
+    subBatchType?: string | null;
+    articles?: Array<{
+      subscaleArticleId?: number;
+      subscaleArticleCode?: string;
+      subscaleArticleName?: string;
+      isActive?: boolean;
+    }> | null;
+  } | null;
   canManageProcessTables?: boolean;
   errors?: Record<string, string> | null;
-  clearFieldError?: (path: string) => void; // <-- Add this
+  clearFieldError?: (path: string) => void;
+  validationFocusPath?: string | null;
 };
+
+const mapMdmOption = (row: SubscaleArticleOption): HardwareArticleOption => ({
+  subscaleArticleId: row.subscaleArticleId,
+  subscaleArticleCode: row.subscaleArticleCode,
+  subscaleArticleName: row.subscaleArticleName,
+});
 
 const SubscaleHardwareArticlePanel = ({
   values,
   onChange,
   hardwareFieldsDisabled = false,
   batchType,
+  batchDetails = null,
   canManageProcessTables = true,
   errors,
   clearFieldError,
+  validationFocusPath = null,
 }: SubscaleHardwareArticlePanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [articleOptions, setArticleOptions] = useState<HardwareArticleOption[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [draftArticleCode, setDraftArticleCode] = useState("");
+  const [draftNoOfArticles, setDraftNoOfArticles] = useState("");
+  const [draftNoOfParts, setDraftNoOfParts] = useState("");
+  const [addError, setAddError] = useState("");
   const valuesRef = useRef(values);
   const pendingValuesRef = useRef(values);
   valuesRef.current = values;
   pendingValuesRef.current = values;
+
+  const subBatchType = String(batchDetails?.subBatchType ?? "").toUpperCase();
+  const useBatchArticles = subBatchType === "EXPERIMENTAL";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOptions = async () => {
+      if (useBatchArticles) {
+        const fromBatch = (batchDetails?.articles ?? [])
+          .filter((a) => a && (a.isActive !== false) && String(a.subscaleArticleName ?? "").trim())
+          .map((a) => ({
+            subscaleArticleId: Number(a.subscaleArticleId ?? 0),
+            subscaleArticleCode: String(a.subscaleArticleCode ?? "").trim(),
+            subscaleArticleName: String(a.subscaleArticleName ?? "").trim(),
+          }));
+        if (!cancelled) setArticleOptions(fromBatch);
+        return;
+      }
+
+      setOptionsLoading(true);
+      try {
+        const response = await generalController.getSubscaleArticles();
+        const list = Array.isArray(response?.data) ? (response.data as SubscaleArticleOption[]) : [];
+        if (!cancelled) {
+          setArticleOptions(
+            list.filter((item) => item.isActive !== false).map(mapMdmOption),
+          );
+        }
+      } catch {
+        if (!cancelled) setArticleOptions([]);
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
+      }
+    };
+
+    void loadOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [useBatchArticles, batchDetails?.articles]);
+
+  const selections = useMemo(() => getHardwareArticleSelections(values), [values]);
+
+  const dropdownOptions = useMemo(() => {
+    const selectedCodes = new Set(
+      selections.map((row) => row.subscaleArticleCode || String(row.subscaleArticleId)),
+    );
+    const selectedNames = new Set(
+      selections.map((row) => row.subscaleArticleName.trim().toLowerCase()).filter(Boolean),
+    );
+    return articleOptions
+      .filter((opt) => {
+        const code = opt.subscaleArticleCode || String(opt.subscaleArticleId);
+        if (selectedCodes.has(code)) return false;
+        const name = opt.subscaleArticleName.trim().toLowerCase();
+        return !name || !selectedNames.has(name);
+      })
+      .map((opt) => ({
+        value: opt.subscaleArticleCode || String(opt.subscaleArticleId),
+        label: opt.subscaleArticleName,
+      }));
+  }, [articleOptions, selections]);
+
+  // Clear draft selection if that article was added (no longer in the dropdown).
+  useEffect(() => {
+    if (!draftArticleCode) return;
+    if (!dropdownOptions.some((opt) => opt.value === draftArticleCode)) {
+      setDraftArticleCode("");
+    }
+  }, [draftArticleCode, dropdownOptions]);
 
   const patchFormValues = useCallback(
     (patch: Partial<SchemaFormValues>) => {
@@ -224,23 +329,64 @@ const SubscaleHardwareArticlePanel = ({
     };
   }, [isLoading, isFormLoaded, values[ARTICLE_TYPE_TABLE_ID]]);
 
-  // Calculate target Article Types array based on entered hardware counts
-  const getCalculatedArticleTypes = () => {
-    const types: string[] = [];
-    ARTICLE_TYPE_SPECS.forEach(({ countField, articleType }) => {
-      const count = parseInt(String(values[countField] ?? 0), 10) || 0;
-      for (let i = 0; i < count; i++) {
-        types.push(articleType);
-      }
-    });
-    return types;
+  const commitSelections = (nextSelections: HardwareArticleSelection[]) => {
+    clearFieldError?.(HARDWARE_ARTICLE_SELECTIONS_ID);
+    onChange(
+      syncHardwareArticleTable({
+        ...values,
+        [HARDWARE_ARTICLE_SELECTIONS_ID]: nextSelections,
+      }),
+    );
+  };
+
+  const handleAddArticle = () => {
+    setAddError("");
+    const option = articleOptions.find(
+      (opt) =>
+        (opt.subscaleArticleCode || String(opt.subscaleArticleId)) === draftArticleCode,
+    );
+    const noOfArticles = parseCount(draftNoOfArticles);
+    const noOfParts = parseCount(draftNoOfParts);
+
+    if (!option || noOfArticles <= 0) {
+      setAddError(S.ARTICLE_ADD_REQUIRED);
+      return;
+    }
+
+    const alreadyAdded = selections.some(
+      (row) =>
+        row.subscaleArticleCode === option.subscaleArticleCode ||
+        row.subscaleArticleName === option.subscaleArticleName,
+    );
+    if (alreadyAdded) {
+      setAddError(S.ARTICLE_ALREADY_ADDED);
+      return;
+    }
+
+    commitSelections([
+      ...selections,
+      {
+        subscaleArticleId: option.subscaleArticleId,
+        subscaleArticleCode: option.subscaleArticleCode,
+        subscaleArticleName: option.subscaleArticleName,
+        noOfArticles,
+        noOfParts,
+      },
+    ]);
+    setDraftArticleCode("");
+    setDraftNoOfArticles("");
+    setDraftNoOfParts("");
+  };
+
+  const handleRemoveArticle = (code: string) => {
+    commitSelections(selections.filter((row) => row.subscaleArticleCode !== code));
   };
 
   // Handle Load Form Click — article table first, remaining tables staggered on idle.
   const handleLoadForm = () => {
     setIsLoading(true);
 
-    const baseTypes = getCalculatedArticleTypes();
+    const baseTypes = getArticleTypesFromSelections(values);
 
     const articleTableRows = baseTypes.map((typeLabel, i) => ({
       SR_NO: i + 1,
@@ -276,6 +422,7 @@ const SubscaleHardwareArticlePanel = ({
     scheduleIdleWork(() => {
       patchFormValues({
         CASTING_TABLE: createDefaultRows({
+          BEM_NO: "",
           BEM_MOULD_NO: "",
           CASTING_PIT_NO: "",
           CASTING_START_TIME: "",
@@ -300,20 +447,8 @@ const SubscaleHardwareArticlePanel = ({
     scheduleIdleWork(() => {
       patchFormValues({
         NDT_TABLE: createDefaultRows({ BEM_NO: "", DATE_OF_NDT: "", OBSERVATIONS: "" }),
-        TRIMMING_TABLE: createDefaultRows({
-          BEM_NO: "",
-          HE_OD: "",
-          HE_PORT_INNER: "",
-          HE_PORT_OUTER: "",
-          HE_BEFORE_INHIBITION_INNER: "",
-          HE_BEFORE_INHIBITION_OUTER: "",
-          NE_OD: "",
-          NE_PORT_INNER: "",
-          NE_PORT_OUTER: "",
-          NE_WEB_INNER: "",
-          NE_WEB_OUTER: "",
-          LENGTH_BEFORE_INHIBITION: "",
-        }),
+        // Built from casting BEM Nos + No. of Parts once casting IDs are entered.
+        TRIMMING_TABLE: [],
       });
     });
 
@@ -329,19 +464,8 @@ const SubscaleHardwareArticlePanel = ({
           DATE_OF_APPLICATION: "",
           REMARKS: "",
         }),
-        STATIC_TESTING_TABLE: showBemTestingTables
-          ? createDefaultRows({
-              BEM_NO: "",
-              PROPELLANT_MASS: "",
-              DT: "",
-              WEB_THICKNESS: "",
-              N_VALUE: "",
-              PRESSURE_AVG: "",
-              THRUST_AVG: "",
-              BURN_RATE: "",
-              GRAPH_UPLOAD: null,
-            })
-          : [],
+        // Built from trimming BEM part IDs (BEM article types only) once casting IDs are entered.
+        STATIC_TESTING_TABLE: [],
         MECHANICAL_PROPERTIES_TABLE: showBemTestingTables
           ? createDefaultRows({
               BEM_NO: "",
@@ -404,26 +528,39 @@ const SubscaleHardwareArticlePanel = ({
         tableData,
       );
 
-      if (tableId === "CASTING_TABLE" && fieldId === "BEM_MOULD_NO") {
+      if (tableId === "CASTING_TABLE" && fieldId === "BEM_NO") {
         nextValues = syncBemNoAcrossProcessTables(nextValues, rowIndex, String(value ?? ""));
+        const existingTrimming = Array.isArray(nextValues.TRIMMING_TABLE)
+          ? (nextValues.TRIMMING_TABLE as TrimmingTableRow[])
+          : [];
+        nextValues = syncProcessTableScope(
+          nextValues,
+          "TRIMMING_TABLE",
+          buildTrimmingRowsFromCasting(nextValues, existingTrimming),
+        );
+        if (!isMainScaleSubscaleBatch(batchType)) {
+          const existingStatic = Array.isArray(nextValues.STATIC_TESTING_TABLE)
+            ? (nextValues.STATIC_TESTING_TABLE as StaticTestingTableRow[])
+            : [];
+          nextValues = syncProcessTableScope(
+            nextValues,
+            "STATIC_TESTING_TABLE",
+            buildStaticTestingRowsFromTrimming(nextValues, existingStatic),
+          );
+        }
       }
       clearFieldError?.(`${tableId}.${rowIndex}.${fieldId}`);
       onChange(nextValues);
     },
-    [onChange, clearFieldError],
+    [onChange, clearFieldError, batchType],
   );
 
   const getSyncedBemNo = (rowIndex: number, fallback?: unknown) =>
     String(
-      (values.CASTING_TABLE as Record<string, unknown>[] | undefined)?.[rowIndex]?.BEM_MOULD_NO ??
+      (values.CASTING_TABLE as Record<string, unknown>[] | undefined)?.[rowIndex]?.BEM_NO ??
         fallback ??
         "",
     );
-
-  const updateCountField = (fieldId: string, raw: string) => {
-    clearFieldError?.(fieldId);
-    onChange(syncHardwareArticleTable({ ...values, [fieldId]: raw }));
-  };
 
   const handleLinerFieldChange = (fieldId: string, value: string) => {
     clearFieldError?.(fieldId);
@@ -494,109 +631,187 @@ const SubscaleHardwareArticlePanel = ({
             <BuildRoundedIcon sx={{ fontSize: 18 }} />
             <Typography sx={sectionTitleSx}>{S.PREPARATION_TITLE}</Typography>
           </Box>
-          <Box
-            sx={{
-              p: 2,
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)" },
-              gap: 2,
-            }}
-          >
-            {HARDWARE_COUNT_FIELDS.map((field) => {
-              const errKey = `${field.id}`;
-              const errorMessage = errors?.[errKey];
-              return (
-                <Box key={field.id} data-ss-field={field.id}>
-                  <FormInput
-                    label={<FieldLabelWithAsterisk label={field.label} required />}
-                    type="number"
-                    inputProps={{ min: 0, step: 1 }}
-                    value={values[field.id] ?? ""}
-                    onChange={(e) => {
-                      updateCountField(field.id, e.target.value);
-                    }}
-                    error={Boolean(errorMessage)}
-                    helperText={errorMessage || ""}
-                  />
-                </Box>
-              );
-            })}
+          <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "1fr 1fr",
+                  md: "minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto",
+                },
+                gap: 2,
+                alignItems: "flex-end",
+              }}
+            >
+              <Box data-ss-field={HARDWARE_ARTICLE_SELECTIONS_ID} sx={{ minWidth: 0 }}>
+                <AppDropdown
+                  // Visual-only asterisk — do not set HTML `required` (blocks form submit).
+                  label={`${S.ARTICLE_TYPE_LABEL} *`}
+                  value={draftArticleCode}
+                  onChange={(value) => {
+                    setDraftArticleCode(value);
+                    setAddError("");
+                  }}
+                  options={dropdownOptions}
+                  placeholder={S.ARTICLE_TYPE_PLACEHOLDER}
+                  loading={optionsLoading}
+                  error={Boolean(errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || addError)}
+                  helperText={errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || addError || undefined}
+                  sx={{ mb: 0 }}
+                />
+              </Box>
+              <AppTextField
+                fullWidth
+                label={`${S.NO_OF_ARTICLES_LABEL} *`}
+                type="number"
+                inputProps={{ min: 1, step: 1 }}
+                value={draftNoOfArticles}
+                onChange={(e) => {
+                  setDraftNoOfArticles(e.target.value);
+                  setAddError("");
+                }}
+                placeholder="0"
+                sx={{ mb: 0 }}
+              />
+              <AppTextField
+                fullWidth
+                label={S.NO_OF_PARTS_LABEL}
+                type="number"
+                inputProps={{ min: 0, step: 1 }}
+                value={draftNoOfParts}
+                onChange={(e) => setDraftNoOfParts(e.target.value)}
+                placeholder="0"
+                sx={{ mb: 0 }}
+              />
+              <Button
+                type="button"
+                variant="contained"
+                onClick={handleAddArticle}
+                sx={{
+                  height: APP_CONTROL_HEIGHT,
+                  minHeight: APP_CONTROL_HEIGHT,
+                  minWidth: 96,
+                  px: 2.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: "8px",
+                  mb: 0,
+                  alignSelf: "flex-end",
+                }}
+              >
+                {S.ADD_ARTICLE}
+              </Button>
+            </Box>
 
-            {(() => {
-              const errKey = `${LINER_TYPE_FIELD.id}`;
-              const errorMessage = errors?.[errKey];
-              return (
-                <Box data-ss-field={LINER_TYPE_FIELD.id}>
-                  <FormInput
-                    select
-                    label={<FieldLabelWithAsterisk label={LINER_TYPE_FIELD.label} required />}
-                    value={values[LINER_TYPE_FIELD.id] ?? ""}
-                    onChange={(e) => {
-                      handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value);
-                    }}
-                    error={Boolean(errorMessage)}
-                    helperText={errorMessage || ""}
-                    SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
-                  >
-                    <MenuItem value="">
-                      <em
-                        style={{ ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties}
-                      >
-                        Select Liner Type
-                      </em>
-                    </MenuItem>
-                    {LINER_TYPE_OPTIONS.map((option) => (
-                      <MenuItem
-                        key={option.value}
-                        value={option.value}
-                        sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
-                      >
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </FormInput>
-                </Box>
-              );
-            })()}
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", mb: 1, color: SUBSCALE_BRAND.text }}>
+                {S.SELECTION_TABLE_TITLE}
+              </Typography>
+              <TableContainer
+                sx={{
+                  border: "1px solid rgba(148,163,184,0.35)",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                }}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "#f8fafc" }}>
+                      <TableCell sx={tableHeaderCellSx}>{S.COL_ARTICLE_TYPE}</TableCell>
+                      <TableCell sx={tableHeaderCellSx}>{S.COL_NO_OF_ARTICLES}</TableCell>
+                      <TableCell sx={tableHeaderCellSx}>{S.COL_NO_OF_PARTS}</TableCell>
+                      <TableCell sx={tableHeaderCellSx} align="center">
+                        {S.COL_ACTION}
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selections.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} sx={{ ...tableBodyCellSx, color: "#94a3b8", py: 2 }}>
+                          {S.SELECTION_TABLE_EMPTY}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      selections.map((row) => (
+                        <TableRow key={row.subscaleArticleCode || row.subscaleArticleName}>
+                          <TableCell sx={tableBodyCellSx}>{row.subscaleArticleName}</TableCell>
+                          <TableCell sx={tableBodyCellSx}>{row.noOfArticles}</TableCell>
+                          <TableCell sx={tableBodyCellSx}>{row.noOfParts}</TableCell>
+                          <TableCell sx={tableBodyCellSx} align="center">
+                            <IconButton
+                              size="small"
+                              aria-label={S.REMOVE_ARTICLE}
+                              onClick={() => handleRemoveArticle(row.subscaleArticleCode)}
+                              sx={{ color: "#b71c1c" }}
+                            >
+                              <DeleteOutlineRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
 
-            {/* 2. Liner Batch No Field */}
-            {(() => {
-              const errKey = `${LINER_BATCH_NO_FIELD.id}`;
-              const errorMessage = errors?.[errKey];
-              return (
-                <Box data-ss-field={LINER_BATCH_NO_FIELD.id}>
-                  <FormInput
-                    label={<FieldLabelWithAsterisk label={LINER_BATCH_NO_FIELD.label} required />}
-                    value={values[LINER_BATCH_NO_FIELD.id] ?? ""}
-                    onChange={(e) => {
-                      handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
-                    }}
-                    error={Boolean(errorMessage)}
-                    helperText={errorMessage || ""}
-                  />
-                </Box>
-              );
-            })()}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)" },
+                gap: 2,
+                alignItems: "flex-start",
+              }}
+            >
+              <Box data-ss-field={LINER_TYPE_FIELD.id} sx={{ minWidth: 0 }}>
+                <AppDropdown
+                  label={LINER_TYPE_FIELD.label}
+                  required
+                  value={String(values[LINER_TYPE_FIELD.id] ?? "")}
+                  onChange={(value) => {
+                    handleLinerFieldChange(LINER_TYPE_FIELD.id, value);
+                  }}
+                  options={LINER_TYPE_OPTIONS}
+                  placeholder="Select Liner Type"
+                  error={Boolean(errors?.[LINER_TYPE_FIELD.id])}
+                  helperText={errors?.[LINER_TYPE_FIELD.id] || undefined}
+                  sx={{ mb: 0 }}
+                />
+              </Box>
 
-            {/* 3. Liner Batch Date Field */}
-            {(() => {
-              const errKey = `${LINER_BATCH_DATE_FIELD.id}`;
-              const errorMessage = errors?.[errKey];
-              return (
-                <Box data-ss-field={LINER_BATCH_DATE_FIELD.id}>
-                  <DateField
-                    label={<FieldLabelWithAsterisk label={LINER_BATCH_DATE_FIELD.label} required />}
-                    value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
-                    onChange={(next) => {
-                      handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
-                    }}
-                    placeholder="DD-MM-YYYY"
-                    error={Boolean(errorMessage)}
-                    helperText={errorMessage || ""}
-                  />
-                </Box>
-              );
-            })()}
+              <Box data-ss-field={LINER_BATCH_NO_FIELD.id} sx={{ minWidth: 0 }}>
+                <AppTextField
+                  fullWidth
+                  label={LINER_BATCH_NO_FIELD.label}
+                  required
+                  value={String(values[LINER_BATCH_NO_FIELD.id] ?? "")}
+                  onChange={(e) => {
+                    handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
+                  }}
+                  error={Boolean(errors?.[LINER_BATCH_NO_FIELD.id])}
+                  helperText={errors?.[LINER_BATCH_NO_FIELD.id] || undefined}
+                  placeholder="Enter batch no."
+                  sx={{ mb: 0 }}
+                />
+              </Box>
+
+              <Box data-ss-field={LINER_BATCH_DATE_FIELD.id} sx={{ minWidth: 0 }}>
+                <DateField
+                  label={LINER_BATCH_DATE_FIELD.label}
+                  required
+                  value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
+                  onChange={(next) => {
+                    handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
+                  }}
+                  placeholder="DD-MM-YYYY"
+                  error={Boolean(errors?.[LINER_BATCH_DATE_FIELD.id])}
+                  helperText={errors?.[LINER_BATCH_DATE_FIELD.id] || undefined}
+                  sx={{ mb: 0 }}
+                />
+              </Box>
+            </Box>
           </Box>
         </Box>
 
@@ -656,6 +871,11 @@ const SubscaleHardwareArticlePanel = ({
               title="Casting Details"
               icon={PrecisionManufacturingIcon}
               defaultExpanded={hasProcessTableData(values.CASTING_TABLE as unknown[])}
+              forceExpand={hasValidationErrorsForPrefixes(
+                errors,
+                ["CASTING_TABLE.", "DATE_OF_CASTING"],
+                validationFocusPath,
+              )}
               lazyMount
             >
               <Box sx={{ mb: 2, maxWidth: 280 }}>
@@ -693,6 +913,11 @@ const SubscaleHardwareArticlePanel = ({
               title="Curing Details"
               icon={ThermostatIcon}
               defaultExpanded={hasProcessTableData(values.CURING_TABLE as unknown[])}
+              forceExpand={hasValidationErrorsForPrefixes(
+                errors,
+                ["CURING_TABLE."],
+                validationFocusPath,
+              )}
               lazyMount
             >
               <CuringTableSection
@@ -709,6 +934,11 @@ const SubscaleHardwareArticlePanel = ({
               title="NDT Details"
               icon={ShieldIcon}
               defaultExpanded={hasProcessTableData(values.NDT_TABLE as unknown[])}
+              forceExpand={hasValidationErrorsForPrefixes(
+                errors,
+                ["NDT_TABLE."],
+                validationFocusPath,
+              )}
               lazyMount
             >
               <NdtTableSection
@@ -725,12 +955,16 @@ const SubscaleHardwareArticlePanel = ({
               title="Trimming Details"
               icon={ContentCutIcon}
               defaultExpanded={hasProcessTableData(values.TRIMMING_TABLE as unknown[])}
+              forceExpand={hasValidationErrorsForPrefixes(
+                errors,
+                ["TRIMMING_TABLE."],
+                validationFocusPath,
+              )}
               lazyMount
             >
               <TrimmingTableSection
                 rows={(values.TRIMMING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
-                getSyncedBemNo={getSyncedBemNo}
                 errors={errors}
               />
             </SubscaleProcessSection>
@@ -739,6 +973,11 @@ const SubscaleHardwareArticlePanel = ({
               title="Inhibition Details"
               icon={ScienceIcon}
               defaultExpanded={hasProcessTableData(values.INHIBITION_TABLE as unknown[])}
+              forceExpand={hasValidationErrorsForPrefixes(
+                errors,
+                ["INHIBITION_TABLE.", "IR_BATCH_NO", "DATE_OF_MFG", "DATE_OF_APPLICATION"],
+                validationFocusPath,
+              )}
               lazyMount
             >
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
@@ -923,12 +1162,17 @@ const SubscaleHardwareArticlePanel = ({
                   title="Static Testing Of BEM"
                   icon={SpeedIcon}
                   defaultExpanded={hasProcessTableData(values.STATIC_TESTING_TABLE as unknown[])}
+                  forceExpand={hasValidationErrorsForPrefixes(
+                    errors,
+                    ["STATIC_TESTING_TABLE."],
+                    validationFocusPath,
+                  )}
                   lazyMount
                 >
                   <StaticTestingTableSection
                     rows={(values.STATIC_TESTING_TABLE as []) ?? []}
                     onCellChange={updateTableRowCell}
-                    getSyncedBemNo={getSyncedBemNo}
+                    errors={errors}
                     FileUploadButton={FileUploadButton}
                     onFileUpload={(idx, file) =>
                       updateTableRowCell("STATIC_TESTING_TABLE", idx, "GRAPH_UPLOAD", file)
@@ -944,12 +1188,18 @@ const SubscaleHardwareArticlePanel = ({
                   defaultExpanded={hasProcessTableData(
                     values.MECHANICAL_PROPERTIES_TABLE as unknown[],
                   )}
+                  forceExpand={hasValidationErrorsForPrefixes(
+                    errors,
+                    ["MECHANICAL_PROPERTIES_TABLE."],
+                    validationFocusPath,
+                  )}
                   lazyMount
                 >
                   <MechanicalPropertiesTableSection
                     rows={(values.MECHANICAL_PROPERTIES_TABLE as []) ?? []}
                     onCellChange={updateTableRowCell}
                     getSyncedBemNo={getSyncedBemNo}
+                    errors={errors}
                   />
                 </SubscaleProcessSection>
               </>

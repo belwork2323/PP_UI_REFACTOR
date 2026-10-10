@@ -36,7 +36,9 @@ type SubscaleSchemaPanelProps = {
   error?: string | null;
   batchDetails;
   errors?: Record<string, string>;
-  clearFieldError?: (path: string) => void; // <-- Add this
+  clearFieldError?: (path: string) => void;
+  /** Active validation focus path — expands lazy sections so highlight/focus can land. */
+  validationFocusPath?: string | null;
 };
 
 const mergeFormValuesForBatchType = (
@@ -58,6 +60,7 @@ const SubscaleSchemaPanel = ({
   batchDetails,
   errors = null,
   clearFieldError,
+  validationFocusPath = null,
 }: SubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
   const showMainScaleSetup = isMainScaleSubscaleBatch(batchType);
@@ -145,9 +148,11 @@ const SubscaleSchemaPanel = ({
             values={formValues}
             onChange={handleHardwareChange}
             batchType={batchType}
+            batchDetails={batchDetails}
             canManageProcessTables={canManageProcessTables}
             errors={errors}
             clearFieldError={clearFieldError}
+            validationFocusPath={validationFocusPath}
           />
         </Box>
       ) : null}
@@ -163,11 +168,13 @@ const SubscaleSchemaPanel = ({
           />
           <SubscaleHardwareArticlePanel
             values={formValues}
-            onChange={handleBatchSetupChange}
+            onChange={handleHardwareChange}
             batchType={batchType}
+            batchDetails={batchDetails}
             canManageProcessTables={canManageProcessTables}
             errors={errors}
             clearFieldError={clearFieldError}
+            validationFocusPath={validationFocusPath}
           />
         </>
       ) : null}

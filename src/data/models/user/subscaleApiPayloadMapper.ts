@@ -2,12 +2,16 @@ import { scopedFormKey, syncRowGenerationTables, SchemaDocumentV2, SchemaFormVal
 import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
 import {
   ARTICLE_TYPE_TABLE_ID,
+  HARDWARE_ARTICLE_SELECTIONS_ID,
   HARDWARE_COUNT_FIELDS,
   HARDWARE_SECTION_ID,
   LINER_TYPE_FIELD,
   LINER_BATCH_NO_FIELD,
   LINER_BATCH_DATE_FIELD,
+  getHardwareArticleSelections,
+  synthesizeSelectionsFromLegacyCounts,
   type ArticleTypeRow,
+  type HardwareArticleSelection,
 } from "../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import {
   SUBSCALE_BATCH_FIELDS,
@@ -46,6 +50,15 @@ export type SubscaleDetailsDTO = {
   mixingCycle?: SubscaleMixingCycleDTO;
 };
 
+/** Mirrors backend `HardwareArticleSelectionDTO` */
+export type HardwareArticleSelectionDTO = {
+  subscaleArticleId?: number;
+  subscaleArticleCode?: string;
+  subscaleArticleName?: string;
+  noOfArticles?: number;
+  noOfParts?: number;
+};
+
 /** Mirrors backend `HardwarePreparationDetailsDTO` */
 export type HardwarePreparationDetailsDTO = {
   numberOf40KgBems?: number;
@@ -54,6 +67,7 @@ export type HardwarePreparationDetailsDTO = {
   numberOfWheelPeels?: number;
   numberOfCartoons?: number;
   numberOfSbsTbs?: number;
+  articles?: HardwareArticleSelectionDTO[];
   linerType?: string;
   linerBatchNo?: string;
   linerBatchDate?: string;
@@ -74,6 +88,7 @@ export type HardwarePreparationTableDTO = {
 /** Mirrors backend `CastingTableDTO` */
 export type CastingTableDTO = {
   articleType?: string;
+  bemNo?: string;
   bemMouldNo?: string;
   castingPitNo?: string;
   castingStartTime?: string;
@@ -299,6 +314,8 @@ const ARTICLE_TYPE_TO_API: Record<string, string> = {
 const TABLE_FIELD_TO_API: Record<string, string> = {
   GRAPH_FILE: "graph",
   GRAPH_UPLOAD: "graph",
+  BEM_NO: "bemNo",
+  BEM_MOULD_NO: "bemMouldNo",
 };
 
 const mapGraphFileToApi = (value: unknown): SubscaleGraphFileDTO | undefined => {
@@ -515,11 +532,24 @@ const mapHardwarePreparationDetails = (
   values: SchemaFormValues,
 ): HardwarePreparationDetailsDTO | undefined => {
   const details: HardwarePreparationDetailsDTO = {};
-  HARDWARE_COUNT_FIELDS.forEach((field) => {
-    const apiKey = HARDWARE_COUNT_TO_API[field.id] as keyof HardwarePreparationDetailsDTO;
-    const num = parseNumber(values[field.id]);
-    if (apiKey && num !== undefined) (details as Record<string, unknown>)[apiKey] = num;
-  });
+
+  const selections = getHardwareArticleSelections(values);
+  if (selections.length > 0) {
+    details.articles = selections.map((row) => ({
+      subscaleArticleId: row.subscaleArticleId,
+      subscaleArticleCode: row.subscaleArticleCode,
+      subscaleArticleName: row.subscaleArticleName,
+      noOfArticles: row.noOfArticles,
+      noOfParts: row.noOfParts,
+    }));
+  } else {
+    // Legacy count fields for older in-progress drafts only
+    HARDWARE_COUNT_FIELDS.forEach((field) => {
+      const apiKey = HARDWARE_COUNT_TO_API[field.id] as keyof HardwarePreparationDetailsDTO;
+      const num = parseNumber(values[field.id]);
+      if (apiKey && num !== undefined) (details as Record<string, unknown>)[apiKey] = num;
+    });
+  }
 
   const linerType = String(values[LINER_TYPE_FIELD.id] ?? "").trim();
   if (linerType) details.linerType = linerType;
@@ -533,6 +563,22 @@ const mapHardwarePreparationDetails = (
   if (linerBatchDate) details.linerBatchDate = linerBatchDate;
 
   return Object.keys(details).length > 0 ? details : undefined;
+};
+
+const mapApiArticlesToSelections = (articles: unknown): HardwareArticleSelection[] => {
+  if (!Array.isArray(articles)) return [];
+  return articles
+    .map((item) => {
+      const row = (item ?? {}) as HardwareArticleSelectionDTO;
+      return {
+        subscaleArticleId: Number(row.subscaleArticleId ?? 0),
+        subscaleArticleCode: String(row.subscaleArticleCode ?? "").trim(),
+        subscaleArticleName: String(row.subscaleArticleName ?? "").trim(),
+        noOfArticles: Number(row.noOfArticles ?? 0) || 0,
+        noOfParts: Number(row.noOfParts ?? 0) || 0,
+      };
+    })
+    .filter((row) => row.subscaleArticleName && row.noOfArticles > 0);
 };
 
 const mapHardwarePreparationTable = (values: SchemaFormValues): HardwarePreparationTableDTO[] => {
@@ -946,6 +992,22 @@ const mapApiTableRowsToUi = (rows: unknown) => {
   );
 };
 
+/** Restore casting Article No / BEM No from curing/NDT when API omitted casting.bemNo. */
+const backfillCastingBemNoFromDownstream = (
+  castingRows: Record<string, unknown>[],
+  curingRows: Record<string, unknown>[],
+  ndtRows: Record<string, unknown>[],
+): Record<string, unknown>[] =>
+  castingRows.map((row, index) => {
+    const existing = String(row.BEM_NO ?? "").trim();
+    if (existing) return row;
+    const fromCuring = String(curingRows[index]?.BEM_MOULD_NO ?? "").trim();
+    if (fromCuring) return { ...row, BEM_NO: fromCuring };
+    const fromNdt = String(ndtRows[index]?.BEM_NO ?? "").trim();
+    if (fromNdt) return { ...row, BEM_NO: fromNdt };
+    return row;
+  });
+
 const setScopedTable = (
   values: SchemaFormValues,
   sectionId: string,
@@ -973,6 +1035,16 @@ export const mapSubscaleApiDetailsToFormValues = (
   Object.entries(HARDWARE_COUNT_TO_API).forEach(([uiKey, apiKey]) => {
     if (hardware[apiKey] !== undefined) values[uiKey] = String(hardware[apiKey]);
   });
+
+  const apiSelections = mapApiArticlesToSelections(hardware.articles);
+  if (apiSelections.length > 0) {
+    values[HARDWARE_ARTICLE_SELECTIONS_ID] = apiSelections;
+  } else {
+    const legacySelections = synthesizeSelectionsFromLegacyCounts(values);
+    if (legacySelections.length > 0) {
+      values[HARDWARE_ARTICLE_SELECTIONS_ID] = legacySelections;
+    }
+  }
 
   if (hardware.linerType != null) values[LINER_TYPE_FIELD.id] = String(hardware.linerType);
   if (hardware.linerBatchNo != null) {
@@ -1088,14 +1160,15 @@ export const mapSubscaleApiDetailsToFormValues = (
     values[scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.CASTING, "DATE_OF_CASTING")] = dateOfCasting;
     setUnscopedField(values, "DATE_OF_CASTING", dateOfCasting);
   }
-  setScopedTable(
-    values,
-    SUBSCALE_SCHEMA_SECTIONS.CASTING,
-    "CASTING_TABLE",
-    mapApiTableRowsToUi(casting.castingTable),
-  );
-
   const curing = (normalized.curingDetails ?? {}) as Record<string, unknown>;
+  const ndt = (normalized.ndtDetails ?? {}) as Record<string, unknown>;
+  const castingRowsUi = backfillCastingBemNoFromDownstream(
+    mapApiTableRowsToUi(casting.castingTable),
+    mapApiTableRowsToUi(curing.curingTable),
+    mapApiTableRowsToUi(ndt.ndtTable),
+  );
+  setScopedTable(values, SUBSCALE_SCHEMA_SECTIONS.CASTING, "CASTING_TABLE", castingRowsUi);
+
   setScopedTable(
     values,
     SUBSCALE_SCHEMA_SECTIONS.CURING,
@@ -1103,7 +1176,6 @@ export const mapSubscaleApiDetailsToFormValues = (
     mapApiTableRowsToUi(curing.curingTable),
   );
 
-  const ndt = (normalized.ndtDetails ?? {}) as Record<string, unknown>;
   setScopedTable(
     values,
     SUBSCALE_SCHEMA_SECTIONS.NDT,
@@ -1233,6 +1305,16 @@ const mapHardwareDetailsApiToDisplayMerged = (
     const value = (source as Record<string, unknown>)[apiKey];
     if (value != null) merged[uiKey] = String(value);
   });
+
+  const apiSelections = mapApiArticlesToSelections(source.articles);
+  if (apiSelections.length > 0) {
+    merged[HARDWARE_ARTICLE_SELECTIONS_ID] = apiSelections;
+  } else {
+    const legacySelections = synthesizeSelectionsFromLegacyCounts(merged as SchemaFormValues);
+    if (legacySelections.length > 0) {
+      merged[HARDWARE_ARTICLE_SELECTIONS_ID] = legacySelections;
+    }
+  }
 
   if (source.linerType) merged[LINER_TYPE_FIELD.id] = source.linerType;
   if (source.linerBatchNo) merged[LINER_BATCH_NO_FIELD.id] = source.linerBatchNo;
@@ -1503,6 +1585,9 @@ const mergeSubscaleDisplayValues = (
   }
 
   if (sectionId === "HARDWARE_PREPARATION_DETAILS") {
+    if (Array.isArray(values[HARDWARE_ARTICLE_SELECTIONS_ID])) {
+      merged[HARDWARE_ARTICLE_SELECTIONS_ID] = values[HARDWARE_ARTICLE_SELECTIONS_ID];
+    }
     HARDWARE_COUNT_FIELDS.forEach((field) => {
       if (values[field.id] != null && values[field.id] !== "") {
         merged[field.id] = values[field.id];
