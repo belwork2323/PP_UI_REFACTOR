@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Box, Stack, Typography, CircularProgress, Collapse } from "@mui/material";
+import { Box, Button, Stack, Typography, CircularProgress, Collapse } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import ProgressBar from "../../../components/common/ProgressBar";
 import StatusChip from "../../../components/common/StatusChip";
 import {
   BatchSubDeptStagesModel,
+  canViewBatchSubDeptFormDetails,
   SubDeptStageItemModel,
   SubDeptTimelineEntry,
 } from "../../../../data/models/SystemManagerModel";
@@ -87,14 +88,17 @@ function TimelineEntryCard({
   isLast,
   tl,
   progressColors,
+  onViewForm,
 }: {
   entry: SubDeptTimelineEntry;
   isLast: boolean;
   tl: any;
   progressColors: { color: string; track: string; value: string };
+  onViewForm?: (item: SubDeptStageItemModel) => void;
 }) {
   const { item, variant, name } = entry;
   const progress = item.displayProgress;
+  const showViewForm = Boolean(onViewForm) && canViewBatchSubDeptFormDetails(item.status, item.formId);
 
   return (
     <Box sx={tl.timelineItem}>
@@ -147,6 +151,19 @@ function TimelineEntryCard({
           </Box>
         )}
 
+        {showViewForm ? (
+          <Box sx={{ mb: 1.25 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => onViewForm?.(item)}
+              sx={{ textTransform: "none", fontWeight: 600 }}
+            >
+              {S.VIEW_FORM_DETAILS}
+            </Button>
+          </Box>
+        ) : null}
+
         <AuditDetailsSection item={item} tl={tl} />
       </Box>
     </Box>
@@ -159,9 +176,17 @@ type Props = {
   error: string | null;
   t: any;
   accentColor?: string;
+  onViewForm?: (item: SubDeptStageItemModel) => void;
 };
 
-export default function BatchSubDeptTimeline({ data, loading, error, t, accentColor }: Props) {
+export default function BatchSubDeptTimeline({
+  data,
+  loading,
+  error,
+  t,
+  accentColor,
+  onViewForm,
+}: Props) {
   const tl = t.popup.detail.subDeptTimeline;
   const ph = t.popup.header.progressBar;
   const progressColors = {
@@ -235,6 +260,7 @@ export default function BatchSubDeptTimeline({ data, loading, error, t, accentCo
               isLast={index === entries.length - 1}
               tl={tl}
               progressColors={progressColors}
+              onViewForm={onViewForm}
             />
           ))
         )}

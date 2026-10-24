@@ -21,6 +21,8 @@ type Props = {
   fieldErrors?: Record<string, string>;
   /** Defaults to "Drying in Tray Oven". */
   title?: string;
+  /** QA Raw Material Processing only. */
+  showQaRemarks?: boolean;
 };
 
 const DryingTrayOvenSection = ({
@@ -30,6 +32,7 @@ const DryingTrayOvenSection = ({
   theme,
   fieldErrors = {},
   title = "Drying in Tray Oven",
+  showQaRemarks = false,
 }: Props) => {
   const patch = (patchValue: Partial<DryingTrayOvenForm>) =>
     onChange({ ...value, ...patchValue });
@@ -127,6 +130,16 @@ const DryingTrayOvenSection = ({
           theme={theme}
           onChange={(v) => patch({ observation: v })}
         />
+        {showQaRemarks ? (
+          <CasePrepTextField
+            label="QA Remarks"
+            value={value.qaRemarks}
+            disabled={disabled}
+            width="100%"
+            theme={theme}
+            onChange={(v) => patch({ qaRemarks: v })}
+          />
+        ) : null}
       </Box>
     </Box>
   );

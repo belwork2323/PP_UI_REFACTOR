@@ -2,6 +2,11 @@ import {
   isMasterDataDecimalInputIncomplete,
   parseMasterDataOptionalNumber,
 } from "@data/models/admin/MasterData/masterDataNumericInput";
+import {
+  SUBSCALE_ARTICLES_TYPE,
+  composeBemArticleName,
+  isSubscaleBemArticle,
+} from "@data/models/admin/MasterData/subscaleArticleMasterForm";
 
 export type MasterDataFieldDef = {
   key: string;
@@ -135,8 +140,19 @@ export const createEmptyMasterDataForm = (schema?: MasterDataTypeDescriptor | nu
   (schema?.fields ?? [])
     .filter((f) => f.attribute)
     .forEach((f) => {
-      attributes[f.key] = f.dataType === "INTEGER" ? "" : f.dataType === "NUMBER" || f.dataType === "DOUBLE" ? "" : f.dataType === "BOOLEAN" ? true : "";
+      if (f.dataType === "INTEGER" || f.dataType === "NUMBER" || f.dataType === "DOUBLE") {
+        attributes[f.key] = "";
+      } else if (f.dataType === "BOOLEAN") {
+        // Subscale articles default to Other (isBem=false); other masters keep true.
+        attributes[f.key] = schema?.type === SUBSCALE_ARTICLES_TYPE && f.key === "isBem" ? false : true;
+      } else {
+        attributes[f.key] = "";
+      }
     });
+  if (schema?.type === SUBSCALE_ARTICLES_TYPE) {
+    attributes.bemUnit = "";
+    attributes.bemSize = "";
+  }
   return {
     id: null,
     code: "",
@@ -288,6 +304,9 @@ export const getMasterDataFieldErrors = (
   const errors: MasterDataFieldErrors = {};
   if (!schema) return errors;
 
+  const isSubscaleArticles = schema.type === SUBSCALE_ARTICLES_TYPE;
+  const subscaleIsBem = isSubscaleArticles && isSubscaleBemArticle(form);
+
   for (const field of schema.fields) {
     if (field.key === "code") {
       if (isEdit || field.serverGenerated) continue;
@@ -297,11 +316,50 @@ export const getMasterDataFieldErrors = (
     }
     if (field.key === "name") {
       if (field.serverGenerated) continue;
+      if (isSubscaleArticles && subscaleIsBem) {
+        const size = form.attributes.bemSize;
+        const unit = String(form.attributes.bemUnit ?? "").trim();
+        if (size === "" || size == null || !unit) {
+          // Size/unit errors are reported on those fields; name is derived.
+          continue;
+        }
+        const expected = composeBemArticleName(size as number | string, unit);
+        if (form.name.trim() !== expected) {
+          errors.name = `BEM article name must be '${expected}'`;
+        }
+        continue;
+      }
       const err = fieldErrorForName(form.name, field.maxLength, field.pattern);
       if (err) errors.name = err;
       continue;
     }
     if (field.key === "isActive" || !field.attribute) continue;
+
+    if (isSubscaleArticles) {
+      if (field.key === "isBem") {
+        if (form.attributes.isBem !== true && form.attributes.isBem !== false) {
+          errors.isBem = "Article kind is required";
+        }
+        continue;
+      }
+      if (field.key === "bemSize") {
+        if (subscaleIsBem) {
+          const err = fieldErrorForAttribute({ ...field, required: true, label: "Size" }, form.attributes.bemSize);
+          if (err) errors.bemSize = err;
+        }
+        continue;
+      }
+      if (field.key === "bemUnit") {
+        if (subscaleIsBem) {
+          const unit = String(form.attributes.bemUnit ?? "").trim();
+          if (!unit) {
+            errors.bemUnit = "Unit is required";
+          }
+        }
+        continue;
+      }
+    }
+
     const err = fieldErrorForAttribute(field, form.attributes[field.key]);
     if (err) errors[field.key] = err;
   }
@@ -320,10 +378,20 @@ export const validateMasterDataForm = (
 
 export const buildCreatePayload = (form: MasterDataFormState, schema: MasterDataTypeDescriptor | null) => {
   const attributes: Record<string, unknown> = {};
+  const isSubscaleArticles = schema?.type === SUBSCALE_ARTICLES_TYPE;
+  const subscaleIsBem = isSubscaleArticles && isSubscaleBemArticle(form);
+
   (schema?.fields ?? [])
     .filter((f) => f.attribute)
     .forEach((f) => {
       const raw = form.attributes[f.key];
+      if (isSubscaleArticles && (f.key === "bemSize" || f.key === "bemUnit") && !subscaleIsBem) {
+        return;
+      }
+      if (f.dataType === "BOOLEAN") {
+        attributes[f.key] = Boolean(raw);
+        return;
+      }
       if (f.dataType === "INTEGER" || f.dataType === "NUMBER" || f.dataType === "DOUBLE") {
         if (raw === "" || raw === null || raw === undefined) return;
         if (f.dataType === "INTEGER") {
@@ -332,17 +400,34 @@ export const buildCreatePayload = (form: MasterDataFormState, schema: MasterData
           const num = parseMasterDataOptionalNumber(String(raw));
           if (num != null) attributes[f.key] = num;
         }
-      } else {
-        attributes[f.key] = String(raw ?? "").trim();
+        return;
       }
+      attributes[f.key] = String(raw ?? "").trim();
     });
+
+  if (isSubscaleArticles && subscaleIsBem) {
+    attributes.isBem = true;
+    const unit = String(form.attributes.bemUnit ?? "").trim();
+    if (unit) attributes.bemUnit = unit;
+    const size = form.attributes.bemSize;
+    if (size !== "" && size != null) {
+      attributes.bemSize = Number(size);
+    }
+  }
+
   const codeField = schema?.fields?.find((f) => f.key === "code");
   const nameField = schema?.fields?.find((f) => f.key === "name");
   const payload: Record<string, unknown> = {
     isActive: form.isActive,
     attributes,
   };
-  if (!nameField?.serverGenerated && form.name.trim()) {
+  if (isSubscaleArticles && subscaleIsBem) {
+    const size = form.attributes.bemSize;
+    const unit = String(attributes.bemUnit ?? "").trim();
+    if (size !== "" && size != null && unit) {
+      payload.name = composeBemArticleName(size as number | string, unit);
+    }
+  } else if (!nameField?.serverGenerated && form.name.trim()) {
     payload.name = form.name.trim();
   }
   if (!codeField?.serverGenerated && form.code.trim()) {

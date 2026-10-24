@@ -6,6 +6,7 @@ import {
   type StageProgress,
   type SubDeptId,
 } from "../data/models/user/BatchStageTypes";
+import { isMotorWorkflowTabDisabled } from "../data/models/common/motorWorkflowGuards";
 
 export {
   SUB_DEPT,
@@ -50,7 +51,8 @@ export function isPremixDisabled(unit: PremixUnit | null | undefined): boolean {
 }
 
 export function isMotorDisabled(unit: MotorUnit | null | undefined): boolean {
-  return unit?.locked === true;
+  if (unit?.locked === true) return true;
+  return isMotorWorkflowTabDisabled(unit?.motorSubmissionStatus);
 }
 
 /** Editability after lock check — still use existing status rules. */
@@ -59,6 +61,7 @@ export function canEditUnit(
   submissionStatus?: string,
 ): boolean {
   if (unit?.locked === true) return false;
+  if (isMotorWorkflowTabDisabled(submissionStatus)) return false;
   return EDITABLE_STATUSES.has(
     String(submissionStatus ?? "")
       .trim()
@@ -71,6 +74,7 @@ export function canSubmitUnit(
   submissionStatus?: string,
 ): boolean {
   if (unit?.locked === true) return false;
+  if (isMotorWorkflowTabDisabled(submissionStatus)) return false;
   return SUBMITTABLE_STATUSES.has(
     String(submissionStatus ?? "")
       .trim()

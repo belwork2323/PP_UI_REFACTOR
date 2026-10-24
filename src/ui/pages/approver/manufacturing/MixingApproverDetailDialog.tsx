@@ -39,8 +39,8 @@ type MixingApproverDetailDialogProps = {
   loading: boolean;
   activeMixCardId?: string | null;
   onActiveMixCardChange?: (mixCardId: string) => void;
-  onApprove: (item: MixingApproverDetailItem) => void;
-  onReject: (item: MixingApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -105,8 +105,8 @@ const MixingApproverDetailDialog = ({
             loading={loading}
             activeMixCardId={activeMixCardId}
             onActiveMixCardChange={onActiveMixCardChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}
@@ -131,6 +131,7 @@ const MixingApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="mixing"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`Mixing Report — ${item.batchId}`}
       />
     </>

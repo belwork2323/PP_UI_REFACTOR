@@ -48,6 +48,7 @@ export const qcNdtDivisionValidationFields: Record<string, FieldRuleConfig> = {
   uploadImage: file([]),
   signedReport: file(["SUBMIT"]),
   additionalRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -92,6 +93,11 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
         value: pickValue(values, "ADDITIONAL_REMARKS", "additionalRemarks"),
         ruleKey: "additionalRemarks",
       });
+      fields.push({
+        path: "QA_REMARKS",
+        value: pickValue(values, "QA_REMARKS", "qaRemarks"),
+        ruleKey: "qaRemarks",
+      });
 
       for (const [key, val] of Object.entries(values)) {
         const arr = asArray(val);
@@ -128,6 +134,11 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
               value: row.TANGENTIAL_EXPOSURES,
               ruleKey: "tangentialExposures",
             });
+            fields.push({
+              path: `${sectionId}.${i}.QA_REMARKS`,
+              value: row.QA_REMARKS ?? row.qaRemarks,
+              ruleKey: "qaRemarks",
+            });
           });
         }
 
@@ -149,6 +160,11 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
               value: row.LOCATION,
               ruleKey: "location",
             });
+            fields.push({
+              path: `${sectionId}.${i}.QA_REMARKS`,
+              value: row.QA_REMARKS ?? row.qaRemarks,
+              ruleKey: "qaRemarks",
+            });
           });
         }
 
@@ -169,6 +185,11 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
               path: `${sectionId}.${i}.UPLOAD_IMAGE`,
               value: row.UPLOAD_IMAGE,
               ruleKey: "uploadImage",
+            });
+            fields.push({
+              path: `${sectionId}.${i}.QA_REMARKS`,
+              value: row.QA_REMARKS ?? row.qaRemarks,
+              ruleKey: "qaRemarks",
             });
           });
         }

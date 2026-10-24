@@ -1,8 +1,11 @@
 import { useMemo, type ReactNode } from "react";
 import { Box, Stack, TextField, Typography, alpha } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { DateTimeField } from "../../../../components/common/DateField";
+import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import {
   QC_DE_CORING_FIELD_LABELS,
   QC_DE_CORING_SECTION_IDS,
@@ -11,7 +14,9 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcDeCoringConfig";
 import {
   getDeCoringField,
+  getDeCoringQaRemarks,
   setDeCoringField,
+  setDeCoringQaRemarks,
 } from "../../../../../hooks/user/qualityControl/qcDeCoringTables";
 import { QCDivisionReadOnlyValue } from "./components/QCDivisionReadOnlyValue";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
@@ -139,9 +144,12 @@ const QCDeCoringMotorPanel = ({
   headerActions,
   validationErrors = null,
 }: QCDeCoringMotorPanelProps) => {
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const load = useMemo(() => getDeCoringField(values, "DE_CORING_LOAD"), [values]);
   const dateTime = useMemo(() => getDeCoringField(values, "DE_CORING_DATE_TIME"), [values]);
   const observations = useMemo(() => getDeCoringField(values, "OBSERVATIONS"), [values]);
+  const qaRemarks = useMemo(() => getDeCoringQaRemarks(values), [values]);
   const inputsDisabled = disabled || readOnly;
   const err = (path: string) => fieldError(validationErrors ?? undefined, path);
 
@@ -232,6 +240,17 @@ const QCDeCoringMotorPanel = ({
               />
             )}
           </FieldRow>
+          <Box data-qc-field="DE_CORING_DETAILS.qaRemarks">
+            <CasePrepTextField
+              label="QA Remarks"
+              value={qaRemarks}
+              readOnly={readOnly}
+              disabled={inputsDisabled}
+              width="100%"
+              theme={manufacturingTheme}
+              onChange={(next) => onChange(setDeCoringQaRemarks(values, next))}
+            />
+          </Box>
         </Stack>
       </SectionCard>
     </Box>

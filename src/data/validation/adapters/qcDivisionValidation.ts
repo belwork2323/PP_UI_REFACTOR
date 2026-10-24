@@ -14,6 +14,9 @@ import { validateQcPostCureValues } from "./qcPostCure.validation";
 import { validateQcNdtDivisionValues } from "./qcNdtDivision.validation";
 import { validateQcPropellantValues } from "./qcPropellant.validation";
 import { validateQcWeighmentValues } from "./qcWeighment.validation";
+import { validateStfMotorSession } from "./stf.validation";
+import { getStfMotorDataFromValues } from "@/hooks/user/qualityControl/qcStfTables";
+import type { StfMotorData } from "@/data/models/user/StfMotorDataModel";
 
 export type { ValidationErrors, ValidationTier };
 
@@ -103,6 +106,26 @@ export function validateQcDivisionEntry(
       case "NDT_MOTOR":
         errors = validateQcNdtDivisionValues(values, tier, entryId);
         break;
+      case "STF": {
+        const stfData = getStfMotorDataFromValues(values);
+        const subType =
+          stfData.variant === "MAIN_MOTOR"
+            ? "MAIN_MOTOR"
+            : String(entry.subType ?? values?.subType ?? "BEM").toUpperCase() === "MAIN_MOTOR"
+              ? "MAIN_MOTOR"
+              : "BEM";
+        errors = validateStfMotorSession(
+          {
+            motorId: String(entry.motorId ?? values?.motorId ?? "").trim() || "MOTOR",
+            subType,
+            stfTestNo: String(values?.stfTestNo ?? "").trim(),
+            formLoaded: true,
+            stfData: { ...stfData, variant: subType } as StfMotorData,
+          },
+          tier,
+        );
+        break;
+      }
       case "PROPELLANT_MOTOR":
       case "PROPELLANT_PROCESS":
         errors = validateQcPropellantValues(values, tier, entryId);
@@ -146,7 +169,6 @@ export function validateQcDivisionEntry(
     if (
       !meaningful &&
       kind !== "SIMPLE" &&
-      kind !== "STF" &&
       !(kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable)
     ) {
       errors = { form: REQUIRED };

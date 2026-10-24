@@ -255,6 +255,11 @@ export const STRINGS = {
       REJECTION_REASON: "Rejection Reason",
       APPROVER_REMARKS: "Approver Remarks",
       AUDIT_DETAILS_SECTION_TITLE: "Audit Details",
+      VIEW_FORM_DETAILS: "View Details",
+      FORM_DETAILS_TITLE: "Form Details",
+      FORM_DETAILS_LOADING: "Loading form details…",
+      FORM_DETAILS_UNSUPPORTED: "Form preview is not available for this sub-department yet.",
+      FORM_DETAILS_FETCH_ERROR: "Failed to load form details.",
       LAST_UPDATED_ON: "Last Updated On",
       NO_DATA_AVAILABLE: "No data available",
       COMPLETE: "% Complete",
@@ -1778,6 +1783,7 @@ export const STRINGS = {
         "No motors are waiting for approval. Review completed motors using the enabled tabs.",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
       MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
         `Save draft for motor ${motorId}? You can continue editing later.`,
@@ -2120,6 +2126,7 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       UPSTREAM_MIXING_SUBMIT_DISABLED: (pending: string) =>
         `Submit is disabled until all Raw Material Preparation premixes and Mixing premix/final mix units are approved. Pending: ${pending}.`,
       MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
@@ -2236,6 +2243,7 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
       MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
         `Save draft for motor ${motorId}? You can continue editing later.`,
@@ -2316,6 +2324,16 @@ export const STRINGS = {
       FILE_ADD: "Upload",
       FILE_ADD_MORE: "Add more files",
       FILE_EMPTY_REPORT: "No report uploaded",
+      DRAWING_SECTION_TITLE: "Drawing",
+      DRAWING_DESCRIPTION_LABEL: "Description",
+      DRAWING_UPLOAD_LABEL: "Upload Drawing",
+      DRAWING_ZOOM_LABEL: "Zoom",
+      DRAWING_ROTATE_LEFT: "Rotate left",
+      DRAWING_ROTATE_RIGHT: "Rotate right",
+      DRAWING_APPLY_CROP: "Apply crop",
+      DRAWING_APPLYING_CROP: "Applying…",
+      DRAWING_REPLACE: "Replace drawing",
+      FILE_EMPTY_DRAWING: "No drawing uploaded",
       EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
       CREATE_FAILED: "Failed to create trimming form.",
       UPDATE_FAILED: "Failed to update trimming form.",
@@ -2329,6 +2347,7 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       MOTOR_RECEIVED_REQUIRED: "Enter motor received date before submitting this motor.",
       MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) =>
         `Draft saved for motor ${motorId} successfully.`,
@@ -2478,7 +2497,7 @@ export const STRINGS = {
     },
   },
   QUALITY_CONTROL: {
-    DEPARTMENT_NAME: "Quality Control Department",
+    DEPARTMENT_NAME: "Quality Assurance Department",
     BATCH_LIST: {
       COL_BATCH_ID: "Batch ID",
       COL_PROJECT: "Project",
@@ -2573,10 +2592,10 @@ export const STRINGS = {
     },
     QC_DIVISION: {
       NEW_LABEL: "New Submission",
-      TABLE_LABEL: "Quality Control batch list",
+      TABLE_LABEL: "Quality Assurance batch list",
       COL_STATUS: "QC Status",
-      TITLE: "Quality Control",
-      FORM_OPENING_TITLE: "Opening Quality Control Form",
+      TITLE: "Quality Assurance",
+      FORM_OPENING_TITLE: "Opening Quality Assurance Form",
       FORM_OPENING_MESSAGE:
         "Loading batch details, division schema, and form data. This will only take a moment…",
       SCHEMA_LOADING_TITLE: "Loading QC Form",
@@ -2601,8 +2620,8 @@ export const STRINGS = {
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       DIVISION_ID_MISSING:
         "Unable to resolve this division for approval. Refresh the page and try again.",
-      CREATE_FAILED: "Failed to create Quality Control form.",
-      UPDATE_FAILED: "Failed to update Quality Control form.",
+      CREATE_FAILED: "Failed to create Quality Assurance form.",
+      UPDATE_FAILED: "Failed to update Quality Assurance form.",
       READY_TO_SUBMIT: "Ready to submit for approval",
       NOT_READY_TO_SUBMIT: "Select division, load form, and fill at least one field",
       SAVE_DRAFT_LABEL: "Save as Draft",
@@ -2624,17 +2643,17 @@ export const STRINGS = {
       CONFIRM_GO_BACK_LABEL: "Go Back",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
       UNSAVED_BACK_MESSAGE:
-        "You have unsaved Quality Control changes. Save as draft to avoid losing your data.",
+        "You have unsaved Quality Assurance changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       EMPTY_FORM_ERROR: "Add at least one QC value before saving or submitting.",
       DRAFT_VALIDATION_FAILED: "Cannot save draft. Fix the validation errors first.",
       SUBMIT_VALIDATION_FAILED: "Cannot submit. Fix the validation errors first.",
       DIVISION_VALIDATION_FAILED: "Cannot submit division. Fix the validation errors first.",
-      CREATE_DRAFT_SUCCESS: "Quality Control draft saved successfully.",
-      UPDATE_DRAFT_SUCCESS: "Quality Control draft updated successfully.",
-      CREATE_SUBMIT_SUCCESS: "Quality Control record submitted for approval successfully.",
-      UPDATE_SUBMIT_SUCCESS: "Quality Control record resubmitted for approval successfully.",
+      CREATE_DRAFT_SUCCESS: "Quality Assurance draft saved successfully.",
+      UPDATE_DRAFT_SUCCESS: "Quality Assurance draft updated successfully.",
+      CREATE_SUBMIT_SUCCESS: "Quality Assurance record submitted for approval successfully.",
+      UPDATE_SUBMIT_SUCCESS: "Quality Assurance record resubmitted for approval successfully.",
       PREMIX_LABEL: "Premix",
       PREMIX_PLACEHOLDER: "Select premix number",
       ADD_PREMIX_LABEL: "Load Form",
@@ -2776,7 +2795,7 @@ export const STRINGS = {
       MOTOR_NAV_TITLE: "Motor Navigation",
       MOTOR_NAV_COUNTER: "Motor {current} of {total}",
       DETAILS_BATCH_SECTION: "Batch information",
-      DETAILS_FORM_SECTION: "Quality Control form details",
+      DETAILS_FORM_SECTION: "Quality Assurance form details",
       DETAILS_NO_DATA: "No form data recorded",
       DIVISION_SECTION_TITLE: "QC Divisions",
       DIVISION_NO_ENTRIES_MESSAGE:
@@ -2980,6 +2999,7 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) =>
         `Draft saved for motor ${motorId} successfully.`,
       MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
@@ -3083,9 +3103,9 @@ export const STRINGS = {
       MOTOR_NAV_TITLE: "Motor navigation",
       MOTOR_NAV_HINT: "Switch between motors to fill static testing details.",
       PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
-        "This motor was not approved in all Quality Control motor divisions.",
+        "This motor was not approved in all QC motor divisions.",
       PREVIOUS_STAGE_UNIT_DISABLED:
-        "This motor was not approved in all Quality Control motor divisions and cannot be filled yet.",
+        "This motor was not approved in all QC motor divisions and cannot be filled yet.",
       PREVIOUS_STAGE_SUBSCALE_DISABLED:
         "Wait until Subscale is completely approved before starting Static Test.",
       MOTOR_CARD_TITLE: "Motor",
@@ -3097,6 +3117,7 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
       DELETE_MOTOR_TOOLTIP: "Remove BEM motor",
       BEM_MOTOR_REMOVE_LOCKED:
         "This BEM motor cannot be removed after it has been saved or submitted.",
@@ -3244,6 +3265,7 @@ export const STRINGS = {
     SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
     MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
     MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
     MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) => `Draft saved for motor ${motorId} successfully.`,
     MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
       `Motor ${motorId} submitted for approval successfully.`,
@@ -3412,14 +3434,14 @@ export const STRINGS = {
         SECTION: "Dispatch Submissions",
       },
       QUALITY_CONTROL: {
-        DEPARTMENT_NAME: "Quality Control Department",
+        DEPARTMENT_NAME: "Quality Assurance Department",
         RAW_MATERIAL_LABEL: "Raw Material Revalidation",
         RAW_MATERIAL_DESCRIPTION: "HTPB, DOA, AP, Al and binder revalidation test result approvals",
         RAW_MATERIAL_SECTION: "Raw Material Revalidation Submissions",
-        QC_DIVISION_LABEL: "Quality Control",
+        QC_DIVISION_LABEL: "Quality Assurance",
         QC_DIVISION_DESCRIPTION:
           "Division-based quality checks, raw material validation and processing inspections",
-        QC_DIVISION_SECTION: "Quality Control Submissions",
+        QC_DIVISION_SECTION: "Quality Assurance Submissions",
         NDT_LABEL: "NDT",
         NDT_DESCRIPTION: "X-ray, ultrasonic and dye-penetrant inspection report approvals",
         NDT_SECTION: "NDT Submissions",
@@ -3567,7 +3589,7 @@ export const STRINGS = {
 
     // ── Batch Filter Options ──────────────────────────────────────
     BATCH_FILTERS: {
-      STAGES: ["All", "Manufacturing", "Quality Control", "Sourcing", "Dispatch"],
+      STAGES: ["All", "Manufacturing", "Quality Assurance", "Sourcing", "Dispatch"],
       TYPES: ["All", "MainScale", "SubScale"],
       STATUS: ["All", "Active", "Inactive"],
     },
@@ -3575,7 +3597,7 @@ export const STRINGS = {
     // ── Event Filter Options ──────────────────────────────────────
     EVENT_FILTERS: {
       TYPES: ["All", "STAGE_UPDATED", "APPROVAL_COMPLETED", "QC_PASSED", "DISPATCHED"],
-      DEPARTMENTS: ["All", "Manufacturing", "Quality Control", "Sourcing", "Dispatch"],
+      DEPARTMENTS: ["All", "Manufacturing", "Quality Assurance", "Sourcing", "Dispatch"],
     },
   },
 
@@ -4055,6 +4077,112 @@ export const STRINGS = {
     },
   },
 
+  /* -------- ADMIN MOTOR MANAGEMENT -------- */
+  MOTOR_MANAGEMENT: {
+    PAGE: {
+      TITLE: "Motor Management",
+      SUBTITLE: "View motors linked to production batches",
+      LOADING_PLACEHOLDER: "…",
+    },
+    STATS: [
+      { label: "Total Motors", subLabel: "All registered motors", variant: "total" },
+      { label: "In Progress Motors", subLabel: "Active in workflow", variant: "inProgress" },
+      { label: "Dispatched Motors", subLabel: "Dispatch approved", variant: "dispatched" },
+      { label: "Discarded", subLabel: "Discarded motors", variant: "discarded" },
+    ],
+    TOOLBAR: {
+      SEARCH_PLACEHOLDER: "Search motor ID or batch ID…",
+      FILTERS_BUTTON: "Filters",
+      FILTERS_BUTTON_WITH_COUNT: (n: number) => `Filters (${n})`,
+      CLEAR_ALL: "Clear all",
+      FILTER_BATCH_ID_LABEL: "Batch ID",
+      FILTER_BATCH_ID_PLACEHOLDER: "e.g. BAT-001",
+      FILTER_PROJECT_LABEL: "Project",
+      FILTER_STAGE_LABEL: "Motor Stage",
+      FILTER_STATUS_LABEL: "Status",
+    },
+    FILTER_OPTIONS: {
+      WORKFLOW_STATUS: ["IN_PROGRESS", "DISPATCHED", "DISCARDED"],
+    },
+    TABLE_COLS: [
+      "Motor ID",
+      "Number of Batches Linked",
+      "Project",
+      "Motor Stage",
+      "Status",
+      "Created By",
+      "Created At",
+      "Actions",
+    ],
+    TABLE: {
+      EMPTY: "No motors found",
+      LINKED_BATCHES_LABEL: (n: number) => `${n} batch${n === 1 ? "" : "es"}`,
+      NO_LINKED_BATCHES: "No linked batches",
+    },
+    TABLE_ACTIONS: {
+      VIEW_DETAILS: "View",
+      VIEW_DETAILS_TOOLTIP: "View motor details",
+      DISCARD: "Discard Motor",
+      DISCARD_TOOLTIP: "Discard motor",
+      DISCARD_DISABLED_TOOLTIP: "Motor already discarded",
+    },
+    DETAILS: {
+      TITLE: "Motor Details",
+      SUBTITLE: (motorId: string) => motorId,
+      LOADING: "Loading motor details…",
+      CLOSE: "Close",
+      EMPTY: "Motor details unavailable",
+      CASING_SUMMARY: "Casing Summary",
+      LINKED_BATCHES: "Linked Batches",
+      NO_LINKED_BATCHES: "No linked batches",
+      TRACK_BATCH_TOOLTIP: "Track batch stages",
+      VIEW_CASING_DETAILS_TOOLTIP: "View casing details",
+      CASING_ID_MISSING: "Motor casing ID not found for this motor",
+      DISCARD_BUTTON: "Discard Motor",
+      DISCARD_DISABLED: "Already discarded",
+      FIELDS: {
+        MOTOR_ID: "Motor ID",
+        PROJECT: "Project",
+        MOTOR_STAGE: "Motor Stage",
+        CASING_ID: "Casing ID",
+        CASING_STATUS: "Casing Status",
+      },
+      COLS: {
+        BATCH_ID: "Batch ID",
+        BATCH_TYPE: "Type",
+        PROJECT: "Project",
+        MOTOR_STAGE: "Stage",
+        STATUS: "Status",
+        CREATED_AT: "Created Date",
+        CREATED_BY: "Created By",
+        ACTIONS: "Actions",
+      },
+    },
+    DISCARD_DIALOG: {
+      TITLE: "Discard motor?",
+      BODY: (motorId: string) =>
+        `This will discard motor ${motorId} on every linked batch. Users and approvers will no longer be able to edit or submit it. This cannot be undone.`,
+      REASON_LABEL: "Reason",
+      REASON_PLACEHOLDER: "Enter reason for discarding this motor",
+      REASON_HELPER: "Reason is required",
+      CONFIRM: "Discard Motor",
+      CANCEL: "Cancel",
+      DISCARDING: "Discarding…",
+      SUCCESS: "Motor discarded successfully",
+      SURE_TITLE: "Are you sure?",
+      SURE_BODY: (motorId: string) =>
+        `Discard motor ${motorId} permanently? This cannot be undone.`,
+      SURE_CONFIRM: "Yes, discard",
+    },
+    ERRORS: {
+      LOAD_STATS_FAILED: "Failed to load motor stats",
+      LOAD_DETAILS_FAILED: "Failed to load motor details",
+      LOAD_LOOKUPS_FAILED: "Failed to load motor management lookups",
+      OPERATION_FAILED: "An error occurred on server",
+      DISCARD_FAILED: "Failed to discard motor",
+    },
+  },
+
   /* -------- ADMIN BATCH MANAGEMENT -------- */
   BATCH_MANAGEMENT: {
     PAGE: {
@@ -4088,7 +4216,7 @@ export const STRINGS = {
       THIS_MONTH: "This Month",
     },
     FILTER_OPTIONS: {
-      STAGES: ["Sourcing", "Manufacturing", "Quality Control", "Dispatch"],
+      STAGES: ["Sourcing", "Manufacturing", "Quality Assurance", "Dispatch"],
       STATUS: ["In Progress", "Waiting for Approval", "Approved", "Rejected"],
       PRIORITIES: ["Low", "Medium", "High", "Critical"],
     },
@@ -4425,7 +4553,7 @@ export const STRINGS = {
         "BATCH_REJECTED",
         "DISPATCH_COMPLETED",
       ],
-      DEPARTMENTS: ["All", "Sourcing", "Manufacturing", "Quality Control", "Dispatch"],
+      DEPARTMENTS: ["All", "Sourcing", "Manufacturing", "Quality Assurance", "Dispatch"],
     },
     FILTERS: {
       BUTTON: "Filters",

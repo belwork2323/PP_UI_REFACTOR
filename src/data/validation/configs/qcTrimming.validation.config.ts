@@ -46,6 +46,9 @@ export const qcTrimmingValidationFields: Record<string, FieldRuleConfig> = {
   cutterSize: number(["SUBMIT"]),
   reading: number(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  dimensionsQaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  motorRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -63,7 +66,8 @@ const detailRowHasData = (row: Record<string, unknown>) =>
       str(row.completionDate) ||
       str(row.arborSize) ||
       str(row.cutterSize) ||
-      str(row.remarks),
+      str(row.remarks) ||
+      str(row.qaRemarks),
   );
 
 export const qcTrimmingValidationConfig: SubDeptValidationConfig<QcTrimmingValidationTarget> = {
@@ -115,6 +119,22 @@ export const qcTrimmingValidationConfig: SubDeptValidationConfig<QcTrimmingValid
         value: row.remarks ?? row.REMARKS,
         ruleKey: "remarks",
       });
+      fields.push({
+        path: `trimmingDetails.${i}.qaRemarks`,
+        value: row.qaRemarks ?? row.QA_REMARKS,
+        ruleKey: "qaRemarks",
+      });
+    });
+
+    fields.push({
+      path: "dimensionsQaRemarks",
+      value: values.dimensionsQaRemarks ?? values.measurementQaRemarks,
+      ruleKey: "dimensionsQaRemarks",
+    });
+    fields.push({
+      path: "motorRemarks",
+      value: values.motorRemarks,
+      ruleKey: "motorRemarks",
     });
 
     asArray(values.commonFormatParameters ?? values.COMMON_FORMAT_PARAMETERS).forEach(

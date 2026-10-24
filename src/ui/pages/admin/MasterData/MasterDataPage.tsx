@@ -50,15 +50,32 @@ const MasterDataPage = () => {
   const t = getMasterDataTheme(mode);
   const hook = useMasterDataHook();
   const equipmentTypeOptions = useEquipmentTypeOptions(hook.selectedType === "equipment");
-  const energyUnitOptions = useEnergyUnitOptions(hook.selectedType === "beam-energy");
+  const unitListOptions = useEnergyUnitOptions(
+    hook.selectedType === "beam-energy" || hook.selectedType === "subscale-articles",
+  );
   const projectOptions = useProjectForMotorStageOptions(hook.selectedType === "motor-stages");
   const dynamicAttributeOptions = useMemo(() => {
     const options: Record<string, typeof equipmentTypeOptions.options> = {};
     if (hook.selectedType === "equipment" && equipmentTypeOptions.options.length > 0) {
       options.equipmentType = equipmentTypeOptions.options;
     }
-    if (hook.selectedType === "beam-energy" && energyUnitOptions.options.length > 0) {
-      options.energyUnit = energyUnitOptions.options;
+    if (hook.selectedType === "beam-energy" && unitListOptions.options.length > 0) {
+      options.energyUnit = unitListOptions.options;
+    }
+    if (hook.selectedType === "subscale-articles" && unitListOptions.options.length > 0) {
+      // Store display symbol in bemUnit (used in "{size} {unit} BEM"); source is Unit Master.
+      const seen = new Set<string>();
+      options.bemUnit = unitListOptions.options
+        .map((opt) => {
+          const label = String(opt.label ?? "").trim();
+          const value = label || String(opt.value ?? "").trim();
+          return { value, label: value };
+        })
+        .filter((opt) => {
+          if (!opt.value || seen.has(opt.value)) return false;
+          seen.add(opt.value);
+          return true;
+        });
     }
     if (hook.selectedType === "motor-stages" && projectOptions.options.length > 0) {
       options.projectId = projectOptions.options;
@@ -67,7 +84,7 @@ const MasterDataPage = () => {
   }, [
     hook.selectedType,
     equipmentTypeOptions.options,
-    energyUnitOptions.options,
+    unitListOptions.options,
     projectOptions.options,
   ]);
   const projectSelectOptions =

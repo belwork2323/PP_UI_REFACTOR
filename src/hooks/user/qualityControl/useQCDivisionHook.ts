@@ -262,6 +262,11 @@ import {
 } from "./qcRawMaterialRevalidationTable";
 import { applyNdtDivisionDetailsSeed, buildInitialNdtValuesForMotor } from "./qcNdtDivisionDetails";
 import {
+  buildInitialStfValuesForMotor,
+  createInitialStfValues,
+  hasIncompleteQcStfUploads,
+} from "./qcStfTables";
+import {
   createInitialWeighmentValues,
   hydrateWeighmentValuesFromSections,
   hasIncompleteQcWeighmentUploads,
@@ -403,6 +408,7 @@ const hasIncompleteQcFormUploads = (form: QualityControlFormState | null | undef
   return entries.some((entry) => {
     const values = valuesById[entry.entryId]?.schemaValues;
     if (entry.kind === "NDT_MOTOR") return hasIncompleteQcNdtUploads(values);
+    if (entry.kind === "STF") return hasIncompleteQcStfUploads(values);
     if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
       return hasIncompleteQcPropellantUploads(values);
     }
@@ -1499,8 +1505,11 @@ export const useQCDivisionHook = () => {
         setDivisionAutoPopulateData(seedRecord);
 
         const batchUnits = extractQcBatchUnits(batchPayload);
-        const hasBatchUnitData = canShowQcDivisionUi(divisionFlowKey, batchUnits, typeKey);
         const batchContext = bootstrap?.context ?? null;
+        const hasBatchUnitData = canShowQcDivisionUi(divisionFlowKey, batchUnits, typeKey, {
+          batchType: batchContext?.batchType,
+          subBatchType: batchContext?.subBatchType,
+        });
         const preservedManualSetup =
           resolvePostCureManualSetup(seedRecord) ??
           resolvePostCureManualSetup(divisionAutoPopulateDataRef.current) ??
@@ -2292,6 +2301,11 @@ export const useQCDivisionHook = () => {
 
       if (entryKind === "NDT_MOTOR") {
         // NDT motors are auto-created from Motor Navigation.
+        return;
+      }
+
+      if (entryKind === "STF") {
+        // STF motors are auto-created from Motor Navigation.
         return;
       }
 
@@ -3408,9 +3422,10 @@ export const useQCDivisionHook = () => {
                       ? (domainEntry.finalMixDetails as Record<string, unknown>)
                       : null;
                   let viscosityValues: SchemaFormValues | undefined;
-                  if (finalMixDetails?.viscosityBuildUp) {
+                  if (finalMixDetails?.viscosityBuildUp || finalMixDetails?.viscosityQaRemarks) {
                     viscosityValues = hydrateViscosityValuesFromDomain(
                       finalMixDetails.viscosityBuildUp,
+                      finalMixDetails.viscosityQaRemarks,
                     );
                   } else {
                     const fromHydrated = hydrated?.finalMixEntries.find(
@@ -3609,6 +3624,11 @@ export const useQCDivisionHook = () => {
             },
             POST_CURE: { kind: "POST_CURE_MOTOR", division: "POST_CURE", subType: null },
             NDT: { kind: "NDT_MOTOR", division: "NDT", subType: null },
+            STATIC_TEST_FACILITY: {
+              kind: "STF",
+              division: "STATIC_TEST_FACILITY",
+              subType: null,
+            },
             QC: { kind: "PROPELLANT_MOTOR", division: "QC", subType: null },
             WEIGHTMENT: { kind: "WEIGHTMENT_MOTOR", division: "WEIGHTMENT", subType: null },
           };
@@ -3911,6 +3931,34 @@ export const useQCDivisionHook = () => {
                 batchPayload,
               });
             }
+
+            const entry = buildEntryFromSelection(
+              loader.kind,
+              { division: loader.division, subType: loader.subType },
+              undefined,
+              item.motorId,
+              undefined,
+              { flowKey },
+            );
+            const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+            updateFormData((prev) =>
+              appendDivisionEntryToForm(prev, entry, { schemaValues: initialValues }, []),
+            );
+            navigateToEntry(nextEntries, entry.entryId);
+            return;
+          }
+
+          if (loader.division === "STATIC_TEST_FACILITY") {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+
+            const seedRoot =
+              seedPayload && typeof seedPayload === "object"
+                ? (seedPayload as Record<string, unknown>)
+                : null;
+            const initialValues = item.motorId
+              ? buildInitialStfValuesForMotor(seedRoot ?? seedPayload, item.motorId)
+              : createInitialStfValues();
 
             const entry = buildEntryFromSelection(
               loader.kind,
@@ -4241,8 +4289,11 @@ export const useQCDivisionHook = () => {
                 ? (domainEntry.finalMixDetails as Record<string, unknown>)
                 : null;
 
-            if (finalMixDetails?.viscosityBuildUp) {
-              initialValues = hydrateViscosityValuesFromDomain(finalMixDetails.viscosityBuildUp);
+            if (finalMixDetails?.viscosityBuildUp || finalMixDetails?.viscosityQaRemarks) {
+              initialValues = hydrateViscosityValuesFromDomain(
+                finalMixDetails.viscosityBuildUp,
+                finalMixDetails.viscosityQaRemarks,
+              );
             } else {
               const fromHydrated = hydrated?.finalMixEntries.find((row) => row.premixNo === mixNo);
               if (fromHydrated) initialValues = fromHydrated.values;
@@ -5518,6 +5569,40 @@ export const useQCDivisionHook = () => {
               if (createdFromNested) continue;
             }
 
+            if (division === "STATIC_TEST_FACILITY") {
+              const dataRec = asRecord(detailData) ?? {};
+              const motors = [...asArray(dataRec.motors), ...asArray(dataRec.motorDetails)];
+              let createdFromNested = false;
+
+              for (const motor of motors) {
+                const rec = asRecord(motor);
+                const motorId = pickMotorIdFromUnknown(rec);
+                if (!rec || !motorId) continue;
+                const subTypeRaw = String(rec.subType ?? rec.sub_type ?? detailSubType ?? "")
+                  .trim()
+                  .toUpperCase();
+                const entrySubType = (
+                  subTypeRaw === "MAIN_MOTOR" ? "MAIN_MOTOR" : subTypeRaw === "BEM" ? "BEM" : null
+                ) as QcApiSubType;
+                const { entryId } = makeEntry(
+                  "STF",
+                  entrySubType,
+                  [],
+                  undefined,
+                  motorId,
+                );
+                entryValues[entryId] = {
+                  schemaValues: buildInitialStfValuesForMotor(
+                    { data: dataRec, motors },
+                    motorId,
+                  ),
+                };
+                createdFromNested = true;
+              }
+
+              if (createdFromNested) continue;
+            }
+
             const sectionsByPremix = new Map<string, SchemaSectionSubmission[]>();
             const sectionsByMotor = new Map<string, SchemaSectionSubmission[]>();
             const simpleSections: SchemaSectionSubmission[] = [];
@@ -6142,6 +6227,62 @@ export const useQCDivisionHook = () => {
               ) {
                 entryValues[entry.entryId] = {
                   schemaValues: createInitialNdtValues(),
+                };
+              }
+              continue;
+            }
+
+            if (entry.kind === "STF") {
+              const motorStatus =
+                entry.motorId != null
+                  ? resolveMotorQcStatusFromFormDetails(
+                      fetchedDetailsPayload,
+                      entry.motorId,
+                      "STATIC_TEST_FACILITY",
+                    )
+                  : null;
+              const awaitingInitiation =
+                motorStatus == null || isQcStatusAwaitingInitiation(motorStatus);
+
+              if (!awaitingInitiation && entry.motorId) {
+                const qcDetail = toDivisionAutoPopulateRecord(
+                  findQcFormDivisionDetail(fetchedDetailsPayload, {
+                    flowKey: "STATIC_TEST_FACILITY",
+                  }),
+                );
+                if (qcDetail) {
+                  entryValues[entry.entryId] = {
+                    schemaValues: buildInitialStfValuesForMotor(qcDetail, entry.motorId),
+                  };
+                  continue;
+                }
+              }
+
+              if (awaitingInitiation && entry.motorId) {
+                const manufacturingPayload = resolveManufacturingDivisionDetailsPayload(
+                  divisionAutoPopulateDataRef.current,
+                );
+                if (manufacturingPayload) {
+                  entryValues[entry.entryId] = {
+                    schemaValues: buildInitialStfValuesForMotor(
+                      manufacturingPayload,
+                      entry.motorId,
+                    ),
+                  };
+                  continue;
+                }
+              }
+
+              if (
+                !entryValues[entry.entryId]?.schemaValues ||
+                Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+              ) {
+                entryValues[entry.entryId] = {
+                  schemaValues: createInitialStfValues(
+                    String(entry.subType ?? "").toUpperCase() === "MAIN_MOTOR"
+                      ? "MAIN_MOTOR"
+                      : "BEM",
+                  ),
                 };
               }
               continue;

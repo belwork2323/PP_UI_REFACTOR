@@ -31,8 +31,8 @@ type PostCureApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: PostCureApproverDetailItem) => void;
-  onReject: (item: PostCureApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   onFormApprove?: (item: PostCureApproverDetailItem) => void;
   onFormReject?: (item: PostCureApproverDetailItem) => void;
   actionLoading?: boolean;
@@ -99,8 +99,8 @@ const PostCureApproverDetailDialog = ({
             loading={loading}
             activeMotorId={activeMotorId}
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             onFormApprove={onFormApprove ? () => onFormApprove(item) : undefined}
             onFormReject={onFormReject ? () => onFormReject(item) : undefined}
             actionLoading={actionLoading}
@@ -128,6 +128,7 @@ const PostCureApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="post-cure-operations"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`Post-Cure Report — ${item.batchId}`}
       />
     </>

@@ -29,6 +29,11 @@ type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   setSelected: React.Dispatch<React.SetStateAction<T | null>>;
   subDepartment: string;
   statusField?: string;
+  /**
+   * Override form-row actionable gate. Motor workflows may stay actioning while form
+   * status is IN_PROGRESS after a sibling unit was approved.
+   */
+  isItemActionable?: (item: T) => boolean;
   buildChangeStatusPayload?: (item: T) => Partial<ApproverChangeStatusRequest>;
   /** Override dialog prefill. For REJECTED, return "" to avoid stale batch rejectionReason. */
   getInitialDialogValue?: (item: T, actionType: ApproverFormActionType) => string;
@@ -61,6 +66,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
   setSelected,
   subDepartment,
   statusField = "status",
+  isItemActionable,
   buildChangeStatusPayload,
   getInitialDialogValue,
   skipListRemarkMirror = false,
@@ -117,7 +123,10 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       return;
     }
 
-    if (!isApproverActionableStatus(resolveItemStatus(item))) {
+    const actionable = isItemActionable
+      ? isItemActionable(item)
+      : isApproverActionableStatus(resolveItemStatus(item));
+    if (!actionable) {
       showAlert(STRINGS.APPROVER.ACTION.INVALID_STATUS, "warning", { autoCloseMs: 3000 });
       return;
     }

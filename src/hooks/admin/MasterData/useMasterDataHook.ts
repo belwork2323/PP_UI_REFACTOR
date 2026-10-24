@@ -16,6 +16,10 @@ import {
   type MasterDataTypeDescriptor,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
+  SUBSCALE_ARTICLES_TYPE,
+  applySubscaleArticleAttributeChange,
+} from "@data/models/admin/MasterData/subscaleArticleMasterForm";
+import {
   EXCLUDED_MASTER_DATA_TYPES,
   isNestedMasterDataType,
 } from "@data/models/admin/MasterData/nestedMasterDataTypes";
@@ -204,6 +208,12 @@ export default function useMasterDataHook() {
     setForm((prev) => {
       if (!isAttribute) {
         return { ...prev, [key]: value } as MasterDataFormState;
+      }
+      if (
+        selectedType === SUBSCALE_ARTICLES_TYPE &&
+        (key === "isBem" || key === "bemSize" || key === "bemUnit")
+      ) {
+        return applySubscaleArticleAttributeChange(prev, key, value);
       }
       return {
         ...prev,

@@ -105,13 +105,13 @@ const adminPalette = {
   stageChip: {
     light: {
       Manufacturing: { bg: "#e3f2fd", color: "#1565c0" },
-      "Quality Control": { bg: "#f3e5f5", color: "#6a1b9a" },
+      "Quality Assurance": { bg: "#f3e5f5", color: "#6a1b9a" },
       Sourcing: { bg: "#e8f5e9", color: "#2e7d32" },
       Dispatch: { bg: "#fff3e0", color: "#e65100" },
     },
     dark: {
       Manufacturing: { bg: "rgba(21,101,192,0.22)", color: "#90caf9" },
-      "Quality Control": { bg: "rgba(106,27,154,0.22)", color: "#e1bee7" },
+      "Quality Assurance": { bg: "rgba(106,27,154,0.22)", color: "#e1bee7" },
       Sourcing: { bg: "rgba(46,125,50,0.22)", color: "#a5d6a7" },
       Dispatch: { bg: "rgba(230,81,0,0.22)", color: "#ffcc80" },
     },
@@ -229,6 +229,21 @@ const adminPalette = {
       month: { accent: "#38bdf8", iconBg: "rgba(56,189,248,0.15)", iconBorder: "rgba(56,189,248,0.30)", iconColor: "#7dd3fc", value: "#7dd3fc" },
       active: { accent: "#22c55e", iconBg: "rgba(34,197,94,0.15)", iconBorder: "rgba(34,197,94,0.30)", iconColor: "#86efac", value: "#86efac" },
       idle: { accent: "#f87171", iconBg: "rgba(248,113,113,0.15)", iconBorder: "rgba(248,113,113,0.30)", iconColor: "#fca5a5", value: "#fca5a5" },
+    },
+  },
+
+  motorStats: {
+    light: {
+      total: { accent: "#1d4ed8", iconBg: "rgba(29,78,216,0.08)", iconBorder: "rgba(29,78,216,0.18)", iconColor: "#1d4ed8", value: "#1d4ed8" },
+      inProgress: { accent: "#0369a1", iconBg: "rgba(3,105,161,0.08)", iconBorder: "rgba(3,105,161,0.18)", iconColor: "#0369a1", value: "#0369a1" },
+      dispatched: { accent: "#15803d", iconBg: "rgba(21,128,61,0.08)", iconBorder: "rgba(21,128,61,0.18)", iconColor: "#15803d", value: "#15803d" },
+      discarded: { accent: "#b91c1c", iconBg: "rgba(185,28,28,0.08)", iconBorder: "rgba(185,28,28,0.18)", iconColor: "#b91c1c", value: "#b91c1c" },
+    },
+    dark: {
+      total: { accent: "#3b82f6", iconBg: "rgba(59,130,246,0.15)", iconBorder: "rgba(59,130,246,0.30)", iconColor: "#93c5fd", value: "#93c5fd" },
+      inProgress: { accent: "#38bdf8", iconBg: "rgba(56,189,248,0.15)", iconBorder: "rgba(56,189,248,0.30)", iconColor: "#7dd3fc", value: "#7dd3fc" },
+      dispatched: { accent: "#22c55e", iconBg: "rgba(34,197,94,0.15)", iconBorder: "rgba(34,197,94,0.30)", iconColor: "#86efac", value: "#86efac" },
+      discarded: { accent: "#f87171", iconBg: "rgba(248,113,113,0.15)", iconBorder: "rgba(248,113,113,0.30)", iconColor: "#fca5a5", value: "#fca5a5" },
     },
   },
 

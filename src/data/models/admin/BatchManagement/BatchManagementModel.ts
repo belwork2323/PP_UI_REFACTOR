@@ -299,9 +299,9 @@ const parseBemMotorIdsFromApi = (raw: unknown): string[] => {
     }
     if (typeof value === "object" && !Array.isArray(value)) {
       const row = value as Record<string, unknown>;
-      // Subscale metadata uses bemMouldNo as the BEM motor id.
+      // Subscale metadata uses bemNo as the BEM motor id (legacy: bemMouldNo).
       const id = String(
-        row.bemMouldNo ?? row.bemNo ?? row.bemMotorNo ?? row.motorId ?? row.motorCode ?? "",
+        row.bemNo ?? row.bemMouldNo ?? row.bemMotorNo ?? row.motorId ?? row.motorCode ?? "",
       ).trim();
       if (id) into.push(id);
     }

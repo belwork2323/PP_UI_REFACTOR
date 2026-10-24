@@ -9,7 +9,10 @@ export const useQcUnitNav = () => {
   const canShowDivision = useCallback(
     (flowKey: string, batchContext: QcBatchContext | null, rawMaterialType?: string | null) => {
       if (!batchContext) return false;
-      return canShowQcDivisionUi(flowKey, batchContext.units, rawMaterialType);
+      return canShowQcDivisionUi(flowKey, batchContext.units, rawMaterialType, {
+        batchType: batchContext.batchType,
+        subBatchType: batchContext.subBatchType,
+      });
     },
     [],
   );
@@ -19,7 +22,10 @@ export const useQcUnitNav = () => {
       if (!batchContext) {
         return "Cannot show QC UI — batch details are not loaded.";
       }
-      return getQcDivisionBlockedReason(flowKey, batchContext.units, rawMaterialType);
+      return getQcDivisionBlockedReason(flowKey, batchContext.units, rawMaterialType, {
+        batchType: batchContext.batchType,
+        subBatchType: batchContext.subBatchType,
+      });
     },
     [],
   );

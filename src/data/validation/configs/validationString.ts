@@ -21,7 +21,13 @@ export const VALIDATIONSTRING = {
     BOWL_ID: /^Bowl No\.\d+$/,
     /** Casting bowl dropdown labels, e.g. "FINAL_MIX 1 / Bowl No.3" */
     CASTING_BOWL_LABEL: /^FINAL[_\s]MIX\s+\S+\s+\/\s*.+$/i,
-    ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,\-_()#/:%&+@°±≤≥µμ²³⁻]+$/, // remarks/observations + science symbols
+    /**
+     * QC Mixing read-only mixer + building display, e.g. "MX-1 & BLD-1"
+     * (also accepts bare mixer/building codes).
+     */
+    MIXER_AND_BLDG_NO: /^[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*(?:\s*&\s*[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*)*$/,
+    /** Remarks/observations + science symbols; # & + @ not allowed */
+    ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,\-_()/:%°±≤≥µμ²³⁻]+$/,
     SPECIFICATION_WITH_TOLERANCE: /^[A-Za-z0-9\s.,_()#/:+±%\-@°≤≥µμ²³⁻]+$/, // e.g. 28 - 34%, ≤0.5%, @25°C
   },
 

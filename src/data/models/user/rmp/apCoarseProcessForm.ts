@@ -25,10 +25,14 @@ export type ApParticleSizeRow = {
 export type ApCoarseProcessForm = {
   uiKey: "apCoarse";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   equipmentType: string;
   blendingDryingParameters: ApOperationParameterRow[];
+  blendingDryingQaRemarks: string;
   dryingOperationRvd: ApTimedOperationParameterRow[];
+  dryingOperationRvdQaRemarks: string;
   particleSizeDistribution: ApParticleSizeRow[];
+  particleSizeDistributionQaRemarks: string;
 };
 
 export const createEmptyApOperationParameterRow = (): ApOperationParameterRow => ({
@@ -55,6 +59,7 @@ export const createEmptyApParticleSizeRow = (): ApParticleSizeRow => ({
 export const createSeededApCoarseProcessForm = (): ApCoarseProcessForm => ({
   uiKey: "apCoarse",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   equipmentType: "RVD",
   blendingDryingParameters: [
     {
@@ -68,6 +73,7 @@ export const createSeededApCoarseProcessForm = (): ApCoarseProcessForm => ({
       actualParameter: "",
     },
   ],
+  blendingDryingQaRemarks: "",
   dryingOperationRvd: [
     {
       operation: "Drying",
@@ -84,6 +90,7 @@ export const createSeededApCoarseProcessForm = (): ApCoarseProcessForm => ({
       endTime: "",
     },
   ],
+  dryingOperationRvdQaRemarks: "",
   particleSizeDistribution: [
     { psdRequirement: "Above 500µm, % max", specification: "5", result: "" },
     { psdRequirement: "500-355 µm, %", specification: "27±5", result: "" },
@@ -91,6 +98,7 @@ export const createSeededApCoarseProcessForm = (): ApCoarseProcessForm => ({
     { psdRequirement: "300-45 µm, %", specification: "35±5", result: "" },
     { psdRequirement: "Less than 45 µm, %", specification: "1", result: "" },
   ],
+  particleSizeDistributionQaRemarks: "",
 });
 
 export const createEmptyApCoarseProcessForm = (): ApCoarseProcessForm =>
@@ -116,6 +124,16 @@ export const apCoarseFormHasUserData = (form: ApCoarseProcessForm): boolean => {
     return true;
   }
   if (form.particleSizeDistribution.some((row) => String(row.result ?? "").trim())) {
+    return true;
+  }
+  if (
+    [
+      form.lotDetailsQaRemarks,
+      form.blendingDryingQaRemarks,
+      form.dryingOperationRvdQaRemarks,
+      form.particleSizeDistributionQaRemarks,
+    ].some((v) => String(v ?? "").trim())
+  ) {
     return true;
   }
   return false;

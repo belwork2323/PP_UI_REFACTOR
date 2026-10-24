@@ -11,6 +11,7 @@ import {
   postCureMotorDataHasUserInput,
   type InhibitionHemcoatMotorData,
   type InhibitionIr1MotorData,
+  type InhibitionOthersMotorData,
   type LooseFlapMotorData,
   type PostCureMotorData,
 } from "../../../data/models/user/PostCureMotorDataModel";
@@ -43,8 +44,13 @@ export const toPostCureUiInhibitorType = (value: string | null | undefined): str
   if (normalized === "HEMCOAT-3K") return "Hemcoat-3K";
   if (normalized === "NOT_APPLICABLE") return "not-applicable";
   if (normalized === "IR1") return "IR1";
+  if (normalized === "OTHERS") return "Others";
   const raw = String(value ?? "").trim();
-  if (raw === "Hemcoat-3K" || raw === "not-applicable" || raw === "IR1") return raw;
+  const upper = raw.toUpperCase().replace(/[-\s]/g, "_");
+  if (raw === "Hemcoat-3K" || upper === "HEMCOAT_3K") return "Hemcoat-3K";
+  if (raw === "not-applicable" || upper === "NOT_APPLICABLE") return "not-applicable";
+  if (raw === "IR1" || upper === "IR1") return "IR1";
+  if (raw === "Others" || upper === "OTHERS" || upper === "OTHER") return "Others";
   return raw;
 };
 
@@ -146,6 +152,7 @@ const emptyLocationRows = (withQty?: "QTY_FILLED" | "QTY_APPLIED"): QcPostCureLo
     FROM_DATE: "",
     TO_DATE: "",
     OBSERVATIONS: "",
+    QA_REMARKS: "",
     ...(withQty === "QTY_FILLED" ? { QTY_FILLED: "" } : null),
     ...(withQty === "QTY_APPLIED" ? { QTY_APPLIED: "" } : null),
   }));
@@ -159,6 +166,7 @@ const emptyQualificationRows = (
     PARAMETER: row.PARAMETER,
     SPECIFICATION: row.SPECIFICATION,
     RESULT: "",
+    QA_REMARKS: "",
     ...(withQcReport ? { QC_REPORT: [] as FileRef[] } : null),
   }));
 
@@ -189,6 +197,12 @@ const normalizeLocationRows = (
       FROM_DATE: formatToUiDate(pickString(row?.FROM_DATE, row?.fromDate)),
       TO_DATE: formatToUiDate(pickString(row?.TO_DATE, row?.toDate)),
       OBSERVATIONS: pickEditableString(row?.OBSERVATIONS, row?.observations),
+      QA_REMARKS: pickEditableString(
+        row?.QA_REMARKS,
+        row?.qaRemarks,
+        row?.REMARKS,
+        row?.remarks,
+      ),
       ...(withQty === "QTY_FILLED"
         ? {
             QTY_FILLED: pickString(
@@ -244,6 +258,12 @@ const normalizeQualificationRows = (
       PARAMETER: fallback.PARAMETER,
       SPECIFICATION: fallback.SPECIFICATION,
       RESULT: pickEditableString(row?.RESULT, row?.result),
+      QA_REMARKS: pickEditableString(
+        row?.QA_REMARKS,
+        row?.qaRemarks,
+        row?.REMARKS,
+        row?.remarks,
+      ),
       ...(withQcReport
         ? { QC_REPORT: parseUploadFiles(row?.QC_REPORT, row?.qcReport) }
         : null),
@@ -369,24 +389,37 @@ const createInitialLegacyDualPostCureValues = (
   };
 };
 
+const toApiInhibitorWire = (uiOrApi: string): string => {
+  const ui = toPostCureUiInhibitorType(uiOrApi);
+  if (ui === "Hemcoat-3K") return "HEMCOAT_3K";
+  if (ui === "not-applicable") return "NOT_APPLICABLE";
+  if (ui === "Others") return "OTHERS";
+  if (ui === "IR1") return "IR1";
+  return "IR1";
+};
+
+const toQcInhibitorCode = (uiOrApi: string): string => {
+  const ui = toPostCureUiInhibitorType(uiOrApi);
+  if (ui === "Hemcoat-3K") return "HEMCOAT-3K";
+  if (ui === "not-applicable") return "NOT_APPLICABLE";
+  if (ui === "Others") return "OTHERS";
+  if (ui === "IR1") return "IR1";
+  return "IR1";
+};
+
 const convertLegacyPostCureValuesToSession = (
   values: SchemaFormValues | null | undefined,
   inhibitorType?: string | null,
 ): QcPostCureSessionValues => {
-  const resolvedInhibitor =
-    normalizeQcInhibitorType(inhibitorType) ??
-    normalizeQcInhibitorType(String((values as Record<string, unknown> | null)?.inhibitorType ?? "")) ??
-    "IR1";
-  const uiInhibitor = toPostCureUiInhibitorType(resolvedInhibitor);
+  const rawInhibitor = pickString(
+    inhibitorType,
+    (values as Record<string, unknown> | null)?.inhibitorType,
+  );
+  const uiInhibitor = toPostCureUiInhibitorType(rawInhibitor || "IR1");
   const apiMotor = {
-    inhibitorType:
-      resolvedInhibitor === "HEMCOAT-3K"
-        ? "HEMCOAT_3K"
-        : resolvedInhibitor === "NOT_APPLICABLE"
-          ? "NOT_APPLICABLE"
-          : "IR1",
+    inhibitorType: toApiInhibitorWire(uiInhibitor),
     looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(values),
-    inhibitionDetails: buildInhibitionDetailsPayload(values, resolvedInhibitor),
+    inhibitionDetails: buildInhibitionDetailsPayload(values, toQcInhibitorCode(uiInhibitor)),
   } as Record<string, unknown>;
 
   return {
@@ -759,6 +792,40 @@ const hydrateApplicationFromData = (values: SchemaFormValues, data: Record<strin
   }
   if (dispatchDate) values[formKey(app, "DISPATCH_DATE")] = dispatchDate;
   if (dispatchStation) values[formKey(app, "DISPATCH_STATION")] = dispatchStation;
+
+  const dispatchQaRemarks = pickString(
+    data.DISPATCH_QA_REMARKS,
+    data.dispatchQaRemarks,
+    asRecord(data.dispatchDetails)?.qaRemarks,
+    asRecord(data.dispatchDetails)?.QA_REMARKS,
+  );
+  if (dispatchQaRemarks) values[formKey(app, "DISPATCH_QA_REMARKS")] = dispatchQaRemarks;
+
+  const batchQaRemarks = pickString(
+    data.INHIBITOR_BATCH_QA_REMARKS,
+    data.inhibitorBatchQaRemarks,
+    asRecord(data.inhibitorBatchDetails)?.qaRemarks,
+    asRecord(data.inhibitorBatchDetails)?.QA_REMARKS,
+    asRecord(data.inhibitionBatchDetails)?.qaRemarks,
+    asRecord(data.inhibitionBatchDetails)?.QA_REMARKS,
+  );
+  if (batchQaRemarks) values[formKey(app, "INHIBITOR_BATCH_QA_REMARKS")] = batchQaRemarks;
+
+  const batchNo = pickString(
+    data.INHIBITOR_BATCH_NO,
+    data.inhibitorBatchNo,
+    asRecord(data.inhibitorBatchDetails)?.batchNo,
+    asRecord(data.inhibitionBatchDetails)?.inhibitorBatchNo,
+  );
+  if (batchNo) values[formKey(app, "INHIBITOR_BATCH_NO")] = batchNo;
+
+  const batchSize = pickString(
+    data.INHIBITOR_BATCH_SIZE,
+    data.inhibitorBatchSize,
+    asRecord(data.inhibitorBatchDetails)?.batchSize,
+    asRecord(data.inhibitionBatchDetails)?.inhibitorBatchSize,
+  );
+  if (batchSize) values[formKey(app, "INHIBITOR_BATCH_SIZE")] = batchSize;
 };
 
 const hydrateNotApplicableFromData = (values: SchemaFormValues, data: Record<string, unknown>) => {
@@ -939,6 +1006,7 @@ const mapLocationRowsForApi = (
           }
         : null),
       observations: String(row.OBSERVATIONS ?? "").trim() || undefined,
+      qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
     }),
   );
 
@@ -950,6 +1018,7 @@ const mapQualificationRowsForApi = (rows: QcPostCureQualificationRow[], withQcRe
       parameter: row.PARAMETER || undefined,
       specification: row.SPECIFICATION || undefined,
       result: String(row.RESULT ?? "").trim() || undefined,
+      qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
       ...(withQcReport && reportPayload.length ? { qcReport: reportPayload } : null),
     });
   });
@@ -970,6 +1039,12 @@ const mapLocationRowsFromApi = (
         formatToUiDate(String(row.toDate ?? row.TO_DATE ?? "")) ||
         pickString(row.toDate, row.TO_DATE),
       OBSERVATIONS: pickEditableString(row.observations, row.OBSERVATIONS),
+      QA_REMARKS: pickEditableString(
+        row.qaRemarks,
+        row.QA_REMARKS,
+        row.remarks,
+        row.REMARKS,
+      ),
       ...(withQty === "QTY_FILLED"
         ? {
             QTY_FILLED: pickString(
@@ -1005,6 +1080,12 @@ const mapQualificationRowsFromApi = (value: unknown, withQcReport = false): unkn
       PARAMETER: pickString(row.parameter, row.PARAMETER),
       SPECIFICATION: pickString(row.specification, row.SPECIFICATION),
       RESULT: pickEditableString(row.result, row.RESULT),
+      QA_REMARKS: pickEditableString(
+        row.qaRemarks,
+        row.QA_REMARKS,
+        row.remarks,
+        row.REMARKS,
+      ),
       ...(withQcReport
         ? { QC_REPORT: parseUploadFiles(row.qcReport, row.QC_REPORT) }
         : null),
@@ -1096,9 +1177,17 @@ const buildInhibitionDetailsPayload = (
         })(),
       }),
       applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
-      ...omitEmpty({
+      inhibitorBatchDetails: omitEmpty({
+        batchNo: getPostCureField(values, app, "INHIBITOR_BATCH_NO") || undefined,
+        batchSize:
+          toFiniteNumber(getPostCureField(values, app, "INHIBITOR_BATCH_SIZE")) ??
+          (getPostCureField(values, app, "INHIBITOR_BATCH_SIZE") || undefined),
+        qaRemarks: getPostCureField(values, app, "INHIBITOR_BATCH_QA_REMARKS") || undefined,
+      }),
+      dispatchDetails: omitEmpty({
         dispatchDate: toApiDate(getPostCureField(values, app, "DISPATCH_DATE")),
         dispatchStation: getPostCureField(values, app, "DISPATCH_STATION") || undefined,
+        qaRemarks: getPostCureField(values, app, "DISPATCH_QA_REMARKS") || undefined,
       }),
     };
   }
@@ -1119,7 +1208,8 @@ const buildInhibitionDetailsPayload = (
   );
   const type = resolvedInhibitor || "IR1";
   return {
-    inhibitorType: type,
+    // Wire uses OTHERS / IR1 (HEMCOAT handled above as HEMCOAT_3K).
+    inhibitorType: type === "OTHERS" ? "OTHERS" : type === "IR1" ? "IR1" : type,
     qualificationDetails: omitEmpty({
       batchNo: getPostCureField(values, qual, "IR1_BATCH_NO") || undefined,
       preparationDate: toApiDate(getPostCureField(values, qual, "IR1_PREPARATION_DATE")),
@@ -1132,18 +1222,22 @@ const buildInhibitionDetailsPayload = (
       })(),
     }),
     applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
-    ...omitEmpty({
+    inhibitorBatchDetails: omitEmpty({
+      batchNo: getPostCureField(values, app, "INHIBITOR_BATCH_NO") || undefined,
+      batchSize:
+        toFiniteNumber(getPostCureField(values, app, "INHIBITOR_BATCH_SIZE")) ??
+        (getPostCureField(values, app, "INHIBITOR_BATCH_SIZE") || undefined),
+      qaRemarks: getPostCureField(values, app, "INHIBITOR_BATCH_QA_REMARKS") || undefined,
+    }),
+    dispatchDetails: omitEmpty({
       dispatchDate: toApiDate(getPostCureField(values, app, "DISPATCH_DATE")),
       dispatchStation: getPostCureField(values, app, "DISPATCH_STATION") || undefined,
+      qaRemarks: getPostCureField(values, app, "DISPATCH_QA_REMARKS") || undefined,
     }),
   };
 };
 
-const toApiInhibitorType = (value: string): string => {
-  const normalized = normalizeQcInhibitorType(value) ?? normalizeQcInhibitorType(toPostCureUiInhibitorType(value));
-  if (normalized === "HEMCOAT-3K") return "HEMCOAT_3K";
-  return normalized ?? "";
-};
+const toApiInhibitorType = (value: string): string => toApiInhibitorWire(value);
 
 const toApiDateFromUi = (value: unknown) => formatToIsoDateInput(String(value ?? "")) || undefined;
 
@@ -1172,6 +1266,7 @@ const mapIngredientRowsForQcApi = (
     partsByWeight?: string;
     quantity?: string;
     qtyTaken?: string;
+    qaRemarks?: string;
   }>,
   qtyKey: "quantity" | "qtyTaken",
 ) => {
@@ -1183,11 +1278,12 @@ const mapIngredientRowsForQcApi = (
       const ingredient = materialCode || displayName;
       const mfgLot = String(row.mfgLot ?? "").trim();
       const partsByWeight = String(row.partsByWeight ?? "").trim();
+      const qaRemarks = String(row.qaRemarks ?? "").trim();
       const qtyRaw = qtyKey === "quantity" ? row.quantity : row.qtyTaken;
       const quantityTaken = toApiNumberFromUi(qtyRaw);
       const isTotal = isIngredientTotalLabel(row.srNo, displayName || ingredient);
       // Skip untouched preset rows — empty ingredient payloads fail QC API validation.
-      if (!isTotal && !mfgLot && quantityTaken == null) return null;
+      if (!isTotal && !mfgLot && quantityTaken == null && !qaRemarks) return null;
       const base = omitEmpty({
         rowKey: String(row.srNo ?? index + 1),
         ingredient: ingredient || undefined,
@@ -1198,6 +1294,7 @@ const mapIngredientRowsForQcApi = (
         ...base,
         mfgLot: mfgLot || undefined,
         partsByWeight: partsByWeight || undefined,
+        qaRemarks: qaRemarks || undefined,
       });
     })
     .filter(Boolean);
@@ -1210,6 +1307,7 @@ const mapLocationDateRowsForQcApi = (
     fromDate?: string;
     toDate?: string;
     observations?: string;
+    qaRemarks?: string;
     qtyFilled?: string;
     qtyApplied?: string;
   }>,
@@ -1221,6 +1319,7 @@ const mapLocationDateRowsForQcApi = (
       fromDate: toApiDateFromUi(row.fromDate),
       toDate: toApiDateFromUi(row.toDate),
       observations: String(row.observations ?? "").trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
       ...(qtyField === "quantityFilled"
         ? { quantityFilled: toApiNumberFromUi(row.qtyFilled) }
         : null),
@@ -1236,6 +1335,7 @@ const mapQualificationRowsForQcApi = (
     parameter?: string;
     specification?: string;
     result?: string;
+    qaRemarks?: string;
   }>,
 ) =>
   rows.map((row, index) =>
@@ -1244,6 +1344,7 @@ const mapQualificationRowsForQcApi = (
       parameter: String(row.parameter ?? "").trim() || undefined,
       specification: String(row.specification ?? "").trim() || undefined,
       result: String(row.result ?? "").trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
   );
 
@@ -1336,12 +1437,17 @@ const buildQcInhibitionFromSession = (
         inhibitorBatchDetails: omitEmpty({
           batchNo: String(hem.inhibitionBatchDetails?.inhibitorBatchNo ?? "").trim() || undefined,
           batchSize: toApiNumberFromUi(hem.inhibitionBatchDetails?.inhibitorBatchSize),
+          qaRemarks: String(hem.inhibitionBatchDetails?.qaRemarks ?? "").trim() || undefined,
         }),
         applicationDetails: mapLocationDateRowsForQcApi(
           hem.inhibitionApplicationDetails?.inhibitionApplicationTable ?? [],
           "quantityApplied",
         ),
-        dispatchDetails: omitEmpty({ dispatchDate, dispatchStation }),
+        dispatchDetails: omitEmpty({
+          dispatchDate,
+          dispatchStation,
+          qaRemarks: String(hem.dispatchDetails?.qaRemarks ?? "").trim() || undefined,
+        }),
         // Flat fields for QC API validators that still expect the legacy shape.
         dispatchDate,
         dispatchStation,
@@ -1349,7 +1455,67 @@ const buildQcInhibitionFromSession = (
     };
   }
 
-  const ir1 =
+  if (data?.variant === "inhibition-others" || apiInhibitor === "OTHERS") {
+    const others =
+      data?.variant === "inhibition-others"
+        ? data
+        : (createEmptyPostCureMotorData("inhibition-others") as InhibitionOthersMotorData);
+    const premixIngredients = mapIngredientRowsForQcApi(
+      others.othersPremix?.othersPremixTable ?? [],
+      "qtyTaken",
+    );
+    const finalMixIngredients = mapIngredientRowsForQcApi(
+      others.othersFinalMix?.othersFinalMixTable ?? [],
+      "qtyTaken",
+    );
+    const qcReport = toFileIdListPayload(others.othersQualification?.qualificationQcReport ?? []);
+    const dispatchDate = toApiDateFromUi(others.dispatchDetails?.dispatchDate);
+    const dispatchStation = String(others.dispatchDetails?.dispatchStation ?? "").trim() || undefined;
+    return {
+      inhibitorType: "OTHERS",
+      ...omitEmpty({
+        premixDetails: omitEmpty({
+          batchNo: String(others.othersPremix?.othersPremixBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(others.othersPremix?.othersPremixDate),
+          ...(premixIngredients ? { ingredients: premixIngredients } : null),
+        }),
+        finalMixDetails: omitEmpty({
+          batchNo: String(others.othersFinalMix?.othersFinalMixBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(others.othersFinalMix?.othersFinalMixDate),
+          ...(finalMixIngredients ? { ingredients: finalMixIngredients } : null),
+        }),
+        qualificationDetails: omitEmpty({
+          batchNo:
+            String(others.othersQualification?.qualificationBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(
+            others.othersQualification?.qualificationPreparationDate,
+          ),
+          parameters: mapQualificationRowsForQcApi(
+            others.othersQualification?.qualificationTable ?? [],
+          ),
+          qcReport: qcReport.length ? qcReport : undefined,
+        }),
+        inhibitorBatchDetails: omitEmpty({
+          batchNo: String(others.inhibitionBatchDetails?.inhibitorBatchNo ?? "").trim() || undefined,
+          batchSize: toApiNumberFromUi(others.inhibitionBatchDetails?.inhibitorBatchSize),
+          qaRemarks: String(others.inhibitionBatchDetails?.qaRemarks ?? "").trim() || undefined,
+        }),
+        applicationDetails: mapLocationDateRowsForQcApi(
+          others.inhibitionApplicationDetails?.inhibitionApplicationTable ?? [],
+          "quantityApplied",
+        ),
+        dispatchDetails: omitEmpty({
+          dispatchDate,
+          dispatchStation,
+          qaRemarks: String(others.dispatchDetails?.qaRemarks ?? "").trim() || undefined,
+        }),
+        dispatchDate,
+        dispatchStation,
+      }),
+    };
+  }
+
+    const ir1 =
     data?.variant === "inhibition-ir1"
       ? data
       : (createEmptyPostCureMotorData("inhibition-ir1") as InhibitionIr1MotorData);
@@ -1384,12 +1550,17 @@ const buildQcInhibitionFromSession = (
       inhibitorBatchDetails: omitEmpty({
         batchNo: String(ir1.inhibitionBatchDetails?.inhibitorBatchNo ?? "").trim() || undefined,
         batchSize: toApiNumberFromUi(ir1.inhibitionBatchDetails?.inhibitorBatchSize),
+        qaRemarks: String(ir1.inhibitionBatchDetails?.qaRemarks ?? "").trim() || undefined,
       }),
       applicationDetails: mapLocationDateRowsForQcApi(
         ir1.inhibitionApplicationDetails?.inhibitionApplicationTable ?? [],
         "quantityApplied",
       ),
-      dispatchDetails: omitEmpty({ dispatchDate, dispatchStation }),
+      dispatchDetails: omitEmpty({
+        dispatchDate,
+        dispatchStation,
+        qaRemarks: String(ir1.dispatchDetails?.qaRemarks ?? "").trim() || undefined,
+      }),
       dispatchDate,
       dispatchStation,
     }),
@@ -1611,13 +1782,27 @@ export const postCureMotorDetailToSections = (
       } as SchemaSectionSubmission);
     }
 
+    const dispatch = asRecord(inhibition.dispatchDetails) ?? {};
+    const batch = asRecord(inhibition.inhibitorBatchDetails) ?? {};
     sections.push({
       sectionId: QC_POST_CURE_SECTION_IDS.APPLICATION,
       sectionData: [
         omitEmpty({
           [QC_POST_CURE_TABLE_IDS.APPLICATION]: applicationRows,
-          DISPATCH_DATE: pickString(inhibition.dispatchDate, inhibition.DISPATCH_DATE),
-          DISPATCH_STATION: pickString(inhibition.dispatchStation, inhibition.DISPATCH_STATION),
+          DISPATCH_DATE: pickString(
+            dispatch.dispatchDate,
+            inhibition.dispatchDate,
+            inhibition.DISPATCH_DATE,
+          ),
+          DISPATCH_STATION: pickString(
+            dispatch.dispatchStation,
+            inhibition.dispatchStation,
+            inhibition.DISPATCH_STATION,
+          ),
+          DISPATCH_QA_REMARKS: pickString(dispatch.qaRemarks, dispatch.QA_REMARKS),
+          INHIBITOR_BATCH_NO: pickString(batch.batchNo, batch.inhibitorBatchNo),
+          INHIBITOR_BATCH_SIZE: pickString(batch.batchSize, batch.inhibitorBatchSize),
+          INHIBITOR_BATCH_QA_REMARKS: pickString(batch.qaRemarks, batch.QA_REMARKS),
         }),
       ],
       motorId,
@@ -1651,25 +1836,18 @@ export const hydratePostCureValuesFromMotorDetail = (
     asRecord(rec.inhibitionDetails) ?? asRecord(details.inhibitionDetails);
   const hasLoose = Boolean(loose && Object.keys(loose).length > 0);
   const hasInhibition = Boolean(inhibition && Object.keys(inhibition).length > 0);
-  const resolvedInhibitor =
-    normalizeQcInhibitorType(inhibitorType) ??
-    normalizeQcInhibitorType(
-      pickString(inhibition?.inhibitorType, rec.inhibitorType, details.inhibitorType),
-    ) ??
-    "";
-  const uiInhibitor = toPostCureUiInhibitorType(resolvedInhibitor);
+  const rawInhibitor = pickString(
+    inhibitorType,
+    inhibition?.inhibitorType,
+    rec.inhibitorType,
+    details.inhibitorType,
+  );
+  const uiInhibitor = toPostCureUiInhibitorType(rawInhibitor);
 
   if (hasLoose || hasInhibition) {
     const apiMotor = {
       ...rec,
-      inhibitorType:
-        resolvedInhibitor === "HEMCOAT-3K"
-          ? "HEMCOAT_3K"
-          : resolvedInhibitor === "NOT_APPLICABLE"
-            ? "NOT_APPLICABLE"
-            : resolvedInhibitor === "IR1"
-              ? "IR1"
-              : rec.inhibitorType,
+      inhibitorType: toApiInhibitorWire(uiInhibitor || rawInhibitor || "IR1"),
       looseFlapFillingDetails: loose ?? rec.looseFlapFillingDetails,
       inhibitionDetails: inhibition ?? rec.inhibitionDetails,
     } as Record<string, unknown>;
@@ -1678,15 +1856,15 @@ export const hydratePostCureValuesFromMotorDetail = (
       inhibitorType: uiInhibitor,
       looseFlapData: parseLooseFlapMotorDataFromApi(apiMotor),
       inhibitionData:
-        parseInhibitionMotorDataFromApi(apiMotor, uiInhibitor) ??
-        createInhibitionDataForType(uiInhibitor),
+        parseInhibitionMotorDataFromApi(apiMotor, uiInhibitor || rawInhibitor) ??
+        createInhibitionDataForType(uiInhibitor || rawInhibitor),
     });
   }
 
   return hydratePostCureValuesFromSections(
     postCureMotorDetailToSections(rec, pickString(rec.motorIdNo, rec.motorId) || "MOTOR"),
     null,
-    resolvedInhibitor || null,
+    uiInhibitor || rawInhibitor || null,
   );
 };
 

@@ -22,6 +22,8 @@ type UseApproverFormPdfArgs = {
   formId?: string | null;
   open: boolean;
   subDepartment: string;
+  /** Explicit ID (e.g. from form details). Preferred when the logged-in user is Admin/not assigned to the sub-dept. */
+  subDepartmentId?: number | null;
 };
 
 const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
@@ -29,6 +31,27 @@ const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
   manufacturing: "manufacturing",
   dispatch: "dispatch",
   qualityControl: "quality",
+};
+
+/**
+ * Known sub-department IDs when the logged-in user (Admin / Centre Head / SM)
+ * is not assigned to that sub-dept and `allSubDepartments` cannot resolve it.
+ * Must stay aligned with backend BatchFormResolver / stage IDs.
+ */
+const FALLBACK_SUB_DEPARTMENT_IDS: Record<string, number> = {
+  "raw-material": 1,
+  "rocket-motor": 2,
+  "raw-material-prep": 3,
+  "case-preparation": 4,
+  mixing: 5,
+  "casting-and-curing": 6,
+  "post-cure-operations": 7,
+  subscale: 8,
+  trimming: 9,
+  ndt: 10,
+  "qc-division": 11,
+  "static-test-facility": 12,
+  dispatch: 13,
 };
 
 const base64ToBlobUrl = (base64: string) => {
@@ -48,6 +71,7 @@ export const useApproverFormPdf = ({
   formId,
   open,
   subDepartment,
+  subDepartmentId: subDepartmentIdOverride,
 }: UseApproverFormPdfArgs) => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -58,15 +82,33 @@ export const useApproverFormPdf = ({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
-  const selectedSubDepartment = useMemo(() => {
-    const deptSlug = DEPARTMENT_SLUGS[department];
+  const resolvedSubDepartmentId = useMemo(() => {
+    const override = Number(subDepartmentIdOverride);
+    if (Number.isFinite(override) && override > 0) {
+      return override;
+    }
 
-    return (
-      user?.allSubDepartments.find(
-        (item) => item.slugs?.dept === deptSlug && item.slugs?.subDept === subDepartment,
-      ) ?? null
+    const deptSlug = DEPARTMENT_SLUGS[department];
+    const list = user?.allSubDepartments ?? [];
+
+    const exact = list.find(
+      (item) => item.slugs?.dept === deptSlug && item.slugs?.subDept === subDepartment,
     );
-  }, [department, subDepartment, user]);
+    if (exact?.subDepartmentId) {
+      return Number(exact.subDepartmentId);
+    }
+
+    // Admin / cross-role: match by sub-dept slug alone
+    const bySubDept = list.find((item) => item.slugs?.subDept === subDepartment);
+    if (bySubDept?.subDepartmentId) {
+      return Number(bySubDept.subDepartmentId);
+    }
+
+    const fallback = FALLBACK_SUB_DEPARTMENT_IDS[subDepartment];
+    if (fallback) return fallback;
+
+    return null;
+  }, [department, subDepartment, subDepartmentIdOverride, user]);
 
   const revokeBlobUrl = () => {
     if (blobUrlRef.current?.startsWith("blob:")) {
@@ -94,14 +136,12 @@ export const useApproverFormPdf = ({
         setLoading(false);
         return;
       }
-      console.log(selectedSubDepartment);
-
       if (!formId) {
         showAlert(STRINGS.APPROVER.PDF.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
         return;
       }
 
-      if (!selectedSubDepartment?.subDepartmentId) {
+      if (!resolvedSubDepartmentId) {
         showAlert(STRINGS.APPROVER.PDF.SUBDEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
         return;
       }
@@ -111,7 +151,7 @@ export const useApproverFormPdf = ({
       const response = await getApproverFormPdf({
         download: false,
         formId,
-        subDepartmentId: selectedSubDepartment.subDepartmentId,
+        subDepartmentId: resolvedSubDepartmentId,
       });
 
       if (cancelled) {
@@ -154,7 +194,7 @@ export const useApproverFormPdf = ({
     return () => {
       cancelled = true;
     };
-  }, [formId, open, selectedSubDepartment?.subDepartmentId, showAlert]);
+  }, [formId, open, resolvedSubDepartmentId, showAlert]);
 
   const downloadPdf = async () => {
     if (!formId) {
@@ -162,7 +202,7 @@ export const useApproverFormPdf = ({
       return;
     }
 
-    if (!selectedSubDepartment?.subDepartmentId) {
+    if (!resolvedSubDepartmentId) {
       showAlert(STRINGS.APPROVER.PDF.SUBDEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
@@ -173,7 +213,7 @@ export const useApproverFormPdf = ({
     const response = await getApproverFormPdf({
       download: true,
       formId,
-      subDepartmentId: selectedSubDepartment.subDepartmentId,
+      subDepartmentId: resolvedSubDepartmentId,
     });
 
     setDownloading(false);

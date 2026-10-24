@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -244,6 +244,9 @@ const QCForm = ({
   const isBlocked = divisionUiMode === "BLOCKED";
   const isSetup = divisionUiMode === "SETUP";
   const showFormBody = divisionUiMode === "FORM";
+  const showContentLoader =
+    Boolean(divisionAutoPopulateLoading) ||
+    (Boolean(schemaLoading) && !hasDivisionEntries);
   const postCureSetupMode = isSetup && isPostCureDivisionFlow(selectedDivision);
   const isRevalidationDivision = isRawMaterialRevalidationType(selectedRawMaterialType);
   const showFlowBar = canEditDivisionStructure && !isRevalidationDivision;
@@ -460,73 +463,50 @@ const QCForm = ({
       ) : null}
 
       {showFormBody ? (
-      divisionAutoPopulateLoading ? (
-        <QCDivisionInlineLoader
-          label={
-            isRevalidationDivision ? S.REVALIDATION_LOADING_TITLE : S.SCHEMA_LOADING_TITLE
-          }
-        />
-      ) : (
-      <Box
-        sx={{
-          position: "relative",
-          ...(schemaLoading ? { pointerEvents: "none", userSelect: "none", minHeight: 160 } : null),
-        }}
-        data-testid="qc-form-container"
-      >
-        {schemaLoading ? (
-          <Box
-            sx={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 20,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "flex-start",
-              pt: { xs: 4, sm: 6 },
-              bgcolor: "rgba(255, 255, 255, 0.45)",
-              borderRadius: "inherit",
-            }}
-          >
-            <CircularProgress size={36} sx={{ color: BRAND.primary }} />
+        showContentLoader ? (
+          <QCDivisionInlineLoader
+            label={
+              isRevalidationDivision ? S.REVALIDATION_LOADING_TITLE : S.SCHEMA_LOADING_TITLE
+            }
+          />
+        ) : (
+          <Box data-testid="qc-form-container">
+            <QCDivisionFormBody
+              batch={batch}
+              divisionAutoPopulateData={divisionAutoPopulateData}
+              mixingQualityChecksByStage={mixingQualityChecksByStage}
+              formData={bodyFormData}
+              subDepartmentId={subDepartmentId}
+              activeDivisionGroupIndex={activeDivisionGroupIndex}
+              activeDivisionSubIndex={activeDivisionSubIndex}
+              readOnly={readOnly || fieldsReadOnly || fieldsDisabled}
+              fieldsDisabled={readOnly || fieldsDisabled}
+              schemaLoading={schemaLoading}
+              divisionAutoPopulateLoading={divisionAutoPopulateLoading}
+              schemaError={schemaError}
+              validationErrorsByEntryId={validationErrorsByEntryId}
+              onClearEntryFieldError={onClearEntryFieldError}
+              hideEntryGroupNav
+              onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
+              onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}
+              onDivisionEntryValuesChange={onDivisionEntryValuesChange}
+              onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
+              onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
+              onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
+              onProcessingProcessChange={onProcessingProcessChange}
+              weightmentErrors={weightmentErrors}
+              weightmentValidationAttempt={weightmentValidationAttempt}
+              processingFieldErrors={processingFieldErrors}
+              processingValidationFocusRequest={processingValidationFocusRequest}
+              onRemoveDivisionEntry={onRemoveDivisionEntry}
+              activePartialItem={activePartialItem}
+              unitActions={unitActions}
+              canResetPostCureSetup={canResetPostCureSetup}
+              onResetPostCureSetup={onResetPostCureSetup}
+              theme={theme}
+            />
           </Box>
-        ) : null}
-        <QCDivisionFormBody
-          batch={batch}
-          divisionAutoPopulateData={divisionAutoPopulateData}
-          mixingQualityChecksByStage={mixingQualityChecksByStage}
-          formData={bodyFormData}
-          subDepartmentId={subDepartmentId}
-          activeDivisionGroupIndex={activeDivisionGroupIndex}
-          activeDivisionSubIndex={activeDivisionSubIndex}
-          readOnly={readOnly || fieldsReadOnly || fieldsDisabled}
-          fieldsDisabled={readOnly || fieldsDisabled}
-          schemaLoading={schemaLoading}
-          divisionAutoPopulateLoading={divisionAutoPopulateLoading}
-          schemaError={schemaError}
-        validationErrorsByEntryId={validationErrorsByEntryId}
-          onClearEntryFieldError={onClearEntryFieldError}
-          hideEntryGroupNav
-          onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
-          onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}
-          onDivisionEntryValuesChange={onDivisionEntryValuesChange}
-          onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
-          onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
-          onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
-          onProcessingProcessChange={onProcessingProcessChange}
-          weightmentErrors={weightmentErrors}
-          weightmentValidationAttempt={weightmentValidationAttempt}
-          processingFieldErrors={processingFieldErrors}
-          processingValidationFocusRequest={processingValidationFocusRequest}
-          onRemoveDivisionEntry={onRemoveDivisionEntry}
-          activePartialItem={activePartialItem}
-          unitActions={unitActions}
-          canResetPostCureSetup={canResetPostCureSetup}
-          onResetPostCureSetup={onResetPostCureSetup}
-          theme={theme}
-        />
-      </Box>
-      )
+        )
       ) : null}
     </Box>
   );

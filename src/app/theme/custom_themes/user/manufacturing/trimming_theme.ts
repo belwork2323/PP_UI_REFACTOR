@@ -142,6 +142,7 @@ export const getTrimmingTheme = (baseTheme: any) => {
 					["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
 					["Completely Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
 					["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
+          ["Discarded"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
 				} as Record<string, { color: string; bg: string; border: string }>;
 			})(),
 			page: { animation: "fadeIn 0.35s ease both" },

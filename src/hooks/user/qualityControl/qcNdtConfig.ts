@@ -42,7 +42,8 @@ export const QC_NDT_FIELD_LABELS = {
   UPLOAD_IMAGE: "Upload Image",
   UPLOAD_VIDEO_PHOTO: "Upload Videos / Photos",
   SIGNED_REPORT: "Upload PDF",
-  ADDITIONAL_REMARKS: "Additional remarks",
+  ADDITIONAL_REMARKS: "Remarks",
+  QA_REMARKS: "QA Remarks",
 } as const;
 
 export type QcNdtRadiographyDetailRow = {
@@ -53,6 +54,7 @@ export type QcNdtRadiographyDetailRow = {
   NO_OF_ORIENTATIONS: string;
   NORMAL_EXPOSURES: string;
   TANGENTIAL_EXPOSURES: string;
+  QA_REMARKS: string;
 };
 
 export type QcNdtRadiographyObservationRow = {
@@ -60,6 +62,7 @@ export type QcNdtRadiographyObservationRow = {
   TYPE_OF_DEFECT: string;
   OBSERVATIONS: string;
   LOCATION: string;
+  QA_REMARKS: string;
 };
 
 export type QcNdtVisualInspectionRow = {
@@ -67,6 +70,7 @@ export type QcNdtVisualInspectionRow = {
   OBSERVATION_TYPE: string;
   OBSERVATION: string;
   LOCATION: string;
+  QA_REMARKS: string;
   UPLOAD_IMAGE: FileRef[];
 };
 
@@ -114,6 +118,7 @@ export const emptyNdtRadiographyDetailRow = (): QcNdtRadiographyDetailRow => ({
   NO_OF_ORIENTATIONS: "",
   NORMAL_EXPOSURES: "",
   TANGENTIAL_EXPOSURES: "",
+  QA_REMARKS: "",
 });
 
 export const getQcNdtMotorLabel = (motorId?: string | null) =>

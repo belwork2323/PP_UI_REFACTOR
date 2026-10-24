@@ -67,6 +67,8 @@ import {
 import DateField from "../../../../components/common/DateField";
 import { AppDatePickerProvider } from "../../../../components/common/datePickerShared";
 import { APP_CONTROL_HEIGHT } from "../../../../components/common/fieldStyles";
+import { getSubscaleFieldFormatError } from "../../../../../data/validation/configs/subscale.validation.config";
+import FieldErrorText from "../../../../components/validation/FieldErrorText";
 import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
@@ -98,7 +100,7 @@ import type { SubscaleArticleOption } from "@/data/api/common/generalAPI";
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.HARDWARE;
 const BEM_NO_SYNC_TARGETS = [
-  { tableId: "CURING_TABLE", fieldId: "BEM_MOULD_NO" },
+  { tableId: "CURING_TABLE", fieldId: "BEM_NO" },
   { tableId: "NDT_TABLE", fieldId: "BEM_NO" },
   { tableId: "INHIBITION_TABLE", fieldId: "BEM_NO" },
   { tableId: "MECHANICAL_PROPERTIES_TABLE", fieldId: "BEM_NO" },
@@ -119,6 +121,20 @@ const syncBemNoAcrossProcessTables = (
     next = syncProcessTableScope(next, tableId, rows);
   });
   return next;
+};
+
+/** Article Type MOULD_NO → Casting Details BEM_MOULD_NO (same row index). */
+const syncMouldNoToCastingTable = (
+  values: SchemaFormValues,
+  rowIndex: number,
+  mouldNo: string,
+): SchemaFormValues => {
+  const rows = Array.isArray(values.CASTING_TABLE)
+    ? [...(values.CASTING_TABLE as Record<string, unknown>[])]
+    : [];
+  if (!rows[rowIndex]) return values;
+  rows[rowIndex] = { ...rows[rowIndex], BEM_MOULD_NO: mouldNo };
+  return syncProcessTableScope({ ...values }, "CASTING_TABLE", rows);
 };
 
 // Reusable File Upload Button Component
@@ -190,6 +206,7 @@ type SubscaleHardwareArticlePanelProps = {
       subscaleArticleId?: number;
       subscaleArticleCode?: string;
       subscaleArticleName?: string;
+      isBem?: boolean;
       isActive?: boolean;
     }> | null;
   } | null;
@@ -203,6 +220,7 @@ const mapMdmOption = (row: SubscaleArticleOption): HardwareArticleOption => ({
   subscaleArticleId: row.subscaleArticleId,
   subscaleArticleCode: row.subscaleArticleCode,
   subscaleArticleName: row.subscaleArticleName,
+  isBem: row.isBem === true,
 });
 
 const SubscaleHardwareArticlePanel = ({
@@ -242,6 +260,7 @@ const SubscaleHardwareArticlePanel = ({
             subscaleArticleId: Number(a.subscaleArticleId ?? 0),
             subscaleArticleCode: String(a.subscaleArticleCode ?? "").trim(),
             subscaleArticleName: String(a.subscaleArticleName ?? "").trim(),
+            isBem: a.isBem === true,
           }));
         if (!cancelled) setArticleOptions(fromBatch);
         return;
@@ -329,6 +348,41 @@ const SubscaleHardwareArticlePanel = ({
     };
   }, [isLoading, isFormLoaded, values[ARTICLE_TYPE_TABLE_ID]]);
 
+  const articleMouldSyncKey = useMemo(() => {
+    const rows = Array.isArray(values[ARTICLE_TYPE_TABLE_ID])
+      ? (values[ARTICLE_TYPE_TABLE_ID] as Record<string, unknown>[])
+      : [];
+    return rows.map((row) => String(row?.MOULD_NO ?? "").trim()).join("\u0001");
+  }, [values[ARTICLE_TYPE_TABLE_ID]]);
+
+  const castingRowCount = Array.isArray(values.CASTING_TABLE)
+    ? values.CASTING_TABLE.length
+    : 0;
+
+  // Keep casting mould nos aligned with article type mould nos (drafts / hydrate).
+  useEffect(() => {
+    if (!isFormLoaded) return;
+    const current = valuesRef.current;
+    const articleRows = Array.isArray(current[ARTICLE_TYPE_TABLE_ID])
+      ? (current[ARTICLE_TYPE_TABLE_ID] as Record<string, unknown>[])
+      : [];
+    const castingRows = Array.isArray(current.CASTING_TABLE)
+      ? (current.CASTING_TABLE as Record<string, unknown>[])
+      : [];
+    if (!articleRows.length || !castingRows.length) return;
+
+    let changed = false;
+    const nextCasting = castingRows.map((row, idx) => {
+      const mould = String(articleRows[idx]?.MOULD_NO ?? "").trim();
+      if (!mould) return row;
+      if (String(row.BEM_MOULD_NO ?? "").trim() === mould) return row;
+      changed = true;
+      return { ...row, BEM_MOULD_NO: mould };
+    });
+    if (!changed) return;
+    onChange(syncProcessTableScope({ ...current }, "CASTING_TABLE", nextCasting));
+  }, [isFormLoaded, articleMouldSyncKey, castingRowCount, onChange]);
+
   const commitSelections = (nextSelections: HardwareArticleSelection[]) => {
     clearFieldError?.(HARDWARE_ARTICLE_SELECTIONS_ID);
     onChange(
@@ -339,14 +393,22 @@ const SubscaleHardwareArticlePanel = ({
     );
   };
 
+  const draftOption = useMemo(
+    () =>
+      articleOptions.find(
+        (opt) =>
+          (opt.subscaleArticleCode || String(opt.subscaleArticleId)) === draftArticleCode,
+      ) ?? null,
+    [articleOptions, draftArticleCode],
+  );
+  const draftIsBem = draftOption?.isBem === true;
+
   const handleAddArticle = () => {
     setAddError("");
-    const option = articleOptions.find(
-      (opt) =>
-        (opt.subscaleArticleCode || String(opt.subscaleArticleId)) === draftArticleCode,
-    );
+    const option = draftOption;
     const noOfArticles = parseCount(draftNoOfArticles);
-    const noOfParts = parseCount(draftNoOfParts);
+    // No. of Parts applies only to BEM articles (isBem).
+    const noOfParts = option?.isBem === true ? parseCount(draftNoOfParts) : 0;
 
     if (!option || noOfArticles <= 0) {
       setAddError(S.ARTICLE_ADD_REQUIRED);
@@ -371,6 +433,7 @@ const SubscaleHardwareArticlePanel = ({
         subscaleArticleName: option.subscaleArticleName,
         noOfArticles,
         noOfParts,
+        isBem: option.isBem === true,
       },
     ]);
     setDraftArticleCode("");
@@ -420,18 +483,23 @@ const SubscaleHardwareArticlePanel = ({
     });
 
     scheduleIdleWork(() => {
+      const articleRows = Array.isArray(valuesRef.current[ARTICLE_TYPE_TABLE_ID])
+        ? (valuesRef.current[ARTICLE_TYPE_TABLE_ID] as Record<string, unknown>[])
+        : [];
       patchFormValues({
-        CASTING_TABLE: createDefaultRows({
+        CASTING_TABLE: baseTypes.map((typeLabel, i) => ({
+          SR_NO: i + 1,
+          ARTICLE_TYPE: typeLabel,
           BEM_NO: "",
-          BEM_MOULD_NO: "",
+          BEM_MOULD_NO: String(articleRows[i]?.MOULD_NO ?? ""),
           CASTING_PIT_NO: "",
           CASTING_START_TIME: "",
           CASTING_END_TIME: "",
           VACUUM_LEVEL: "",
           REMARKS: "",
-        }),
+        })),
         CURING_TABLE: createDefaultRows({
-          BEM_MOULD_NO: "",
+          BEM_NO: "",
           CURING_START_DATE: "",
           CURING_END_DATE: "",
           OVEN_NO: "",
@@ -528,6 +596,10 @@ const SubscaleHardwareArticlePanel = ({
         tableData,
       );
 
+      if (tableId === ARTICLE_TYPE_TABLE_ID && fieldId === "MOULD_NO") {
+        nextValues = syncMouldNoToCastingTable(nextValues, rowIndex, String(value ?? ""));
+      }
+
       if (tableId === "CASTING_TABLE" && fieldId === "BEM_NO") {
         nextValues = syncBemNoAcrossProcessTables(nextValues, rowIndex, String(value ?? ""));
         const existingTrimming = Array.isArray(nextValues.TRIMMING_TABLE)
@@ -545,14 +617,15 @@ const SubscaleHardwareArticlePanel = ({
           nextValues = syncProcessTableScope(
             nextValues,
             "STATIC_TESTING_TABLE",
-            buildStaticTestingRowsFromTrimming(nextValues, existingStatic),
+            buildStaticTestingRowsFromTrimming(nextValues, existingStatic, {
+              subBatchType,
+            }),
           );
         }
       }
-      clearFieldError?.(`${tableId}.${rowIndex}.${fieldId}`);
       onChange(nextValues);
     },
-    [onChange, clearFieldError, batchType],
+    [onChange, batchType, subBatchType],
   );
 
   const getSyncedBemNo = (rowIndex: number, fallback?: unknown) =>
@@ -562,8 +635,17 @@ const SubscaleHardwareArticlePanel = ({
         "",
     );
 
+  const getSyncedMouldNo = (rowIndex: number, fallback?: unknown) =>
+    String(
+      (values[ARTICLE_TYPE_TABLE_ID] as Record<string, unknown>[] | undefined)?.[rowIndex]
+        ?.MOULD_NO ??
+        (values.CASTING_TABLE as Record<string, unknown>[] | undefined)?.[rowIndex]
+          ?.BEM_MOULD_NO ??
+        fallback ??
+        "",
+    );
+
   const handleLinerFieldChange = (fieldId: string, value: string) => {
-    clearFieldError?.(fieldId);
     onChange(syncHardwareArticleTable({ ...values, [fieldId]: value }));
   };
 
@@ -638,7 +720,9 @@ const SubscaleHardwareArticlePanel = ({
                 gridTemplateColumns: {
                   xs: "1fr",
                   sm: "1fr 1fr",
-                  md: "minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto",
+                  md: draftIsBem
+                    ? "minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto"
+                    : "minmax(0, 1.4fr) minmax(0, 1fr) auto",
                 },
                 gap: 2,
                 alignItems: "flex-end",
@@ -651,6 +735,7 @@ const SubscaleHardwareArticlePanel = ({
                   value={draftArticleCode}
                   onChange={(value) => {
                     setDraftArticleCode(value);
+                    setDraftNoOfParts("");
                     setAddError("");
                   }}
                   options={dropdownOptions}
@@ -674,16 +759,18 @@ const SubscaleHardwareArticlePanel = ({
                 placeholder="0"
                 sx={{ mb: 0 }}
               />
-              <AppTextField
-                fullWidth
-                label={S.NO_OF_PARTS_LABEL}
-                type="number"
-                inputProps={{ min: 0, step: 1 }}
-                value={draftNoOfParts}
-                onChange={(e) => setDraftNoOfParts(e.target.value)}
-                placeholder="0"
-                sx={{ mb: 0 }}
-              />
+              {draftIsBem ? (
+                <AppTextField
+                  fullWidth
+                  label={S.NO_OF_PARTS_LABEL}
+                  type="number"
+                  inputProps={{ min: 0, step: 1 }}
+                  value={draftNoOfParts}
+                  onChange={(e) => setDraftNoOfParts(e.target.value)}
+                  placeholder="0"
+                  sx={{ mb: 0 }}
+                />
+              ) : null}
               <Button
                 type="button"
                 variant="contained"
@@ -738,7 +825,9 @@ const SubscaleHardwareArticlePanel = ({
                         <TableRow key={row.subscaleArticleCode || row.subscaleArticleName}>
                           <TableCell sx={tableBodyCellSx}>{row.subscaleArticleName}</TableCell>
                           <TableCell sx={tableBodyCellSx}>{row.noOfArticles}</TableCell>
-                          <TableCell sx={tableBodyCellSx}>{row.noOfParts}</TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            {row.isBem === true ? row.noOfParts : "—"}
+                          </TableCell>
                           <TableCell sx={tableBodyCellSx} align="center">
                             <IconButton
                               size="small"
@@ -782,19 +871,30 @@ const SubscaleHardwareArticlePanel = ({
               </Box>
 
               <Box data-ss-field={LINER_BATCH_NO_FIELD.id} sx={{ minWidth: 0 }}>
-                <AppTextField
-                  fullWidth
-                  label={LINER_BATCH_NO_FIELD.label}
-                  required
-                  value={String(values[LINER_BATCH_NO_FIELD.id] ?? "")}
-                  onChange={(e) => {
-                    handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
-                  }}
-                  error={Boolean(errors?.[LINER_BATCH_NO_FIELD.id])}
-                  helperText={errors?.[LINER_BATCH_NO_FIELD.id] || undefined}
-                  placeholder="Enter batch no."
-                  sx={{ mb: 0 }}
-                />
+                {(() => {
+                  const linerBatchValue = String(values[LINER_BATCH_NO_FIELD.id] ?? "");
+                  const linerBatchError =
+                    getSubscaleFieldFormatError(LINER_BATCH_NO_FIELD.id, linerBatchValue) ||
+                    errors?.[LINER_BATCH_NO_FIELD.id];
+                  return (
+                    <>
+                      <AppTextField
+                        fullWidth
+                        label={LINER_BATCH_NO_FIELD.label}
+                        required
+                        value={linerBatchValue}
+                        onChange={(e) => {
+                          handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
+                        }}
+                        error={Boolean(linerBatchError)}
+                        helperText=""
+                        placeholder="Enter batch no."
+                        sx={{ mb: 0 }}
+                      />
+                      <FieldErrorText message={linerBatchError} />
+                    </>
+                  );
+                })()}
               </Box>
 
               <Box data-ss-field={LINER_BATCH_DATE_FIELD.id} sx={{ minWidth: 0 }}>
@@ -880,16 +980,17 @@ const SubscaleHardwareArticlePanel = ({
             >
               <Box sx={{ mb: 2, maxWidth: 280 }}>
                 {(() => {
-                  const errKey = "DATE_OF_CASTING";
-                  const errorMessage = errors?.[errKey];
+                  const castingDateValue = formatToUiDate(String(values.DATE_OF_CASTING ?? ""));
+                  const errorMessage =
+                    getSubscaleFieldFormatError("DATE_OF_CASTING", castingDateValue) ||
+                    errors?.DATE_OF_CASTING;
                   return (
                     <Box data-ss-field="DATE_OF_CASTING">
                       <DateField
                         required
                         label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
-                        value={formatToUiDate(String(values.DATE_OF_CASTING ?? ""))}
+                        value={castingDateValue}
                         onChange={(next) => {
-                          clearFieldError?.("DATE_OF_CASTING");
                           patchFormValues({ DATE_OF_CASTING: next });
                         }}
                         placeholder="DD-MM-YYYY"
@@ -903,6 +1004,7 @@ const SubscaleHardwareArticlePanel = ({
               <CastingTableSection
                 rows={(values.CASTING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
+                getSyncedMouldNo={getSyncedMouldNo}
                 errors={errors}
               />
             </SubscaleProcessSection>
@@ -982,36 +1084,39 @@ const SubscaleHardwareArticlePanel = ({
             >
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
                 {(() => {
-                  const errKey = "IR_BATCH_NO";
-                  const errorMessage = errors?.[errKey];
+                  const irBatchValue = String(values.IR_BATCH_NO ?? "");
+                  const errorMessage =
+                    getSubscaleFieldFormatError("IR_BATCH_NO", irBatchValue) ||
+                    errors?.IR_BATCH_NO;
                   return (
                     <Box data-ss-field="IR_BATCH_NO" sx={{ flex: 1 }}>
                       <FormInput
                         required
                         label={<FieldLabelWithAsterisk label="IR Batch No" required />}
-                        value={values.IR_BATCH_NO ?? ""}
+                        value={irBatchValue}
                         onChange={(e) => {
-                          clearFieldError?.("IR_BATCH_NO");
                           patchFormValues({ IR_BATCH_NO: e.target.value });
                         }}
                         error={Boolean(errorMessage)}
-                        helperText={errorMessage || ""}
+                        helperText=""
+                        sx={{ mb: 0 }}
                       />
+                      <FieldErrorText message={errorMessage} />
                     </Box>
                   );
                 })()}
 
                 {(() => {
-                  const errKey = "DATE_OF_MFG";
-                  const errorMessage = errors?.[errKey];
+                  const mfgValue = formatToUiDate(String(values.DATE_OF_MFG ?? ""));
+                  const errorMessage =
+                    getSubscaleFieldFormatError("DATE_OF_MFG", mfgValue) || errors?.DATE_OF_MFG;
                   return (
                     <Box data-ss-field="DATE_OF_MFG" sx={{ flex: 1 }}>
                       <DateField
                         required
                         label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
-                        value={formatToUiDate(String(values.DATE_OF_MFG ?? ""))}
+                        value={mfgValue}
                         onChange={(next) => {
-                          clearFieldError?.("DATE_OF_MFG");
                           patchFormValues({ DATE_OF_MFG: next });
                         }}
                         placeholder="DD-MM-YYYY"
@@ -1052,6 +1157,7 @@ const SubscaleHardwareArticlePanel = ({
                       <TableCell sx={tableHeaderCellSx}>
                         <FieldLabelWithAsterisk
                           label="Date of Application"
+                          required
                           sx={tableHeaderCellSx}
                         />
                       </TableCell>
@@ -1061,7 +1167,12 @@ const SubscaleHardwareArticlePanel = ({
                   <TableBody>
                     {((values.INHIBITION_TABLE as []) ?? []).map((row: any, idx: number) => {
                       const errKey = `INHIBITION_TABLE.${idx}.DATE_OF_APPLICATION`;
-                      const errorMessage = errors?.[errKey];
+                      const applicationDate = formatToUiDate(
+                        String(row.DATE_OF_APPLICATION ?? ""),
+                      );
+                      const errorMessage =
+                        getSubscaleFieldFormatError("DATE_OF_APPLICATION", applicationDate) ||
+                        errors?.[errKey];
                       return (
                         <TableRow key={idx}>
                           <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
@@ -1078,6 +1189,9 @@ const SubscaleHardwareArticlePanel = ({
                               fieldId="LINER_COATED_SLEEVE_WEIGHT"
                               value={row.LINER_COATED_SLEEVE_WEIGHT ?? ""}
                               onCellChange={updateTableRowCell}
+                              errorMessage={
+                                errors?.[`INHIBITION_TABLE.${idx}.LINER_COATED_SLEEVE_WEIGHT`]
+                              }
                             />
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
@@ -1089,6 +1203,9 @@ const SubscaleHardwareArticlePanel = ({
                               fieldId="WEIGHT_BEFORE_INHIBITION"
                               value={row.WEIGHT_BEFORE_INHIBITION ?? ""}
                               onCellChange={updateTableRowCell}
+                              errorMessage={
+                                errors?.[`INHIBITION_TABLE.${idx}.WEIGHT_BEFORE_INHIBITION`]
+                              }
                             />
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
@@ -1100,6 +1217,9 @@ const SubscaleHardwareArticlePanel = ({
                               fieldId="WEIGHT_AFTER_INHIBITION"
                               value={row.WEIGHT_AFTER_INHIBITION ?? ""}
                               onCellChange={updateTableRowCell}
+                              errorMessage={
+                                errors?.[`INHIBITION_TABLE.${idx}.WEIGHT_AFTER_INHIBITION`]
+                              }
                             />
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
@@ -1111,6 +1231,7 @@ const SubscaleHardwareArticlePanel = ({
                               fieldId="IR_APPLIED_WEIGHT"
                               value={row.IR_APPLIED_WEIGHT ?? ""}
                               onCellChange={updateTableRowCell}
+                              errorMessage={errors?.[`INHIBITION_TABLE.${idx}.IR_APPLIED_WEIGHT`]}
                             />
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
@@ -1121,7 +1242,7 @@ const SubscaleHardwareArticlePanel = ({
                               <DateField
                                 compact
                                 required
-                                value={formatToUiDate(String(row.DATE_OF_APPLICATION ?? ""))}
+                                value={applicationDate}
                                 onChange={(next) => {
                                   updateTableRowCell(
                                     "INHIBITION_TABLE",
@@ -1144,6 +1265,7 @@ const SubscaleHardwareArticlePanel = ({
                               fieldId="REMARKS"
                               value={row.REMARKS ?? ""}
                               onCellChange={updateTableRowCell}
+                              errorMessage={errors?.[`INHIBITION_TABLE.${idx}.REMARKS`]}
                             />
                           </TableCell>
                         </TableRow>

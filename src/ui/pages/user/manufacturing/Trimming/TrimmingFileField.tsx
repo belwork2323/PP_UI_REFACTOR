@@ -39,8 +39,12 @@ type TrimmingFileFieldProps = {
   subDeptSlug?: string;
 };
 
-const acceptForMode = (mode: FileAcceptMode) =>
-  mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+const acceptForMode = (mode: FileAcceptMode) => {
+  if (mode === "image") return FILE_PICKER_ACCEPT.IMAGE;
+  if (mode === "imageVideo") return FILE_PICKER_ACCEPT.IMAGE_VIDEO;
+  if (mode === "pdf") return FILE_PICKER_ACCEPT.IMAGE_PDF;
+  return FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+};
 
 const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;

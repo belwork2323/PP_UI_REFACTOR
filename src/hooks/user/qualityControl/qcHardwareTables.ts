@@ -260,25 +260,46 @@ const readRowsFromValues = <T extends Record<string, unknown>>(
   return fallback;
 };
 
+export const HARDWARE_QA_REMARKS_BLOCK_ID = "QA_REMARKS";
+
+export const getHardwareQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+  subType: QcHardwareProcessSubType,
+): string =>
+  String(values?.[formKey(QC_HARDWARE_SECTION_IDS[subType], HARDWARE_QA_REMARKS_BLOCK_ID)] ?? "");
+
+export const setHardwareQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+  subType: QcHardwareProcessSubType,
+  qaRemarks: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(QC_HARDWARE_SECTION_IDS[subType], HARDWARE_QA_REMARKS_BLOCK_ID)]: qaRemarks,
+});
+
 export const createInitialHardwareProcessValues = (
   subType: QcHardwareProcessSubType,
 ): SchemaFormValues => {
   const sectionId = QC_HARDWARE_SECTION_IDS[subType];
+  const qaRemarksKey = formKey(sectionId, HARDWARE_QA_REMARKS_BLOCK_ID);
   if (subType === "ABRADING") {
     return {
       ...createInitialHardwareUploadValues(),
       [formKey(sectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID)]: [emptyCutRow(1)],
       [formKey(sectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID)]: [emptyCutRow(1)],
+      [qaRemarksKey]: "",
     };
   }
   if (subType === "PREHEATING") {
     return {
       [formKey(sectionId, QC_HARDWARE_PREHEATING_TABLE_ID)]: [emptyPreheatingRow(1)],
+      [qaRemarksKey]: "",
     };
   }
   if (subType === "LINEAR_COATING") {
     return {
       [formKey(sectionId, QC_HARDWARE_LINEAR_COATING_TABLE_ID)]: [emptyLinearCoatingRow(1)],
+      [qaRemarksKey]: "",
     };
   }
   return {
@@ -288,6 +309,7 @@ export const createInitialHardwareProcessValues = (
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: "",
     [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
       emptyVisualObservationRows(),
+    [qaRemarksKey]: "",
   };
 };
 
@@ -1121,12 +1143,14 @@ const dispatchToApi = (values: SchemaFormValues | null | undefined) => {
     observations: String(row.OBSERVATIONS ?? "").trim(),
     remarks: String(row.REMARKS ?? "").trim() || null,
   }));
+  const qaRemarks = getHardwareQaRemarks(values, "DISPATCH").trim();
   return omitEmpty({
     hePunctures: dispatch.HE_PUNCTURES,
     nePunctures: dispatch.NE_PUNCTURES,
     lfPunctures: dispatch.LF_PUNCTURES,
     dispatchDateTime: dispatch.DISPATCH_DATE_TIME,
     visualObservations,
+    qaRemarks: qaRemarks || null,
   });
 };
 
@@ -1137,9 +1161,11 @@ const buildHardwareAbradingPayload = (values: SchemaFormValues): Record<string, 
   const secondCut = sanitizeCutRows(
     getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID),
   ).map((row, index) => cutRowToApiRow(row, index));
+  const qaRemarks = getHardwareQaRemarks(values, "ABRADING").trim();
   return omitEmpty({
     firstCut,
     secondCut,
+    qaRemarks: qaRemarks || null,
   });
 };
 
@@ -1147,14 +1173,22 @@ const buildHardwarePreheatingPayload = (values: SchemaFormValues): Record<string
   const rows = sanitizePreheatingRows(getHardwarePreheatingRows(values)).map((row, index) =>
     preheatingRowToApiRow(row, index),
   );
-  return rows.length ? { rows } : {};
+  const qaRemarks = getHardwareQaRemarks(values, "PREHEATING").trim();
+  return omitEmpty({
+    ...(rows.length ? { rows } : {}),
+    qaRemarks: qaRemarks || null,
+  });
 };
 
 const buildHardwareLinerCoatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
   const rows = sanitizeLinearCoatingRows(getHardwareLinearCoatingRows(values)).map((row, index) =>
     linerRowToApiRow(row, index),
   );
-  return rows.length ? { rows } : {};
+  const qaRemarks = getHardwareQaRemarks(values, "LINEAR_COATING").trim();
+  return omitEmpty({
+    ...(rows.length ? { rows } : {}),
+    qaRemarks: qaRemarks || null,
+  });
 };
 
 const buildHardwareDispatchPayload = (values: SchemaFormValues): Record<string, unknown> =>
@@ -1521,16 +1555,33 @@ export const hydrateHardwareValuesFromMotorDetail = (
   const dispatch = asRecord(motor.dispatch) ?? asRecord(motor.dispatchToCasting) ?? {};
   const uploads = hydrateHardwareAttachmentsFromMotorDetail(motor.attachments);
 
+  const abrading = asRecord(motor.abrading) ?? asRecord(motor.abradingOperation) ?? {};
+
   let values: SchemaFormValues = {
     ...createInitialHardwareProcessValues("ABRADING"),
     [formKey(abradingSectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID)]:
       firstCut.length > 0 ? normalizeCutRows(firstCut) : [emptyCutRow(1)],
     [formKey(abradingSectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID)]:
       secondCut.length > 0 ? normalizeCutRows(secondCut) : [emptyCutRow(1)],
+    [formKey(abradingSectionId, HARDWARE_QA_REMARKS_BLOCK_ID)]: pickApiField(
+      abrading,
+      "qaRemarks",
+      "QA_REMARKS",
+    ),
     [formKey(preheatingSectionId, QC_HARDWARE_PREHEATING_TABLE_ID)]:
       preheatingRows.length > 0 ? normalizePreheatingRows(preheatingRows) : [emptyPreheatingRow(1)],
+    [formKey(preheatingSectionId, HARDWARE_QA_REMARKS_BLOCK_ID)]: pickApiField(
+      preheating,
+      "qaRemarks",
+      "QA_REMARKS",
+    ),
     [formKey(linerSectionId, QC_HARDWARE_LINEAR_COATING_TABLE_ID)]:
       linerRows.length > 0 ? normalizeLinearCoatingRows(linerRows) : [emptyLinearCoatingRow(1)],
+    [formKey(linerSectionId, HARDWARE_QA_REMARKS_BLOCK_ID)]: pickApiField(
+      linerCoating,
+      "qaRemarks",
+      "QA_REMARKS",
+    ),
     [formKey(dispatchSectionId, "HE_PUNCTURES")]: pickApiField(dispatch, "hePunctures", "HE_PUNCTURES"),
     [formKey(dispatchSectionId, "NE_PUNCTURES")]: pickApiField(dispatch, "nePunctures", "NE_PUNCTURES"),
     [formKey(dispatchSectionId, "LF_PUNCTURES")]: pickApiField(dispatch, "lfPunctures", "LF_PUNCTURES"),
@@ -1541,6 +1592,11 @@ export const hydrateHardwareValuesFromMotorDetail = (
     ),
     [formKey(dispatchSectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
       mapDispatchVisualObservationsFromApi(dispatch),
+    [formKey(dispatchSectionId, HARDWARE_QA_REMARKS_BLOCK_ID)]: pickApiField(
+      dispatch,
+      "qaRemarks",
+      "QA_REMARKS",
+    ),
   };
 
   values = mergeHardwareUploadValuesIntoEntryValues(values, uploads);

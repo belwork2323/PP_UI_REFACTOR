@@ -30,6 +30,8 @@ export type StfMainIgniterRow = {
   WEIGHT_OF_COMPOSITION: string;
   SQUIB_RESISTANCE: string;
   REMARKS: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfMainNozzleRow = {
@@ -41,6 +43,8 @@ export type StfMainNozzleRow = {
   DT_AFTER: string;
   DE_AFTER: string;
   REMARKS: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfMainTestingDetails = {
@@ -51,6 +55,8 @@ export type StfMainTestingDetails = {
   CONDITIONING_TEMPERATURE: string;
   AMBIENT_TEMPERATURE: string;
   RH_PERCENT: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfMainSensorRow = {
@@ -65,6 +71,8 @@ export type StfMainSensorRow = {
   EXT_VOLTAGE: string;
   OFFSET_VALUE: string;
   PRELOADING: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfMainResultRow = {
@@ -74,6 +82,8 @@ export type StfMainResultRow = {
   BURN_RATE: string;
   C_STAR: string;
   ISP: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfMainMotorData = {
@@ -92,6 +102,8 @@ export type StfBemConditioningDetails = {
   TEMPERATURE: string;
   RH: string;
   OBSERVATION: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemGrainRow = {
@@ -102,6 +114,8 @@ export type StfBemGrainRow = {
   C: string;
   LENGTH: string;
   WEIGHT: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemHardwareDetails = {
@@ -113,6 +127,8 @@ export type StfBemHardwareDetails = {
   CASING_ID: string;
   CASING_LENGTH: string;
   FIRING_NO: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemIgniterDetails = StfMainIgniterRow;
@@ -127,6 +143,8 @@ export type StfBemNozzleRow = {
   AFTER_D1: string;
   AFTER_D2: string;
   REMARKS: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemTestingDetails = {
@@ -137,6 +155,8 @@ export type StfBemTestingDetails = {
   CONDITIONING_TEMP: string;
   AMBIENT_TEMP: string;
   RH: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemSensorRow = {
@@ -151,6 +171,8 @@ export type StfBemSensorRow = {
   EXT_V: string;
   OFFSET_VALUE: string;
   PRELOADING: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemResultRow = {
@@ -160,6 +182,8 @@ export type StfBemResultRow = {
   BURN_RATE: string;
   C_STAR: string;
   ISP: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
 };
 
 export type StfBemMotorData = {
@@ -183,6 +207,7 @@ export type StfIgniterDetailsApi = {
   weightOfComposition?: number;
   squibResistance?: number;
   remarks?: string;
+  qaRemarks?: string;
 };
 
 export type StfMainNozzleDetailsApi = {
@@ -194,6 +219,7 @@ export type StfMainNozzleDetailsApi = {
   dtAfter?: number;
   deAfter?: number;
   remarks?: string;
+  qaRemarks?: string;
 };
 
 export type StfBemNozzleDetailsApi = {
@@ -206,6 +232,7 @@ export type StfBemNozzleDetailsApi = {
   afterD1?: number;
   afterD2?: number;
   remarks?: string;
+  qaRemarks?: string;
 };
 
 export type StfTestingDetailsApi = {
@@ -216,6 +243,7 @@ export type StfTestingDetailsApi = {
   conditioningTemperature?: number;
   ambientTemperature?: number;
   rhPercent?: number;
+  qaRemarks?: string;
 };
 
 export type StfSensorConfigurationApi = {
@@ -230,6 +258,7 @@ export type StfSensorConfigurationApi = {
   extVoltage?: number;
   offsetValue?: number;
   preloading?: number;
+  qaRemarks?: string;
 };
 
 export type StfResultDetailsApi = {
@@ -239,6 +268,7 @@ export type StfResultDetailsApi = {
   burnRate?: number;
   cStar?: number;
   isp?: number;
+  qaRemarks?: string;
 };
 
 export type StfConditioningDetailsApi = {
@@ -247,6 +277,7 @@ export type StfConditioningDetailsApi = {
   temperature?: number;
   rh?: number;
   observation?: string;
+  qaRemarks?: string;
 };
 
 export type StfGrainDimensionApi = {
@@ -257,6 +288,7 @@ export type StfGrainDimensionApi = {
   c?: number;
   length?: number;
   weight?: number;
+  qaRemarks?: string;
 };
 
 export type StfBemHardwareDetailsApi = {
@@ -268,6 +300,7 @@ export type StfBemHardwareDetailsApi = {
   casingId?: number;
   casingLength?: number;
   firingNo?: string;
+  qaRemarks?: string;
 };
 
 export type StfStaticTestingDetailsApi = {
@@ -297,6 +330,7 @@ const createMainSensorRows = (): StfMainSensorRow[] =>
     EXT_VOLTAGE: "",
     OFFSET_VALUE: "",
     PRELOADING: "",
+    QA_REMARKS: "",
   }));
 
 const createBemSensorRows = (): StfBemSensorRow[] =>
@@ -312,6 +346,7 @@ const createBemSensorRows = (): StfBemSensorRow[] =>
     EXT_V: "",
     OFFSET_VALUE: "",
     PRELOADING: "",
+    QA_REMARKS: "",
   }));
 
 const createGrainRows = (): StfBemGrainRow[] =>
@@ -323,6 +358,7 @@ const createGrainRows = (): StfBemGrainRow[] =>
     C: "",
     LENGTH: "",
     WEIGHT: "",
+    QA_REMARKS: "",
   }));
 
 export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
@@ -333,6 +369,7 @@ export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
     WEIGHT_OF_COMPOSITION: "",
     SQUIB_RESISTANCE: "",
     REMARKS: "",
+    QA_REMARKS: "",
   },
   NOZZLE_DETAILS: {
     NOZZLE_CLOSURE_MATERIAL: "",
@@ -343,6 +380,7 @@ export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
     DT_AFTER: "",
     DE_AFTER: "",
     REMARKS: "",
+    QA_REMARKS: "",
   },
   TESTING_DETAILS: {
     THROAT_DIAMETER: "",
@@ -352,6 +390,7 @@ export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
     CONDITIONING_TEMPERATURE: "",
     AMBIENT_TEMPERATURE: "",
     RH_PERCENT: "",
+    QA_REMARKS: "",
   },
   SENSOR_CONFIGURATION: createMainSensorRows(),
   STATIC_TEST_RESULT: {
@@ -361,6 +400,7 @@ export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
     BURN_RATE: "",
     C_STAR: "",
     ISP: "",
+    QA_REMARKS: "",
   },
   UPLOAD_PT_CURVE: { PT_CURVE_FILE: [] },
 });
@@ -373,6 +413,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     TEMPERATURE: "",
     RH: "",
     OBSERVATION: "",
+    QA_REMARKS: "",
   },
   GRAIN_DIMENSION: createGrainRows(),
   BEM_HARDWARE_DETAILS: {
@@ -384,6 +425,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     CASING_ID: "",
     CASING_LENGTH: "",
     FIRING_NO: "",
+    QA_REMARKS: "",
   },
   IGNITER_DETAILS: {
     CONTAINER_TYPE: "",
@@ -391,6 +433,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     WEIGHT_OF_COMPOSITION: "",
     SQUIB_RESISTANCE: "",
     REMARKS: "",
+    QA_REMARKS: "",
   },
   NOZZLE_DETAILS: {
     NOZZLE_CLOSURE_MATERIAL: "",
@@ -402,6 +445,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     AFTER_D1: "",
     AFTER_D2: "",
     REMARKS: "",
+    QA_REMARKS: "",
   },
   TESTING_DETAILS: {
     THROAT_DIAMETER: "",
@@ -411,6 +455,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     CONDITIONING_TEMP: "",
     AMBIENT_TEMP: "",
     RH: "",
+    QA_REMARKS: "",
   },
   SENSOR_CONFIGURATION: createBemSensorRows(),
   RESULT_DETAILS: {
@@ -420,6 +465,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     BURN_RATE: "",
     C_STAR: "",
     ISP: "",
+    QA_REMARKS: "",
   },
   UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: [] },
 });
@@ -461,7 +507,12 @@ const mapRowFields = <T extends Record<string, string>>(
 ): T => {
   const next = { ...preset };
   (Object.keys(preset) as Array<keyof T>).forEach((key) => {
-    const value = pickField(saved, String(key));
+    const keyStr = String(key);
+    // Prefer UI key; for QA_REMARKS also accept API camelCase qaRemarks (never mfg remarks).
+    const value =
+      keyStr === "QA_REMARKS"
+        ? pickField(saved, "QA_REMARKS", "qaRemarks")
+        : pickField(saved, keyStr);
     if (value !== undefined && value !== null) {
       next[key] = str(value) as T[keyof T];
     }
@@ -516,6 +567,7 @@ const buildIgniterDetails = (row: StfMainIgniterRow): StfIgniterDetailsApi =>
     weightOfComposition: numOrOmit(row.WEIGHT_OF_COMPOSITION),
     squibResistance: numOrOmit(row.SQUIB_RESISTANCE),
     remarks: row.REMARKS.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildMainNozzleDetails = (row: StfMainNozzleRow): StfMainNozzleDetailsApi =>
@@ -528,6 +580,7 @@ const buildMainNozzleDetails = (row: StfMainNozzleRow): StfMainNozzleDetailsApi 
     dtAfter: numOrOmit(row.DT_AFTER),
     deAfter: numOrOmit(row.DE_AFTER),
     remarks: row.REMARKS.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildBemNozzleDetails = (row: StfBemNozzleRow): StfBemNozzleDetailsApi =>
@@ -541,6 +594,7 @@ const buildBemNozzleDetails = (row: StfBemNozzleRow): StfBemNozzleDetailsApi =>
     afterD1: numOrOmit(row.AFTER_D1),
     afterD2: numOrOmit(row.AFTER_D2),
     remarks: row.REMARKS.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildMainTestingDetails = (row: StfMainTestingDetails): StfTestingDetailsApi =>
@@ -552,6 +606,7 @@ const buildMainTestingDetails = (row: StfMainTestingDetails): StfTestingDetailsA
     conditioningTemperature: numOrOmit(row.CONDITIONING_TEMPERATURE),
     ambientTemperature: numOrOmit(row.AMBIENT_TEMPERATURE),
     rhPercent: numOrOmit(row.RH_PERCENT),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildBemTestingDetails = (row: StfBemTestingDetails): StfTestingDetailsApi =>
@@ -563,6 +618,7 @@ const buildBemTestingDetails = (row: StfBemTestingDetails): StfTestingDetailsApi
     conditioningTemperature: numOrOmit(row.CONDITIONING_TEMP),
     ambientTemperature: numOrOmit(row.AMBIENT_TEMP),
     rhPercent: numOrOmit(row.RH),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildMainSensorConfigurations = (
@@ -582,6 +638,7 @@ const buildMainSensorConfigurations = (
         extVoltage: numOrOmit(row.EXT_VOLTAGE),
         offsetValue: numOrOmit(row.OFFSET_VALUE),
         preloading: numOrOmit(row.PRELOADING),
+        qaRemarks: row.QA_REMARKS.trim() || undefined,
       }),
     )
     .filter((row) => Object.keys(row).length > 0);
@@ -601,6 +658,7 @@ const buildBemSensorConfigurations = (rows: StfBemSensorRow[]): StfSensorConfigu
         extVoltage: numOrOmit(row.EXT_V),
         offsetValue: numOrOmit(row.OFFSET_VALUE),
         preloading: numOrOmit(row.PRELOADING),
+        qaRemarks: row.QA_REMARKS.trim() || undefined,
       }),
     )
     .filter((row) => Object.keys(row).length > 0);
@@ -613,6 +671,7 @@ const buildMainResultDetails = (row: StfMainResultRow): StfResultDetailsApi =>
     burnRate: numOrOmit(row.BURN_RATE),
     cStar: numOrOmit(row.C_STAR),
     isp: numOrOmit(row.ISP),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildBemResultDetails = (row: StfBemResultRow): StfResultDetailsApi =>
@@ -623,6 +682,7 @@ const buildBemResultDetails = (row: StfBemResultRow): StfResultDetailsApi =>
     burnRate: numOrOmit(row.BURN_RATE),
     cStar: numOrOmit(row.C_STAR),
     isp: numOrOmit(row.ISP),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildConditioningDetails = (row: StfBemConditioningDetails): StfConditioningDetailsApi =>
@@ -632,6 +692,7 @@ const buildConditioningDetails = (row: StfBemConditioningDetails): StfConditioni
     temperature: numOrOmit(row.TEMPERATURE),
     rh: numOrOmit(row.RH),
     observation: row.OBSERVATION.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const buildGrainDimensions = (rows: StfBemGrainRow[]): StfGrainDimensionApi[] =>
@@ -645,6 +706,7 @@ const buildGrainDimensions = (rows: StfBemGrainRow[]): StfGrainDimensionApi[] =>
         c: numOrOmit(row.C),
         length: numOrOmit(row.LENGTH),
         weight: numOrOmit(row.WEIGHT),
+        qaRemarks: row.QA_REMARKS.trim() || undefined,
       }),
     )
     .filter((row) => Object.keys(row).length > 0);
@@ -659,6 +721,7 @@ const buildBemHardwareDetails = (row: StfBemHardwareDetails): StfBemHardwareDeta
     casingId: numOrOmit(row.CASING_ID),
     casingLength: numOrOmit(row.CASING_LENGTH),
     firingNo: row.FIRING_NO.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
 const hasNestedDtoShape = (details: Record<string, unknown>) =>
@@ -684,6 +747,7 @@ const parseIgniterDetails = (
     WEIGHT_OF_COMPOSITION: pickField(source ?? {}, "weightOfComposition", "WEIGHT_OF_COMPOSITION"),
     SQUIB_RESISTANCE: pickField(source ?? {}, "squibResistance", "SQUIB_RESISTANCE"),
     REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseMainNozzleDetails = (
@@ -699,6 +763,7 @@ const parseMainNozzleDetails = (
     DT_AFTER: pickField(source ?? {}, "dtAfter", "DT_AFTER"),
     DE_AFTER: pickField(source ?? {}, "deAfter", "DE_AFTER"),
     REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseBemNozzleDetails = (
@@ -715,6 +780,7 @@ const parseBemNozzleDetails = (
     AFTER_D1: pickField(source ?? {}, "afterD1", "AFTER_D1"),
     AFTER_D2: pickField(source ?? {}, "afterD2", "AFTER_D2"),
     REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseTestingDetailsMain = (
@@ -733,6 +799,7 @@ const parseTestingDetailsMain = (
     ),
     AMBIENT_TEMPERATURE: pickField(source ?? {}, "ambientTemperature", "AMBIENT_TEMPERATURE"),
     RH_PERCENT: pickField(source ?? {}, "rhPercent", "RH_PERCENT"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseTestingDetailsBem = (
@@ -747,6 +814,7 @@ const parseTestingDetailsBem = (
     CONDITIONING_TEMP: pickField(source ?? {}, "conditioningTemperature", "CONDITIONING_TEMP", "CONDITIONING_TEMPERATURE"),
     AMBIENT_TEMP: pickField(source ?? {}, "ambientTemperature", "AMBIENT_TEMP", "AMBIENT_TEMPERATURE"),
     RH: pickField(source ?? {}, "rhPercent", "RH", "RH_PERCENT"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseMainSensorConfigurations = (
@@ -768,6 +836,7 @@ const parseMainSensorConfigurations = (
       EXT_VOLTAGE: str(pickField(saved, "extVoltage", "EXT_VOLTAGE", "EXT_V")),
       OFFSET_VALUE: str(pickField(saved, "offsetValue", "OFFSET_VALUE")),
       PRELOADING: str(pickField(saved, "preloading", "PRELOADING")),
+      QA_REMARKS: str(pickField(saved, "qaRemarks", "QA_REMARKS")),
     };
   });
 };
@@ -791,6 +860,7 @@ const parseBemSensorConfigurations = (
       EXT_V: str(pickField(saved, "extVoltage", "EXT_V", "EXT_VOLTAGE")),
       OFFSET_VALUE: str(pickField(saved, "offsetValue", "OFFSET_VALUE")),
       PRELOADING: str(pickField(saved, "preloading", "PRELOADING")),
+      QA_REMARKS: str(pickField(saved, "qaRemarks", "QA_REMARKS")),
     };
   });
 };
@@ -806,6 +876,7 @@ const parseMainResultDetails = (
     BURN_RATE: pickField(source ?? {}, "burnRate", "BURN_RATE"),
     C_STAR: pickField(source ?? {}, "cStar", "C_STAR"),
     ISP: pickField(source ?? {}, "isp", "ISP"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseBemResultDetails = (
@@ -819,6 +890,7 @@ const parseBemResultDetails = (
     BURN_RATE: pickField(source ?? {}, "burnRate", "BURN_RATE"),
     C_STAR: pickField(source ?? {}, "cStar", "C_STAR"),
     ISP: pickField(source ?? {}, "isp", "ISP"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseFromNestedDto = (
@@ -859,6 +931,7 @@ const parseFromNestedDto = (
         TEMPERATURE: pickField(conditioning ?? {}, "temperature", "TEMPERATURE"),
         RH: pickField(conditioning ?? {}, "rh", "RH"),
         OBSERVATION: pickField(conditioning ?? {}, "observation", "OBSERVATION"),
+        QA_REMARKS: pickField(conditioning ?? {}, "qaRemarks", "QA_REMARKS"),
       }),
       FROM_DATE_TIME:
         toUiDateTime(pickField(conditioning ?? {}, "fromDateTime", "FROM_DATE_TIME")) ||
@@ -881,6 +954,7 @@ const parseFromNestedDto = (
       CASING_ID: pickField(hardware ?? {}, "casingId", "CASING_ID"),
       CASING_LENGTH: pickField(hardware ?? {}, "casingLength", "CASING_LENGTH"),
       FIRING_NO: pickField(hardware ?? {}, "firingNo", "FIRING_NO"),
+      QA_REMARKS: pickField(hardware ?? {}, "qaRemarks", "QA_REMARKS"),
     }),
     IGNITER_DETAILS: parseIgniterDetails(empty.IGNITER_DETAILS, igniter ?? undefined),
     NOZZLE_DETAILS: parseBemNozzleDetails(empty.NOZZLE_DETAILS, nozzle ?? undefined),

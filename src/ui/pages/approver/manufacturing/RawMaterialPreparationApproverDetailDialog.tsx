@@ -32,8 +32,8 @@ type RawMaterialPreparationApproverDetailDialogProps = {
   loading: boolean;
   activePremixNo?: number | null;
   onActivePremixChange?: (premixNo: number) => void;
-  onApprove: (item: RawMaterialPreparationApproverDetailItem) => void;
-  onReject: (item: RawMaterialPreparationApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -107,8 +107,8 @@ const RawMaterialPreparationApproverDetailDialog = ({
             loading={loading}
             activePremixNo={activePremixNo}
             onActivePremixChange={onActivePremixChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}
@@ -133,6 +133,7 @@ const RawMaterialPreparationApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="raw-material-prep"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`RMP Report — ${item.batchId}`}
       />
     </>

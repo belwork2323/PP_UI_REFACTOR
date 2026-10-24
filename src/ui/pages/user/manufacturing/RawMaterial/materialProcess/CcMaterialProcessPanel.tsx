@@ -17,6 +17,7 @@ type Props = {
   disabled?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  showQaRemarks?: boolean;
 };
 
 const splitFieldErrors = (
@@ -45,6 +46,7 @@ const CcMaterialProcessPanel = ({
   disabled,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const lotErrors = useMemo(
     () => splitFieldErrors(validationErrors, "lotDetails"),
@@ -75,6 +77,9 @@ const CcMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={lotErrors}
+        showQaRemarks={showQaRemarks}
+        qaRemarks={value.lotDetailsQaRemarks}
+        onQaRemarksChange={(lotDetailsQaRemarks) => patch({ lotDetailsQaRemarks })}
       />
       <DoaFormatSection
         title={ccIoSectionTitle(value.uiKey)}
@@ -88,6 +93,9 @@ const CcMaterialProcessPanel = ({
         onTotalQtySentForPremixChange={(totalQtySentForPremix) =>
           patch({ totalQtySentForPremix })
         }
+        showQaRemarks={showQaRemarks}
+        qaRemarks={value.qaRemarks}
+        onQaRemarksChange={(qaRemarks) => patch({ qaRemarks })}
         disabled={disabled}
         theme={theme}
         validationErrors={validationErrors}
@@ -100,6 +108,7 @@ const CcMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={dryingErrors}
+            showQaRemarks={showQaRemarks}
           />
           <SievingSection
             value={value.sieving}
@@ -107,6 +116,7 @@ const CcMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={sievingErrors}
+            showQaRemarks={showQaRemarks}
           />
         </>
       ) : null}

@@ -48,6 +48,19 @@ const displayValue = (value: unknown): string => {
   return String(value);
 };
 
+/** API materials usually have lotIds[]; older rows may only have singular lotId. */
+const displayMaterialLotIds = (material: {
+  lotId?: string | null;
+  lotIds?: string[] | null;
+}): string => {
+  const singular = String(material.lotId ?? "").trim();
+  if (singular) return singular;
+  const fromArray = (material.lotIds ?? [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean);
+  return fromArray.length > 0 ? fromArray.join(", ") : "—";
+};
+
 const IdentificationSheetCollapsible = ({
   batchId,
   identificationSheet,
@@ -218,7 +231,9 @@ const IdentificationSheetCollapsible = ({
                           <TableCell sx={dt.tableCell}>
                             {displayValue(material.gradeName || material.gradeCode)}
                           </TableCell>
-                          <TableCell sx={dt.tableCell}>{displayValue(material.lotId)}</TableCell>
+                          <TableCell sx={dt.tableCell}>
+                            {displayMaterialLotIds(material)}
+                          </TableCell>
                           <TableCell sx={dt.tableCell}>
                             {displayValue(material.make || material.manufacturerName)}
                           </TableCell>

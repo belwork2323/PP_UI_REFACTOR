@@ -33,8 +33,8 @@ type SubscaleApproverDetailDialogProps = {
   item: SubscaleApproverDetailItem | null;
   detailView: SubscaleDetailView | null;
   loading: boolean;
-  onApprove: (item: SubscaleApproverDetailItem) => void;
-  onReject: (item: SubscaleApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -111,7 +111,7 @@ const SubscaleApproverDetailDialog = ({
           <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
             Close
           </Button>
-          {canApproveOrReject ? (
+          {canApproveOrReject && onApprove && onReject ? (
             <>
               <Button
                 variant="contained"
@@ -142,6 +142,7 @@ const SubscaleApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="subscale"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`Subscale Report — ${item.batchId}`}
       />
     </>

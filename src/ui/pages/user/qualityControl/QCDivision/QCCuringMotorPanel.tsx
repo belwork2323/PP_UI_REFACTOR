@@ -18,8 +18,11 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
+import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import {
   QC_CURING_HOT_WATER_STATUS_OPTIONS,
   QC_CURING_SECTION_IDS,
@@ -34,12 +37,14 @@ import {
 import {
   getCuringCycleRows,
   getCuringPostField,
+  getCuringSectionQaRemarks,
   getCuringSetupField,
   getCuringSubscaleField,
   getCuringSubscaleParameterRows,
   getCuringTypeFromValues,
   setCuringCycleRows,
   setCuringPostField,
+  setCuringSectionQaRemarks,
   setCuringSetupField,
   setCuringSubscaleField,
   setCuringSubscaleParameterRows,
@@ -594,7 +599,7 @@ const CYCLE_COLUMN_DEFS: Record<
     fieldType: "select",
     options: QC_CURING_HOT_WATER_STATUS_OPTIONS,
   },
-  REMARKS: { id: "REMARKS", label: "Remarks", fieldType: "textarea" },
+  QA_REMARKS: { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 };
 
 const buildCycleColumns = (subType: string | null | undefined) =>
@@ -612,7 +617,7 @@ const createEmptyCycleRow = (srNo: number): QcCuringCycleRow => ({
   PROPELLANT_PRESSURE: "",
   PEAK_PRESSURE_ACHIEVED: "",
   HOT_WATER_STATUS: "",
-  REMARKS: "",
+  QA_REMARKS: "",
 });
 
 const SUBSCALE_PARAMETER_COLUMNS: ColumnDef<QcCuringSubscaleParameterRow>[] = [
@@ -622,6 +627,7 @@ const SUBSCALE_PARAMETER_COLUMNS: ColumnDef<QcCuringSubscaleParameterRow>[] = [
   { id: "WHEEL_PEEL_NO", label: "Wheel Peel No.", fieldType: "number", required: true },
   { id: "CARTON_NO", label: "Carton No.", fieldType: "number", required: true },
   { id: "CONTROL_GRAIN_NO", label: "Control Grain No.", fieldType: "number", required: true },
+  { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];
 
 type QCCuringMotorPanelProps = {
@@ -643,6 +649,8 @@ const QCCuringMotorPanel = ({
   headerActions,
   validationErrors = null,
 }: QCCuringMotorPanelProps) => {
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const curingType = useMemo(
     () => getCuringTypeFromValues(values, curingSubType),
@@ -657,11 +665,19 @@ const QCCuringMotorPanel = ({
     [values],
   );
   const curingTypeLabel = useMemo(() => getQcCuringTypeLabel(curingType), [curingType]);
+  const setupQaRemarks = useMemo(
+    () => getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.MOTOR_SETUP),
+    [values],
+  );
 
   const cycleRows = useMemo(() => getCuringCycleRows(values), [values]);
 
   const visualObservations = useMemo(
     () => getCuringPostField(values, "VISUAL_OBSERVATIONS"),
+    [values],
+  );
+  const postQaRemarks = useMemo(
+    () => getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.POST_CURING),
     [values],
   );
   const pressurePlateRemovalDateTime = useMemo(
@@ -708,6 +724,10 @@ const QCCuringMotorPanel = ({
   );
   const subscaleVisualObservations = useMemo(
     () => getCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS"),
+    [values],
+  );
+  const subscaleQaRemarks = useMemo(
+    () => getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.SUBSCALE),
     [values],
   );
 
@@ -788,6 +808,20 @@ const QCCuringMotorPanel = ({
               )}
             </SetupFieldCell>
           </Stack>
+          <Box sx={{ mt: 1.5 }} data-qc-field="CURING_MOTOR_SETUP.qaRemarks">
+            <CasePrepTextField
+              label="QA Remarks"
+              value={setupQaRemarks}
+              readOnly={readOnly}
+              width="100%"
+              theme={manufacturingTheme}
+              onChange={(next) =>
+                onChange(
+                  setCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.MOTOR_SETUP, next),
+                )
+              }
+            />
+          </Box>
         </SectionCard>
 
         <SectionCard
@@ -857,6 +891,20 @@ const QCCuringMotorPanel = ({
                 },
               )}
             </FieldRow>
+            <Box data-qc-field="POST_CURING_DETAILS.qaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={postQaRemarks}
+                readOnly={readOnly}
+                width="100%"
+                theme={manufacturingTheme}
+                onChange={(next) =>
+                  onChange(
+                    setCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.POST_CURING, next),
+                  )
+                }
+              />
+            </Box>
           </Stack>
         </SectionCard>
 
@@ -881,6 +929,7 @@ const QCCuringMotorPanel = ({
                 WHEEL_PEEL_NO: "",
                 CARTON_NO: "",
                 CONTROL_GRAIN_NO: "",
+                QA_REMARKS: "",
               })}
               readOnly={readOnly}
               showSerialNumber={false}
@@ -1014,6 +1063,18 @@ const QCCuringMotorPanel = ({
                 },
               )}
             </FieldRow>
+            <Box data-qc-field="SUBSCALE_ARTICLES_CURING.qaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={subscaleQaRemarks}
+                readOnly={readOnly}
+                width="100%"
+                theme={manufacturingTheme}
+                onChange={(next) =>
+                  onChange(setCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.SUBSCALE, next))
+                }
+              />
+            </Box>
           </Stack>
         </SectionCard>
       </Stack>

@@ -150,7 +150,21 @@ export const normalizeSheetMaterialsForWeightmentCompare = (
         materialName: String(m.materialName ?? m.material_name ?? materialCode).trim(),
         gradeCode: String(m.gradeCode ?? m.grade_code ?? "").trim() || undefined,
         gradeName: String(m.gradeName ?? m.grade_name ?? "").trim() || undefined,
-        lotId: String(m.lotId ?? m.lot_id ?? "").trim(),
+        // API stores lotIds[]; singular lotId is often empty — keep both for dropdown + compare table.
+        ...(() => {
+          const fromArray = Array.isArray(m.lotIds)
+            ? m.lotIds.map((id) => String(id ?? "").trim()).filter(Boolean)
+            : Array.isArray(m.lot_ids)
+              ? m.lot_ids.map((id) => String(id ?? "").trim()).filter(Boolean)
+              : [];
+          const singular = String(m.lotId ?? m.lot_id ?? "").trim();
+          const lotIds =
+            fromArray.length > 0 ? fromArray : singular ? [singular] : [];
+          return {
+            lotIds,
+            lotId: singular || lotIds.join(", "),
+          };
+        })(),
         make: String(m.make ?? m.manufacturerName ?? "").trim(),
         manufacturerName: String(m.manufacturerName ?? m.make ?? "").trim(),
         requiredComposition: unwrapSheetNumber(m.requiredComposition ?? m.required_composition),

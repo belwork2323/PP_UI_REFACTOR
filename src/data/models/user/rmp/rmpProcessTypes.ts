@@ -28,6 +28,7 @@ export type DryingTrayOvenDto = {
   endDatetime?: string | null;
   moisture?: string | null;
   observation?: string | null;
+  qaRemarks?: string | null;
 };
 
 export type SievingDto = {
@@ -35,6 +36,7 @@ export type SievingDto = {
   sievedQuantity?: string | null;
   sieveMeshSize?: string | null;
   observation?: string | null;
+  qaRemarks?: string | null;
 };
 
 export type ApOperationParameterRowDto = {
@@ -59,6 +61,9 @@ export type ApCoarseProcessDto = {
   blendingDryingParameters?: ApOperationParameterRowDto[];
   dryingOperationRvd?: ApTimedOperationParameterRowDto[];
   particleSizeDistribution?: ApParticleSizeRowDto[];
+  blendingDryingQaRemarks?: string | null;
+  dryingOperationRvdQaRemarks?: string | null;
+  particleSizeDistributionQaRemarks?: string | null;
 };
 
 export type ApFineProcessDto = {
@@ -71,10 +76,13 @@ export type ApFineProcessDto = {
   grindingStartDatetime?: string | null;
   grindingEndDatetime?: string | null;
   grindingObservation?: string | null;
+  grindingQaRemarks?: string | null;
   particleSizeDistribution?: ApParticleSizeRowDto[];
   qtyKgQualified?: string | null;
   blendingDryingParameters?: ApOperationParameterRowDto[];
+  blendingDryingQaRemarks?: string | null;
   dryingOperationRvd?: ApTimedOperationParameterRowDto[];
+  dryingOperationRvdQaRemarks?: string | null;
   trayOvenStorage?: DryingTrayOvenDto | null;
   sieving?: SievingDto | null;
 };
@@ -87,6 +95,7 @@ export type ApUltraFineProcessDto = {
   grindingStartDatetime?: string | null;
   grindingEndDatetime?: string | null;
   grindingObservation?: string | null;
+  grindingQaRemarks?: string | null;
   particleSizeResult?: string | null;
   qtyKgQualified?: string | null;
   drying?: DryingTrayOvenDto | null;
@@ -101,6 +110,7 @@ export type AluminumProcessDto = {
   observation?: string | null;
   qtyKgQualified?: string | null;
   dispatchDatetime?: string | null;
+  qaRemarks?: string | null;
 };
 
 export type DoaProcessDto = {
@@ -110,6 +120,7 @@ export type DoaProcessDto = {
   dispatchDatetime?: string | null;
   observation?: string | null;
   totalQtySentForPremix?: string | null;
+  qaRemarks?: string | null;
 };
 
 /** Typed API process entry — no sections bag for RMP writes. */
@@ -122,6 +133,8 @@ export type PreparationProcessEntry = {
   /** RMP typed process; optional for legacy QC section payloads. */
   processType?: RmpProcessType | string;
   lotDetails?: LotDetailDto[];
+  lotDetailsQaRemarks?: string | null;
+  qaRemarks?: string | null;
   drying?: DryingTrayOvenDto | null;
   sieving?: SievingDto | null;
   apCoarse?: ApCoarseProcessDto | null;

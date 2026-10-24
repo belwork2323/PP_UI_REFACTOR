@@ -65,6 +65,11 @@ import {
 } from "./qcNdtTables";
 import { buildInitialNdtValuesForMotor } from "./qcNdtDivisionDetails";
 import {
+  buildInitialStfValuesForMotor,
+  createInitialStfValues,
+  stfFormValuesHaveUserData,
+} from "./qcStfTables";
+import {
   createInitialWeighmentValues,
   hydrateWeighmentValuesFromRecord,
   hydrateWeighmentValuesFromSections,
@@ -495,6 +500,31 @@ export async function hydrateQcDivisionFormFromDetails(
       if (createdFromNested) continue;
     }
 
+    if (division === "STATIC_TEST_FACILITY") {
+      const dataRec = asRecord(detailData) ?? {};
+      const motors = [...asArray(dataRec.motors), ...asArray(dataRec.motorDetails)];
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId) continue;
+        const subTypeRaw = String(rec.subType ?? rec.sub_type ?? detailSubType ?? "")
+          .trim()
+          .toUpperCase();
+        const entrySubType = (
+          subTypeRaw === "MAIN_MOTOR" ? "MAIN_MOTOR" : subTypeRaw === "BEM" ? "BEM" : null
+        ) as QcApiSubType;
+        const { entryId } = makeEntry("STF", entrySubType, [], undefined, motorId);
+        entryValues[entryId] = {
+          schemaValues: buildInitialStfValuesForMotor({ data: dataRec, motors }, motorId),
+        };
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
     if (division === "WEIGHTMENT") {
       const dataRec = asRecord(detailData) ?? {};
       const scale = asRecord(dataRec.weighscaleDetails);
@@ -915,6 +945,31 @@ export async function hydrateQcDivisionFormFromDetails(
       ) {
         entryValues[entry.entryId] = {
           schemaValues: createInitialNdtValues(),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "STF") {
+      // First pass already hydrated from division data; do not overwrite with empty shells.
+      if (stfFormValuesHaveUserData(entryValues[entry.entryId]?.schemaValues)) {
+        continue;
+      }
+      if (entry.motorId) {
+        const nestedValues = buildInitialStfValuesForMotor(detailsRecord, entry.motorId);
+        if (stfFormValuesHaveUserData(nestedValues)) {
+          entryValues[entry.entryId] = { schemaValues: nestedValues };
+          continue;
+        }
+      }
+      if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialStfValues(
+            String(entry.subType ?? "").toUpperCase() === "MAIN_MOTOR" ? "MAIN_MOTOR" : "BEM",
+          ),
         };
       }
       continue;

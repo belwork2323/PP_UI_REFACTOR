@@ -281,6 +281,7 @@ const QCPostCureMotorPanel = ({
           readOnly={readOnly}
           theme={panelTheme}
           useQcDivisionFileField
+          qaRemarksMode
           motorId={motorId}
         />
       ) : null}
@@ -365,6 +366,7 @@ const QCPostCureMotorPanel = ({
               readOnly={readOnly}
               theme={panelTheme}
               useQcDivisionFileField
+              qaRemarksMode
               motorId={motorId}
             />
           ) : null}

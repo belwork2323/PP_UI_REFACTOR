@@ -6,6 +6,7 @@ import {
 import {
   createDispatchFormApi,
   fetchDispatchFormDetailsApi,
+  fetchDispatchMotorDetailsApi,
   updateDispatchFormApi,
 } from "../../../data/api/users/dispatch/dispatchAPI";
 
@@ -87,6 +88,21 @@ export type DispatchDetailsPayload = {
   // subDepartmentId: number;
 };
 
+export type DispatchMotorDetailsPayload = {
+  batchId: string;
+  motorId?: string;
+};
+
+export type DispatchMotorSeed = {
+  motorId: string;
+  dispatchDetails: Record<string, unknown>;
+};
+
+export type DispatchMotorDetailsResult = {
+  batchId: string;
+  motors: DispatchMotorSeed[];
+};
+
 export const dispatchController = {
   createForm: async (payload: DispatchCreatePayload) => {
     try {
@@ -124,6 +140,34 @@ export const dispatchController = {
       );
     } catch (error) {
       console.error("Failed to update Dispatch form:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  fetchMotorDetails: async (payload: DispatchMotorDetailsPayload) => {
+    try {
+      const response = await fetchDispatchMotorDetailsApi(payload);
+      return new ApiResponseModel<DispatchMotorDetailsResult>(response, (res) => {
+        const data = (res?.data ?? res ?? {}) as Record<string, unknown>;
+        const motorsRaw = Array.isArray(data.motors) ? data.motors : [];
+        const motors: DispatchMotorSeed[] = motorsRaw
+          .map((entry) => {
+            const rec = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+            const motorId = String(rec.motorId ?? "").trim();
+            const dispatchDetails =
+              rec.dispatchDetails && typeof rec.dispatchDetails === "object"
+                ? (rec.dispatchDetails as Record<string, unknown>)
+                : {};
+            return { motorId, dispatchDetails };
+          })
+          .filter((entry) => entry.motorId.length > 0);
+        return {
+          batchId: String(data.batchId ?? payload.batchId ?? ""),
+          motors,
+        };
+      });
+    } catch (error) {
+      console.error("Failed to fetch Dispatch motor details seed:", error);
       return new ApiResponseModel(error);
     }
   },

@@ -54,6 +54,7 @@ export type DryingTrayOvenForm = {
   endDatetime: string;
   moisture: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type SievingForm = {
@@ -61,11 +62,13 @@ export type SievingForm = {
   sievedQuantity: string;
   sieveMeshSize: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type DefaultSolidProcessForm = {
   uiKey: "defaultSolid";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   drying: DryingTrayOvenForm;
   sieving: SievingForm;
 };
@@ -73,6 +76,8 @@ export type DefaultSolidProcessForm = {
 export type DefaultLiquidProcessForm = {
   uiKey: "defaultLiquid";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
+  qaRemarks: string;
 };
 
 export type RmpMaterialProcessForm =
@@ -94,6 +99,7 @@ export const createEmptyDryingTrayOvenForm = (): DryingTrayOvenForm => ({
   endDatetime: "",
   moisture: "",
   observation: "",
+  qaRemarks: "",
 });
 
 export const createEmptySievingForm = (): SievingForm => ({
@@ -101,11 +107,13 @@ export const createEmptySievingForm = (): SievingForm => ({
   sievedQuantity: "",
   sieveMeshSize: "",
   observation: "",
+  qaRemarks: "",
 });
 
 export const createEmptyDefaultSolidProcessForm = (): DefaultSolidProcessForm => ({
   uiKey: "defaultSolid",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   drying: createEmptyDryingTrayOvenForm(),
   sieving: createEmptySievingForm(),
 });
@@ -113,6 +121,8 @@ export const createEmptyDefaultSolidProcessForm = (): DefaultSolidProcessForm =>
 export const createEmptyDefaultLiquidProcessForm = (): DefaultLiquidProcessForm => ({
   uiKey: "defaultLiquid",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
+  qaRemarks: "",
 });
 
 export const createEmptyProcessFormForUiKey = (uiKey: RmpMaterialUiKey): RmpMaterialProcessForm => {
@@ -139,7 +149,11 @@ export const ensureProcessFormMatchesUiKey = (
   if (form && form.uiKey === uiKey) return form;
   const next = createEmptyProcessFormForUiKey(uiKey);
   const lots = form?.lotDetails?.length ? form.lotDetails : next.lotDetails;
-  return { ...next, lotDetails: lots };
+  const lotDetailsQaRemarks =
+    form && "lotDetailsQaRemarks" in form
+      ? String((form as { lotDetailsQaRemarks?: string }).lotDetailsQaRemarks ?? "")
+      : next.lotDetailsQaRemarks;
+  return { ...next, lotDetails: lots, lotDetailsQaRemarks };
 };
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();

@@ -254,6 +254,13 @@ export const BATCH_MANAGEMENT = {
   DELETE_BATCH: `${API_BASE}/admin/batch`,
 };
 
+export const MOTOR_MANAGEMENT = {
+  LIST: `${API_BASE}/admin/motor/list`,
+  STATS: `${API_BASE}/admin/motor/stats`,
+  DETAILS: `${API_BASE}/admin/motor/details`,
+  DISCARD: `${API_BASE}/admin/motor/discard`,
+};
+
 export const BLOCKCHAIN = {
   GET_BATCH_BY_ID: `${API_BASE}/admin/blockchain/fetch`,
 };
@@ -388,6 +395,7 @@ export const USER_DISPATCH_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/dispatch/form/create`,
   FORM_DETAILS: `${API_BASE}/user/dispatch/form/details`,
   UPDATE_FORM: `${API_BASE}/user/dispatch/form/update`,
+  MOTOR_DETAILS: `${API_BASE}/user/dispatch/motor-details`,
 };
 
 export const BLOCKCHAIN_EXPLORER = {

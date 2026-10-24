@@ -19,6 +19,8 @@ const tableKey = () =>
   formKey(QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS, QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS);
 const uploadReportKey = () =>
   formKey(QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS, "UPLOAD_REPORT");
+const attachmentQaRemarksKey = () =>
+  formKey(QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS, "QA_REMARKS");
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -80,6 +82,7 @@ const normalizeWeightRows = (value: unknown): QcWeighmentWeightRow[] => {
         fallback.WEIGHT_PARAMETER,
       ),
       WEIGHT_KG: pickString(match?.WEIGHT_KG, match?.weightKg, match?.weight),
+      QA_REMARKS: pickString(match?.QA_REMARKS, match?.qaRemarks),
       locked: fallback.locked,
     };
   });
@@ -91,6 +94,7 @@ export const createInitialWeighmentValues = (): SchemaFormValues => ({
   [calibrationKey()]: "",
   [tableKey()]: emptyQcWeighmentWeightRows(),
   [uploadReportKey()]: [] as FileRef[],
+  [attachmentQaRemarksKey()]: "",
 });
 
 export const getWeighmentWeighscaleNo = (values: SchemaFormValues | undefined) =>
@@ -105,6 +109,9 @@ export const getWeighmentWeightRows = (values: SchemaFormValues | undefined): Qc
 export const getWeighmentUploadReport = (
   values: SchemaFormValues | undefined,
 ): FileRef[] => parseUploadFiles(values?.[uploadReportKey()]);
+
+export const getWeighmentAttachmentQaRemarks = (values: SchemaFormValues | undefined) =>
+  pickString(values?.[attachmentQaRemarksKey()]);
 
 export const setWeighmentWeighscaleNo = (
   values: SchemaFormValues,
@@ -138,11 +145,22 @@ export const setWeighmentUploadReport = (
   [uploadReportKey()]: files ?? [],
 });
 
+export const setWeighmentAttachmentQaRemarks = (
+  values: SchemaFormValues,
+  next: string,
+): SchemaFormValues => ({
+  ...values,
+  [attachmentQaRemarksKey()]: next,
+});
+
 export const weighmentFormValuesHaveUserData = (values: SchemaFormValues | undefined): boolean => {
   if (getWeighmentWeighscaleNo(values) || getWeighmentCalibrationDueDate(values)) return true;
   if (getWeighmentUploadReport(values).length) return true;
+  if (getWeighmentAttachmentQaRemarks(values)) return true;
   return getWeighmentWeightRows(values).some(
-    (row) => String(row.SR_NO).toUpperCase() !== "H" && String(row.WEIGHT_KG ?? "").trim(),
+    (row) =>
+      (String(row.SR_NO).toUpperCase() !== "H" && String(row.WEIGHT_KG ?? "").trim()) ||
+      String(row.QA_REMARKS ?? "").trim(),
   );
 };
 
@@ -182,6 +200,8 @@ const hydrateFromSectionData = (
       data.attachments,
     );
     if (files.length) values[uploadReportKey()] = files;
+    const attachmentQaRemarks = pickString(data.QA_REMARKS, data.qaRemarks);
+    if (attachmentQaRemarks) values[attachmentQaRemarksKey()] = attachmentQaRemarks;
   }
 };
 
@@ -249,6 +269,12 @@ export const weighmentMotorDetailToSections = (
     rec.uploadReport,
     rec.UPLOAD_REPORT,
   );
+  const attachmentQaRemarks = pickString(
+    source.qaRemarks,
+    source.QA_REMARKS,
+    rec.qaRemarks,
+    rec.QA_REMARKS,
+  );
 
   const sections: SchemaSectionSubmission[] = [
     withMotor({
@@ -274,11 +300,16 @@ export const weighmentMotorDetailToSections = (
     }),
   ];
 
-  if (uploadedFiles.length) {
+  if (uploadedFiles.length || attachmentQaRemarks) {
     sections.push(
       withMotor({
         sectionId: QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS,
-        sectionData: [{ uploadedFiles }],
+        sectionData: [
+          omitEmpty({
+            ...(uploadedFiles.length ? { uploadedFiles } : {}),
+            ...(attachmentQaRemarks ? { qaRemarks: attachmentQaRemarks } : {}),
+          }),
+        ],
       }),
     );
   }
@@ -308,6 +339,7 @@ export type QcWeighmentMotorSubmissionType = "DRAFT" | "SUBMIT";
 
 const buildWeighmentWeightRowPayload = (row: QcWeighmentWeightRow): Record<string, unknown> => {
   const isPropellant = String(row.SR_NO).trim().toUpperCase() === "H";
+  const qaRemarks = String(row.QA_REMARKS ?? "").trim();
   return {
     srNo: row.SR_NO,
     weightParameter: row.WEIGHT_PARAMETER,
@@ -316,6 +348,7 @@ const buildWeighmentWeightRowPayload = (row: QcWeighmentWeightRow): Record<strin
       formula: isPropellant ? QC_WEIGHMENT_API_PROPELLANT_FORMULA : null,
       autoCalculate: isPropellant,
     },
+    ...(qaRemarks ? { qaRemarks } : {}),
   };
 };
 
@@ -334,11 +367,13 @@ export const buildWeighmentMotorWeightsPayload = (
   motorSubmissionType?: QcWeighmentMotorSubmissionType | null,
 ): Record<string, unknown> => {
   const uploadedFiles = toFileIdListPayload(getWeighmentUploadReport(values ?? undefined));
+  const qaRemarks = getWeighmentAttachmentQaRemarks(values ?? undefined);
   return omitEmpty({
     motorId,
     ...(motorSubmissionType ? { motorSubmissionType } : {}),
     weights: getWeighmentWeightRows(values).map(buildWeighmentWeightRowPayload),
     ...(uploadedFiles.length ? { uploadedFiles } : {}),
+    ...(qaRemarks ? { qaRemarks } : {}),
   });
 };
 

@@ -1007,6 +1007,9 @@ export const useBaseStaticTestFacility = ({
               bemMotorIds:
                 (batchDetails as { bemMotorIds?: unknown } | null)?.bemMotorIds ??
                 stfBatchObj.bemMotorIds,
+              stageProgress:
+                (batchDetails as { stageProgress?: unknown } | null)?.stageProgress ??
+                (stfBatchObj as { stageProgress?: unknown }).stageProgress,
             });
             setAvailableBemMotorOptions(
               showBemSelection

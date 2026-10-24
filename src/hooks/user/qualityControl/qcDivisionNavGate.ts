@@ -273,15 +273,29 @@ const fillTemplate = (
  *    - After Mixing: need Premix N + Final Mix N both Approved to unlock Hardware
  *    - After Hardware+: any approved motor unlocks the next motor division
  */
+const isSubscaleCompletelyApprovedForQcCuring = (stageProgress?: unknown): boolean => {
+  const stages = asStageEntries(stageProgress);
+  const subscale =
+    stages.find((stage) => Number(stage.subDepartmentId) === 8) ??
+    stages.find((stage) => normalizeNameKey(stage.subDepartmentName) === "subscale");
+  if (!subscale) return false;
+  const upper = String(subscale.status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return upper === "COMPLETELY_APPROVED";
+};
+
 export const resolveQcDivisionNavTabGate = (params: {
   tab: QcDivisionCatalogNavTab;
   tabIndex: number;
   tabs: QcDivisionCatalogNavTab[];
   statusByTabKey: Record<string, QcPartialItemStatus | string>;
   unitMaps: QcUnitStatusMaps;
+  stageProgress?: unknown;
   messages?: QcDivisionNavGateMessages;
 }): { enabled: boolean; reason?: string } => {
-  const { tab, tabIndex, tabs, statusByTabKey, unitMaps, messages = {} } = params;
+  const { tab, tabIndex, tabs, statusByTabKey, unitMaps, stageProgress, messages = {} } = params;
   if (tabIndex <= 0) return { enabled: true };
 
   const currentKey = resolveNavTabGateKey(tab);
@@ -338,11 +352,35 @@ export const resolveQcDivisionNavTabGate = (params: {
   }
 
   // Motor-based prior division: any approved motor unlocks next.
-  if (hasAnyApprovedMotor(unitMaps, previousKey)) return { enabled: true };
+  // QC CURING also requires Subscale COMPLETELY_APPROVED (backend unlock gate).
+  if (currentKey === "CURING") {
+    const subscaleReady = isSubscaleCompletelyApprovedForQcCuring(stageProgress);
+    if (hasAnyApprovedMotor(unitMaps, previousKey) && subscaleReady) {
+      return { enabled: true };
+    }
+    if (!subscaleReady) {
+      return {
+        enabled: false,
+        reason:
+          "Approve Casting/Curing manufacturing and wait until Subscale is completely approved to enable Curing.",
+      };
+    }
+  } else if (hasAnyApprovedMotor(unitMaps, previousKey)) {
+    return { enabled: true };
+  }
 
   // Fallback: if prior division itself is fully Approved (no unit rows yet), allow.
   const previousStatus = resolveStatusForGateKey(previousKey, statusByTabKey, tabs);
-  if (previousStatus === "APPROVED") return { enabled: true };
+  if (previousStatus === "APPROVED") {
+    if (currentKey === "CURING" && !isSubscaleCompletelyApprovedForQcCuring(stageProgress)) {
+      return {
+        enabled: false,
+        reason:
+          "Approve Casting/Curing manufacturing and wait until Subscale is completely approved to enable Curing.",
+      };
+    }
+    return { enabled: true };
+  }
 
   return {
     enabled: false,
@@ -380,6 +418,7 @@ export const buildQcDivisionNavGateHelpers = (params: {
         tabs: params.tabs,
         statusByTabKey: params.statusByTabKey,
         unitMaps,
+        stageProgress: params.stageProgress ?? params.currentStage,
         messages: params.messages,
       }),
     );

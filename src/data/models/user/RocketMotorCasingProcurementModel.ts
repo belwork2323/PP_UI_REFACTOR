@@ -207,6 +207,12 @@ export class RocketMotorCasingDetailsModel {
   motorNo: string;
   motorCasingId: string;
   status: string;
+  casingType: string;
+  insulationType: string;
+  receivingDate: string;
+  createdBy: string;
+  createdByFullName: string;
+  createdOn: string;
   sections: Record<string, unknown>;
 
   constructor(payload: any) {
@@ -223,6 +229,22 @@ export class RocketMotorCasingDetailsModel {
     this.motorNo = this.motorId;
     this.motorCasingId = String(payload?.motorCasingId ?? "");
     this.status = String(payload?.status ?? "");
+    this.casingType = String(payload?.casingType ?? "").trim();
+    this.insulationType = String(payload?.insulationType ?? "").trim();
+    this.receivingDate = String(payload?.receivingDate ?? "").trim();
+    const createdByInfo =
+      payload?.createdByInfo && typeof payload.createdByInfo === "object"
+        ? payload.createdByInfo
+        : payload?.createdBy && typeof payload.createdBy === "object"
+          ? payload.createdBy
+          : null;
+    this.createdBy = String(
+      createdByInfo?.id ?? (typeof payload?.createdBy === "string" ? payload.createdBy : ""),
+    ).trim();
+    this.createdByFullName = String(
+      createdByInfo?.fullName ?? payload?.createdByUsername ?? "",
+    ).trim();
+    this.createdOn = String(payload?.createdOn ?? payload?.createdAt ?? "").trim();
     this.sections = (
       payload?.sections && typeof payload.sections === "object" ? payload.sections : {}
     ) as Record<string, unknown>;
@@ -252,6 +274,44 @@ export class RocketMotorCasingDetailsModel {
 
   static toDetailBlocks(model: RocketMotorCasingDetailsModel): CasingDetailBlock[] {
     return mapCasingFormDataToDetailBlocks(RocketMotorCasingDetailsModel.toCasingFormData(model));
+  }
+
+  /**
+   * Identification header fields for RMC detail dialogs (Motor Management / Approver / User).
+   * Prefers section-parsed form data, then API flat fields, then optional list-row fallback.
+   */
+  static toDetailHeaderFields(
+    model: RocketMotorCasingDetailsModel,
+    fallback?: Record<string, any> | null,
+  ): {
+    casingType: string;
+    insulationType: string;
+    receivingDate: string;
+    submittedBy: string;
+    createdOn: string;
+  } {
+    const formData = RocketMotorCasingDetailsModel.toCasingFormData(model);
+    const fb = fallback ?? {};
+    const submittedBy =
+      model.createdByFullName ||
+      String(fb.submittedBy ?? "").trim() ||
+      String(fb.createdBy?.fullName ?? fb.assignedTo?.fullName ?? "").trim() ||
+      model.createdBy ||
+      "";
+    return {
+      casingType:
+        formData.casingType || model.casingType || String(fb.casingType ?? fb.batchType ?? "").trim(),
+      insulationType:
+        formData.insulationType ||
+        model.insulationType ||
+        String(fb.insulationType ?? "").trim(),
+      receivingDate:
+        formData.receivingDate ||
+        model.receivingDate ||
+        String(fb.receivingDate ?? "").trim(),
+      submittedBy,
+      createdOn: model.createdOn || String(fb.createdOn ?? fb.createdAt ?? "").trim(),
+    };
   }
 }
 

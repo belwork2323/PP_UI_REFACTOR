@@ -57,6 +57,7 @@ export type HardwareArticleSelectionDTO = {
   subscaleArticleName?: string;
   noOfArticles?: number;
   noOfParts?: number;
+  isBem?: boolean;
 };
 
 /** Mirrors backend `HardwarePreparationDetailsDTO` */
@@ -106,6 +107,8 @@ export type CastingDetailsDTO = {
 /** Mirrors backend `CuringTableDTO` */
 export type CuringTableDTO = {
   articleType?: string;
+  /** Article No / BEM No (legacy key: bemMouldNo). */
+  bemNo?: string;
   bemMouldNo?: string;
   curingStartDate?: string;
   curingEndDate?: string;
@@ -379,6 +382,29 @@ const ARTICLE_TYPE_TO_COUNT_FIELD: Record<string, string> = {
   Cartons: "NO_OF_CARTOONS",
 };
 
+/** Map article master names / API codes → legacy preparation count field ids. */
+const resolveHardwareCountFieldFromArticleName = (articleName: string): string | null => {
+  const raw = String(articleName ?? "").trim();
+  if (!raw) return null;
+  if (ARTICLE_TYPE_TO_COUNT_FIELD[raw]) return ARTICLE_TYPE_TO_COUNT_FIELD[raw];
+
+  const normalized = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (ARTICLE_TYPE_TO_COUNT_FIELD[normalized]) return ARTICLE_TYPE_TO_COUNT_FIELD[normalized];
+
+  if (/(?:^|\s)40\s*kg/.test(normalized) && normalized.includes("bem")) return "NO_OF_40KG_BEMS";
+  if (/(?:^|\s)10\s*kg/.test(normalized) && normalized.includes("bem")) return "NO_OF_10KG_BEMS";
+  if (/(?:^|\s)2\s*kg/.test(normalized) && normalized.includes("bem")) return "NO_OF_2KG_BEMS";
+  if (normalized.includes("bem") && normalized.includes("40")) return "NO_OF_40KG_BEMS";
+  if (normalized.includes("bem") && normalized.includes("10")) return "NO_OF_10KG_BEMS";
+  if (normalized.includes("bem") && /(?:^|\s)2(?:\s|$)/.test(normalized.replace("kg", " "))) {
+    return "NO_OF_2KG_BEMS";
+  }
+  if (normalized.includes("wheel") && normalized.includes("peel")) return "NO_OF_WHEEL_PEEL";
+  if (normalized.includes("sbs") || normalized.includes("tbs")) return "NO_OF_SBS_TBS";
+  if (normalized.includes("cartoon") || normalized.includes("carton")) return "NO_OF_CARTOONS";
+  return null;
+};
+
 const RUNTIME_ROW_KEYS = new Set(["SR_NO", "srNo"]);
 
 /** UI-only table columns not sent to the API */
@@ -540,7 +566,8 @@ const mapHardwarePreparationDetails = (
       subscaleArticleCode: row.subscaleArticleCode,
       subscaleArticleName: row.subscaleArticleName,
       noOfArticles: row.noOfArticles,
-      noOfParts: row.noOfParts,
+      noOfParts: row.isBem === true ? row.noOfParts : 0,
+      isBem: row.isBem === true,
     }));
   } else {
     // Legacy count fields for older in-progress drafts only
@@ -570,12 +597,14 @@ const mapApiArticlesToSelections = (articles: unknown): HardwareArticleSelection
   return articles
     .map((item) => {
       const row = (item ?? {}) as HardwareArticleSelectionDTO;
+      const isBem = row.isBem === true;
       return {
         subscaleArticleId: Number(row.subscaleArticleId ?? 0),
         subscaleArticleCode: String(row.subscaleArticleCode ?? "").trim(),
         subscaleArticleName: String(row.subscaleArticleName ?? "").trim(),
         noOfArticles: Number(row.noOfArticles ?? 0) || 0,
-        noOfParts: Number(row.noOfParts ?? 0) || 0,
+        noOfParts: isBem ? Number(row.noOfParts ?? 0) || 0 : 0,
+        isBem,
       };
     })
     .filter((row) => row.subscaleArticleName && row.noOfArticles > 0);
@@ -992,6 +1021,20 @@ const mapApiTableRowsToUi = (rows: unknown) => {
   );
 };
 
+/** Normalize curing identity to BEM_NO (legacy curing used BEM_MOULD_NO / bemMouldNo). */
+const normalizeCuringUiRows = (rows: Record<string, unknown>[]): Record<string, unknown>[] =>
+  rows.map((row) => {
+    const bemNo = String(row.BEM_NO ?? "").trim();
+    if (bemNo) {
+      const { BEM_MOULD_NO: _legacy, ...rest } = row;
+      return { ...rest, BEM_NO: bemNo };
+    }
+    const legacy = String(row.BEM_MOULD_NO ?? "").trim();
+    if (!legacy) return row;
+    const { BEM_MOULD_NO: _legacy, ...rest } = row;
+    return { ...rest, BEM_NO: legacy };
+  });
+
 /** Restore casting Article No / BEM No from curing/NDT when API omitted casting.bemNo. */
 const backfillCastingBemNoFromDownstream = (
   castingRows: Record<string, unknown>[],
@@ -1001,7 +1044,9 @@ const backfillCastingBemNoFromDownstream = (
   castingRows.map((row, index) => {
     const existing = String(row.BEM_NO ?? "").trim();
     if (existing) return row;
-    const fromCuring = String(curingRows[index]?.BEM_MOULD_NO ?? "").trim();
+    const curing = curingRows[index] ?? {};
+    const fromCuring =
+      String(curing.BEM_NO ?? "").trim() || String(curing.BEM_MOULD_NO ?? "").trim();
     if (fromCuring) return { ...row, BEM_NO: fromCuring };
     const fromNdt = String(ndtRows[index]?.BEM_NO ?? "").trim();
     if (fromNdt) return { ...row, BEM_NO: fromNdt };
@@ -1033,12 +1078,23 @@ export const mapSubscaleApiDetailsToFormValues = (
   const hardware = (normalized.hardwarePreparationDetails ?? {}) as Record<string, unknown>;
 
   Object.entries(HARDWARE_COUNT_TO_API).forEach(([uiKey, apiKey]) => {
-    if (hardware[apiKey] !== undefined) values[uiKey] = String(hardware[apiKey]);
+    // Skip null — String(null) becomes "null" and shows in the details UI.
+    if (hardware[apiKey] != null) values[uiKey] = String(hardware[apiKey]);
   });
 
   const apiSelections = mapApiArticlesToSelections(hardware.articles);
   if (apiSelections.length > 0) {
     values[HARDWARE_ARTICLE_SELECTIONS_ID] = apiSelections;
+    // Backfill legacy count fields from BEM noOfParts for details / older UI.
+    apiSelections.forEach((row) => {
+      const countField = resolveHardwareCountFieldFromArticleName(row.subscaleArticleName);
+      if (!countField) return;
+      if (row.isBem === true) {
+        values[countField] = String(row.noOfParts ?? 0);
+      } else if (values[countField] == null || values[countField] === "") {
+        values[countField] = String(row.noOfArticles ?? 0);
+      }
+    });
   } else {
     const legacySelections = synthesizeSelectionsFromLegacyCounts(values);
     if (legacySelections.length > 0) {
@@ -1162,9 +1218,10 @@ export const mapSubscaleApiDetailsToFormValues = (
   }
   const curing = (normalized.curingDetails ?? {}) as Record<string, unknown>;
   const ndt = (normalized.ndtDetails ?? {}) as Record<string, unknown>;
+  const curingRowsUi = normalizeCuringUiRows(mapApiTableRowsToUi(curing.curingTable));
   const castingRowsUi = backfillCastingBemNoFromDownstream(
     mapApiTableRowsToUi(casting.castingTable),
-    mapApiTableRowsToUi(curing.curingTable),
+    curingRowsUi,
     mapApiTableRowsToUi(ndt.ndtTable),
   );
   setScopedTable(values, SUBSCALE_SCHEMA_SECTIONS.CASTING, "CASTING_TABLE", castingRowsUi);
@@ -1173,7 +1230,7 @@ export const mapSubscaleApiDetailsToFormValues = (
     values,
     SUBSCALE_SCHEMA_SECTIONS.CURING,
     "CURING_TABLE",
-    mapApiTableRowsToUi(curing.curingTable),
+    curingRowsUi,
   );
 
   setScopedTable(
@@ -1306,9 +1363,17 @@ const mapHardwareDetailsApiToDisplayMerged = (
     if (value != null) merged[uiKey] = String(value);
   });
 
+  // Keep selections for form hydration paths; details display merges BEM parts into
+  // count fields and omits the selections table.
   const apiSelections = mapApiArticlesToSelections(source.articles);
   if (apiSelections.length > 0) {
     merged[HARDWARE_ARTICLE_SELECTIONS_ID] = apiSelections;
+    apiSelections
+      .filter((row) => row.isBem === true)
+      .forEach((row) => {
+        const countField = resolveHardwareCountFieldFromArticleName(row.subscaleArticleName);
+        if (countField) merged[countField] = String(row.noOfParts ?? 0);
+      });
   } else {
     const legacySelections = synthesizeSelectionsFromLegacyCounts(merged as SchemaFormValues);
     if (legacySelections.length > 0) {
@@ -1464,10 +1529,17 @@ const mergeSubscaleApiSectionRecord = (
     }
 
     if (key === "curingDetails") {
-      Object.assign(
-        merged,
-        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "curingTable", "CURING_TABLE"),
+      const curingMapped = mapProcessSectionApiToDisplayMerged(
+        value as Record<string, unknown>,
+        "curingTable",
+        "CURING_TABLE",
       );
+      if (Array.isArray(curingMapped.CURING_TABLE)) {
+        curingMapped.CURING_TABLE = normalizeCuringUiRows(
+          curingMapped.CURING_TABLE as Record<string, unknown>[],
+        );
+      }
+      Object.assign(merged, curingMapped);
       return;
     }
 
@@ -1585,12 +1657,41 @@ const mergeSubscaleDisplayValues = (
   }
 
   if (sectionId === "HARDWARE_PREPARATION_DETAILS") {
-    if (Array.isArray(values[HARDWARE_ARTICLE_SELECTIONS_ID])) {
-      merged[HARDWARE_ARTICLE_SELECTIONS_ID] = values[HARDWARE_ARTICLE_SELECTIONS_ID];
+    const selections = Array.isArray(values[HARDWARE_ARTICLE_SELECTIONS_ID])
+      ? (values[HARDWARE_ARTICLE_SELECTIONS_ID] as HardwareArticleSelection[])
+      : [];
+
+    // Do not surface HARDWARE_ARTICLE_SELECTIONS as a details table — show
+    // No. of Articles + No. of Parts against each BEM article.
+    const bemLegacyCountFields = new Set<string>();
+    if (selections.length > 0) {
+      selections
+        .filter((row) => row.isBem === true)
+        .forEach((row, index) => {
+          const name = String(row.subscaleArticleName ?? "").trim() || `BEM ${index + 1}`;
+          merged[`No. of Articles (${name})`] = String(row.noOfArticles ?? 0);
+          merged[`No. of Parts (${name})`] = String(row.noOfParts ?? 0);
+          const countField = resolveHardwareCountFieldFromArticleName(name);
+          if (countField) bemLegacyCountFields.add(countField);
+        });
+
+      selections
+        .filter((row) => row.isBem !== true)
+        .forEach((row) => {
+          const countField = resolveHardwareCountFieldFromArticleName(row.subscaleArticleName);
+          if (countField && merged[countField] == null) {
+            merged[countField] = String(row.noOfArticles ?? 0);
+          }
+        });
     }
+
     HARDWARE_COUNT_FIELDS.forEach((field) => {
-      if (values[field.id] != null && values[field.id] !== "") {
-        merged[field.id] = values[field.id];
+      // Prefer explicit "No. of Parts (article)" rows over legacy BEM count labels.
+      if (bemLegacyCountFields.has(field.id)) return;
+      if (merged[field.id] != null) return;
+      const raw = values[field.id];
+      if (raw != null && raw !== "" && String(raw).toLowerCase() !== "null") {
+        merged[field.id] = raw;
       }
     });
     if (values[LINER_TYPE_FIELD.id] != null && values[LINER_TYPE_FIELD.id] !== "") {

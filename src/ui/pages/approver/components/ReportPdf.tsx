@@ -28,6 +28,8 @@ type ReportDialogProps = {
   formId?: string | null;
   department: ApproverDepartmentKey;
   subDepartment: string;
+  /** From form/casing details when the current user is not assigned to the sub-dept (e.g. Admin). */
+  subDepartmentId?: number | null;
   dialogTitle?: string;
   themeColor?: string;
   themeColorLight?: string;
@@ -39,6 +41,7 @@ export const ReportPreviewDialog = ({
   formId,
   department,
   subDepartment,
+  subDepartmentId,
   dialogTitle = STRINGS.APPROVER.PDF.TITLE,
   themeColor = "#1B4F72",
   themeColorLight = "#2E86C1",
@@ -48,6 +51,7 @@ export const ReportPreviewDialog = ({
     formId,
     open,
     subDepartment,
+    subDepartmentId,
   });
 
   return (

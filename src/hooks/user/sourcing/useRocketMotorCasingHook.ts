@@ -489,6 +489,15 @@ export const useRocketMotorCasingHook = () => {
       const detailsModel = detailsResponse.data as RocketMotorCasingDetailsModel;
       const formData = RocketMotorCasingDetailsModel.toCasingFormData(detailsModel);
       const blocks = mapCasingFormDataToDetailBlocks(formData);
+      const header = RocketMotorCasingDetailsModel.toDetailHeaderFields(detailsModel, {
+        casingType: batch.casingType ?? batch.batchType,
+        insulationType: batch.insulationType,
+        receivingDate: batch.receivingDate,
+        createdOn: batch.createdOn,
+        createdBy: batch.assignedTo,
+        assignedTo: batch.assignedTo,
+        submittedBy: batch.assignedTo?.fullName,
+      });
 
       setDetailsBlocks(blocks);
       setDetailsRow({
@@ -499,12 +508,16 @@ export const useRocketMotorCasingHook = () => {
         motorStage: detailsModel.motorStage || batch.motorStage || "",
         motorNo:
           detailsModel.motorId || detailsModel.motorNo || batch.motorNo || batch.motorId || "",
-        casingType: formData.casingType || String(batch.casingType ?? batch.batchType ?? ""),
-        insulationType: formData.insulationType || String(batch.insulationType ?? ""),
-        receivingDate: formData.receivingDate || String(batch.receivingDate ?? ""),
+        casingType: header.casingType || formData.casingType || String(batch.casingType ?? batch.batchType ?? ""),
+        insulationType: header.insulationType || formData.insulationType || String(batch.insulationType ?? ""),
+        receivingDate: header.receivingDate || formData.receivingDate || String(batch.receivingDate ?? ""),
         rmStatus: normalizeRocketCasingListStatus(detailsModel.status),
-        createdBy: batch.assignedTo ? { fullName: batch.assignedTo.fullName } : null,
-        createdOn: batch.createdOn,
+        createdBy: header.submittedBy
+          ? { fullName: header.submittedBy }
+          : batch.assignedTo
+            ? { fullName: batch.assignedTo.fullName }
+            : null,
+        createdOn: header.createdOn || batch.createdOn,
         rejectionReason: batch.rejectionReason,
       });
     } finally {

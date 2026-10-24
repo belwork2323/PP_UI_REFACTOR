@@ -666,6 +666,17 @@ const matchesStatusDivision = (
   if (upperFilter === "POST_CURE" || upperFilter === "POST_CURE_OPERATION") {
     return upperDivision === "POST_CURE" || upperDivision === "POST_CURE_OPERATION";
   }
+  if (upperFilter === "STATIC_TEST_FACILITY") {
+    if (
+      upperDivision === "STATIC_TEST_FACILITY" ||
+      upperDivision.includes("STATIC_TEST") ||
+      upperSubType === "STATIC_TEST_FACILITY"
+    ) {
+      return true;
+    }
+    // Nested QC/mfg unit rows often carry only BEM / MAIN_MOTOR without a division field.
+    return !upperDivision && (upperSubType === "BEM" || upperSubType === "MAIN_MOTOR");
+  }
   return false;
 };
 
@@ -953,6 +964,119 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
   return items.sort(compareQcPartialNavItems);
 };
 
+/** Coerce API / BSON number-like ids (plain number, string, or `{ low }` Long). */
+const toStageId = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  const rec = asRecord(value);
+  if (rec) {
+    const n = Number(rec.low ?? rec.$numberLong ?? rec.value);
+    if (Number.isFinite(n)) return n;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const isQcQualityControlStageRec = (stage: Record<string, unknown>): boolean => {
+  const id = toStageId(stage.subDepartmentId ?? stage.sub_department_id);
+  if (id === 11) return true;
+  const name = String(stage.subDepartmentName ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return name.includes("qualitycontrol") || name === "qc";
+};
+
+const isManufacturingStfStageRec = (stage: Record<string, unknown>): boolean => {
+  const id = toStageId(stage.subDepartmentId ?? stage.sub_department_id);
+  if (id === 12) return true;
+  const name = String(stage.subDepartmentName ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return name === "statictestfacility" || name === "statictesting" || name.includes("statictest");
+};
+
+const isQcStfDivisionRec = (division: Record<string, unknown>): boolean => {
+  const id = toStageId(division.divisionId ?? division.division_id);
+  if (id === 12) return true;
+  const name = String(division.divisionName ?? division.division ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  return name === "STATIC_TEST_FACILITY";
+};
+
+/**
+ * Seed QC Static Test Facility motor tabs from batch stageProgress:
+ * - QC divisionStatuses[STATIC_TEST_FACILITY].motorStatuses (MAIN + BEM + chip status)
+ * - manufacturing STF motorStatuses for any motor not yet on the QC row (locked YET_TO_START)
+ */
+export const extractStfMotorNavFromBatch = (batchPayload: unknown): QcPartialNavItem[] => {
+  const root = asRecord(batchPayload);
+  if (!root) return [];
+  const batch = asRecord(root.__batchDetails) ?? root;
+  const stages = [...asArray(batch.stageProgress), ...asArray(batch.currentStage)]
+    .map((row) => asRecord(row))
+    .filter((row): row is Record<string, unknown> => Boolean(row));
+
+  const byId = new Map<string, QcPartialNavItem>();
+
+  const pushMotor = (motorId: string, status: unknown) => {
+    const id = String(motorId ?? "").trim();
+    if (!id) return;
+    const key = `motor:${id}`;
+    const nextStatus = normalizePartialItemStatus(status);
+    const existing = byId.get(key);
+    if (existing) {
+      // Prefer authoritative non-seed statuses (e.g. YET_TO_START over TO_BE_INITIATED).
+      if (existing.status === "TO_BE_INITIATED" && nextStatus && nextStatus !== "TO_BE_INITIATED") {
+        byId.set(key, { ...existing, status: nextStatus });
+      }
+      return;
+    }
+    byId.set(key, {
+      id: key,
+      kind: "MOTOR",
+      label: id,
+      status: nextStatus || "YET_TO_START",
+      motorId: id,
+    });
+  };
+
+  for (const stage of stages) {
+    if (!isQcQualityControlStageRec(stage)) continue;
+    for (const division of asArray(stage.divisionStatuses)) {
+      const divRec = asRecord(division);
+      if (!divRec || !isQcStfDivisionRec(divRec)) continue;
+      for (const motor of asArray(divRec.motorStatuses)) {
+        const motorRec = asRecord(motor);
+        if (!motorRec) continue;
+        const motorId = pickString(motorRec.motorId, motorRec.motor_id);
+        if (!motorId) continue;
+        pushMotor(motorId, motorRec.motorSubmissionStatus ?? motorRec.status);
+      }
+    }
+  }
+
+  for (const stage of stages) {
+    if (!isManufacturingStfStageRec(stage)) continue;
+    for (const motor of asArray(stage.motorStatuses)) {
+      const motorRec = asRecord(motor);
+      if (!motorRec) continue;
+      const motorId = pickString(motorRec.motorId, motorRec.motor_id);
+      if (!motorId || byId.has(`motor:${motorId}`)) continue;
+      // Present on manufacturing STF but not yet seeded on QC — keep locked.
+      pushMotor(motorId, "YET_TO_START");
+    }
+  }
+
+  return Array.from(byId.values()).sort(compareQcPartialNavItems);
+};
+
 export const mergePartialNavItems = (
   primary: QcPartialNavItem[],
   secondary: QcPartialNavItem[],
@@ -1057,7 +1181,23 @@ export const buildQcDivisionPartialNav = (params: {
     division: statusDivisionKey,
   });
 
-  const merged = mergePartialNavItems(fromBatchUnits, fromStatuses);
+  let merged = mergePartialNavItems(fromBatchUnits, fromStatuses);
+
+  // STF: show every MAIN + BEM from batch stageProgress (QC divisionStatuses / mfg STF),
+  // not only batch.motorIds or motors present on manufacturing division-details.
+  if (String(params.flowKey ?? "").trim().toUpperCase() === "STATIC_TEST_FACILITY") {
+    merged = mergePartialNavItems(merged, extractStfMotorNavFromBatch(params.batchPayload));
+
+    const stfSeed =
+      asRecord(params.autoPopulatePayload)?.__manufacturingDivisionData ??
+      params.autoPopulatePayload;
+    const fromStfMotors = mapDivisionDetailsToPartialNav(stfSeed, {
+      flowKey: params.flowKey,
+      rawMaterialType: typeKey,
+      batchPayload: params.batchPayload,
+    });
+    merged = mergePartialNavItems(merged, fromStfMotors);
+  }
 
   // Manufacturing division-details attaches prerequisite status only — not tab creation.
   const withManufacturingPrerequisites = applyManufacturingPrerequisiteStatuses(

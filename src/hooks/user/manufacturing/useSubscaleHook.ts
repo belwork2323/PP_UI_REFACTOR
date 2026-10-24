@@ -91,6 +91,8 @@ export const useSubscaleHook = () => {
   const baselineFormStateRef = useRef<SubscaleFormState>(createDefaultSubscaleFormState());
   const initialPayloadSnapshotRef = useRef(initialPayloadSnapshot);
   initialPayloadSnapshotRef.current = initialPayloadSnapshot;
+  /** Debounce full-form FORMAT/SUBMIT reconcile so typing stays responsive (cells validate locally). */
+  const liveValidationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeBatchType = activeBatch?.batchType;
 
   const isFormDirtyNow = useCallback(() => {
@@ -110,6 +112,10 @@ export const useSubscaleHook = () => {
   );
 
   const resetFormContext = useCallback(() => {
+    if (liveValidationTimerRef.current) {
+      clearTimeout(liveValidationTimerRef.current);
+      liveValidationTimerRef.current = null;
+    }
     const defaults = createDefaultSubscaleFormState();
     setView("list");
     setActiveBatch(null);
@@ -363,12 +369,18 @@ export const useSubscaleHook = () => {
         return next;
       });
 
-      const payload = buildValidationPayload(values);
-      const formatErrors = validateSubscale(payload, "FORMAT") ?? {};
-      const fullErrors = validateSubscale(payload, "SUBMIT") ?? {};
-      setValidationErrors((prev) =>
-        reconcileLiveValidationErrors(prev, formatErrors, fullErrors),
-      );
+      // Instant local cell errors handle typing UX; debounce expensive whole-form reconcile
+      // (same idea as Case Prep / Trimming scoping work to a motor session).
+      if (liveValidationTimerRef.current) clearTimeout(liveValidationTimerRef.current);
+      liveValidationTimerRef.current = setTimeout(() => {
+        liveValidationTimerRef.current = null;
+        const payload = buildValidationPayload(values);
+        const formatErrors = validateSubscale(payload, "FORMAT") ?? {};
+        const fullErrors = validateSubscale(payload, "SUBMIT") ?? {};
+        setValidationErrors((prev) =>
+          reconcileLiveValidationErrors(prev, formatErrors, fullErrors),
+        );
+      }, 280);
     },
     [buildValidationPayload],
   );

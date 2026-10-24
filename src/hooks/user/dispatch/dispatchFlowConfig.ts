@@ -148,10 +148,11 @@ export type DispatchSharedSetup = {
 };
 
 export const canCompleteDispatchSetup = (setup: DispatchSharedSetup) => {
-  if (!setup.motorStage.trim()) return false;
+  // Stage comes from the batch (not shown on FlowBar) — do not require it here.
   if (!setup.castingDate.trim() || !setup.dispatchDate.trim()) return false;
   if (!setup.dispatchLocation.trim()) return false;
   if (!setup.ndtClearance.trim() || !setup.finalAcceptanceClearance.trim()) return false;
+  // MOM only required when clearance is YES — NO is a valid choice for Load Form.
   if (setup.ndtClearance === "YES" && !setup.ndtMomNo.trim()) return false;
   if (setup.finalAcceptanceClearance === "YES" && !setup.finalAcceptanceMomNo.trim()) return false;
   return true;
@@ -170,7 +171,10 @@ export const canLoadDispatchMotor = ({
   if (!canCompleteDispatchSetup(setup)) return false;
 
   const motorId = String(draftMotorId ?? "").trim();
-  if (!motorId || usedMotorIds.includes(motorId)) return false;
+  // Allow loading the current motor even if it is listed; only block when
+  // that motor was already loaded (formLoaded), which callers put in usedMotorIds.
+  if (!motorId) return false;
+  if (usedMotorIds.includes(motorId)) return false;
 
   return true;
 };

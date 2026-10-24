@@ -9,11 +9,13 @@ import {
 export type AluminumProcessForm = {
   uiKey: "aluminum";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   equipmentId: string;
   setRpm: string;
   startDatetime: string;
   endDatetime: string;
   observation: string;
+  qaRemarks: string;
   qtyKgQualified: string;
   dispatchDatetime: string;
 };
@@ -21,11 +23,13 @@ export type AluminumProcessForm = {
 export const createEmptyAluminumProcessForm = (): AluminumProcessForm => ({
   uiKey: "aluminum",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   equipmentId: "",
   setRpm: "",
   startDatetime: "",
   endDatetime: "",
   observation: "",
+  qaRemarks: "",
   qtyKgQualified: "",
   dispatchDatetime: "",
 });
@@ -40,6 +44,8 @@ export const aluminumFormHasUserData = (form: AluminumProcessForm): boolean => {
     form.startDatetime,
     form.endDatetime,
     form.observation,
+    form.qaRemarks,
+    form.lotDetailsQaRemarks,
     form.qtyKgQualified,
     form.dispatchDatetime,
   ].some((v) => str(v));

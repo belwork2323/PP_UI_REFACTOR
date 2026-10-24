@@ -10,6 +10,10 @@ import {
   type QcPartialNavItem,
 } from "./qcDivisionApprovalUnits";
 import {
+  isQcExperimentalAlwaysEnabledDivision,
+  isQcExperimentalSubBatch,
+  isQcSubscaleBatch,
+  QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON,
   shouldSkipQcManufacturingUnitPrerequisiteGate,
 } from "./qcBatchType";
 
@@ -22,6 +26,7 @@ const MOTOR_QC_DIVISIONS = new Set([
   "TRIMMING",
   "POST_CURE",
   "NDT",
+  "STATIC_TEST_FACILITY",
   "QC",
   "WEIGHTMENT",
 ]);
@@ -122,7 +127,7 @@ const mergeStageProgress = (
   return merged;
 };
 
-/** QC Quality Control catalog (id 11) — not QC NDT. Those rows are current QC work. */
+/** Quality Assurance / QC division catalog (id 11) — not QC NDT. Those rows are current QC work. */
 const isQcQualityControlStage = (stage: StageProgressEntry): boolean => {
   const sub = normalizeNameKey(stage.subDepartmentName);
   if (!sub || sub === "ndt") return false;
@@ -230,6 +235,7 @@ export const formatQcDivisionGateLabel = (divisionKey: string | null | undefined
     TRIMMING: "Trimming",
     POST_CURE: "Post Cure",
     NDT: "NDT",
+    STATIC_TEST_FACILITY: "Static Test Facility",
     QC: "QC",
     WEIGHTMENT: "Weighment",
   };
@@ -281,6 +287,39 @@ const isPostCureStage = (stage: StageProgressEntry): boolean => {
 const isTrimmingStage = (stage: StageProgressEntry): boolean =>
   normalizeNameKey(stage.subDepartmentName) === "trimming";
 
+const isStfStage = (stage: StageProgressEntry): boolean => {
+  const id = Number(
+    stage.subDepartmentId ?? (stage as { sub_department_id?: unknown }).sub_department_id,
+  );
+  // Main-batch STF subdepartment (SUB_DEPT.STF = 12).
+  if (Number.isFinite(id) && id === 12) return true;
+  const name = normalizeNameKey(stage.subDepartmentName);
+  return name === "statictestfacility" || name === "statictesting" || name.includes("statictest");
+};
+
+/** True when any STF BEM motor row is APPROVED on manufacturing stage progress. */
+export const hasApprovedBemMotorInStageProgress = (
+  stageProgress?: unknown,
+  currentStage?: unknown,
+): boolean => {
+  const stages = mergeStageProgress(stageProgress, currentStage);
+  const stfStage = stages.find((stage) => isStfStage(stage));
+  if (!stfStage) return false;
+  return untaggedMotorRows(stfStage).some((row) => {
+    const subType = String(row.subType ?? row.sub_type ?? "")
+      .trim()
+      .toUpperCase();
+    if (subType !== "BEM") return false;
+    const status = String(
+      row.motorSubmissionStatus ?? row.motor_submission_status ?? row.status ?? "",
+    )
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "_");
+    return status === "APPROVED";
+  });
+};
+
 const isStageCompletelyApproved = (stage: StageProgressEntry | null): boolean => {
   if (!stage) return false;
   const upper = String(stage.status ?? "")
@@ -320,9 +359,17 @@ const manufacturingPredecessorForQcDivision = (
   if (currentKey === "TRIMMING") {
     return { match: isTrimmingStage, label: "Trimming", kind: "motor" };
   }
-  // NDT, QC, WEIGHTMENT — unlock only after the NDT subdepartment (id 10) is approved.
-  if (currentKey === "NDT" || currentKey === "QC" || currentKey === "WEIGHTMENT") {
+  // NDT — unlock after the NDT subdepartment (id 10) is approved.
+  if (currentKey === "NDT") {
     return { match: isNdtStage, label: "NDT", kind: "motor" };
+  }
+  // STF / QC / WEIGHTMENT — unlock after any STF BEM motor is approved.
+  if (
+    currentKey === "STATIC_TEST_FACILITY" ||
+    currentKey === "QC" ||
+    currentKey === "WEIGHTMENT"
+  ) {
+    return { match: isStfStage, label: "Static Test Facility", kind: "motor" };
   }
   return null;
 };
@@ -508,6 +555,39 @@ export const resolveManufacturingGateForQcDivision = (params: {
     );
   }
 
+  // QC / Weighment: backend unlocks every batch.motorId once any STF BEM is APPROVED.
+  // Main motors often remain TO_BE_INITIATED on manufacturing STF while BEM drives the
+  // unlock — requiring per-motor STF APPROVED left the QC propellant panel empty.
+  if (currentKey === "QC" || currentKey === "WEIGHTMENT") {
+    const bemApproved = untaggedMotorRows(stage).some((row) => {
+      const subType = String(row.subType ?? row.sub_type ?? "")
+        .trim()
+        .toUpperCase();
+      if (subType !== "BEM") return false;
+      return isApprovedStatus(motorStatusFromRow(row));
+    });
+    if (bemApproved || stageDone) {
+      return {
+        enableAll: true,
+        kind: "motor" as const,
+        previousSubDepartmentId: Number(stage?.subDepartmentId ?? 0) || null,
+        previousSubDepartmentName:
+          String(stage?.subDepartmentName ?? "").trim() || predecessor.label,
+        approvedPremixNos: new Set<number>(),
+        approvedMotorIds: new Set<string>(),
+      };
+    }
+    return gateFromPredecessor(
+      "motor",
+      stage,
+      {
+        approvedPremixNos: new Set(),
+        approvedMotorIds: new Set(),
+      },
+      predecessor.label,
+    );
+  }
+
   const approvedMotorIds = collectApprovedMotorIds(stage);
   if (stageDone) {
     collectAllMotorIds(stage).forEach((id) => approvedMotorIds.add(id));
@@ -573,9 +653,9 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   }
 
   // Manufacturing stage row missing (or only present on currentStage before merge fix):
-  // fall back to QC divisionStatuses. Backend only promotes NDT/QC/Weighment unit rows from
-  // YET_TO_START → TO_BE_INITIATED after manufacturing NDT (or QC) approval — same pattern
-  // as Trimming/Post Cure. Initial seed keeps those units YET_TO_START, so this is safe.
+  // fall back to QC divisionStatuses. Backend only promotes gated unit rows from
+  // YET_TO_START → TO_BE_INITIATED after manufacturing unlock (NDT → QC NDT; STF BEM →
+  // STF/QC/Weighment). Initial seed keeps those units YET_TO_START, so this is safe.
   if (fromDivisionStatuses) {
     return fromDivisionStatuses;
   }
@@ -589,15 +669,25 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   return emptyGate(null, false);
 };
 
-/** NDT / QC / WEIGHTMENT — unlocked only after manufacturing NDT motor APPROVED. */
-const isNdtFamilyQcDivision = (key: string): boolean =>
-  key === "NDT" || key === "QC" || key === "WEIGHTMENT";
+/** QC NDT — unlocked only after manufacturing NDT motor APPROVED. */
+const isNdtOnlyQcDivision = (key: string): boolean => key === "NDT";
+
+/** STF / QC / WEIGHTMENT — unlocked after any STF BEM motor APPROVED. */
+const isStfFamilyQcDivision = (key: string): boolean =>
+  key === "STATIC_TEST_FACILITY" || key === "QC" || key === "WEIGHTMENT";
+
+/** Hover tooltip when a QC division tab is still locked (YET_TO_START). */
+const lockedDivisionReason = (divisionKey: string, currentLabel: string): string => {
+  // CURING unlocks only after Casting and Curing motor APPROVED and Subscale COMPLETELY_APPROVED.
+  if (divisionKey === "CURING") {
+    return "Casting and Curing and Subscale must be approved to unlock Curing.";
+  }
+  return `Waiting for manufacturing to unlock ${currentLabel}.`;
+};
 
 /**
  * Division tab enablement from QC stage `divisionStatuses` (server-authoritative),
- * with manufacturing NDT APPROVED as the source of truth for NDT / QC / WEIGHTMENT.
- * Locked when status is missing or `YET_TO_START`; unlocked for any other status
- * (except NDT-family, which also requires manufacturing NDT approval).
+ * with manufacturing gates for NDT (NDT APPROVED) and STF-family (any BEM APPROVED).
  */
 export const isQcDivisionEnabledByServerStatus = (params: {
   divisionKey: string;
@@ -611,18 +701,34 @@ export const isQcDivisionEnabledByServerStatus = (params: {
     return { enabled: true };
   }
 
+  // Experimental: RMR / RMP / Mixing always on; STF falls through to BEM gate;
+  // Hardware+ / QC / Weighment stay N/A (no motors).
   if (
-    shouldSkipQcManufacturingUnitPrerequisiteGate(params.batchType, params.subBatchType)
+    isQcSubscaleBatch(params.batchType) &&
+    isQcExperimentalSubBatch(params.subBatchType)
   ) {
+    if (isQcExperimentalAlwaysEnabledDivision(key)) {
+      return { enabled: true };
+    }
+    if (key !== "STATIC_TEST_FACILITY") {
+      return {
+        enabled: false,
+        reason: QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON,
+      };
+    }
+    // STF: continue to BEM gate below.
+  } else if (
+    shouldSkipQcManufacturingUnitPrerequisiteGate(params.batchType, params.subBatchType) &&
+    key !== "STATIC_TEST_FACILITY"
+  ) {
+    // Qualification: unlock all divisions except STF (still BEM-gated).
     return { enabled: true };
   }
 
   const currentLabel = formatQcDivisionGateLabel(key);
 
-  // NDT / QC / WEIGHTMENT: manufacturing NDT APPROVED is authoritative.
-  // Do not trust corrupted divisionStatuses TO_BE_INITIATED while manufacturing NDT
-  // is still only TO_BE_INITIATED (no motor APPROVED).
-  if (isNdtFamilyQcDivision(key)) {
+  // NDT: manufacturing NDT APPROVED is authoritative.
+  if (isNdtOnlyQcDivision(key)) {
     const mfgGate = resolveManufacturingGateForQcDivision({
       currentDivisionKey: key,
       stageProgress: params.stageProgress,
@@ -638,14 +744,27 @@ export const isQcDivisionEnabledByServerStatus = (params: {
       }
       return { enabled: true };
     }
-    // Manufacturing NDT stage row missing — fall through to divisionStatuses.
+  }
+
+  // STF / QC / WEIGHTMENT: any approved STF BEM is authoritative.
+  // Subscale Experimental only reaches here for STF; Qual reaches here for STF only.
+  if (isStfFamilyQcDivision(key)) {
+    if (
+      !hasApprovedBemMotorInStageProgress(params.stageProgress, params.currentStage)
+    ) {
+      return {
+        enabled: false,
+        reason: `Waiting for STF BEM approval to unlock ${currentLabel}.`,
+      };
+    }
+    return { enabled: true };
   }
 
   const qcStage = findQcStageEntry(params.stageProgress, params.currentStage);
   if (!qcStage) {
     return {
       enabled: false,
-      reason: `Waiting for manufacturing to unlock ${currentLabel}.`,
+      reason: lockedDivisionReason(key, currentLabel),
     };
   }
 
@@ -664,7 +783,7 @@ export const isQcDivisionEnabledByServerStatus = (params: {
 
   return {
     enabled: false,
-    reason: `Waiting for manufacturing to unlock ${currentLabel}.`,
+    reason: lockedDivisionReason(key, currentLabel),
   };
 };
 
@@ -705,6 +824,7 @@ const matchDivisionRow = (
     return true;
   }
   if (currentKey === "QC" && (id === 10 || name === "PROPELLANT_PROPERTIES")) return true;
+  if (currentKey === "STATIC_TEST_FACILITY" && id === 12) return true;
   if (currentKey === "RAW_MATERIAL_REVALIDATION" && id === 101) return true;
   if (currentKey === "RAW_MATERIAL_PROCESSING" && id === 102) return true;
   return false;

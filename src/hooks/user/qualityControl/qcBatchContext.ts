@@ -4,16 +4,21 @@ import {
   extractBatchMotorIds,
   type QcPartialItemStatus,
 } from "./qcDivisionApprovalUnits";
-import {
-  extractQcDivisionStatusesFromBatch,
-  mapFormDetailsDivisionStatusesToFlowKeyMap,
-  resolveQcDivisionStatusSource,
-} from "./qcDivisionDataSource";
+import { resolveQcDivisionStatusSource } from "./qcDivisionDataSource";
 import type { QcDivisionCatalogItem } from "./qcFlowConfig";
 import {
+  isQcExperimentalAllowedDivision,
+  isQcExperimentalSubBatch,
+  isQcSubscaleBatch,
+  QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON,
   resolveQcWorkingBatchType,
   resolveQcWorkingSubBatchType,
 } from "./qcBatchType";
+
+export type QcDivisionUiOptions = {
+  batchType?: string | null;
+  subBatchType?: string | null;
+};
 
 export type QcBatchUnits = {
   motorIds: string[];
@@ -116,6 +121,7 @@ export const getQcDivisionUnitRequirements = (
     key === "TRIMMING" ||
     key === "POST_CURE" ||
     key === "NDT" ||
+    key === "STATIC_TEST_FACILITY" ||
     key === "QC" ||
     key === "WEIGHTMENT"
   ) {
@@ -128,7 +134,21 @@ export const canShowQcDivisionUi = (
   flowKey: string,
   units: QcBatchUnits,
   rawMaterialType?: string | null,
+  options?: QcDivisionUiOptions,
 ): boolean => {
+  if (
+    isQcSubscaleBatch(options?.batchType) &&
+    isQcExperimentalSubBatch(options?.subBatchType) &&
+    !isQcExperimentalAllowedDivision(flowKey, rawMaterialType)
+  ) {
+    return false;
+  }
+
+  // Subscale skips mfg RMP/Mixing/motors — show empty shells for applicable divisions.
+  if (isQcSubscaleBatch(options?.batchType)) {
+    return true;
+  }
+
   const requirements = getQcDivisionUnitRequirements(flowKey, rawMaterialType);
   if (requirements.includes("NONE") || requirements.length === 0) return true;
 
@@ -144,8 +164,17 @@ export const getQcDivisionBlockedReason = (
   flowKey: string,
   units: QcBatchUnits,
   rawMaterialType?: string | null,
+  options?: QcDivisionUiOptions,
 ): string | null => {
-  if (canShowQcDivisionUi(flowKey, units, rawMaterialType)) return null;
+  if (
+    isQcSubscaleBatch(options?.batchType) &&
+    isQcExperimentalSubBatch(options?.subBatchType) &&
+    !isQcExperimentalAllowedDivision(flowKey, rawMaterialType)
+  ) {
+    return QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON;
+  }
+
+  if (canShowQcDivisionUi(flowKey, units, rawMaterialType, options)) return null;
 
   const requirements = getQcDivisionUnitRequirements(flowKey, rawMaterialType);
   const missing: string[] = [];
@@ -197,5 +226,3 @@ export const resolveQcBatchContext = (params: {
     currentStage: (stageArrays.currentStage as unknown[] | null) ?? null,
   };
 };
-
-export { extractQcDivisionStatusesFromBatch, mapFormDetailsDivisionStatusesToFlowKeyMap, resolveQcDivisionStatusSource };

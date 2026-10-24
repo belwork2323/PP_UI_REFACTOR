@@ -60,7 +60,7 @@ export const stageConfig: Record<string, RoleChipConfig> = {
     color: "#7c3aed",
     bg: "rgba(124,58,237,0.10)",
   },
-  "Quality Control": { Icon: icons.batchMgmt.qcStage, color: "#b45309", bg: "rgba(180,83,9,0.10)" },
+  "Quality Assurance": { Icon: icons.batchMgmt.qcStage, color: "#b45309", bg: "rgba(180,83,9,0.10)" },
   Dispatch: { Icon: icons.batchMgmt.dispatchStage, color: "#047857", bg: "rgba(4,120,87,0.10)" },
 };
 
@@ -130,6 +130,16 @@ export const batchStatusConfig: Record<string, RoleChipConfig> = {
     color: "#C0392B",
     bg: "rgba(192,57,43,0.10)",
   },
+  DISCARDED: {
+    Icon: icons.batchMgmt.rejectedStatus,
+    color: "#7F1D1D",
+    bg: "rgba(127,29,29,0.10)",
+  },
+  DISPATCHED: {
+    Icon: icons.batchMgmt.dispatchedStatus,
+    color: "#15803d",
+    bg: "rgba(21,128,61,0.10)",
+  },
 
   // UI values (aliases)
   "Yet To Start": {
@@ -154,6 +164,11 @@ export const batchStatusConfig: Record<string, RoleChipConfig> = {
   },
   Approved: { Icon: icons.batchMgmt.approvedStatus, color: "#148F77", bg: "rgba(20,143,119,0.10)" },
   Rejected: { Icon: icons.batchMgmt.rejectedStatus, color: "#C0392B", bg: "rgba(192,57,43,0.10)" },
+  Discarded: {
+    Icon: icons.batchMgmt.rejectedStatus,
+    color: "#7F1D1D",
+    bg: "rgba(127,29,29,0.10)",
+  },
   Draft: { Icon: icons.batchMgmt.pendingStatus, color: "#64748b", bg: "rgba(100,116,139,0.10)" },
   Submitted: {
     Icon: icons.batchMgmt.inProgressStatus,
@@ -203,7 +218,7 @@ export const subDeptConfig: Record<string, { color: string; bg: string }> = {
   Subscale: { color: "#047857", bg: "rgba(4,120,87,0.10)" },
   Trimming: { color: "#0f766e", bg: "rgba(15,118,110,0.10)" },
   // Quality
-  "Quality Control": { color: "#b45309", bg: "rgba(180,83,9,0.10)" },
+  "Quality Assurance": { color: "#b45309", bg: "rgba(180,83,9,0.10)" },
   "Raw Material Revalidation": { color: "#a16207", bg: "rgba(161,98,7,0.10)" },
   "QC Division": { color: "#ca8a04", bg: "rgba(202,138,4,0.10)" },
   NDT: { color: "#d97706", bg: "rgba(217,119,6,0.10)" },

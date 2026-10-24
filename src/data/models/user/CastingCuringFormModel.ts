@@ -30,6 +30,12 @@ import {
   toApiDateTime,
   toUiDateTime,
 } from "./castingCuringFieldCodec";
+import {
+  collectDiscardedMotorIds,
+  isDiscardedMotorId,
+  isMotorWorkflowTabDisabled,
+  preferMotorSubmissionStatus,
+} from "@data/models/common/motorWorkflowGuards";
 
 /** Local section payload shape for CastingCuringFormBody (no schema-engine dependency). */
 export type SchemaSectionSubmission = {
@@ -54,7 +60,8 @@ export type CastingCuringMotorSubmissionStatus =
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
   | "APPROVED"
-  | "REJECTED";
+  | "REJECTED"
+  | "DISCARDED";
 
 export type CastingCuringMotorStatusMeta = {
   motorSubmissionType?: CastingCuringMotorSubmissionType;
@@ -70,12 +77,18 @@ export const isCastingCuringMotorLocked = (
   status?: CastingCuringMotorSubmissionStatus | string | null,
 ) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isCastingCuringMotorEditable = (
   status?: CastingCuringMotorSubmissionStatus | string | null,
-) => !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+) =>
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const areAllCastingCuringMotorsApproved = (
   motorStatusById: Record<string, CastingCuringMotorStatusMeta>,
@@ -94,7 +107,7 @@ export const isCastingCuringMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED" || normalized === "IN_PROGRESS";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED" || normalized === "IN_PROGRESS";
 };
 
 export const isCastingCuringMotorApproverActionable = (
@@ -168,7 +181,8 @@ export const normalizeCastingCuringMotorStatus = (
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }
@@ -225,13 +239,34 @@ export const mapCastingCuringMotorStatusesFromApi = (
       motorSubmissionType:
         normalizeCCMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeCCMotorStatus(
-        motor?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
+        preferMotorSubmissionStatus(
+          existing?.motorSubmissionStatus,
+          motor?.motorSubmissionStatus,
+        ),
       ),
       submittedAt: motor?.submittedAt ?? existing?.submittedAt ?? null,
       reviewedBy: motor?.actionBy ?? motor?.reviewedBy ?? existing?.reviewedBy ?? null,
       reviewedAt: motor?.actionAt ?? motor?.reviewedAt ?? existing?.reviewedAt ?? null,
       remarks: motor?.remarks ?? existing?.remarks ?? null,
       rejectionReason: motor?.rejectionReason ?? existing?.rejectionReason ?? null,
+    };
+  });
+
+  const discardedIds = collectDiscardedMotorIds(details);
+  Object.keys(statusById).forEach((motorId) => {
+    if (isDiscardedMotorId(discardedIds, motorId)) {
+      statusById[motorId] = {
+        ...statusById[motorId],
+        motorSubmissionStatus: "DISCARDED",
+      };
+    }
+  });
+  discardedIds.forEach((lowerId) => {
+    const existingKey =
+      Object.keys(statusById).find((key) => key.toLowerCase() === lowerId) ?? lowerId;
+    statusById[existingKey] = {
+      ...(statusById[existingKey] ?? { motorSubmissionStatus: "DISCARDED" }),
+      motorSubmissionStatus: "DISCARDED",
     };
   });
 
@@ -825,6 +860,7 @@ export const mapCastingCuringDetailsForDisplay = (
   const project = (details.project ?? {}) as Record<string, unknown>;
 
   const motorStatuses = mapCastingCuringMotorStatusesFromApi(data);
+  const discardedIds = collectDiscardedMotorIds(data);
 
   const preferredMotorIds =
     options?.preferredMotorIds ??
@@ -837,7 +873,9 @@ export const mapCastingCuringDetailsForDisplay = (
       motorId,
       motorReceivedAt: "",
       motorSubmissionType: statusMeta?.motorSubmissionType,
-      motorSubmissionStatus: statusMeta?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+      motorSubmissionStatus: isDiscardedMotorId(discardedIds, motorId)
+        ? "DISCARDED"
+        : (statusMeta?.motorSubmissionStatus ?? "TO_BE_INITIATED"),
       rejectionReason: statusMeta?.rejectionReason ?? null,
       setup: {
         castingType: "",
@@ -873,8 +911,10 @@ export const mapCastingCuringDetailsForDisplay = (
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
           normalizeCCMotorSubmissionType(entry.motorSubmissionType as unknown),
-        motorSubmissionStatus:
-          statusMeta?.motorSubmissionStatus ?? normalizeCCMotorStatus(entry.motorSubmissionStatus),
+        motorSubmissionStatus: isDiscardedMotorId(discardedIds, motorId)
+          ? "DISCARDED"
+          : (statusMeta?.motorSubmissionStatus ??
+            normalizeCCMotorStatus(entry.motorSubmissionStatus)),
         rejectionReason:
           statusMeta?.rejectionReason ?? (entry.rejectionReason as string | null) ?? null,
         setup: {

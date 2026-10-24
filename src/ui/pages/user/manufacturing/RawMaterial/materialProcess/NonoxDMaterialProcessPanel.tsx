@@ -12,6 +12,7 @@ type Props = {
   disabled?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  showQaRemarks?: boolean;
 };
 
 const splitFieldErrors = (
@@ -37,6 +38,7 @@ const NonoxDMaterialProcessPanel = ({
   disabled,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const lotErrors = useMemo(
     () => splitFieldErrors(validationErrors, "lotDetails"),
@@ -57,6 +59,9 @@ const NonoxDMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={lotErrors}
+        showQaRemarks={showQaRemarks}
+        qaRemarks={value.lotDetailsQaRemarks}
+        onQaRemarksChange={(lotDetailsQaRemarks) => patch({ lotDetailsQaRemarks })}
       />
       <DoaFormatSection
         title="NONOX-D"
@@ -72,6 +77,9 @@ const NonoxDMaterialProcessPanel = ({
         onTotalQtySentForPremixChange={(totalQtySentForPremix) =>
           patch({ totalQtySentForPremix })
         }
+        showQaRemarks={showQaRemarks}
+        qaRemarks={value.qaRemarks}
+        onQaRemarksChange={(qaRemarks) => patch({ qaRemarks })}
         disabled={disabled}
         theme={theme}
         validationErrors={validationErrors}

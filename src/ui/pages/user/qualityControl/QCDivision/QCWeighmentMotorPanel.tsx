@@ -14,6 +14,8 @@ import {
 } from "@mui/material";
 import DateField from "../../../../components/common/DateField";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import { STRINGS } from "../../../../../app/config/strings";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
@@ -26,15 +28,18 @@ import {
   type QcWeighmentWeightRow,
 } from "../../../../../hooks/user/qualityControl/qcWeighmentConfig";
 import {
+  getWeighmentAttachmentQaRemarks,
   getWeighmentCalibrationDueDate,
   getWeighmentUploadReport,
   getWeighmentWeighscaleNo,
   getWeighmentWeightRows,
+  setWeighmentAttachmentQaRemarks,
   setWeighmentCalibrationDueDate,
   setWeighmentUploadReport,
   setWeighmentWeighscaleNo,
   setWeighmentWeightRows,
 } from "../../../../../hooks/user/qualityControl/qcWeighmentTables";
+import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QCDivisionReadOnlyValue,
@@ -153,6 +158,10 @@ const WeightDetailsTable = ({
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, WEIGHT_KG: value } : row)));
   };
 
+  const updateQaRemarks = (index: number, value: string) => {
+    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, QA_REMARKS: value } : row)));
+  };
+
   return (
     <Stack spacing={0.75}>
       <TableContainer
@@ -162,22 +171,25 @@ const WeightDetailsTable = ({
             : { border: `1px solid ${TABLE_BORDER}`, borderRadius: 1, overflowX: "auto" }
         }
       >
-        <Table size="small" sx={{ minWidth: 520, borderCollapse: "collapse" }}>
+        <Table size="small" sx={{ minWidth: 680, borderCollapse: "collapse" }}>
           <TableHead>
             <TableRow>
               <TableCell sx={headerSx}>{QC_WEIGHMENT_FIELD_LABELS.WEIGHT_PARAMETER}</TableCell>
-              <TableCell sx={{ ...headerSx, width: 168 }}>
+              <TableCell sx={{ ...headerSx, width: 140 }}>
                 <FieldLabelWithAsterisk
                   label={QC_WEIGHMENT_FIELD_LABELS.WEIGHT_KG}
                   required
                   sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
                 />
               </TableCell>
+              <TableCell sx={{ ...headerSx, width: 200 }}>{QC_WEIGHMENT_FIELD_LABELS.QA_REMARKS}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((row, index) => {
               const computed = Boolean(row.locked);
+              const qaPath = `MOTOR_WEIGHT_DETAILS.${index}.QA_REMARKS`;
+              const qaMessage = fieldError(validationErrors ?? undefined, qaPath);
               return (
                 <TableRow
                   key={row.SR_NO}
@@ -227,6 +239,30 @@ const WeightDetailsTable = ({
                       })()
                     )}
                   </TableCell>
+                  <TableCell sx={bodyCellSx}>
+                    {readOnly ? (
+                      <QCDivisionReadOnlyValue
+                        value={String(row.QA_REMARKS ?? "")}
+                        muted={!String(row.QA_REMARKS ?? "").trim()}
+                      />
+                    ) : (
+                      <Box data-qc-field={qaPath}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          multiline
+                          minRows={1}
+                          value={String(row.QA_REMARKS ?? "")}
+                          disabled={inputsDisabled}
+                          onChange={(event) => updateQaRemarks(index, event.target.value)}
+                          inputProps={{ "data-qc-field": qaPath }}
+                          sx={tableFieldSx}
+                          error={Boolean(qaMessage)}
+                        />
+                        <FieldErrorText message={qaMessage} />
+                      </Box>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -258,10 +294,13 @@ const QCWeighmentMotorPanel = ({
 }: QCWeighmentMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
   const err = (path: string) => fieldError(validationErrors ?? undefined, path);
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const weighscaleNo = getWeighmentWeighscaleNo(values);
   const calibrationDueDate = getWeighmentCalibrationDueDate(values);
   const rows = useMemo(() => getWeighmentWeightRows(values), [values]);
   const uploadReport = useMemo(() => getWeighmentUploadReport(values), [values]);
+  const attachmentQaRemarks = getWeighmentAttachmentQaRemarks(values);
 
   const patchValues = useCallback(
     (updater: (prev: SchemaFormValues) => SchemaFormValues) => {
@@ -364,20 +403,37 @@ const QCWeighmentMotorPanel = ({
         </Stack>
       </SectionCard>
       <SectionCard title={QC_WEIGHMENT_SECTION_TITLES.ATTACHMENTS} readOnly={readOnly}>
-        <Box>
-          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
-            {QC_WEIGHMENT_FIELD_LABELS.UPLOAD_REPORT}
-          </Typography>
-          <QCDivisionFileField
-            files={uploadReport}
-            onChange={patchUploadReport}
-            disabled={inputsDisabled}
-            readOnly={readOnly}
-            multiple
-            acceptMode="imageVideoPdf"
-            emptyLabel="Upload"
-          />
-        </Box>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
+              {QC_WEIGHMENT_FIELD_LABELS.UPLOAD_REPORT}
+            </Typography>
+            <QCDivisionFileField
+              files={uploadReport}
+              onChange={patchUploadReport}
+              disabled={inputsDisabled}
+              readOnly={readOnly}
+              multiple
+              acceptMode="imageVideoPdf"
+              emptyLabel="Upload"
+            />
+          </Box>
+          <Box data-qc-field="ATTACHMENTS.QA_REMARKS">
+            <CasePrepTextField
+              label={QC_WEIGHMENT_FIELD_LABELS.QA_REMARKS}
+              value={attachmentQaRemarks}
+              readOnly={readOnly}
+              disabled={inputsDisabled}
+              width="100%"
+              theme={manufacturingTheme}
+              onChange={(next) =>
+                patchValues((prev) => setWeighmentAttachmentQaRemarks(prev, next))
+              }
+              error={Boolean(err("ATTACHMENTS.QA_REMARKS"))}
+            />
+            {!readOnly ? <FieldErrorText message={err("ATTACHMENTS.QA_REMARKS")} /> : null}
+          </Box>
+        </Stack>
       </SectionCard>
       </Stack>
     </Box>

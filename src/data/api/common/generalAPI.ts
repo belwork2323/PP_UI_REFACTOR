@@ -437,6 +437,9 @@ export type SubscaleArticleOption = {
   subscaleArticleCode: string;
   subscaleArticleName: string;
   isActive: boolean;
+  isBem: boolean;
+  bemSize?: number | null;
+  bemUnit?: string | null;
 };
 
 export type FetchSubscaleArticlesParams = {
@@ -448,6 +451,12 @@ const mapSubscaleArticleOption = (row: Record<string, unknown>): SubscaleArticle
   subscaleArticleCode: String(row.subscaleArticleCode ?? row.code ?? "").trim(),
   subscaleArticleName: String(row.subscaleArticleName ?? row.name ?? "").trim(),
   isActive: row.isActive !== false,
+  isBem: row.isBem === true,
+  bemSize:
+    row.bemSize == null || row.bemSize === ""
+      ? null
+      : Number(row.bemSize),
+  bemUnit: row.bemUnit == null || row.bemUnit === "" ? null : String(row.bemUnit).trim(),
 });
 
 /**

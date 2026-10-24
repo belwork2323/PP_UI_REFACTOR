@@ -19,6 +19,10 @@ type Props = {
   disabled?: boolean;
   theme: any;
   fieldErrors?: Record<string, string>;
+  /** QA Raw Material Processing only — not shown in manufacturing RMP. */
+  showQaRemarks?: boolean;
+  qaRemarks?: string;
+  onQaRemarksChange?: (value: string) => void;
 };
 
 const LotDetailsSection = ({
@@ -29,6 +33,9 @@ const LotDetailsSection = ({
   disabled,
   theme,
   fieldErrors = {},
+  showQaRemarks = false,
+  qaRemarks = "",
+  onQaRemarksChange,
 }: Props) => {
   const rows = value.length > 0 ? value : [createEmptyLotDetailRow()];
   const sum = sumLotDetailQuantities(rows);
@@ -175,6 +182,18 @@ const LotDetailsSection = ({
           </Typography>
         )}
       </Box>
+      {showQaRemarks ? (
+        <Box sx={{ mt: 1.25 }} data-rmp-field="lotDetailsQaRemarks">
+          <CasePrepTextField
+            label="QA Remarks"
+            value={qaRemarks}
+            disabled={disabled}
+            width="100%"
+            theme={theme}
+            onChange={(v) => onQaRemarksChange?.(v)}
+          />
+        </Box>
+      ) : null}
     </Box>
   );
 };

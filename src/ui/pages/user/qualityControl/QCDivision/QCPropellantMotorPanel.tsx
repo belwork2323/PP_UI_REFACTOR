@@ -185,7 +185,6 @@ type PropertyTableProps = {
   readOnly?: boolean;
   disabled?: boolean;
   includeSampleNo?: boolean;
-  includeRemarks?: boolean;
   includeRowStats?: boolean;
   includeRowUpload?: boolean;
   validationErrors?: Record<string, string> | null;
@@ -200,7 +199,6 @@ const PropertyTable = ({
   readOnly = false,
   disabled = false,
   includeSampleNo = false,
-  includeRemarks = false,
   includeRowStats = false,
   includeRowUpload = false,
   validationErrors = null,
@@ -285,8 +283,8 @@ const PropertyTable = ({
                   </TableCell>
                 </>
               ) : null}
-              {includeRemarks ? <TableCell sx={headerSx}>Remarks</TableCell> : null}
               {includeRowUpload ? <TableCell sx={headerSx}>Upload</TableCell> : null}
+              <TableCell sx={headerSx}>QA Remarks</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -409,28 +407,6 @@ const PropertyTable = ({
                       </TableCell>
                     </>
                   ) : null}
-                  {includeRemarks ? (
-                    <TableCell sx={bodyCellSx}>
-                      {(() => {
-                        const path = `${sectionId}.${index}.REMARKS`;
-                        const message = fieldError(validationErrors ?? undefined, path);
-                        return (
-                          <>
-                            <CellInput
-                              value={String(row.REMARKS ?? "")}
-                              onChange={(value) => updateCell(index, "REMARKS", value)}
-                              disabled={inputsDisabled}
-                              readOnly={readOnly}
-                              multiline
-                              fieldPath={path}
-                              error={Boolean(message)}
-                            />
-                            {!readOnly ? <FieldErrorText message={message} /> : null}
-                          </>
-                        );
-                      })()}
-                    </TableCell>
-                  ) : null}
                   {includeRowUpload ? (
                     <TableCell sx={bodyCellSx}>
                       <Box sx={{ minWidth: 160, maxWidth: 280 }}>
@@ -451,6 +427,26 @@ const PropertyTable = ({
                       </Box>
                     </TableCell>
                   ) : null}
+                  <TableCell sx={bodyCellSx}>
+                    {(() => {
+                      const path = `${sectionId}.${index}.QA_REMARKS`;
+                      const message = fieldError(validationErrors ?? undefined, path);
+                      return (
+                        <>
+                          <CellInput
+                            value={String(row.QA_REMARKS ?? "")}
+                            onChange={(value) => updateCell(index, "QA_REMARKS", value)}
+                            disabled={inputsDisabled}
+                            readOnly={readOnly}
+                            multiline
+                            fieldPath={path}
+                            error={Boolean(message)}
+                          />
+                          {!readOnly ? <FieldErrorText message={message} /> : null}
+                        </>
+                      );
+                    })()}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -554,6 +550,9 @@ const BallisticTable = ({
                   </Stack>
                 </TableCell>
               ))}
+              <TableCell sx={{ ...headerSx, verticalAlign: "middle" }} rowSpan={2}>
+                QA Remarks
+              </TableCell>
             </TableRow>
             <TableRow>
               {groups.flatMap((group) =>
@@ -631,6 +630,26 @@ const BallisticTable = ({
                     </TableCell>
                   );
                 })}
+                <TableCell sx={bodyCellSx}>
+                  {(() => {
+                    const path = `${sectionId}.${index}.QA_REMARKS`;
+                    const message = fieldError(validationErrors ?? undefined, path);
+                    return (
+                      <>
+                        <CellInput
+                          value={String(row.QA_REMARKS ?? "")}
+                          onChange={(value) => updateCell(index, "QA_REMARKS", value)}
+                          disabled={inputsDisabled}
+                          readOnly={readOnly}
+                          multiline
+                          fieldPath={path}
+                          error={Boolean(message)}
+                        />
+                        {!readOnly ? <FieldErrorText message={message} /> : null}
+                      </>
+                    );
+                  })()}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -789,7 +808,6 @@ const QCPropellantMotorPanel = ({
               readOnly={readOnly}
               disabled={inputsDisabled}
               includeSampleNo
-              includeRemarks
               includeRowStats
               validationErrors={validationErrors}
             />
@@ -825,7 +843,6 @@ const QCPropellantMotorPanel = ({
             readOnly={readOnly}
             disabled={inputsDisabled}
             includeSampleNo
-            includeRemarks
             includeRowStats
             includeRowUpload
             validationErrors={validationErrors}

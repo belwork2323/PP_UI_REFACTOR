@@ -48,8 +48,8 @@ type DispatchApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: DispatchApproverDetailItem) => void;
-  onReject: (item: DispatchApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -140,8 +140,8 @@ const DispatchApproverDetailDialog = ({
             loading={loading}
             activeMotorId={activeMotorId}
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             dispatchTheme={dispatchTheme}
             approverTheme={theme}
@@ -166,6 +166,7 @@ const DispatchApproverDetailDialog = ({
         formId={item.formId}
         department="dispatch"
         subDepartment="dispatch"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`${strings.TITLE} Report — ${item.batchId}`}
       />
     </>

@@ -36,7 +36,7 @@ export const qcPropellantValidationFields: Record<string, FieldRuleConfig> = {
   stdDev: number(["SUBMIT"]),
   /** Std Dev is blank with a single FM sample (auto-stat); format-only until ≥2 samples. */
   stdDevOptional: number([]),
-  remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   ballisticSpec: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
   // Ballistic FM/BEM cells are optional notes-style values (UI has no required asterisks)
   ballisticValue: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -117,9 +117,11 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
               ruleKey: filledFmCount >= 2 ? "stdDev" : "stdDevOptional",
             });
           }
-          if ("REMARKS" in row) {
-            fields.push({ path: `${base}.REMARKS`, value: row.REMARKS, ruleKey: "remarks" });
-          }
+          fields.push({
+            path: `${base}.QA_REMARKS`,
+            value: row.QA_REMARKS ?? row.qaRemarks ?? "",
+            ruleKey: "qaRemarks",
+          });
         });
         continue;
       }
@@ -134,9 +136,22 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
             ruleKey: "ballisticSpec",
           });
           Object.keys(row).forEach((col) => {
-            if (col === "DETAILS" || col === "SPECIFICATION" || col === "SR_NO") return;
+            if (
+              col === "DETAILS" ||
+              col === "SPECIFICATION" ||
+              col === "SR_NO" ||
+              col === "QA_REMARKS" ||
+              col === "qaRemarks"
+            ) {
+              return;
+            }
             if (typeof row[col] === "object") return;
             fields.push({ path: `${base}.${col}`, value: row[col], ruleKey: "ballisticValue" });
+          });
+          fields.push({
+            path: `${base}.QA_REMARKS`,
+            value: row.QA_REMARKS ?? row.qaRemarks ?? "",
+            ruleKey: "qaRemarks",
           });
         });
       }

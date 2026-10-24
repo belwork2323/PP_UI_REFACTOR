@@ -11,9 +11,18 @@ type Props = {
   disabled?: boolean;
   theme: any;
   fieldErrors?: Record<string, string>;
+  /** QA Raw Material Processing only. */
+  showQaRemarks?: boolean;
 };
 
-const SievingSection = ({ value, onChange, disabled, theme, fieldErrors = {} }: Props) => {
+const SievingSection = ({
+  value,
+  onChange,
+  disabled,
+  theme,
+  fieldErrors = {},
+  showQaRemarks = false,
+}: Props) => {
   const patch = (patchValue: Partial<SievingForm>) => onChange({ ...value, ...patchValue });
 
   return (
@@ -75,6 +84,16 @@ const SievingSection = ({ value, onChange, disabled, theme, fieldErrors = {} }: 
           theme={theme}
           onChange={(v) => patch({ observation: v })}
         />
+        {showQaRemarks ? (
+          <CasePrepTextField
+            label="QA Remarks"
+            value={value.qaRemarks}
+            disabled={disabled}
+            width="100%"
+            theme={theme}
+            onChange={(v) => patch({ qaRemarks: v })}
+          />
+        ) : null}
       </Box>
     </Box>
   );

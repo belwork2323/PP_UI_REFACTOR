@@ -15,3 +15,11 @@ export const fetchDispatchFormDetailsApi = async (payload: {
 export const updateDispatchFormApi = async (payload: any) => {
   return await put(USER_DISPATCH_ENDPOINTS.UPDATE_FORM, payload);
 };
+
+/** Seed casting date / NDT clearance / propellant from approved QC Division. */
+export const fetchDispatchMotorDetailsApi = async (payload: {
+  batchId: string;
+  motorId?: string;
+}) => {
+  return await post(USER_DISPATCH_ENDPOINTS.MOTOR_DETAILS, payload);
+};

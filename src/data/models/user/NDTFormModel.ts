@@ -10,6 +10,7 @@ import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
 import type { BatchMotorRadiographyDetails } from "../admin/BatchManagement/BatchManagementModel";
 import { isFileReady, isFileUploadIncomplete, type FileRef } from "../common/FileUploadModel";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 export type NDTMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type NDTMotorSubmissionStatus =
@@ -17,7 +18,8 @@ export type NDTMotorSubmissionStatus =
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
   | "APPROVED"
-  | "REJECTED";
+  | "REJECTED"
+  | "DISCARDED";
 
 export type NDTMotorStatusMeta = {
   motorSubmissionType?: NDTMotorSubmissionType;
@@ -39,11 +41,16 @@ export type NDTMotorCounts = {
 
 export const isNDTMotorLocked = (status?: NDTMotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isNDTMotorEditable = (status?: NDTMotorSubmissionStatus | string | null) =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const isNDTMotorApproverTabDisabled = (
   status?: NDTMotorSubmissionStatus | string | null,
@@ -52,7 +59,7 @@ export const isNDTMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED";
 };
 
 export const isNDTMotorApproverActionable = (
@@ -116,7 +123,8 @@ export const normalizeNDTMotorStatus = (value: unknown): NDTMotorSubmissionStatu
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }

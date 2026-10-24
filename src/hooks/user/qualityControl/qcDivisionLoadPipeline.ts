@@ -57,8 +57,17 @@ export const loadQcDivisionContext = async (params: {
 
   const { batchDetails, qcFormDetails, context } = bootstrap;
   const typeKey = String(params.rawMaterialType ?? "").trim();
-  const blocked = !canShowQcDivisionUi(params.flowKey, context.units, typeKey);
-  const blockedReason = getQcDivisionBlockedReason(params.flowKey, context.units, typeKey);
+  const uiOptions = {
+    batchType: context.batchType,
+    subBatchType: context.subBatchType,
+  };
+  const blocked = !canShowQcDivisionUi(params.flowKey, context.units, typeKey, uiOptions);
+  const blockedReason = getQcDivisionBlockedReason(
+    params.flowKey,
+    context.units,
+    typeKey,
+    uiOptions,
+  );
 
   let manufacturingSeed: Record<string, unknown> | null = null;
   if (!blocked && params.fetchManufacturingSeed) {

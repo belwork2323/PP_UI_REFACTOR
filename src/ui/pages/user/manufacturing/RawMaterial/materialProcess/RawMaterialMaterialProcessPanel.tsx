@@ -30,6 +30,8 @@ type Props = {
   readOnly?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  /** QA Raw Material Processing only — manufacturing leaves unset. */
+  showQaRemarks?: boolean;
 };
 
 const RawMaterialMaterialProcessPanel = ({
@@ -44,6 +46,7 @@ const RawMaterialMaterialProcessPanel = ({
   readOnly = false,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const isAp = isApRmpFormTemplate(rmpFormTemplate);
 
@@ -74,6 +77,7 @@ const RawMaterialMaterialProcessPanel = ({
         readOnly={readOnly}
         theme={theme}
         validationErrors={validationErrors}
+        showQaRemarks={showQaRemarks}
       />
     );
   }
@@ -92,6 +96,7 @@ const RawMaterialMaterialProcessPanel = ({
         disabled={readOnly}
         theme={theme}
         validationErrors={validationErrors}
+        showQaRemarks={showQaRemarks}
         onChange={(processForm) =>
           onSlotChange({
             uiKey: slotState.uiKey,
@@ -111,6 +116,7 @@ const RawMaterialMaterialProcessPanel = ({
         disabled={readOnly}
         theme={theme}
         validationErrors={validationErrors}
+        showQaRemarks={showQaRemarks}
         onChange={(processForm) =>
           onSlotChange({
             uiKey: slotState.uiKey,
@@ -130,6 +136,7 @@ const RawMaterialMaterialProcessPanel = ({
         disabled={readOnly}
         theme={theme}
         validationErrors={validationErrors}
+        showQaRemarks={showQaRemarks}
         onChange={(processForm) =>
           onSlotChange({
             uiKey: "nonoxD",
@@ -148,6 +155,7 @@ const RawMaterialMaterialProcessPanel = ({
       disabled={readOnly}
       theme={theme}
       validationErrors={validationErrors}
+      showQaRemarks={showQaRemarks}
       onChange={(processForm) =>
         onSlotChange({
           uiKey: slotState.uiKey,

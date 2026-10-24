@@ -37,6 +37,51 @@ export const shouldSkipQcManufacturingUnitPrerequisiteGate = (
   subBatchType?: string | null,
 ): boolean => isQcSubscaleQualOrExperimentalBatch(batchType, subBatchType);
 
+/**
+ * Experimental QC applicable divisions: RMR / RMP / Mixing, plus STF (BEM-gated separately).
+ * Hardware+ / QC / Weighment stay N/A (no motors on experimental subscale).
+ */
+export const isQcExperimentalAllowedDivision = (
+  flowKey: string,
+  rawMaterialType?: string | null,
+): boolean => {
+  const key = String(flowKey ?? "")
+    .trim()
+    .toUpperCase();
+  const typeKey = String(rawMaterialType ?? "")
+    .trim()
+    .toUpperCase();
+  if (
+    key === "RAW_MATERIAL_REVALIDATION" ||
+    key === "RAW_MATERIAL_PROCESSING" ||
+    key === "MIXING" ||
+    key === "STATIC_TEST_FACILITY"
+  ) {
+    return true;
+  }
+  if (key === "RAW_MATERIAL") {
+    if (!typeKey) return true;
+    return (
+      typeKey === "RAW_MATERIAL_REVALIDATION" || typeKey === "RAW_MATERIAL_PROCESSING"
+    );
+  }
+  return false;
+};
+
+/** True when Experimental division is always-on (not BEM-gated STF). */
+export const isQcExperimentalAlwaysEnabledDivision = (
+  flowKey: string,
+  rawMaterialType?: string | null,
+): boolean => {
+  const key = String(flowKey ?? "")
+    .trim()
+    .toUpperCase();
+  if (key === "STATIC_TEST_FACILITY") return false;
+  return isQcExperimentalAllowedDivision(flowKey, rawMaterialType);
+};
+
+export const QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON =
+  "No motor linked to this subscale batch — this division is not applicable.";
 /** Prefer explicit Subscale from list or details — details may default empty batchType to MAIN. */
 export const resolveQcWorkingBatchType = (
   listBatchType?: string | null,

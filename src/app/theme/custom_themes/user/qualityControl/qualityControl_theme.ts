@@ -9,7 +9,7 @@ export const getQualityControlTheme = (mode = "light") => {
     ...baseTheme,
     qualityControl: {
       dashboard: {
-        departmentName: "Quality Control Department",
+        departmentName: "Quality Assurance Department",
       },
       brands: QUALITY_CONTROL_BRANDS,
       ndt: getNdtTheme(baseTheme),

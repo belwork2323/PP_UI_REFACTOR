@@ -152,6 +152,8 @@ const mergeTrimmingSessions = (
     commonFormatLocations: current.commonFormatLocations.length
       ? current.commonFormatLocations
       : incoming.commonFormatLocations,
+    dimensionsQaRemarks: current.dimensionsQaRemarks || incoming.dimensionsQaRemarks,
+    manufacturingRemarks: current.manufacturingRemarks || incoming.manufacturingRemarks,
     motorRemarks: current.motorRemarks || incoming.motorRemarks,
     reportFiles: mergeQcDivisionFileRefsForSeed(
       current.reportFiles,
@@ -180,16 +182,33 @@ export const applyTrimmingDivisionDetailsSeed = (
     Array.isArray(detailSource.trimmingMeasurementDetails) ||
     Array.isArray(detailSource.trimmingOperationDetails) ||
     Boolean(asRecord(detailSource.trimmingRemarks)) ||
+    Boolean(String(detailSource.measurementQaRemarks ?? "").trim()) ||
     Boolean(String(detailSource.motorReceivedDate ?? detailSource.motorReceivedAt ?? "").trim()) ||
     detailSource.motorStage != null;
 
   let next = base;
   if (motor && hasTrimmingSections) {
+    const fromSections = getTrimmingSessionFromValues(
+      hydrateTrimmingValuesFromSections(sections, { motorReceivedAt: receivedAt }),
+    );
+    const nestedRemarks =
+      detailSource.trimmingRemarks && typeof detailSource.trimmingRemarks === "object"
+        ? (detailSource.trimmingRemarks as Record<string, unknown>)
+        : {};
     const hydrated = setTrimmingSessionValues({
-      ...getTrimmingSessionFromValues(
-        hydrateTrimmingValuesFromSections(sections, { motorReceivedAt: receivedAt }),
-      ),
+      ...fromSections,
       motorStage,
+      dimensionsQaRemarks:
+        String(detailSource.measurementQaRemarks ?? "").trim() ||
+        fromSections.dimensionsQaRemarks,
+      manufacturingRemarks:
+        String(nestedRemarks.remarks ?? "").trim() ||
+        fromSections.manufacturingRemarks ||
+        "",
+      motorRemarks:
+        String(nestedRemarks.qaRemarks ?? "").trim() ||
+        fromSections.motorRemarks ||
+        "",
     });
     next = onlyIfEmpty
       ? mergeTrimmingSessions(getTrimmingSessionFromValues(base), getTrimmingSessionFromValues(hydrated))

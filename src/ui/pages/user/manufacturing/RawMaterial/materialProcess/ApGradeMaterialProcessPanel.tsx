@@ -55,6 +55,8 @@ type Props = {
   disabled?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  /** QA Raw Material Processing only — manufacturing leaves unset. */
+  showQaRemarks?: boolean;
 };
 
 const fieldError = (
@@ -75,6 +77,7 @@ const ApGradeMaterialProcessPanel = ({
   disabled,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const aligned = useMemo(
     () => ensureProcessFormMatchesUiKey(uiKey, value) as TypedSolidForm,
@@ -117,6 +120,11 @@ const ApGradeMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={lotErrors}
+        showQaRemarks={showQaRemarks}
+        qaRemarks={aligned.lotDetailsQaRemarks}
+        onQaRemarksChange={(lotDetailsQaRemarks) =>
+          onChange({ ...aligned, lotDetailsQaRemarks } as TypedSolidForm)
+        }
       />
 
       {uiKey === "apCoarse" && aligned.uiKey === "apCoarse" ? (
@@ -149,6 +157,18 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             validationErrors={validationErrors}
           />
+          {showQaRemarks ? (
+            <Box sx={{ mb: 2 }}>
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.blendingDryingQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(blendingDryingQaRemarks) => patchCoarse({ blendingDryingQaRemarks })}
+              />
+            </Box>
+          ) : null}
           <ApRvdTable
             rows={aligned.dryingOperationRvd}
             onChange={(rows) => patchCoarse({ dryingOperationRvd: rows })}
@@ -156,6 +176,20 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             validationErrors={validationErrors}
           />
+          {showQaRemarks ? (
+            <Box sx={{ mb: 2 }}>
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.dryingOperationRvdQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(dryingOperationRvdQaRemarks) =>
+                  patchCoarse({ dryingOperationRvdQaRemarks })
+                }
+              />
+            </Box>
+          ) : null}
           <ApPsdTable
             rows={aligned.particleSizeDistribution}
             onChange={(rows) => patchCoarse({ particleSizeDistribution: rows })}
@@ -163,6 +197,20 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             validationErrors={validationErrors}
           />
+          {showQaRemarks ? (
+            <Box sx={{ mb: 2 }}>
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.particleSizeDistributionQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(particleSizeDistributionQaRemarks) =>
+                  patchCoarse({ particleSizeDistributionQaRemarks })
+                }
+              />
+            </Box>
+          ) : null}
         </>
       ) : null}
 
@@ -253,6 +301,16 @@ const ApGradeMaterialProcessPanel = ({
               theme={theme}
               onChange={(v) => patchFine({ grindingObservation: v })}
             />
+            {showQaRemarks ? (
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.grindingQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(grindingQaRemarks) => patchFine({ grindingQaRemarks })}
+              />
+            ) : null}
             <ApPsdTable
               title="Particle size Distribution"
               requirementLabel="PSD / Spec band"
@@ -282,6 +340,18 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             validationErrors={validationErrors}
           />
+          {showQaRemarks ? (
+            <Box sx={{ mb: 2 }}>
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.blendingDryingQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(blendingDryingQaRemarks) => patchFine({ blendingDryingQaRemarks })}
+              />
+            </Box>
+          ) : null}
           <ApRvdTable
             rows={aligned.dryingOperationRvd}
             onChange={(rows) => patchFine({ dryingOperationRvd: rows })}
@@ -289,6 +359,20 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             validationErrors={validationErrors}
           />
+          {showQaRemarks ? (
+            <Box sx={{ mb: 2 }}>
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.dryingOperationRvdQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(dryingOperationRvdQaRemarks) =>
+                  patchFine({ dryingOperationRvdQaRemarks })
+                }
+              />
+            </Box>
+          ) : null}
           <DryingTrayOvenSection
             title="Storage in Tray Oven"
             value={aligned.trayOvenStorage as DryingTrayOvenForm}
@@ -300,6 +384,7 @@ const ApGradeMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={splitFieldErrors(validationErrors, "trayOvenStorage")}
+            showQaRemarks={showQaRemarks}
           />
           <SievingSection
             value={aligned.sieving as SievingForm}
@@ -307,6 +392,7 @@ const ApGradeMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={splitFieldErrors(validationErrors, "sieving")}
+            showQaRemarks={showQaRemarks}
           />
         </>
       ) : null}
@@ -388,6 +474,16 @@ const ApGradeMaterialProcessPanel = ({
               theme={theme}
               onChange={(v) => patchUltra({ grindingObservation: v })}
             />
+            {showQaRemarks ? (
+              <CasePrepTextField
+                label="QA Remarks"
+                value={aligned.grindingQaRemarks}
+                disabled={disabled}
+                width="100%"
+                theme={theme}
+                onChange={(grindingQaRemarks) => patchUltra({ grindingQaRemarks })}
+              />
+            ) : null}
             <Box
               sx={{
                 display: "grid",
@@ -426,6 +522,7 @@ const ApGradeMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={splitFieldErrors(validationErrors, "drying")}
+            showQaRemarks={showQaRemarks}
           />
           <SievingSection
             value={aligned.sieving as SievingForm}
@@ -435,6 +532,7 @@ const ApGradeMaterialProcessPanel = ({
             disabled={disabled}
             theme={theme}
             fieldErrors={splitFieldErrors(validationErrors, "sieving")}
+            showQaRemarks={showQaRemarks}
           />
         </>
       ) : null}
@@ -497,6 +595,16 @@ const ApGradeMaterialProcessPanel = ({
             theme={theme}
             onChange={(v) => patchAluminum({ observation: v })}
           />
+          {showQaRemarks ? (
+            <CasePrepTextField
+              label="QA Remarks"
+              value={aligned.qaRemarks}
+              disabled={disabled}
+              width="100%"
+              theme={theme}
+              onChange={(qaRemarks) => patchAluminum({ qaRemarks })}
+            />
+          ) : null}
           <CasePrepTextField
             label="Qty. (kg) qualified"
             value={aligned.qtyKgQualified}
@@ -534,6 +642,9 @@ const ApGradeMaterialProcessPanel = ({
           disabled={disabled}
           theme={theme}
           validationErrors={validationErrors}
+          showQaRemarks={showQaRemarks}
+          qaRemarks={aligned.qaRemarks}
+          onQaRemarksChange={(qaRemarks) => patchDoa({ qaRemarks })}
         />
       ) : null}
     </>

@@ -29,6 +29,7 @@ import {
   POST_CURE_OPERATION_LOOSE_FLAP,
 } from "../../../hooks/user/manufacturing/postCureConfig";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 export type PostCureMotorSession = {
   motorId: string;
@@ -41,7 +42,12 @@ export type PostCureMotorSession = {
 
 export type PostCureMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type PostCureMotorSubmissionStatus =
-  "TO_BE_INITIATED" | "IN_PROGRESS" | "WAITING_FOR_APPROVAL" | "APPROVED" | "REJECTED";
+  | "TO_BE_INITIATED"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_APPROVAL"
+  | "APPROVED"
+  | "REJECTED"
+  | "DISCARDED";
 
 export type PostCureMotorStatusMeta = {
   motorSubmissionType?: PostCureMotorSubmissionType;
@@ -55,11 +61,16 @@ export type PostCureMotorStatusMeta = {
 
 export const isPostCureMotorLocked = (status?: PostCureMotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isPostCureMotorEditable = (status?: PostCureMotorSubmissionStatus | string | null) =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const isPostCureMotorApproverTabDisabled = (
   status?: PostCureMotorSubmissionStatus | string | null,
@@ -68,7 +79,7 @@ export const isPostCureMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED";
 };
 
 export const isPostCureMotorApproverActionable = (
@@ -150,7 +161,8 @@ export const normalizePostCureMotorStatus = (value: unknown): PostCureMotorSubmi
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }
@@ -272,7 +284,7 @@ export type PostCureDetails = {
 export type PostCureMotorPayload = {
   motorId: string;
   motorReceiptDate: string;
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE";
   looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
   inhibitionDetails?: InhibitionDetailsApi;
   motorSubmissionType?: PostCureMotorSubmissionType;
@@ -365,6 +377,7 @@ const mapApiOperationType = (operationType: string) => {
 
 const mapApiInhibitorType = (inhibitorType: string) => {
   if (inhibitorType === "HEMCOAT_3K") return "Hemcoat-3K";
+  if (inhibitorType === "OTHERS" || inhibitorType === "OTHER") return "Others";
   if (inhibitorType === "NOT_APPLICABLE") return "not-applicable";
   return inhibitorType;
 };

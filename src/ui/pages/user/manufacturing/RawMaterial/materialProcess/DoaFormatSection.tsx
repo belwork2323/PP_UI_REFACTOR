@@ -20,6 +20,10 @@ type Props = {
   onDispatchDatetimeChange: (value: string) => void;
   onObservationChange: (value: string) => void;
   onTotalQtySentForPremixChange: (value: string) => void;
+  /** QA Raw Material Processing only. */
+  showQaRemarks?: boolean;
+  qaRemarks?: string;
+  onQaRemarksChange?: (value: string) => void;
   disabled?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
@@ -43,6 +47,9 @@ const DoaFormatSection = ({
   onDispatchDatetimeChange,
   onObservationChange,
   onTotalQtySentForPremixChange,
+  showQaRemarks = false,
+  qaRemarks = "",
+  onQaRemarksChange,
   disabled,
   theme,
   validationErrors,
@@ -116,6 +123,16 @@ const DoaFormatSection = ({
         theme={theme}
         onChange={onObservationChange}
       />
+      {showQaRemarks ? (
+        <CasePrepTextField
+          label="QA Remarks"
+          value={qaRemarks}
+          disabled={disabled}
+          width="100%"
+          theme={theme}
+          onChange={(v) => onQaRemarksChange?.(v)}
+        />
+      ) : null}
       <CasePrepTextField
         label="Total Quantity sent for premix"
         value={totalQtySentForPremix}

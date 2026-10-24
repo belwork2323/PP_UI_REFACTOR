@@ -12,6 +12,8 @@ export const QC_MIXING_VISCOSITY_TABLE_ID = "VISCOSITY_BUILD_UP";
 export const QC_MIXING_PREMIX_FORM_KEY = `${QC_MIXING_PREMIX_SECTION_ID}::${QC_MIXING_PREMIX_TABLE_ID}`;
 export const QC_MIXING_FINAL_MIX_DETAILS_FORM_KEY = `${QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID}::${QC_MIXING_FINAL_MIX_DETAILS_TABLE_ID}`;
 export const QC_MIXING_VISCOSITY_FORM_KEY = `${QC_MIXING_VISCOSITY_SECTION_ID}::${QC_MIXING_VISCOSITY_TABLE_ID}`;
+/** Section-level QA Remarks for Final Mix viscosity (not per-row). */
+export const QC_MIXING_VISCOSITY_QA_REMARKS_KEY = `${QC_MIXING_VISCOSITY_SECTION_ID}::QA_REMARKS`;
 
 export const QC_MIXING_PREMIX_PARAMETERS = ["Homogeneity", "Moisture"] as const;
 export const QC_MIXING_FINAL_MIX_DETAIL_PARAMETERS = [
@@ -1009,6 +1011,19 @@ export const createInitialFinalMixDetailsValues = (
 
 export const createInitialViscosityValues = (): SchemaFormValues => ({
   [QC_MIXING_VISCOSITY_FORM_KEY]: [{ SR_NO: 1, TIME: "", VISCOSITY_VALUE: "" }],
+  [QC_MIXING_VISCOSITY_QA_REMARKS_KEY]: "",
+});
+
+export const getViscosityQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+): string => String(values?.[QC_MIXING_VISCOSITY_QA_REMARKS_KEY] ?? "").trim();
+
+export const setViscosityQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+  qaRemarks: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [QC_MIXING_VISCOSITY_QA_REMARKS_KEY]: qaRemarks,
 });
 
 export const getMixingDetailsRows = (
@@ -1216,6 +1231,9 @@ export const setViscosityRows = (
     ...row,
     SR_NO: row.SR_NO ?? index + 1,
   })),
+  // Preserve section-level QA Remarks when only rows change.
+  [QC_MIXING_VISCOSITY_QA_REMARKS_KEY]:
+    values?.[QC_MIXING_VISCOSITY_QA_REMARKS_KEY] ?? "",
 });
 
 /** Merge Final Mix Details + Viscosity into one entry schemaValues blob. */
@@ -1241,16 +1259,23 @@ export const pickFinalMixDetailsSchemaValues = (
   return sharedFallback ?? {};
 };
 
-/** Read only Viscosity rows from a Final Mix entry schemaValues blob. */
+/** Read only Viscosity rows + QA Remarks from a Final Mix entry schemaValues blob. */
 export const pickViscositySchemaValues = (
   entrySchemaValues?: SchemaFormValues | null,
 ): SchemaFormValues => {
-  if (entrySchemaValues?.[QC_MIXING_VISCOSITY_FORM_KEY] != null) {
-    return {
-      [QC_MIXING_VISCOSITY_FORM_KEY]: entrySchemaValues[QC_MIXING_VISCOSITY_FORM_KEY],
-    };
+  if (
+    entrySchemaValues?.[QC_MIXING_VISCOSITY_FORM_KEY] == null &&
+    entrySchemaValues?.[QC_MIXING_VISCOSITY_QA_REMARKS_KEY] == null
+  ) {
+    return {};
   }
-  return {};
+  return {
+    ...(entrySchemaValues?.[QC_MIXING_VISCOSITY_FORM_KEY] != null
+      ? { [QC_MIXING_VISCOSITY_FORM_KEY]: entrySchemaValues[QC_MIXING_VISCOSITY_FORM_KEY] }
+      : {}),
+    [QC_MIXING_VISCOSITY_QA_REMARKS_KEY]:
+      entrySchemaValues?.[QC_MIXING_VISCOSITY_QA_REMARKS_KEY] ?? "",
+  };
 };
 
 const syncSharedDetailsFields = (
@@ -1378,6 +1403,7 @@ export type QcMixingDomainDetails = {
   premixQty?: string | number;
   parameters?: QcMixingDomainParameter[];
   viscosityBuildUp?: Array<Record<string, unknown>>;
+  viscosityQaRemarks?: string | null;
 };
 
 const buildDomainParametersFromRows = (
@@ -1445,6 +1471,7 @@ const buildMixingDetailsWithSubmissionType = (
     premixQty,
     parameters,
     viscosityBuildUp,
+    viscosityQaRemarks,
   } = details;
   return {
     ...(submissionType ? { premixSubmissionType: submissionType } : {}),
@@ -1455,6 +1482,9 @@ const buildMixingDetailsWithSubmissionType = (
     ...(premixQty != null ? { premixQty } : {}),
     parameters: parameters ?? [],
     ...(viscosityBuildUp != null ? { viscosityBuildUp } : {}),
+    ...(viscosityQaRemarks != null && String(viscosityQaRemarks).trim()
+      ? { viscosityQaRemarks: String(viscosityQaRemarks).trim() }
+      : {}),
   };
 };
 
@@ -1535,8 +1565,11 @@ export const buildMixingPremixesPayload = (
         const viscosityBuildUp = entrySchemaValues
           ? buildViscosityDomainPayload(entrySchemaValues)
           : [];
+        const viscosityQaRemarks = entrySchemaValues
+          ? getViscosityQaRemarks(entrySchemaValues)
+          : "";
 
-        if (perUnitFinalMixDetails || viscosityBuildUp.length) {
+        if (perUnitFinalMixDetails || viscosityBuildUp.length || viscosityQaRemarks) {
           const baseFinalMixDetails: QcMixingDomainDetails = {
             ...(perUnitFinalMixDetails ?? {
               bowlNo: "",
@@ -1546,6 +1579,7 @@ export const buildMixingPremixesPayload = (
               parameters: [],
             }),
             viscosityBuildUp,
+            ...(viscosityQaRemarks ? { viscosityQaRemarks } : {}),
           };
           // Final-mix unit saves also expect submission type nested under finalMixDetails.
           payload.finalMixDetails = buildMixingDetailsWithSubmissionType(
@@ -1679,6 +1713,7 @@ export const hydrateMixingDetailsValuesFromDomain = (
 
 export const hydrateViscosityValuesFromDomain = (
   viscosityBuildUp: unknown,
+  viscosityQaRemarks?: unknown,
 ): SchemaFormValues => {
   const rows = asArray(viscosityBuildUp).map((item, index) => {
     const rec = asRecord(item) ?? {};
@@ -1693,8 +1728,8 @@ export const hydrateViscosityValuesFromDomain = (
       ),
     } satisfies QcMixingViscosityRow;
   });
-  if (!rows.length) return createInitialViscosityValues();
-  return setViscosityRows({}, rows);
+  const base = rows.length ? setViscosityRows({}, rows) : createInitialViscosityValues();
+  return setViscosityQaRemarks(base, pickString(viscosityQaRemarks));
 };
 
 export type HydratedMixingDivisionData = {
@@ -1746,7 +1781,10 @@ export const hydrateMixingDivisionFromFormData = (
           premixNo,
           values: mergeFinalMixEntrySchemaValues(
             detailsValues,
-            hydrateViscosityValuesFromDomain(finalMixDetails.viscosityBuildUp),
+            hydrateViscosityValuesFromDomain(
+              finalMixDetails.viscosityBuildUp,
+              finalMixDetails.viscosityQaRemarks,
+            ),
           ),
         });
       }

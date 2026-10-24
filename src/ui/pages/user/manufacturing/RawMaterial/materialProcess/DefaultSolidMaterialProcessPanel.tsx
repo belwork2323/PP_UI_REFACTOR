@@ -1,9 +1,11 @@
 import React, { useMemo } from "react";
+import { Box } from "@mui/material";
 import type {
   DefaultLiquidProcessForm,
   DefaultSolidProcessForm,
   RmpMaterialProcessForm,
 } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
+import CasePrepTextField from "../../CasePreparation/CasePrepTextField";
 import LotDetailsSection from "./LotDetailsSection";
 import DryingTrayOvenSection from "./DryingTrayOvenSection";
 import SievingSection from "./SievingSection";
@@ -16,6 +18,8 @@ type Props = {
   disabled?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  /** QA Raw Material Processing only. */
+  showQaRemarks?: boolean;
 };
 
 const splitFieldErrors = (
@@ -40,6 +44,7 @@ const DefaultSolidMaterialProcessPanel = ({
   disabled,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const lotErrors = useMemo(
     () => splitFieldErrors(validationErrors, "lotDetails"),
@@ -57,15 +62,34 @@ const DefaultSolidMaterialProcessPanel = ({
   if (value.uiKey === "defaultLiquid") {
     const liquid = value as DefaultLiquidProcessForm;
     return (
-      <LotDetailsSection
-        value={liquid.lotDetails}
-        onChange={(lotDetails) => onChange({ ...liquid, lotDetails })}
-        lotOptions={lotOptions}
-        quantityPerPremix={quantityPerPremix}
-        disabled={disabled}
-        theme={theme}
-        fieldErrors={lotErrors}
-      />
+      <>
+        <LotDetailsSection
+          value={liquid.lotDetails}
+          onChange={(lotDetails) => onChange({ ...liquid, lotDetails })}
+          lotOptions={lotOptions}
+          quantityPerPremix={quantityPerPremix}
+          disabled={disabled}
+          theme={theme}
+          fieldErrors={lotErrors}
+          showQaRemarks={showQaRemarks}
+          qaRemarks={liquid.lotDetailsQaRemarks}
+          onQaRemarksChange={(lotDetailsQaRemarks) =>
+            onChange({ ...liquid, lotDetailsQaRemarks })
+          }
+        />
+        {showQaRemarks ? (
+          <Box sx={{ mb: 2 }}>
+            <CasePrepTextField
+              label="QA Remarks"
+              value={liquid.qaRemarks}
+              disabled={disabled}
+              width="100%"
+              theme={theme}
+              onChange={(qaRemarks) => onChange({ ...liquid, qaRemarks })}
+            />
+          </Box>
+        ) : null}
+      </>
     );
   }
 
@@ -81,6 +105,11 @@ const DefaultSolidMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={lotErrors}
+        showQaRemarks={showQaRemarks}
+        qaRemarks={solid.lotDetailsQaRemarks}
+        onQaRemarksChange={(lotDetailsQaRemarks) =>
+          onChange({ ...solid, lotDetailsQaRemarks })
+        }
       />
       <DryingTrayOvenSection
         value={solid.drying}
@@ -88,6 +117,7 @@ const DefaultSolidMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={dryingErrors}
+        showQaRemarks={showQaRemarks}
       />
       <SievingSection
         value={solid.sieving}
@@ -95,6 +125,7 @@ const DefaultSolidMaterialProcessPanel = ({
         disabled={disabled}
         theme={theme}
         fieldErrors={sievingErrors}
+        showQaRemarks={showQaRemarks}
       />
     </>
   );

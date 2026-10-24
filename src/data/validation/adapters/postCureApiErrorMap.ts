@@ -66,22 +66,60 @@ const LOOSE_FLAP_RULES: RemapRule[] = [
 ];
 
 const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
-  const isHemcoat = String(inhibitorType ?? "")
+  const upper = String(inhibitorType ?? "")
     .trim()
     .toUpperCase()
-    .includes("HEMCOAT");
+    .replace(/[-\s]/g, "_");
+  const isHemcoat = upper.includes("HEMCOAT");
+  const isOthers = upper === "OTHERS" || upper === "OTHER" || upper.includes("OTHERS");
 
-  const premixPrefix = isHemcoat ? "hemcoat3kPreparation" : "ir1Premix";
-  const premixBatch = isHemcoat ? "hemcoatPremixBatchNo" : "ir1PremixBatchNo";
-  const premixDate = isHemcoat ? "hemcoatPremixDate" : "ir1PremixDate";
-  const premixTable = isHemcoat ? "premixPreparationTable" : "ir1PremixTable";
+  const premixPrefix = isHemcoat
+    ? "hemcoat3kPreparation"
+    : isOthers
+      ? "othersPremix"
+      : "ir1Premix";
+  const premixBatch = isHemcoat
+    ? "hemcoatPremixBatchNo"
+    : isOthers
+      ? "othersPremixBatchNo"
+      : "ir1PremixBatchNo";
+  const premixDate = isHemcoat
+    ? "hemcoatPremixDate"
+    : isOthers
+      ? "othersPremixDate"
+      : "ir1PremixDate";
+  const premixTable = isHemcoat
+    ? "premixPreparationTable"
+    : isOthers
+      ? "othersPremixTable"
+      : "ir1PremixTable";
 
-  const finalPrefix = isHemcoat ? "hemcoat3kFinalMix" : "ir1FinalMix";
-  const finalBatch = isHemcoat ? "hemcoatFinalMixBatchNo" : "ir1FinalMixBatchNo";
-  const finalDate = isHemcoat ? "hemcoatFinalMixDate" : "ir1FinalMixDate";
-  const finalTable = isHemcoat ? "finalMixTable" : "ir1FinalMixTable";
+  const finalPrefix = isHemcoat
+    ? "hemcoat3kFinalMix"
+    : isOthers
+      ? "othersFinalMix"
+      : "ir1FinalMix";
+  const finalBatch = isHemcoat
+    ? "hemcoatFinalMixBatchNo"
+    : isOthers
+      ? "othersFinalMixBatchNo"
+      : "ir1FinalMixBatchNo";
+  const finalDate = isHemcoat
+    ? "hemcoatFinalMixDate"
+    : isOthers
+      ? "othersFinalMixDate"
+      : "ir1FinalMixDate";
+  const finalTable = isHemcoat
+    ? "finalMixTable"
+    : isOthers
+      ? "othersFinalMixTable"
+      : "ir1FinalMixTable";
 
-  const qualPrefix = isHemcoat ? "hemcoat3kQualification" : "ir1Qualification";
+  const qualPrefix = isHemcoat
+    ? "hemcoat3kQualification"
+    : isOthers
+      ? "othersQualification"
+      : "ir1Qualification";
 
   return [
     {

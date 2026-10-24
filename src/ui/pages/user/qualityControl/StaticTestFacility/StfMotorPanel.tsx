@@ -36,6 +36,8 @@ type Props = {
   onChange: (next: StfMotorData) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  /** QC Division only: QA Remarks columns/fields; mfg Remarks stay read-only. */
+  qaRemarksMode?: boolean;
   theme?: any;
   subDeptSlug?: StfFileSubDeptSlug;
   subDepartmentId?: number;
@@ -49,8 +51,10 @@ const patchSection = <T extends Record<string, string>>(section: T, key: keyof T
   [key]: val,
 });
 
-const formatFieldLabel = (key: string) =>
-  key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+const formatFieldLabel = (key: string) => {
+  if (key === "QA_REMARKS") return "QA Remarks";
+  return key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 const CompactDate = ({
   value,
@@ -115,7 +119,8 @@ const ScalarFields = <T extends Record<string, string>>({
   disabled,
   readOnly,
   columns = 2,
-  multilineKeys = ["REMARKS", "OBSERVATION"],
+  multilineKeys = ["REMARKS", "OBSERVATION", "QA_REMARKS"],
+  readOnlyKeys = [],
   pathPrefix,
   validationErrors,
 }: {
@@ -126,6 +131,8 @@ const ScalarFields = <T extends Record<string, string>>({
   readOnly?: boolean;
   columns?: 2 | 3 | 4;
   multilineKeys?: string[];
+  /** Force specific keys read-only (e.g. mfg REMARKS in QC qaRemarksMode). */
+  readOnlyKeys?: string[];
   pathPrefix?: string;
   validationErrors?: ValidationErrors;
 }) => (
@@ -134,6 +141,7 @@ const ScalarFields = <T extends Record<string, string>>({
       const multiline = multilineKeys.includes(key);
       const path = pathPrefix ? `${pathPrefix}.${key}` : key;
       const message = fieldError(validationErrors, path);
+      const fieldReadOnly = Boolean(readOnly || readOnlyKeys.includes(key));
       return (
         <Box
           key={key}
@@ -145,7 +153,7 @@ const ScalarFields = <T extends Record<string, string>>({
             value={section[key]}
             onChange={(val) => onChange(patchSection(section, key, val))}
             disabled={disabled}
-            readOnly={readOnly}
+            readOnly={fieldReadOnly}
             error={Boolean(message)}
             {...(multiline ? { multiline: true, minRows: 2 } : {})}
           />
@@ -161,12 +169,14 @@ const MainSensorTable = ({
   onChange,
   disabled,
   readOnly,
+  qaRemarksMode = false,
   validationErrors,
 }: {
   rows: StfMainSensorRow[];
   onChange: (rows: StfMainSensorRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  qaRemarksMode?: boolean;
   validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfMainSensorRow; readonly?: boolean }> = [
@@ -181,6 +191,7 @@ const MainSensorTable = ({
     { key: "EXT_VOLTAGE" },
     { key: "OFFSET_VALUE" },
     { key: "PRELOADING" },
+    ...(qaRemarksMode ? [{ key: "QA_REMARKS" as const }] : []),
   ];
 
   const updateRow = (index: number, key: keyof StfMainSensorRow, val: string) =>
@@ -188,7 +199,7 @@ const MainSensorTable = ({
 
   return (
     <TableContainer sx={{ ...postCureTableContainerSx, overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 960 }}>
+      <Table size="small" sx={{ minWidth: qaRemarksMode ? 1080 : 960 }}>
         <TableHead>
           <TableRow>
             {columns.map(({ key }, idx) => (
@@ -241,12 +252,14 @@ const BemSensorTable = ({
   onChange,
   disabled,
   readOnly,
+  qaRemarksMode = false,
   validationErrors,
 }: {
   rows: StfBemSensorRow[];
   onChange: (rows: StfBemSensorRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  qaRemarksMode?: boolean;
   validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfBemSensorRow; readonly?: boolean }> = [
@@ -261,6 +274,7 @@ const BemSensorTable = ({
     { key: "EXT_V" },
     { key: "OFFSET_VALUE" },
     { key: "PRELOADING" },
+    ...(qaRemarksMode ? [{ key: "QA_REMARKS" as const }] : []),
   ];
 
   const updateRow = (index: number, key: keyof StfBemSensorRow, val: string) =>
@@ -268,7 +282,7 @@ const BemSensorTable = ({
 
   return (
     <TableContainer sx={{ ...postCureTableContainerSx, overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 960 }}>
+      <Table size="small" sx={{ minWidth: qaRemarksMode ? 1080 : 960 }}>
         <TableHead>
           <TableRow>
             {columns.map(({ key }, idx) => (
@@ -321,12 +335,14 @@ const GrainDimensionTable = ({
   onChange,
   disabled,
   readOnly,
+  qaRemarksMode = false,
   validationErrors,
 }: {
   rows: StfBemGrainRow[];
   onChange: (rows: StfBemGrainRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  qaRemarksMode?: boolean;
   validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfBemGrainRow; readonly?: boolean }> = [
@@ -337,6 +353,7 @@ const GrainDimensionTable = ({
     { key: "C" },
     { key: "LENGTH" },
     { key: "WEIGHT" },
+    ...(qaRemarksMode ? [{ key: "QA_REMARKS" as const }] : []),
   ];
 
   const updateRow = (index: number, key: keyof StfBemGrainRow, val: string) =>
@@ -406,6 +423,7 @@ const MainMotorPanel = ({
   disabled,
   theme,
   readOnly,
+  qaRemarksMode = false,
   subDeptSlug,
   validationErrors,
 }: {
@@ -413,20 +431,26 @@ const MainMotorPanel = ({
   onChange: (next: StfMainMotorData) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  qaRemarksMode?: boolean;
   theme?: any;
   subDeptSlug?: StfFileSubDeptSlug;
   validationErrors?: ValidationErrors;
-}) => (
+}) => {
+  const mfgRemarksRo = qaRemarksMode ? (["REMARKS"] as string[]) : [];
+  return (
   <Box>
     <SectionCard title="Igniter Details" theme={theme}>
       <ScalarFields
         section={data.IGNITER_DETAILS}
-        fields={[...IGNITER_FIELDS]}
+        fields={[
+          ...IGNITER_FIELDS,
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
+        ]}
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-
+        readOnlyKeys={mfgRemarksRo}
         pathPrefix="IGNITER_DETAILS"
         validationErrors={validationErrors}
       />
@@ -444,12 +468,13 @@ const MainMotorPanel = ({
           "DT_AFTER",
           "DE_AFTER",
           "REMARKS",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
         ]}
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-
+        readOnlyKeys={mfgRemarksRo}
         pathPrefix="NOZZLE_DETAILS"
         validationErrors={validationErrors}
       />
@@ -466,12 +491,12 @@ const MainMotorPanel = ({
           "CONDITIONING_TEMPERATURE",
           "AMBIENT_TEMPERATURE",
           "RH_PERCENT",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
         ]}
         onChange={(next) => onChange({ ...data, TESTING_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-
         pathPrefix="TESTING_DETAILS"
         validationErrors={validationErrors}
       />
@@ -483,6 +508,7 @@ const MainMotorPanel = ({
         onChange={(rows) => onChange({ ...data, SENSOR_CONFIGURATION: rows })}
         disabled={disabled}
         readOnly={readOnly}
+        qaRemarksMode={qaRemarksMode}
         validationErrors={validationErrors}
       />
     </SectionCard>
@@ -490,13 +516,20 @@ const MainMotorPanel = ({
     <SectionCard title="Static Test Result" theme={theme}>
       <ScalarFields
         section={data.STATIC_TEST_RESULT}
-        fields={["AVERAGE_PRESSURE", "PEAK_PRESSURE", "TB", "BURN_RATE", "C_STAR", "ISP"]}
+        fields={[
+          "AVERAGE_PRESSURE",
+          "PEAK_PRESSURE",
+          "TB",
+          "BURN_RATE",
+          "C_STAR",
+          "ISP",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
+        ]}
         onChange={(next) => onChange({ ...data, STATIC_TEST_RESULT: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-        multilineKeys={[]}
-
+        multilineKeys={qaRemarksMode ? ["QA_REMARKS"] : []}
         pathPrefix="STATIC_TEST_RESULT"
         validationErrors={validationErrors}
       />
@@ -523,7 +556,8 @@ const MainMotorPanel = ({
       </Box>
     </SectionCard>
   </Box>
-);
+  );
+};
 
 const BemMotorPanel = ({
   data,
@@ -531,6 +565,7 @@ const BemMotorPanel = ({
   disabled,
   theme,
   readOnly,
+  qaRemarksMode = false,
   subDeptSlug,
   validationErrors,
 }: {
@@ -538,10 +573,13 @@ const BemMotorPanel = ({
   onChange: (next: StfBemMotorData) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  qaRemarksMode?: boolean;
   theme?: any;
   subDeptSlug?: StfFileSubDeptSlug;
   validationErrors?: ValidationErrors;
-}) => (
+}) => {
+  const mfgRemarksRo = qaRemarksMode ? (["REMARKS"] as string[]) : [];
+  return (
   <Box>
     <SectionCard title="Conditioning Details" theme={theme}>
       <FieldGrid columns={3}>
@@ -646,6 +684,35 @@ const BemMotorPanel = ({
             message={fieldError(validationErrors, "CONDITIONING_DETAILS.OBSERVATION")}
           />
         </Box>
+        {qaRemarksMode ? (
+          <Box
+            data-stf-field="CONDITIONING_DETAILS.QA_REMARKS"
+            sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}
+          >
+            <FieldLabel>{formatFieldLabel("QA_REMARKS")}</FieldLabel>
+            <TableTextInput
+              value={data.CONDITIONING_DETAILS.QA_REMARKS}
+              onChange={(next) =>
+                onChange({
+                  ...data,
+                  CONDITIONING_DETAILS: patchSection(
+                    data.CONDITIONING_DETAILS,
+                    "QA_REMARKS",
+                    next,
+                  ),
+                })
+              }
+              disabled={disabled}
+              readOnly={readOnly}
+              multiline
+              minRows={2}
+              error={Boolean(fieldError(validationErrors, "CONDITIONING_DETAILS.QA_REMARKS"))}
+            />
+            <FieldErrorText
+              message={fieldError(validationErrors, "CONDITIONING_DETAILS.QA_REMARKS")}
+            />
+          </Box>
+        ) : null}
       </FieldGrid>
     </SectionCard>
 
@@ -655,6 +722,7 @@ const BemMotorPanel = ({
         onChange={(rows) => onChange({ ...data, GRAIN_DIMENSION: rows })}
         disabled={disabled}
         readOnly={readOnly}
+        qaRemarksMode={qaRemarksMode}
         validationErrors={validationErrors}
       />
     </SectionCard>
@@ -671,13 +739,13 @@ const BemMotorPanel = ({
           "CASING_ID",
           "CASING_LENGTH",
           "FIRING_NO",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
         ]}
         onChange={(next) => onChange({ ...data, BEM_HARDWARE_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-        multilineKeys={[]}
-
+        multilineKeys={qaRemarksMode ? ["QA_REMARKS"] : []}
         pathPrefix="BEM_HARDWARE_DETAILS"
         validationErrors={validationErrors}
       />
@@ -686,12 +754,15 @@ const BemMotorPanel = ({
     <SectionCard title="Igniter Details" theme={theme}>
       <ScalarFields
         section={data.IGNITER_DETAILS}
-        fields={[...IGNITER_FIELDS]}
+        fields={[
+          ...IGNITER_FIELDS,
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
+        ]}
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-
+        readOnlyKeys={mfgRemarksRo}
         pathPrefix="IGNITER_DETAILS"
         validationErrors={validationErrors}
       />
@@ -710,12 +781,13 @@ const BemMotorPanel = ({
           "AFTER_D1",
           "AFTER_D2",
           "REMARKS",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
         ]}
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-
+        readOnlyKeys={mfgRemarksRo}
         pathPrefix="NOZZLE_DETAILS"
         validationErrors={validationErrors}
       />
@@ -732,13 +804,12 @@ const BemMotorPanel = ({
           "CONDITIONING_TEMP",
           "AMBIENT_TEMP",
           "RH",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
         ]}
         onChange={(next) => onChange({ ...data, TESTING_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-        multilineKeys={[]}
-
         pathPrefix="TESTING_DETAILS"
         validationErrors={validationErrors}
       />
@@ -750,6 +821,7 @@ const BemMotorPanel = ({
         onChange={(rows) => onChange({ ...data, SENSOR_CONFIGURATION: rows })}
         disabled={disabled}
         readOnly={readOnly}
+        qaRemarksMode={qaRemarksMode}
         validationErrors={validationErrors}
       />
     </SectionCard>
@@ -757,13 +829,20 @@ const BemMotorPanel = ({
     <SectionCard title="Result Details" theme={theme}>
       <ScalarFields
         section={data.RESULT_DETAILS}
-        fields={["AVG_PRESSURE", "PEAK_PRESSURE", "TB", "BURN_RATE", "C_STAR", "ISP"]}
+        fields={[
+          "AVG_PRESSURE",
+          "PEAK_PRESSURE",
+          "TB",
+          "BURN_RATE",
+          "C_STAR",
+          "ISP",
+          ...(qaRemarksMode ? (["QA_REMARKS"] as const) : []),
+        ]}
         onChange={(next) => onChange({ ...data, RESULT_DETAILS: next })}
         disabled={disabled}
         readOnly={readOnly}
         columns={3}
-        multilineKeys={[]}
-
+        multilineKeys={qaRemarksMode ? ["QA_REMARKS"] : []}
         pathPrefix="RESULT_DETAILS"
         validationErrors={validationErrors}
       />
@@ -790,13 +869,15 @@ const BemMotorPanel = ({
       </Box>
     </SectionCard>
   </Box>
-);
+  );
+};
 
 const StfMotorPanel = ({
   value,
   onChange,
   disabled = false,
   readOnly = false,
+  qaRemarksMode = false,
   theme,
   subDeptSlug = "static-test-facility",
   subDepartmentId: _subDepartmentId,
@@ -811,6 +892,7 @@ const StfMotorPanel = ({
         onChange={onChange}
         disabled={disabled}
         readOnly={readOnly}
+        qaRemarksMode={qaRemarksMode}
         theme={theme}
         subDeptSlug={subDeptSlug}
         validationErrors={validationErrors}
@@ -824,6 +906,7 @@ const StfMotorPanel = ({
       onChange={onChange}
       disabled={disabled}
       readOnly={readOnly}
+      qaRemarksMode={qaRemarksMode}
       theme={theme}
       subDeptSlug={subDeptSlug}
       validationErrors={validationErrors}

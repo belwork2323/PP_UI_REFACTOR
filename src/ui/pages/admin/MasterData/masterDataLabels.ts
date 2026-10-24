@@ -8,6 +8,11 @@ const ATTRIBUTE_FIELD_LABEL_OVERRIDES: Record<string, Record<string, string>> = 
     noOfOvenAvailable: "Number of Ovens Available",
     noOfOvenAdded: "Number of Ovens Available",
   },
+  "subscale-articles": {
+    isBem: "Article Type",
+    bemSize: "Size",
+    bemUnit: "Unit",
+  },
 };
 
 /** Display names for master-type dropdown / add button (API type codes unchanged). */
@@ -27,6 +32,10 @@ export const getMasterDataFieldLabel = (
   }
   return field.label;
 };
+
+/** Name column header / placeholder for flat master tables. */
+export const getMasterDataNameColumnLabel = (selectedType: string): string =>
+  selectedType === "subscale-articles" ? "Article Name" : S.TABLE.COL_NAME;
 
 export const stripMasterTypeSuffix = (label: string) => label.replace(/\s+Master$/i, "").trim();
 

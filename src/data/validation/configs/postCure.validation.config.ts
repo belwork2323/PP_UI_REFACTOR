@@ -120,6 +120,13 @@ export const postCureFieldRules = {
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
+  specification: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    // Allow common qual specs e.g. ">=8 KSC", "≥25 KSC" (pattern used elsewhere omits '>').
+    maxLength: S.LENGTH.MAX_STANDARD,
+  },
   // Loose Flap Specific
   epoxyBatchNo: {
     valueType: "text" as const,
@@ -184,6 +191,39 @@ export const postCureFieldRules = {
     valueType: "date" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  },
+
+  // Others Specific (flexible mixes)
+  othersPremixBatchNo: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
+  },
+  othersPremixDate: {
+    valueType: "date" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  },
+  othersFinalMixBatchNo: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
+  },
+  othersFinalMixDate: {
+    valueType: "date" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  },
+  ingredient: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
 
   // Not Applicable Variant
@@ -274,7 +314,7 @@ function resolveFieldPaths(data: any) {
   };
 
   // 2. Uniform Qualification Paths Builder
-  const pushQualificationPaths = (qualPath: string) => {
+  const pushQualificationPaths = (qualPath: string, options?: { requireSpecification?: boolean }) => {
     const qual = data[qualPath];
     if (qual) {
       paths.push({
@@ -290,6 +330,13 @@ function resolveFieldPaths(data: any) {
 
       if (Array.isArray(qual.qualificationTable)) {
         qual.qualificationTable.forEach((row: any, i: number) => {
+          if (options?.requireSpecification) {
+            paths.push({
+              path: `${qualPath}.qualificationTable.${i}.specification`,
+              value: row.specification,
+              ruleKey: "specification",
+            });
+          }
           paths.push({
             path: `${qualPath}.qualificationTable.${i}.result`,
             value: row.result,
@@ -469,7 +516,83 @@ function resolveFieldPaths(data: any) {
     pushInhibitionSharedPaths("");
   }
 
-  // Variant 4: Inhibition Not Applicable
+  // Variant 4: Inhibition Others (flexible premix/final + shared trailing sections)
+  else if (variant === "inhibition-others") {
+    const pushOthersMixPaths = (
+      tablePath: string,
+      ruleKeyMap: { batchNoKey: string; prepDateKey: string; tableKey: string },
+      rowsArray: any[],
+    ) => {
+      const tableObj = data[tablePath];
+      if (!tableObj) return;
+
+      paths.push({
+        path: `${tablePath}.${ruleKeyMap.batchNoKey}`,
+        value: tableObj[ruleKeyMap.batchNoKey],
+        ruleKey: ruleKeyMap.batchNoKey,
+      });
+      paths.push({
+        path: `${tablePath}.${ruleKeyMap.prepDateKey}`,
+        value: tableObj[ruleKeyMap.prepDateKey],
+        ruleKey: ruleKeyMap.prepDateKey,
+      });
+
+      if (!Array.isArray(rowsArray)) return;
+      rowsArray.forEach((row: any, i: number) => {
+        const isTotal = String(row.srNo ?? "").toUpperCase() === "TOTAL";
+        if (isTotal) return;
+
+        paths.push({
+          path: `${tablePath}.${ruleKeyMap.tableKey}.${i}.ingredient`,
+          value: row.ingredient,
+          ruleKey: "ingredient",
+        });
+        paths.push({
+          path: `${tablePath}.${ruleKeyMap.tableKey}.${i}.partsByWeight`,
+          value: row.partsByWeight,
+          ruleKey: "partsByWeight",
+        });
+        paths.push({
+          path: `${tablePath}.${ruleKeyMap.tableKey}.${i}.qtyTaken`,
+          value: row.qtyTaken ?? row.quantity,
+          ruleKey: "qtyTaken",
+        });
+        // Mfg lot only when a catalog material is selected (free-text ingredient may omit it).
+        if (String(row.materialCode ?? "").trim()) {
+          paths.push({
+            path: `${tablePath}.${ruleKeyMap.tableKey}.${i}.mfgLot`,
+            value: row.mfgLot,
+            ruleKey: "mfgLot",
+          });
+        }
+      });
+    };
+
+    pushOthersMixPaths(
+      "othersPremix",
+      {
+        batchNoKey: "othersPremixBatchNo",
+        prepDateKey: "othersPremixDate",
+        tableKey: "othersPremixTable",
+      },
+      data.othersPremix?.othersPremixTable,
+    );
+
+    pushOthersMixPaths(
+      "othersFinalMix",
+      {
+        batchNoKey: "othersFinalMixBatchNo",
+        prepDateKey: "othersFinalMixDate",
+        tableKey: "othersFinalMixTable",
+      },
+      data.othersFinalMix?.othersFinalMixTable,
+    );
+
+    pushQualificationPaths("othersQualification", { requireSpecification: true });
+    pushInhibitionSharedPaths("");
+  }
+
+  // Variant 5: Inhibition Not Applicable
   else if (variant === "inhibition-not-applicable") {
     const na = data.inhibitionNotApplicable;
     if (na) {

@@ -14,6 +14,8 @@ import {
   extractWeighmentMotorNavFromFormDetails,
   mergePartialNavItems,
 } from "../../user/qualityControl/qcDivisionDataSource";
+import { QC_NAV_TAB_ORDER } from "../../user/qualityControl/qcFlowConfig";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 const normalizeStatusKey = (value: unknown): string =>
   String(value ?? "")
@@ -42,7 +44,11 @@ export const isQcPartialItemApproverTabDisabled = (
   status?: QcPartialItemStatus | string | null,
 ): boolean => {
   const normalized = normalizeStatusKey(status);
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return (
+    isMotorWorkflowTabDisabled(status) ||
+    !normalized ||
+    normalized === "TO_BE_INITIATED"
+  );
 };
 
 export const isQcPartialItemApproverActionable = (
@@ -245,22 +251,6 @@ export const buildQcApproverDivisionRows = (
   divisionLabel: string,
 ): QcApprovalTableRow[] => buildDivisionApprovalRows(items, divisionLabel);
 
-const QC_APPROVER_OVERVIEW_ORDER = [
-  "RAW_MATERIAL_REVALIDATION",
-  "RAW_MATERIAL_PROCESSING",
-  "MIXING",
-  "HARDWARE",
-  "CASTING",
-  "CURING",
-  "DE_CORING",
-  "TRIMMING",
-  "POST_CURE",
-  "NDT",
-  "QC",
-  "WEIGHTMENT",
-  "STATIC_TEST_FACILITY",
-] as const;
-
 const OVERVIEW_SKIP_KEYS = new Set([
   "RAW_MATERIAL",
   "PROPELLANT_PROPERTIES",
@@ -268,19 +258,14 @@ const OVERVIEW_SKIP_KEYS = new Set([
   "WEIGHMENT",
 ]);
 
-const sortQcApproverOverviewKeys = (keys: string[]): string[] => {
-  const orderIndex = new Map(
-    QC_APPROVER_OVERVIEW_ORDER.map((key, index) => [key, index] as const),
-  );
-  return [...keys].sort((a, b) => {
-    const aIdx = orderIndex.get(a as (typeof QC_APPROVER_OVERVIEW_ORDER)[number]);
-    const bIdx = orderIndex.get(b as (typeof QC_APPROVER_OVERVIEW_ORDER)[number]);
-    if (aIdx != null && bIdx != null) return aIdx - bIdx;
-    if (aIdx != null) return -1;
-    if (bIdx != null) return 1;
+/** Same order as user QC division nav (`QC_NAV_TAB_ORDER`) — STF before QC / Weighment. */
+const sortQcApproverOverviewKeys = (keys: string[]): string[] =>
+  [...keys].sort((a, b) => {
+    const aIdx = QC_NAV_TAB_ORDER[a] ?? 1000;
+    const bIdx = QC_NAV_TAB_ORDER[b] ?? 1000;
+    if (aIdx !== bIdx) return aIdx - bIdx;
     return a.localeCompare(b);
   });
-};
 
 export const buildQcApproverFinalGroups = (
   partialNavByDivision: Record<string, QcPartialNavItem[]>,

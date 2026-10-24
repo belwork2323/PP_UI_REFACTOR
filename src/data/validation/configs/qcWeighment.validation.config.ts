@@ -37,6 +37,7 @@ export const qcWeighmentValidationFields: Record<string, FieldRuleConfig> = {
   weighscaleNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   calibrationDueDate: date(["SUBMIT"]),
   weightKg: number(["SUBMIT"]),
+  qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -90,14 +91,26 @@ export const qcWeighmentValidationConfig: SubDeptValidationConfig<QcWeighmentVal
       arr.forEach((item, i) => {
         const row = asRecord(item) ?? {};
         // Computed propellant row (locked) — skip until a value is present.
-        if (row.locked && !str(row.WEIGHT_KG)) return;
+        if (!(row.locked && !str(row.WEIGHT_KG))) {
+          fields.push({
+            path: `${sectionId}.${i}.WEIGHT_KG`,
+            value: row.WEIGHT_KG,
+            ruleKey: "weightKg",
+          });
+        }
         fields.push({
-          path: `${sectionId}.${i}.WEIGHT_KG`,
-          value: row.WEIGHT_KG,
-          ruleKey: "weightKg",
+          path: `${sectionId}.${i}.QA_REMARKS`,
+          value: row.QA_REMARKS ?? row.qaRemarks ?? "",
+          ruleKey: "qaRemarks",
         });
       });
     }
+
+    fields.push({
+      path: "ATTACHMENTS.QA_REMARKS",
+      value: pickValue(values, "QA_REMARKS", "qaRemarks"),
+      ruleKey: "qaRemarks",
+    });
 
     return fields;
   },

@@ -30,8 +30,8 @@ type CastingAndCuringApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: CastingAndCuringApproverDetailItem) => void;
-  onReject: (item: CastingAndCuringApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -94,8 +94,8 @@ const CastingAndCuringApproverDetailDialog = ({
             loading={loading}
             activeMotorId={activeMotorId}
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}
@@ -120,6 +120,7 @@ const CastingAndCuringApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="casting-and-curing"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`Casting & Curing Report — ${item.batchId}`}
       />
     </>

@@ -18,7 +18,7 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../hooks/operationStatus";
-import { POST_CURE_INHIBITOR_TYPE_OPTIONS } from "../../../../hooks/user/manufacturing/postCureConfig";
+import { formatPostCureInhibitorTypeLabel } from "../../../../hooks/user/manufacturing/postCureConfig";
 import {
   canApproverActionEntirePostCureForm,
   isPostCureMotorApproverActionable,
@@ -52,8 +52,8 @@ type PostCureApproverReviewContentProps = {
   loading: boolean;
   activeMotorId: string | null;
   onActiveMotorChange: (motorId: string) => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
   onFormApprove?: () => void;
   onFormReject?: () => void;
   actionLoading?: boolean;
@@ -86,9 +86,7 @@ const formatDateTime = (value?: string | null) => {
 const resolveInhibitorLabel = (inhibitorType?: string | null) => {
   const raw = String(inhibitorType ?? "").trim();
   if (!raw) return "—";
-  return (
-    POST_CURE_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === raw)?.label ?? raw
-  );
+  return formatPostCureInhibitorTypeLabel(raw) || raw;
 };
 
 const PostCureApproverReviewContent = ({
@@ -358,7 +356,7 @@ const PostCureApproverReviewContent = ({
             </Typography>
           ) : null}
 
-          {canApproveOrReject ? (
+          {canApproveOrReject && onApprove && onReject ? (
             <Stack
               direction={{ xs: "column", sm: "row" }}
               gap={1}

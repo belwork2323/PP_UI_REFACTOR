@@ -31,8 +31,8 @@ type TrimmingApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: TrimmingApproverDetailItem) => void;
-  onReject: (item: TrimmingApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -95,8 +95,8 @@ const TrimmingApproverDetailDialog = ({
             loading={loading}
             activeMotorId={activeMotorId}
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}
@@ -121,6 +121,7 @@ const TrimmingApproverDetailDialog = ({
         formId={item.formId}
         department="manufacturing"
         subDepartment="trimming"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`Trimming Report — ${item.batchId}`}
       />
     </>

@@ -6,6 +6,7 @@ import {
   parseDispatchMotorDataFromApi,
   type DispatchMotorData,
 } from "./DispatchMotorDataModel";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 export type DispatchMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type DispatchMotorSubmissionStatus =
@@ -13,7 +14,8 @@ export type DispatchMotorSubmissionStatus =
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
   | "APPROVED"
-  | "REJECTED";
+  | "REJECTED"
+  | "DISCARDED";
 
 export type DispatchMotorStatusMeta = {
   motorSubmissionType?: DispatchMotorSubmissionType;
@@ -27,11 +29,16 @@ export type DispatchMotorStatusMeta = {
 
 export const isDispatchMotorLocked = (status?: DispatchMotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isDispatchMotorEditable = (status?: DispatchMotorSubmissionStatus | string | null) =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const isDispatchMotorApproverTabDisabled = (
   status?: DispatchMotorSubmissionStatus | string | null,
@@ -40,7 +47,7 @@ export const isDispatchMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED";
 };
 
 export const isDispatchMotorApproverActionable = (
@@ -103,7 +110,8 @@ export const normalizeDispatchMotorStatus = (value: unknown): DispatchMotorSubmi
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }
@@ -244,6 +252,25 @@ export const hydrateDispatchMotorSession = (
   dispatchData: parseDispatchMotorDataFromApi(dispatchDetails),
 });
 
+/**
+ * Merge QC seed into setup.
+ * Casting date fills only when empty. NDT / FAC clearance stay as the user selected them
+ * (seed must not flip NO → YES on Load Form).
+ */
+export const mergeDispatchSetupFromDetails = (
+  setup: DispatchMotorSetup,
+  details?: Record<string, unknown> | null,
+): DispatchMotorSetup => {
+  if (!details) return setup;
+  const seededCasting = String(details.castingDate ?? "").trim();
+  const currentCasting = String(setup.castingDate ?? "").trim();
+
+  return {
+    ...setup,
+    castingDate: currentCasting || seededCasting,
+  };
+};
+
 export const createDispatchData = () => ({
   motorStage: "",
   castingDate: "",
@@ -326,7 +353,8 @@ export const appendDispatchMotorToState = (
   if (!trimmedId) return state;
 
   const existing = state.motors ?? [];
-  const setup = setupOverride ?? snapshotDispatchSetupFromForm(state);
+  const baseSetup = setupOverride ?? snapshotDispatchSetupFromForm(state);
+  const setup = mergeDispatchSetupFromDetails(baseSetup, dispatchDetails);
   const nextSession = hydrateDispatchMotorSession(trimmedId, setup, dispatchDetails);
   const clearedState = clearDispatchFormSetup(state);
 

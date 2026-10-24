@@ -18,8 +18,11 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { TimeField } from "../../../../components/common/DateField";
+import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import {
   QC_CASTING_SECTION_IDS,
   QC_CASTING_SECTION_TITLES,
@@ -34,6 +37,7 @@ import {
   getCastingPostCastField,
   getCastingPressurePlateRows,
   getCastingPropellantField,
+  getCastingSectionQaRemarks,
   getCastingTableRows,
   getCastingType,
   getCastingWeightmentRows,
@@ -42,6 +46,7 @@ import {
   setCastingPostCastField,
   setCastingPressurePlateRows,
   setCastingPropellantField,
+  setCastingSectionQaRemarks,
   setCastingTableRows,
   setCastingWeightmentRows,
   type QcCastingMandrelRow,
@@ -518,6 +523,7 @@ const MANDREL_COLUMNS: ColumnDef<QcCastingMandrelRow>[] = [
     fieldType: "number",
     required: true,
   },
+  { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];
 
 const CASTING_TABLE_COLUMNS: ColumnDef<QcCastingTableRow>[] = [
@@ -547,13 +553,14 @@ const CASTING_TABLE_COLUMNS: ColumnDef<QcCastingTableRow>[] = [
     fieldType: "number",
     required: true,
   },
-  { id: "REMARKS", label: "Remarks", fieldType: "textarea" },
+  { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];
 
 const WEIGHTMENT_COLUMNS: ColumnDef<QcCastingWeightmentRow>[] = [
   { id: "LOAD_CELL_INITIAL", label: "Load Cell Reading Initial", fieldType: "number", required: true },
   { id: "LOAD_CELL_FINAL", label: "Load Cell Reading Final", fieldType: "number", required: true },
   { id: "TOTAL_WEIGHT", label: "Total Weight (Kg)", fieldType: "number", required: true },
+  { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];
 
 const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
@@ -562,6 +569,7 @@ const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
   { id: "PRESSURE_SENSOR_USED", label: "Pressure Sensor Id", fieldType: "text" },
   { id: "INITIAL_PRESSURE_READING", label: "Initial Pressure Reading", fieldType: "number" },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
+  { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];
 
 type QCCastingMotorPanelProps = {
@@ -584,10 +592,16 @@ const QCCastingMotorPanel = ({
   headerActions,
   validationErrors = null,
 }: QCCastingMotorPanelProps) => {
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const castingType = useMemo(() => getCastingType(values), [values]);
   const assemblyDate = useMemo(() => getCastingAssemblyDate(values), [values]);
   const mandrelRows = useMemo(() => getCastingMandrelRows(values), [values]);
+  const finalAssemblyQaRemarks = useMemo(
+    () => getCastingSectionQaRemarks(values, QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY),
+    [values],
+  );
   const dateOfCasting = useMemo(
     () => getCastingPropellantField(values, "DATE_OF_CASTING"),
     [values],
@@ -598,6 +612,10 @@ const QCCastingMotorPanel = ({
     [values],
   );
   const castingRows = useMemo(() => getCastingTableRows(values), [values]);
+  const propellantQaRemarks = useMemo(
+    () => getCastingSectionQaRemarks(values, QC_CASTING_SECTION_IDS.PROPELLANT_CASTING),
+    [values],
+  );
   const weightmentRows = useMemo(() => getCastingWeightmentRows(values), [values]);
   const soakingDuration = useMemo(
     () => getCastingPostCastField(values, "SOAKING_DURATION"),
@@ -608,6 +626,10 @@ const QCCastingMotorPanel = ({
     [values],
   );
   const pressurePlateRows = useMemo(() => getCastingPressurePlateRows(values), [values]);
+  const postCastQaRemarks = useMemo(
+    () => getCastingSectionQaRemarks(values, QC_CASTING_SECTION_IDS.POST_CAST),
+    [values],
+  );
 
   const setMandrelRows = useCallback(
     (rows: QcCastingMandrelRow[]) => onChange(setCastingMandrelRows(values, rows)),
@@ -705,11 +727,26 @@ const QCCastingMotorPanel = ({
                 SR_NO: srNo,
                 READING_WITHOUT_CUP: "",
                 READING_WITH_BOTTOM_CUP: "",
+                QA_REMARKS: "",
               })}
               readOnly={readOnly}
               validationErrors={validationErrors}
               errorPrefix="MANDREL_ASSEMBLY"
             />
+            <Box data-qc-field="FINAL_ASSEMBLY.qaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={finalAssemblyQaRemarks}
+                readOnly={readOnly}
+                width="100%"
+                theme={manufacturingTheme}
+                onChange={(next) =>
+                  onChange(
+                    setCastingSectionQaRemarks(values, QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY, next),
+                  )
+                }
+              />
+            </Box>
           </Stack>
         </SectionCard>
 
@@ -787,12 +824,30 @@ const QCCastingMotorPanel = ({
                 CASTING_START_TIME: "",
                 CASTING_COMPLETION_TIME: "",
                 SLURRY_CAST_FROM_EACH_BOWL: "",
-                REMARKS: "",
+                QA_REMARKS: "",
               })}
               readOnly={readOnly}
               validationErrors={validationErrors}
               errorPrefix="CASTING_TABLE"
             />
+            <Box data-qc-field="PROPELLANT_CASTING.qaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={propellantQaRemarks}
+                readOnly={readOnly}
+                width="100%"
+                theme={manufacturingTheme}
+                onChange={(next) =>
+                  onChange(
+                    setCastingSectionQaRemarks(
+                      values,
+                      QC_CASTING_SECTION_IDS.PROPELLANT_CASTING,
+                      next,
+                    ),
+                  )
+                }
+              />
+            </Box>
           </Stack>
         </SectionCard>
 
@@ -811,6 +866,7 @@ const QCCastingMotorPanel = ({
                 LOAD_CELL_INITIAL: "",
                 LOAD_CELL_FINAL: "",
                 TOTAL_WEIGHT: "",
+                QA_REMARKS: "",
               }) as QcCastingWeightmentRow
             }
             readOnly={readOnly}
@@ -867,12 +923,27 @@ const QCCastingMotorPanel = ({
                   PRESSURE_SENSOR_USED: "",
                   INITIAL_PRESSURE_READING: "",
                   OBSERVATIONS: "",
+                  QA_REMARKS: "",
                 })}
                 readOnly={readOnly}
                 validationErrors={validationErrors}
                 errorPrefix="PRESSURE_PLATE_DETAILS"
               />
             ) : null}
+            <Box data-qc-field="POST_CAST_OPERATION.qaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={postCastQaRemarks}
+                readOnly={readOnly}
+                width="100%"
+                theme={manufacturingTheme}
+                onChange={(next) =>
+                  onChange(
+                    setCastingSectionQaRemarks(values, QC_CASTING_SECTION_IDS.POST_CAST, next),
+                  )
+                }
+              />
+            </Box>
           </Stack>
         </SectionCard>
       </Stack>

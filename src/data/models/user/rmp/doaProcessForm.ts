@@ -11,8 +11,10 @@ export type LiquidDispatchUiKey = "doa" | "htpb" | "tdi";
 export type DoaProcessForm = {
   uiKey: LiquidDispatchUiKey;
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   dispatchDatetime: string;
   observation: string;
+  qaRemarks: string;
   totalQtySentForPremix: string;
 };
 
@@ -21,8 +23,10 @@ export const createEmptyDoaProcessForm = (
 ): DoaProcessForm => ({
   uiKey,
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   dispatchDatetime: "",
   observation: "",
+  qaRemarks: "",
   totalQtySentForPremix: "",
 });
 
@@ -30,9 +34,13 @@ const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
 export const doaFormHasUserData = (form: DoaProcessForm): boolean => {
   if (lotDetailsHaveUserData(form.lotDetails)) return true;
-  return [form.dispatchDatetime, form.observation, form.totalQtySentForPremix].some((v) =>
-    str(v),
-  );
+  return [
+    form.dispatchDatetime,
+    form.observation,
+    form.qaRemarks,
+    form.lotDetailsQaRemarks,
+    form.totalQtySentForPremix,
+  ].some((v) => str(v));
 };
 
 export const isLiquidDispatchUiKey = (

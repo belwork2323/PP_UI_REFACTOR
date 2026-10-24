@@ -37,8 +37,8 @@ type DispatchApproverReviewContentProps = {
   loading: boolean;
   activeMotorId: string | null;
   onActiveMotorChange: (motorId: string) => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
   actionLoading?: boolean;
   dispatchTheme: ReturnType<typeof getDispatchTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -249,7 +249,7 @@ const DispatchApproverReviewContent = ({
             </Typography>
           ) : null}
 
-          {canApproveOrReject ? (
+          {canApproveOrReject && onApprove && onReject ? (
             <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={1.25} justifyContent="flex-end">
               <Button
                 variant="contained"

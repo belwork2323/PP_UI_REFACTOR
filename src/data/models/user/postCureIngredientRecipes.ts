@@ -30,10 +30,22 @@ const normalizeIngredientKey = (value: unknown): string =>
 
 type QtyKey = "quantity" | "qtyTaken";
 
+const pickExistingQaRemarks = (row: Record<string, unknown> | null | undefined): string => {
+  if (!row) return "";
+  for (const key of ["qaRemarks", "QA_REMARKS"] as const) {
+    const value = String(row[key] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+};
+
 /**
  * Build ingredient rows from the post-cure ingredients API.
- * Preserves mfgLot / qty from existing rows matched by ingredient name or materialCode
+ * Preserves mfgLot / qty / qaRemarks from existing rows matched by ingredient name or materialCode
  * (Case Prep style: saved `ingredient` may be a master code).
+ *
+ * QC Division reloads details → session (with qaRemarks), then this seed runs to attach
+ * materialId/materialCode — must not drop qaRemarks or they vanish after save.
  */
 export const buildPostCureIngredientRowsFromApi = <T extends Record<string, unknown>>(
   api: PostCureIngredientsApiResponse | null | undefined,
@@ -94,6 +106,7 @@ export const buildPostCureIngredientRowsFromApi = <T extends Record<string, unkn
           (prev as { qtyTaken?: unknown } | undefined)?.qtyTaken ??
           "",
       );
+      const prevQaRemarks = pickExistingQaRemarks(prev as Record<string, unknown> | undefined);
 
       return {
         srNo: index + 1,
@@ -103,6 +116,7 @@ export const buildPostCureIngredientRowsFromApi = <T extends Record<string, unkn
         mfgLot: prevMfgLot,
         partsByWeight,
         [qtyKey]: prevQty,
+        qaRemarks: prevQaRemarks,
       } as unknown as T;
     });
 
@@ -121,6 +135,7 @@ export const buildPostCureIngredientRowsFromApi = <T extends Record<string, unkn
     mfgLot: "",
     partsByWeight: "",
     [qtyKey]: totalQty,
+    qaRemarks: "",
   } as unknown as T);
 
   return rows;

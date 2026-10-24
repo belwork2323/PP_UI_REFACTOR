@@ -14,6 +14,7 @@ export type ApUltraFineTrayOvenForm = {
   endDatetime: string;
   moisture: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type ApUltraFineSievingForm = {
@@ -21,11 +22,13 @@ export type ApUltraFineSievingForm = {
   sievedQuantity: string;
   sieveMeshSize: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type ApUltraFineProcessForm = {
   uiKey: "apUltraFine";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   /** Grinding — lot details replace multi-batch + coarse lot/qty rows. */
   equipmentId: string;
   screwFeederRpm: string;
@@ -34,6 +37,7 @@ export type ApUltraFineProcessForm = {
   grindingStartDatetime: string;
   grindingEndDatetime: string;
   grindingObservation: string;
+  grindingQaRemarks: string;
   /** Spec is fixed: 6±1μm — user enters measured result. */
   particleSizeResult: string;
   qtyKgQualified: string;
@@ -49,6 +53,7 @@ const emptyTrayOven = (): ApUltraFineTrayOvenForm => ({
   endDatetime: "",
   moisture: "",
   observation: "",
+  qaRemarks: "",
 });
 
 const emptySieving = (): ApUltraFineSievingForm => ({
@@ -56,6 +61,7 @@ const emptySieving = (): ApUltraFineSievingForm => ({
   sievedQuantity: "",
   sieveMeshSize: "",
   observation: "",
+  qaRemarks: "",
 });
 
 export const AP_ULTRA_FINE_PARTICLE_SIZE_SPEC = "6±1μm";
@@ -63,6 +69,7 @@ export const AP_ULTRA_FINE_PARTICLE_SIZE_SPEC = "6±1μm";
 export const createSeededApUltraFineProcessForm = (): ApUltraFineProcessForm => ({
   uiKey: "apUltraFine",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   equipmentId: "",
   screwFeederRpm: "",
   feedPressure: "",
@@ -70,6 +77,7 @@ export const createSeededApUltraFineProcessForm = (): ApUltraFineProcessForm => 
   grindingStartDatetime: "",
   grindingEndDatetime: "",
   grindingObservation: "",
+  grindingQaRemarks: "",
   particleSizeResult: "",
   qtyKgQualified: "",
   drying: emptyTrayOven(),

@@ -47,8 +47,8 @@ type NDTApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: NDTApproverDetailItem) => void;
-  onReject: (item: NDTApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -117,8 +117,8 @@ const NDTApproverDetailDialog = ({
             loading={loading}
             activeMotorId={activeMotorId}
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-            onApprove={() => onApprove(item)}
-            onReject={() => onReject(item)}
+            onApprove={onApprove ? () => onApprove(item) : undefined}
+            onReject={onReject ? () => onReject(item) : undefined}
             actionLoading={actionLoading}
             qcTheme={qcTheme}
             approverTheme={theme}
@@ -143,6 +143,7 @@ const NDTApproverDetailDialog = ({
         formId={item.formId}
         department="qualityControl"
         subDepartment="ndt"
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`${strings.TITLE} Report — ${item.batchId}`}
       />
     </>

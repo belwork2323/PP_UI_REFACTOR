@@ -101,6 +101,8 @@ export const hydrateProcessSlotFromProcessingEntry = (
     gradeId: entry.savedProcess?.gradeId ?? entry.gradeId ?? null,
     gradeCode: gradeCode ?? null,
     lotDetails: entry.savedProcess?.lotDetails ?? [],
+    lotDetailsQaRemarks: entry.savedProcess?.lotDetailsQaRemarks ?? null,
+    qaRemarks: entry.savedProcess?.qaRemarks ?? null,
     drying: entry.savedProcess?.drying ?? null,
     sieving: entry.savedProcess?.sieving ?? null,
     apCoarse: entry.savedProcess?.apCoarse ?? null,

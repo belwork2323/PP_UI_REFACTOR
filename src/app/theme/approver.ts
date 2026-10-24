@@ -223,7 +223,6 @@ export const getApproverBrand = (department: ApproverDepartmentKey): ApproverDep
 export const isApproverActionableStatus = (status?: string | null) => {
   const api = toApiStatusEnum(status);
   return (
-    api === "IN_PROGRESS" ||
     api === "WAITING_FOR_APPROVAL" ||
     api === "WAITING_FOR_PARTIAL_APPROVAL" ||
     api === "WAITING_FOR_COMPLETE_APPROVAL" ||
@@ -233,7 +232,21 @@ export const isApproverActionableStatus = (status?: string | null) => {
 
 export const isApproverApprovedStatus = (status?: string | null) => {
   const api = toApiStatusEnum(status);
-  return api === "APPROVED" || api === "COMPLETELY_APPROVED" || api === "FINAL_APPROVAL_COMPLETED";
+  return (
+    api === "APPROVED" ||
+    api === "COMPLETELY_APPROVED" ||
+    api === "FINAL_APPROVAL_COMPLETED" ||
+    api === "COMPLETED"
+  );
+};
+
+/** Batch timeline: show View Form for approved / partially approved stages. */
+export const canViewApprovedSubDeptFormDetails = (status?: string | null) => {
+  const api = toApiStatusEnum(status);
+  return (
+    isApproverApprovedStatus(status) ||
+    api === "WAITING_FOR_PARTIAL_APPROVAL"
+  );
 };
 
 export const isApproverRejectedStatus = (status?: string | null) =>
@@ -251,8 +264,10 @@ export const canApproverViewBatchDetails = (
 ) => {
   if (isApproverToBeInitiatedStatus(status)) return false;
 
+  const api = toApiStatusEnum(status);
   return (
     isApproverActionableStatus(status) ||
+    api === "IN_PROGRESS" ||
     isApproverRejectedStatus(status) ||
     (allowWhenApproved && isApproverApprovedStatus(status))
   );

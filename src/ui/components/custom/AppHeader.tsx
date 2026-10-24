@@ -77,7 +77,8 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
   const headerDeptOptions = user?.headerDeptOptions ?? []; // computed getter on UserModel
 
   const showDeptDropdown = roleKey === "USER" || roleKey === "APPROVER";
-  const showDrawer = roleKey === "ADMIN" || roleKey === "CENTRE_HEAD";
+  const showDrawer =
+    roleKey === "ADMIN" || roleKey === "CENTRE_HEAD" || roleKey === "SYSTEM_MANAGER";
   const showProfileMenu =
     roleKey === "USER" || roleKey === "APPROVER" || roleKey === "SYSTEM_MANAGER";
 

@@ -199,7 +199,9 @@ export type QcPropellantPropertyRow = {
   SAMPLE_NO?: number | "";
   PROPERTY: string;
   SPECIFICATION: string;
+  /** @deprecated Prefer QA_REMARKS — kept for legacy overlay only. */
   REMARKS?: string;
+  QA_REMARKS?: string;
   /** Eager-upload refs (NdtFileField); not filename strings. */
   UPLOAD_GRAPH?: FileRef[];
   kind?: "data" | "mean" | "std";
@@ -210,6 +212,7 @@ export type QcPropellantPropertyRow = {
 export type QcPropellantBallisticRow = {
   DETAILS: string;
   SPECIFICATION: string;
+  QA_REMARKS?: string;
   [key: string]: unknown;
 };
 

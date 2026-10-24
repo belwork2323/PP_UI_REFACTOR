@@ -71,6 +71,7 @@ export const stfValidationFields: Record<string, FieldRuleConfig> = {
   weightOfComposition: number(["SUBMIT"]),
   squibResistance: number(["SUBMIT"]),
   igniterRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
   nozzleClosureMaterial: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   throatMaterial: number(["SUBMIT"]),
@@ -135,9 +136,12 @@ const resolveBemFields = (
   push(fields, "CONDITIONING_DETAILS.TEMPERATURE", c.TEMPERATURE, "conditioningTemp");
   push(fields, "CONDITIONING_DETAILS.RH", c.RH, "conditioningRh");
   push(fields, "CONDITIONING_DETAILS.OBSERVATION", c.OBSERVATION, "conditioningObservation");
+  push(fields, "CONDITIONING_DETAILS.QA_REMARKS", c.QA_REMARKS, "qaRemarks");
 
   (data.GRAIN_DIMENSION ?? []).forEach((row, i) => {
-    const hasData = [row.OD, row.A, row.B, row.C, row.LENGTH, row.WEIGHT].some((v) => str(v));
+    const hasData = [row.OD, row.A, row.B, row.C, row.LENGTH, row.WEIGHT, row.QA_REMARKS].some((v) =>
+      str(v),
+    );
     if (!hasData) return;
     push(fields, `GRAIN_DIMENSION.${i}.OD`, row.OD, "grainOd");
     push(fields, `GRAIN_DIMENSION.${i}.A`, row.A, "grainA");
@@ -145,6 +149,7 @@ const resolveBemFields = (
     push(fields, `GRAIN_DIMENSION.${i}.C`, row.C, "grainC");
     push(fields, `GRAIN_DIMENSION.${i}.LENGTH`, row.LENGTH, "grainLength");
     push(fields, `GRAIN_DIMENSION.${i}.WEIGHT`, row.WEIGHT, "grainWeight");
+    push(fields, `GRAIN_DIMENSION.${i}.QA_REMARKS`, row.QA_REMARKS, "qaRemarks");
   });
 
   const h = data.BEM_HARDWARE_DETAILS;
@@ -156,6 +161,7 @@ const resolveBemFields = (
   push(fields, "BEM_HARDWARE_DETAILS.CASING_ID", h.CASING_ID, "casingId");
   push(fields, "BEM_HARDWARE_DETAILS.CASING_LENGTH", h.CASING_LENGTH, "casingLength");
   push(fields, "BEM_HARDWARE_DETAILS.FIRING_NO", h.FIRING_NO, "firingNo");
+  push(fields, "BEM_HARDWARE_DETAILS.QA_REMARKS", h.QA_REMARKS, "qaRemarks");
 
   const ig = data.IGNITER_DETAILS;
   push(fields, "IGNITER_DETAILS.CONTAINER_TYPE", ig.CONTAINER_TYPE, "containerType");
@@ -168,6 +174,7 @@ const resolveBemFields = (
   );
   push(fields, "IGNITER_DETAILS.SQUIB_RESISTANCE", ig.SQUIB_RESISTANCE, "squibResistance");
   push(fields, "IGNITER_DETAILS.REMARKS", ig.REMARKS, "igniterRemarks");
+  push(fields, "IGNITER_DETAILS.QA_REMARKS", ig.QA_REMARKS, "qaRemarks");
 
   const n = data.NOZZLE_DETAILS;
   push(
@@ -184,6 +191,7 @@ const resolveBemFields = (
   push(fields, "NOZZLE_DETAILS.AFTER_D1", n.AFTER_D1, "afterD1");
   push(fields, "NOZZLE_DETAILS.AFTER_D2", n.AFTER_D2, "afterD2");
   push(fields, "NOZZLE_DETAILS.REMARKS", n.REMARKS, "nozzleRemarks");
+  push(fields, "NOZZLE_DETAILS.QA_REMARKS", n.QA_REMARKS, "qaRemarks");
 
   const t = data.TESTING_DETAILS;
   push(fields, "TESTING_DETAILS.THROAT_DIAMETER", t.THROAT_DIAMETER, "throatDiameter");
@@ -193,6 +201,7 @@ const resolveBemFields = (
   push(fields, "TESTING_DETAILS.CONDITIONING_TEMP", t.CONDITIONING_TEMP, "testingCondTemp");
   push(fields, "TESTING_DETAILS.AMBIENT_TEMP", t.AMBIENT_TEMP, "ambientTemp");
   push(fields, "TESTING_DETAILS.RH", t.RH, "testingRh");
+  push(fields, "TESTING_DETAILS.QA_REMARKS", t.QA_REMARKS, "qaRemarks");
 
   (data.SENSOR_CONFIGURATION ?? []).forEach((row, i) => {
     const hasData = [
@@ -206,6 +215,7 @@ const resolveBemFields = (
       (row as any).EXT_V ?? (row as any).EXT_VOLTAGE,
       row.OFFSET_VALUE,
       row.PRELOADING,
+      row.QA_REMARKS,
     ].some((v) => str(v));
     if (!hasData) return;
 
@@ -224,6 +234,7 @@ const resolveBemFields = (
     );
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
+    push(fields, `SENSOR_CONFIGURATION.${i}.QA_REMARKS`, row.QA_REMARKS, "qaRemarks");
   });
 
   const r = (data as any).RESULT_DETAILS ?? (data as any).STATIC_TEST_RESULT ?? {};
@@ -233,6 +244,7 @@ const resolveBemFields = (
   push(fields, "RESULT_DETAILS.BURN_RATE", r.BURN_RATE, "burnRate");
   push(fields, "RESULT_DETAILS.C_STAR", r.C_STAR, "cStar");
   push(fields, "RESULT_DETAILS.ISP", r.ISP, "isp");
+  push(fields, "RESULT_DETAILS.QA_REMARKS", r.QA_REMARKS, "qaRemarks");
 
   const pt = data.UPLOAD_PT_CURVE as any;
   push(
@@ -258,6 +270,7 @@ const resolveMainFields = (
   );
   push(fields, "IGNITER_DETAILS.SQUIB_RESISTANCE", ig.SQUIB_RESISTANCE, "squibResistance");
   push(fields, "IGNITER_DETAILS.REMARKS", ig.REMARKS, "igniterRemarks");
+  push(fields, "IGNITER_DETAILS.QA_REMARKS", ig.QA_REMARKS, "qaRemarks");
 
   const n = data.NOZZLE_DETAILS as any;
   push(
@@ -273,6 +286,7 @@ const resolveMainFields = (
   push(fields, "NOZZLE_DETAILS.DT_AFTER", n.DT_AFTER, "dtAfter");
   push(fields, "NOZZLE_DETAILS.DE_AFTER", n.DE_AFTER, "deAfter");
   push(fields, "NOZZLE_DETAILS.REMARKS", n.REMARKS, "nozzleRemarks");
+  push(fields, "NOZZLE_DETAILS.QA_REMARKS", n.QA_REMARKS, "qaRemarks");
 
   const t = data.TESTING_DETAILS as any;
   push(fields, "TESTING_DETAILS.THROAT_DIAMETER", t.THROAT_DIAMETER, "throatDiameter");
@@ -298,6 +312,7 @@ const resolveMainFields = (
     "ambientTemp",
   );
   push(fields, "TESTING_DETAILS.RH_PERCENT", t.RH_PERCENT ?? t.RH, "testingRh");
+  push(fields, "TESTING_DETAILS.QA_REMARKS", t.QA_REMARKS, "qaRemarks");
 
   (data.SENSOR_CONFIGURATION ?? []).forEach((row: any, i) => {
     const hasData = [
@@ -313,6 +328,7 @@ const resolveMainFields = (
       row.EXT_V,
       row.OFFSET_VALUE,
       row.PRELOADING,
+      row.QA_REMARKS,
     ].some((v) => str(v));
     // Skip empty placeholder channels so they do not block SUBMIT
     if (!hasData) return;
@@ -332,6 +348,7 @@ const resolveMainFields = (
     push(fields, `SENSOR_CONFIGURATION.${i}.EXT_VOLTAGE`, row.EXT_VOLTAGE ?? row.EXT_V, "extV");
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
+    push(fields, `SENSOR_CONFIGURATION.${i}.QA_REMARKS`, row.QA_REMARKS, "qaRemarks");
   });
 
   const r = (data as any).STATIC_TEST_RESULT ?? (data as any).RESULT_DETAILS ?? {};
@@ -346,6 +363,7 @@ const resolveMainFields = (
   push(fields, "STATIC_TEST_RESULT.BURN_RATE", r.BURN_RATE, "burnRate");
   push(fields, "STATIC_TEST_RESULT.C_STAR", r.C_STAR, "cStar");
   push(fields, "STATIC_TEST_RESULT.ISP", r.ISP, "isp");
+  push(fields, "STATIC_TEST_RESULT.QA_REMARKS", r.QA_REMARKS, "qaRemarks");
 
   const pt = data.UPLOAD_PT_CURVE as any;
   push(

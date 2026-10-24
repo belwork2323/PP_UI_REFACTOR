@@ -304,6 +304,20 @@ export const useDispatchHook = () => {
     [resetFlowDraft],
   );
 
+  const fetchQcSeedForMotor = useCallback(
+    async (motorId: string): Promise<Record<string, unknown> | undefined> => {
+      const batchId = String(activeBatch?.batchId ?? "").trim();
+      if (!batchId || !motorId) return undefined;
+      const response = await dispatchController.fetchMotorDetails({ batchId, motorId });
+      if (!response?.success || !response.data) return undefined;
+      const seed = response.data.motors?.find(
+        (entry) => String(entry.motorId ?? "").trim() === motorId,
+      );
+      return seed?.dispatchDetails;
+    },
+    [activeBatch?.batchId],
+  );
+
   const updateSetupField = useCallback(
     <K extends keyof DispatchFormState>(field: K, value: DispatchFormState[K]) => {
       setFormData((prev) => {
@@ -320,12 +334,35 @@ export const useDispatchHook = () => {
   );
 
   const handleLoadDispatchForm = useCallback(
-    (targetMotorId?: string) => {
+    async (targetMotorId?: string) => {
       const idToLoad = String(targetMotorId || draftMotorId || "").trim();
       if (!idToLoad) return false;
-      return appendMotorToForm(idToLoad);
+
+      const existing = (formData.motors ?? []).find((motor) => motor.motorId === idToLoad);
+      const status =
+        motorStatusById[idToLoad]?.motorSubmissionStatus ?? "TO_BE_INITIATED";
+      const shouldSeedFromQc =
+        status === "TO_BE_INITIATED" &&
+        (!existing?.formLoaded || !hasMotorDispatchValue(formData, idToLoad));
+
+      let seedDetails: Record<string, unknown> | undefined;
+      if (shouldSeedFromQc) {
+        try {
+          seedDetails = await fetchQcSeedForMotor(idToLoad);
+        } catch (error) {
+          console.error("Unable to seed Dispatch motor from QC Division", error);
+        }
+      }
+
+      return appendMotorToForm(idToLoad, seedDetails);
     },
-    [appendMotorToForm, draftMotorId],
+    [
+      appendMotorToForm,
+      draftMotorId,
+      fetchQcSeedForMotor,
+      formData,
+      motorStatusById,
+    ],
   );
 
   const handleDraftMotorIdChange = useCallback((value: string) => {

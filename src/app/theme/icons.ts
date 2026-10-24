@@ -88,7 +88,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 // ─── Batch Management ─────────────────────────────────────────────────────────
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"; // Sourcing stage
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing"; // Manufacturing stage
-import BiotechIcon from "@mui/icons-material/Biotech"; // Quality Control stage
+import BiotechIcon from "@mui/icons-material/Biotech"; // Quality Assurance stage
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined"; // Dispatch stage
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty"; // Pending status
@@ -256,6 +256,7 @@ export const icons = {
   drawerDashboard: DashboardIcon,
   drawerUsers: PeopleIcon,
   drawerBatch: BatchPredictionIcon,
+  drawerMotors: RocketIcon,
   drawerDepartments: Project,
   drawerBlockchainExplorer: ViewInArIcon,
   drawerLogout: LogoutIcon,
@@ -315,6 +316,17 @@ export const icons = {
   },
 
   // ─── Batch Management ────────────────────────────────────────────────────────
+  motorMgmt: {
+    refresh: RefreshIcon,
+    motorIcon: RocketIcon,
+    motorId: RocketIcon,
+    linkedStatus: LinkIcon,
+    approvedStatus: VerifiedIcon,
+    waitingStatus: PendingActionsRoundedIcon,
+    inProgressStatus: AutorenewIcon,
+    pendingStatus: HourglassEmptyIcon,
+  },
+
   batchMgmt: {
     // Page actions
     add: AddIcon,

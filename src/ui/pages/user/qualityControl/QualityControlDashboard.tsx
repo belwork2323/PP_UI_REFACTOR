@@ -17,7 +17,7 @@ import STFPage from "./StaticTestFacility/StaticTestFacilityPage";
 
 const SUB_DEPT_LABELS = {
   "raw-material-revalidation": "Raw Material Revalidation",
-  "qc-division":                "Quality Control",
+  "qc-division":                "Quality Assurance",
   "ndt":                       "NDT",
   "static-test-facility":      "Static Test Facility",
 };

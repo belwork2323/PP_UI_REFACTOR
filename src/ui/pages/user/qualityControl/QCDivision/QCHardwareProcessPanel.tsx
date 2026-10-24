@@ -17,9 +17,12 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import AppDropdown from "../../../../components/common/AppDropdown";
+import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import {
   QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID,
@@ -32,6 +35,7 @@ import {
   getHardwareDispatchVisualObservationRows,
   getHardwareLinearCoatingRows,
   getHardwarePreheatingRows,
+  getHardwareQaRemarks,
   getQcHardwareProcessLabel,
   isQcHardwareProcessSubType,
   setHardwareAbradingRows,
@@ -39,6 +43,7 @@ import {
   setHardwareDispatchVisualObservationRows,
   setHardwareLinearCoatingRows,
   setHardwarePreheatingRows,
+  setHardwareQaRemarks,
   type QcHardwareCutRow,
   type QcHardwareLinearCoatingRow,
   type QcHardwarePreheatingRow,
@@ -436,6 +441,8 @@ const QCHardwareProcessPanel = ({
   headerActions,
   validationErrors = null,
 }: QCHardwareProcessPanelProps) => {
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const processLabel = getQcHardwareProcessLabel(subType);
   const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
   const preheatingColumns = useMemo(
@@ -465,6 +472,11 @@ const QCHardwareProcessPanel = ({
   const visualObservationRows = useMemo(
     () => getHardwareDispatchVisualObservationRows(values),
     [values],
+  );
+  const processSubType = isQcHardwareProcessSubType(subType) ? subType : null;
+  const qaRemarks = useMemo(
+    () => (processSubType ? getHardwareQaRemarks(values, processSubType) : ""),
+    [processSubType, values],
   );
 
   const setFirstCut = useCallback(
@@ -870,6 +882,19 @@ const QCHardwareProcessPanel = ({
             </TableContainer>
           </Box>
         </Stack>
+      ) : null}
+
+      {processSubType ? (
+        <Box sx={{ mt: 2 }} data-qc-field={`${processSubType}.qaRemarks`}>
+          <CasePrepTextField
+            label="QA Remarks"
+            value={qaRemarks}
+            readOnly={readOnly}
+            width="100%"
+            theme={manufacturingTheme}
+            onChange={(next) => onChange(setHardwareQaRemarks(values, processSubType, next))}
+          />
+        </Box>
       ) : null}
     </Box>
   );

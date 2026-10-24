@@ -75,8 +75,8 @@ type RawMaterialPreparationApproverReviewContentProps = {
   loading: boolean;
   activePremixNo: number | null;
   onActivePremixChange: (premixNo: number) => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
   actionLoading?: boolean;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -316,7 +316,7 @@ const RawMaterialPreparationApproverReviewContent = ({
             </Typography>
           ) : null}
 
-          {canApproveOrReject ? (
+          {canApproveOrReject && onApprove && onReject ? (
             <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={1.25} justifyContent="flex-end">
               <Button
                 variant="contained"

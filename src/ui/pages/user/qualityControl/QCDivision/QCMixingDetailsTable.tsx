@@ -266,7 +266,7 @@ const QCMixingDetailsTable = ({
                 {renderHeaderLabel("Value", true)}
               </TableCell>
               <TableCell rowSpan={showSampleSubHeaders ? 2 : 1} sx={headerCellSx}>
-                Remarks
+                QA Remarks
               </TableCell>
             </TableRow>
             {showSampleSubHeaders ? (

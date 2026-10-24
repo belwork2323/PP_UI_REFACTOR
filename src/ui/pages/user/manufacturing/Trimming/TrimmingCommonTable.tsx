@@ -27,7 +27,9 @@ import {
   uniformTableHeaderCellSx,
 } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import TrimmingFileField from "./TrimmingFileField";
+import TrimmingDrawingImageField from "./TrimmingDrawingImageField";
 import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
+import CasePrepTextField from "../CasePreparation/CasePrepTextField";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import type { ValidationErrors } from "@/data/validation/adapters/trimming.validation";
 import { fieldError } from "@/data/validation/adapters/trimming.validation";
@@ -84,6 +86,8 @@ export const TrimmingCommonTable = ({
   fileSubDeptSlug = "trimming",
   /** When true, use shared QC eager FileRef field (same as hardware / revalidation). */
   useQcDivisionFileField = false,
+  /** QC Division only: add QA Remarks column + Dimensions / Remarks section QA fields. */
+  qaRemarksMode = false,
   validationErrors,
 }: {
   activeMotorSession: any;
@@ -95,6 +99,7 @@ export const TrimmingCommonTable = ({
   theme?: any;
   fileSubDeptSlug?: string;
   useQcDivisionFileField?: boolean;
+  qaRemarksMode?: boolean;
   validationErrors?: ValidationErrors;
 }) => {
   const palette = theme?.palette ?? {};
@@ -416,7 +421,7 @@ export const TrimmingCommonTable = ({
 
         <Box sx={{ p: 1.5 }}>
           <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
-            <Table size="small" sx={{ borderCollapse: "collapse", minWidth: 720 }}>
+            <Table size="small" sx={{ borderCollapse: "collapse", minWidth: qaRemarksMode ? 900 : 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={thSx}><FieldLabelWithAsterisk label="Machine Details" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
@@ -425,6 +430,7 @@ export const TrimmingCommonTable = ({
                   <TableCell sx={thSx}><FieldLabelWithAsterisk label="Arbor Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                   <TableCell sx={thSx}><FieldLabelWithAsterisk label="Cutter Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                   <TableCell sx={thSx}>Remarks</TableCell>
+                  {qaRemarksMode ? <TableCell sx={thSx}>QA Remarks</TableCell> : null}
                   {showStructureActions ? (
                     <TableCell align="center" sx={{ ...thSx, width: 50 }}>
                       Actions
@@ -604,7 +610,7 @@ export const TrimmingCommonTable = ({
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
-                      {readOnly ? (
+                      {readOnly || qaRemarksMode ? (
                         <ReadOnlyValue value={row.remarks} />
                       ) : (
                         <Box data-qc-field={`trimmingDetails.${rowIndex}.remarks`}>
@@ -626,6 +632,34 @@ export const TrimmingCommonTable = ({
                         </Box>
                       )}
                     </TableCell>
+                    {qaRemarksMode ? (
+                      <TableCell sx={tdSx}>
+                        {readOnly ? (
+                          <ReadOnlyValue value={row.qaRemarks} />
+                        ) : (
+                          <Box data-qc-field={`trimmingDetails.${rowIndex}.qaRemarks`}>
+                            <FormInput
+                              value={row.qaRemarks ?? ""}
+                              size="small"
+                              error={Boolean(err(`trimmingDetails.${rowIndex}.qaRemarks`))}
+                              onChange={(e) => {
+                                const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                                nextRows[rowIndex] = {
+                                  ...nextRows[rowIndex],
+                                  qaRemarks: e.target.value,
+                                };
+                                onMotorSessionChange(activeMotorEntry.motorId, {
+                                  ...activeMotorSession,
+                                  trimmingDetails: nextRows,
+                                });
+                              }}
+                              disabled={inputsLocked}
+                            />
+                            <FieldErrorText message={err(`trimmingDetails.${rowIndex}.qaRemarks`)} />
+                          </Box>
+                        )}
+                      </TableCell>
+                    ) : null}
                     {showStructureActions ? (
                       <TableCell align="center" sx={tdSx}>
                         {rowIndex > 0 && (
@@ -664,6 +698,7 @@ export const TrimmingCommonTable = ({
                         arborSize: "",
                         cutterSize: "",
                         remarks: "",
+                        qaRemarks: "",
                       },
                     ],
                   });
@@ -1005,8 +1040,95 @@ export const TrimmingCommonTable = ({
               </Button>
             </Stack>
           ) : null}
+
+          {qaRemarksMode ? (
+            <Box sx={{ mt: 1.5 }} data-qc-field="measurementQaRemarks">
+              <CasePrepTextField
+                label="QA Remarks"
+                value={String(activeMotorSession.dimensionsQaRemarks ?? "")}
+                readOnly={readOnly}
+                disabled={inputsLocked}
+                width="100%"
+                theme={theme}
+                onChange={(next) =>
+                  onMotorSessionChange(activeMotorEntry.motorId, {
+                    ...activeMotorSession,
+                    dimensionsQaRemarks: next,
+                  })
+                }
+              />
+            </Box>
+          ) : null}
         </Box>
       </Box>
+
+      {!qaRemarksMode ? (
+        <Box sx={sectionCardSx}>
+          <Box sx={sectionHeaderSx}>
+            <Typography sx={sectionTitleStyle}>{S.DRAWING_SECTION_TITLE}</Typography>
+          </Box>
+          <Box sx={{ p: 1.5 }}>
+            <Stack spacing={2}>
+              {readOnly ? (
+                <>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                        color: colors.primary,
+                        mb: 0.5,
+                      }}
+                    >
+                      {S.DRAWING_DESCRIPTION_LABEL}
+                    </Typography>
+                    <ReadOnlyValue value={activeMotorSession.drawingDescription ?? ""} />
+                  </Box>
+                  <TrimmingDrawingImageField
+                    label={S.DRAWING_UPLOAD_LABEL}
+                    files={activeMotorSession.drawingFiles ?? []}
+                    onChange={() => {}}
+                    readOnly
+                    emptyLabel={S.FILE_EMPTY_DRAWING}
+                    subDeptSlug={fileSubDeptSlug}
+                  />
+                </>
+              ) : (
+                <>
+                  <FormInput
+                    multiline
+                    minRows={3}
+                    label={S.DRAWING_DESCRIPTION_LABEL}
+                    value={activeMotorSession.drawingDescription ?? ""}
+                    onChange={(e) =>
+                      onMotorSessionChange(activeMotorEntry.motorId, {
+                        ...activeMotorSession,
+                        drawingDescription: e.target.value,
+                      })
+                    }
+                    disabled={inputsLocked}
+                  />
+                  <TrimmingDrawingImageField
+                    label={S.DRAWING_UPLOAD_LABEL}
+                    files={activeMotorSession.drawingFiles ?? []}
+                    onChange={(next) =>
+                      onMotorSessionChange(activeMotorEntry.motorId, {
+                        ...activeMotorSession,
+                        drawingFiles: next.slice(0, 1),
+                      })
+                    }
+                    disabled={inputsLocked}
+                    emptyLabel={S.FILE_EMPTY_DRAWING}
+                    subDeptSlug={fileSubDeptSlug}
+                  />
+                </>
+              )}
+            </Stack>
+          </Box>
+        </Box>
+      ) : null}
 
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
@@ -1016,6 +1138,23 @@ export const TrimmingCommonTable = ({
           <Stack spacing={2}>
             {readOnly ? (
               <>
+                {qaRemarksMode ? (
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                        color: colors.primary,
+                        mb: 0.5,
+                      }}
+                    >
+                      Remarks
+                    </Typography>
+                    <ReadOnlyValue value={activeMotorSession.manufacturingRemarks} />
+                  </Box>
+                ) : null}
                 <Box>
                   <Typography
                     sx={{
@@ -1027,7 +1166,7 @@ export const TrimmingCommonTable = ({
                       mb: 0.5,
                     }}
                   >
-                    Remarks
+                    {qaRemarksMode ? "QA Remarks" : "Remarks"}
                   </Typography>
                   <ReadOnlyValue value={activeMotorSession.motorRemarks} />
                 </Box>
@@ -1054,10 +1193,27 @@ export const TrimmingCommonTable = ({
               </>
             ) : (
               <>
+                {qaRemarksMode ? (
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: "0.65rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.02em",
+                        textTransform: "uppercase",
+                        color: colors.primary,
+                        mb: 0.5,
+                      }}
+                    >
+                      Remarks
+                    </Typography>
+                    <ReadOnlyValue value={activeMotorSession.manufacturingRemarks} />
+                  </Box>
+                ) : null}
                 <FormInput
                   multiline
                   minRows={3}
-                  label="Remarks"
+                  label={qaRemarksMode ? "QA Remarks" : "Remarks"}
                   value={activeMotorSession.motorRemarks ?? ""}
                   onChange={(e) =>
                     onMotorSessionChange(activeMotorEntry.motorId, {

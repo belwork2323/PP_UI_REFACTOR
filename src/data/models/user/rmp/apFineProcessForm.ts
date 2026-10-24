@@ -22,6 +22,7 @@ export type ApFineTrayOvenForm = {
   endDatetime: string;
   moisture: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type ApFineSievingForm = {
@@ -29,11 +30,13 @@ export type ApFineSievingForm = {
   sievedQuantity: string;
   sieveMeshSize: string;
   observation: string;
+  qaRemarks: string;
 };
 
 export type ApFineProcessForm = {
   uiKey: "apFine";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   /** Grinding — ACM (lot details replace multi-batch + coarse lot/qty rows). */
   acmEquipmentId: string;
   millRpm: string;
@@ -44,10 +47,13 @@ export type ApFineProcessForm = {
   grindingStartDatetime: string;
   grindingEndDatetime: string;
   grindingObservation: string;
+  grindingQaRemarks: string;
   particleSizeDistribution: ApParticleSizeRow[];
   qtyKgQualified: string;
   blendingDryingParameters: ApOperationParameterRow[];
+  blendingDryingQaRemarks: string;
   dryingOperationRvd: ApTimedOperationParameterRow[];
+  dryingOperationRvdQaRemarks: string;
   trayOvenStorage: ApFineTrayOvenForm;
   sieving: ApFineSievingForm;
 };
@@ -72,6 +78,7 @@ const emptyTrayOven = (): ApFineTrayOvenForm => ({
   endDatetime: "",
   moisture: "",
   observation: "",
+  qaRemarks: "",
 });
 
 const emptySieving = (): ApFineSievingForm => ({
@@ -79,12 +86,14 @@ const emptySieving = (): ApFineSievingForm => ({
   sievedQuantity: "",
   sieveMeshSize: "",
   observation: "",
+  qaRemarks: "",
 });
 
 /** Seeded from AP Fine process sheets (Grinding + Blending/RVD/Tray/Sieving). */
 export const createSeededApFineProcessForm = (): ApFineProcessForm => ({
   uiKey: "apFine",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   acmEquipmentId: "",
   millRpm: "",
   classifierRpm: "",
@@ -94,6 +103,7 @@ export const createSeededApFineProcessForm = (): ApFineProcessForm => ({
   grindingStartDatetime: "",
   grindingEndDatetime: "",
   grindingObservation: "",
+  grindingQaRemarks: "",
   particleSizeDistribution: [
     { psdRequirement: "+105", specification: "", result: "" },
     { psdRequirement: "75+105", specification: "", result: "" },
@@ -112,6 +122,7 @@ export const createSeededApFineProcessForm = (): ApFineProcessForm => ({
       actualParameter: "",
     },
   ],
+  blendingDryingQaRemarks: "",
   dryingOperationRvd: [
     {
       operation: "Drying",
@@ -135,6 +146,7 @@ export const createSeededApFineProcessForm = (): ApFineProcessForm => ({
       endTime: "",
     },
   ],
+  dryingOperationRvdQaRemarks: "",
   trayOvenStorage: emptyTrayOven(),
   sieving: emptySieving(),
 });

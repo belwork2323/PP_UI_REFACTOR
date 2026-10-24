@@ -56,8 +56,9 @@ const CasePreparationDetailsView = ({ row, data, loading, onBack }: CasePreparat
     () =>
       mapCasePreparationDetailsForDisplay(data, undefined, {
         preferredMotorIds: Array.isArray(row.motorIds) ? (row.motorIds as Array<string | number>) : null,
+        batchContext: row,
       }),
-    [data, row.motorIds],
+    [data, row],
   );
 
   return (

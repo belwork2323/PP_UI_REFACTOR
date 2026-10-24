@@ -23,6 +23,8 @@ type Props = {
   readOnly?: boolean;
   theme: any;
   validationErrors?: Record<string, string>;
+  /** QA Raw Material Processing only — manufacturing leaves unset. */
+  showQaRemarks?: boolean;
 };
 
 const filterErrorsForGrade = (
@@ -55,6 +57,7 @@ const ApMaterialHostPanel = ({
   readOnly = false,
   theme,
   validationErrors,
+  showQaRemarks = false,
 }: Props) => {
   const updateCard = (gradeCode: string, nextSlot: RawMaterialPrepMaterialProcessSlot) => {
     onCardsChange(
@@ -94,6 +97,7 @@ const ApMaterialHostPanel = ({
                 disabled={readOnly}
                 theme={theme}
                 validationErrors={gradeErrors}
+                showQaRemarks={showQaRemarks}
                 onChange={(processForm) =>
                   updateCard(grade, { uiKey: resolvedUiKey, processForm })
                 }
@@ -106,6 +110,7 @@ const ApMaterialHostPanel = ({
                 disabled={readOnly}
                 theme={theme}
                 validationErrors={gradeErrors}
+                showQaRemarks={showQaRemarks}
                 onChange={(processForm: RmpMaterialProcessForm) =>
                   updateCard(grade, {
                     uiKey: resolvedUiKey as RmpMaterialUiKey,

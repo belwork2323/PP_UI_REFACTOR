@@ -1,11 +1,13 @@
-import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
-import { qcDivisionController } from "../../../controllers/user/quality_control/qcDivisionController";
 import { resolveQcBatchContext, type QcBatchContext } from "./qcBatchContext";
 import type { QcDivisionCatalogItem } from "./qcFlowConfig";
 
+/** Controllers pulled lazily so FormModel is not loaded during this module's init. */
 export const fetchFreshBatchDetails = async (batchId: string) => {
   const id = String(batchId ?? "").trim();
   if (!id) return null;
+  const { batchManagementController } = await import(
+    "../../../controllers/admin/BatchManagement/batchManagementController"
+  );
   return batchManagementController.getBatchById(id);
 };
 
@@ -16,6 +18,9 @@ export const fetchFreshQcFormDetails = async (params: {
   const formId = String(params.formId ?? "").trim();
   if (!formId || !params.subDepartmentId) return null;
 
+  const { qcDivisionController } = await import(
+    "../../../controllers/user/quality_control/qcDivisionController"
+  );
   const response = await qcDivisionController.fetchFormDetails({
     formId,
     subDepartmentId: params.subDepartmentId,

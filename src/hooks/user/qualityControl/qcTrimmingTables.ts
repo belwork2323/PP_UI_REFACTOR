@@ -23,6 +23,11 @@ export type QcTrimmingSessionValues = {
   trimmingDetails: TrimmingDetailsRow[];
   commonFormatParameters: TrimmingCommonFormatParameter[];
   commonFormatLocations: string[];
+  /** QA Remarks for Dimensions After Trimming (API: measurementQaRemarks). */
+  dimensionsQaRemarks: string;
+  /** Manufacturing remarks preserved on QC save (API: trimmingRemarks.remarks). */
+  manufacturingRemarks?: string;
+  /** QC QA Remarks for Remarks & Attachments (API: trimmingRemarks.qaRemarks). */
   motorRemarks: string;
   reportFiles: FileRef[];
   /** Legacy hydrate only. */
@@ -65,6 +70,7 @@ const createDefaultTrimmingDetailsRows = (): TrimmingDetailsRow[] => [
     arborSize: "",
     cutterSize: "",
     remarks: "",
+    qaRemarks: "",
   },
 ];
 
@@ -108,6 +114,8 @@ export const createInitialTrimmingValues = (
     trimmingDetails: createDefaultTrimmingDetailsRows(),
     commonFormatParameters: createDefaultCommonFormatParameters(),
     commonFormatLocations: [],
+    dimensionsQaRemarks: "",
+    manufacturingRemarks: "",
     motorRemarks: "",
     reportFiles: [],
   }) as SchemaFormValues;
@@ -126,14 +134,26 @@ export const getTrimmingSessionFromValues = (
     .map((loc) => String(loc ?? "").trim())
     .filter(Boolean);
 
+  const normalizedDetails = (details.length ? details : createDefaultTrimmingDetailsRows()).map(
+    (row) => ({
+      ...row,
+      remarks: String(row.remarks ?? "").trim(),
+      qaRemarks: String(row.qaRemarks ?? "").trim(),
+    }),
+  );
+
   return {
     motorStage: rec.motorStage as number | string | undefined,
     motorReceivedAt: toTrimmingUiMotorReceivedAt(
       String(rec.motorReceivedAt ?? rec.motorReceivedDate ?? "").trim(),
     ),
-    trimmingDetails: details.length ? details : createDefaultTrimmingDetailsRows(),
+    trimmingDetails: normalizedDetails,
     commonFormatParameters: params.length ? params : createDefaultCommonFormatParameters(),
     commonFormatLocations: locations,
+    dimensionsQaRemarks: String(
+      rec.dimensionsQaRemarks ?? rec.measurementQaRemarks ?? "",
+    ).trim(),
+    manufacturingRemarks: String(rec.manufacturingRemarks ?? "").trim(),
     motorRemarks: String(rec.motorRemarks ?? "").trim(),
     reportFiles: parseFileRefs(rec.reportFiles ?? rec.reportFile ?? rec.reportLink),
   };
@@ -149,6 +169,8 @@ export const setTrimmingSessionValues = (
     commonFormatParameters:
       session.commonFormatParameters ?? createDefaultCommonFormatParameters(),
     commonFormatLocations: session.commonFormatLocations ?? [],
+    dimensionsQaRemarks: session.dimensionsQaRemarks ?? "",
+    manufacturingRemarks: session.manufacturingRemarks ?? "",
     motorRemarks: session.motorRemarks ?? "",
     reportFiles: session.reportFiles ?? [],
   }) as SchemaFormValues;
@@ -192,6 +214,7 @@ export const hydrateTrimmingValuesFromSections = (
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
       remarks: String(row!.remarks ?? "").trim(),
+      qaRemarks: String(row!.qaRemarks ?? "").trim(),
     }));
 
   const parameters = commonRaw
@@ -207,6 +230,8 @@ export const hydrateTrimmingValuesFromSections = (
     });
   });
 
+  const commonMeta = asRecord(commonRaw[0]) ?? {};
+
   return setTrimmingSessionValues({
     motorReceivedAt: String(options?.motorReceivedAt ?? "").trim(),
     trimmingDetails: details.length ? details : createDefaultTrimmingDetailsRows(),
@@ -214,7 +239,15 @@ export const hydrateTrimmingValuesFromSections = (
       ? parameters
       : createDefaultCommonFormatParameters(),
     commonFormatLocations: Array.from(locationSet),
-    motorRemarks: String(remarks.remarks ?? remarks.motorRemarks ?? "").trim(),
+    dimensionsQaRemarks: String(
+      commonMeta.measurementQaRemarks ??
+        commonMeta.dimensionsQaRemarks ??
+        remarks.measurementQaRemarks ??
+        "",
+    ).trim(),
+    manufacturingRemarks: String(remarks.remarks ?? "").trim(),
+    // QC QA field only — manufacturing remarks stay on trimmingRemarks.remarks.
+    motorRemarks: String(remarks.qaRemarks ?? remarks.motorRemarks ?? "").trim(),
     reportFiles: parseFileRefs(
       remarks.reportFiles ?? remarks.reportFile ?? remarks.reportLink,
     ),
@@ -252,6 +285,7 @@ const operationRowHasData = (row: TrimmingDetailsRow) =>
     row.arborSize,
     row.cutterSize,
     row.remarks,
+    row.qaRemarks,
   ].some(hasValue);
 
 /** Map Trimming Details table → QC `trimmingOperationDetails[]`. */
@@ -268,6 +302,7 @@ export const buildTrimmingOperationDetailsPayload = (
         arborSize: String(row.arborSize ?? "").trim() || undefined,
         cutterSize: String(row.cutterSize ?? "").trim() || undefined,
         remarks: String(row.remarks ?? "").trim() || undefined,
+        qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
       }),
     );
 
@@ -287,6 +322,7 @@ export const hydrateTrimmingDetailsFromOperationDetails = (
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
       remarks: String(row!.remarks ?? "").trim(),
+      qaRemarks: String(row!.qaRemarks ?? "").trim(),
     }))
     .filter(operationRowHasData);
 
@@ -397,12 +433,17 @@ export const buildTrimmingMotorSections = (
   }
 
   const readyReportFiles = toFileIdListPayload(session.reportFiles ?? []);
-  if (session.motorRemarks.trim() || readyReportFiles.length) {
+  if (
+    session.motorRemarks.trim() ||
+    String(session.manufacturingRemarks ?? "").trim() ||
+    readyReportFiles.length
+  ) {
     sections.push({
       sectionId: QC_TRIMMING_SECTION_IDS.REMARKS,
       sectionData: [
         omitEmpty({
-          remarks: session.motorRemarks || undefined,
+          remarks: String(session.manufacturingRemarks ?? "").trim() || undefined,
+          qaRemarks: session.motorRemarks || undefined,
           ...(readyReportFiles.length ? { reportFile: readyReportFiles } : {}),
         }),
       ],
@@ -432,9 +473,11 @@ export const buildTrimmingMotorDetailPayload = (
   );
   const readyReportFiles = toFileIdListPayload(session.reportFiles ?? []);
   const trimmingRemarks = omitEmpty({
-    remarks: session.motorRemarks || undefined,
+    remarks: String(session.manufacturingRemarks ?? "").trim() || undefined,
+    qaRemarks: session.motorRemarks || undefined,
     ...(readyReportFiles.length ? { reportFile: readyReportFiles } : {}),
   });
+  const measurementQaRemarks = String(session.dimensionsQaRemarks ?? "").trim();
 
   return omitEmpty({
     motorIdNo: motorId,
@@ -445,6 +488,7 @@ export const buildTrimmingMotorDetailPayload = (
       trimmingMeasurementDetails.length > 0 ? trimmingMeasurementDetails : undefined,
     trimmingOperationDetails:
       trimmingOperationDetails.length > 0 ? trimmingOperationDetails : undefined,
+    measurementQaRemarks: measurementQaRemarks || undefined,
     ...(Object.keys(trimmingRemarks).length ? { trimmingRemarks } : {}),
   });
 };
@@ -495,9 +539,22 @@ export const hydrateTrimmingValuesFromMotorDetail = (
       }),
       { motorReceivedAt: receivedAt },
     );
+    const fromSession = getTrimmingSessionFromValues(fromSections);
+    const nestedRemarks = asRecord(source.trimmingRemarks) ?? {};
     return setTrimmingSessionValues({
-      ...getTrimmingSessionFromValues(fromSections),
+      ...fromSession,
       motorStage: source.motorStage as number | string | undefined,
+      dimensionsQaRemarks:
+        String(source.measurementQaRemarks ?? "").trim() ||
+        fromSession.dimensionsQaRemarks,
+      manufacturingRemarks:
+        String(nestedRemarks.remarks ?? "").trim() ||
+        fromSession.manufacturingRemarks ||
+        "",
+      motorRemarks:
+        String(nestedRemarks.qaRemarks ?? "").trim() ||
+        fromSession.motorRemarks ||
+        "",
     });
   }
 
@@ -516,7 +573,10 @@ export const hydrateTrimmingValuesFromMotorDetail = (
       ? fromMeasurements
       : createDefaultCommonFormatParameters(),
     commonFormatLocations: [],
-    motorRemarks: String(remarks.remarks ?? source.remarks ?? "").trim(),
+    dimensionsQaRemarks: String(source.measurementQaRemarks ?? "").trim(),
+    manufacturingRemarks: String(remarks.remarks ?? "").trim(),
+    // Prefer QC qaRemarks; do not seed QA from manufacturing remarks.
+    motorRemarks: String(remarks.qaRemarks ?? "").trim(),
     reportFiles: parseFileRefs(
       remarks.reportFiles ?? remarks.reportFile ?? remarks.reportLink ?? source.reportLink,
     ),
@@ -565,7 +625,13 @@ export const trimmingMotorDetailToSections = (
 
 export const trimmingValuesHaveData = (values: SchemaFormValues | null | undefined) => {
   const session = getTrimmingSessionFromValues(values);
-  if (hasValue(session.motorReceivedAt) || hasValue(session.motorRemarks)) return true;
+  if (
+    hasValue(session.motorReceivedAt) ||
+    hasValue(session.motorRemarks) ||
+    hasValue(session.dimensionsQaRemarks)
+  ) {
+    return true;
+  }
   if ((session.reportFiles ?? []).some((ref) => isFileReady(ref) || ref.fileName?.trim())) {
     return true;
   }

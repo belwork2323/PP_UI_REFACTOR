@@ -36,9 +36,19 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
+import PremixStatusChip from "../../RawMaterial/components/PremixStatusChip";
 
 const ABRADING_OBS_COLUMNS = new Set(["remarksObservations", "observations", "remarks"]);
 const ABRADING_ATTACH_COLUMNS = new Set(["attachments"]);
+
+const MOTOR_STATUS_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
+  TO_BE_INITIATED: { bg: "rgba(120,120,120,0.1)", color: "#757575" },
+  IN_PROGRESS: { bg: "rgba(25,118,210,0.1)", color: "#1565C0" },
+  WAITING_FOR_APPROVAL: { bg: "rgba(212,172,13,0.1)", color: "#7D6608" },
+  APPROVED: { bg: "rgba(20,143,119,0.1)", color: "#0E6655" },
+  REJECTED: { bg: "rgba(192,57,43,0.1)", color: "#922B21" },
+  DISCARDED: { bg: "rgba(192,57,43,0.12)", color: "#C0392B" },
+};
 
 const isAbradingDetailsTable = (table: CasePrepDetailTable) =>
   table.blockId === "abradingDetails" ||
@@ -529,12 +539,14 @@ export const MotorDetailPanel = ({
   palette,
   subDepartmentId,
   onOpen,
+  statusConfig,
 }: {
   motor: CasePrepMotorDetailView;
   dt: CasePrepDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
+  statusConfig?: Record<string, { color: string; bg: string; border: string }>;
 }) => (
   <Box>
     <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
@@ -542,6 +554,35 @@ export const MotorDetailPanel = ({
       <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
         {motor.motorId}
       </Typography>
+      {motor.motorSubmissionStatus ? (
+        statusConfig ? (
+          <PremixStatusChip
+            status={motor.motorSubmissionStatus as any}
+            statusConfig={statusConfig}
+            variant="embedded"
+          />
+        ) : (
+          (() => {
+            const statusKey = String(motor.motorSubmissionStatus).toUpperCase();
+            const chipStyle = MOTOR_STATUS_CHIP_COLORS[statusKey];
+            return (
+              <Chip
+                label={statusKey.replace(/_/g, " ")}
+                size="small"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.62rem",
+                  height: 22,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.3,
+                  background: chipStyle?.bg,
+                  color: chipStyle?.color,
+                }}
+              />
+            );
+          })()
+        )
+      ) : null}
       {motor.prrcClearanceDate ? (
         <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
           PRRC: {motor.prrcClearanceDate}
@@ -581,6 +622,7 @@ const CasePreparationDetailsContent = ({
   resetMotorOnFormId,
 }: CasePreparationDetailsContentProps) => {
   const dt = theme.manufacturing.casePreparation.details;
+  const statusConfig = dt.bannerStatusConfig ?? {};
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const subDepartmentId = useAuthStore(
     (s) =>
@@ -613,11 +655,19 @@ const CasePreparationDetailsContent = ({
 
   const motorTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
-      motors.map((motor) => ({
+      motors.map((motor, index) => ({
         id: motor.motorId,
         label: motor.motorId,
+        endAdornment: motor.motorSubmissionStatus ? (
+          <PremixStatusChip
+            status={motor.motorSubmissionStatus as any}
+            statusConfig={statusConfig}
+            variant="embedded"
+            onAccent={index === activeMotorIndexSafe}
+          />
+        ) : undefined,
       })),
-    [motors],
+    [activeMotorIndexSafe, motors, statusConfig],
   );
 
   const metaFields = [
@@ -695,6 +745,7 @@ const CasePreparationDetailsContent = ({
               palette={theme.palette}
               subDepartmentId={subDepartmentId}
               onOpen={onOpenFile}
+              statusConfig={statusConfig}
             />
           ) : null}
         </Box>

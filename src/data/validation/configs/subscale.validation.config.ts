@@ -1,177 +1,184 @@
-import type { SubDeptValidationConfig } from "../runValidation";
+import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
+import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { stateToMessage, validateFieldState } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
-export const subscaleHardwareFieldRules = {
+const textRule = (
+  requiredIn: ValidationTier[],
+  maxLength: number = S.LENGTH.MAX_STANDARD,
+  requiredMessage: string = S.REQUIRED,
+): FieldRuleConfig => ({
+  valueType: "text",
+  requiredIn,
+  messages: { required: requiredMessage, invalid: S.INVALID },
+  pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+  maxLength,
+});
+
+const numberRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "number",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  pattern: S.PATTERNS.FLOAT,
+});
+
+const dateRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "date",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
+
+/** HH:mm or HH:mm:ss (API hydrate often includes seconds). */
+const timeRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "text",
+  requiredIn,
+  pattern: /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
+
+export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   // Hardware Preparation Fields
   HARDWARE_ARTICLE_SELECTIONS: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    valueType: "text",
+    requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
-  LINER_TYPE: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
-    maxLength: S.LENGTH.MAX_STANDARD,
-  },
-  LINER_BATCH_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  LINER_BATCH_DATE: {
-    valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
+  LINER_TYPE: textRule(["UNIT", "SUBMIT"]),
+  LINER_BATCH_NO: textRule(["UNIT", "SUBMIT"], 50, S.FIELD_REQUIRED),
+  LINER_BATCH_DATE: dateRule(["UNIT", "SUBMIT"]),
 
   // General Batch Info / Process Fields
-
-  MIXER_BLDG_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
-  PREMIX_DATE: {
-    valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
-  FINAL_MIX_DATE: {
-    valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
-  DATE_OF_CASTING: {
-    valueType: "date" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
-  IR_BATCH_NO: {
-    valueType: "text" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  DATE_OF_MFG: {
-    valueType: "date" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
+  MIXER_BLDG_NO: textRule(["UNIT", "SUBMIT"], S.LENGTH.MAX_STANDARD, S.FIELD_REQUIRED),
+  PREMIX_DATE: dateRule(["UNIT", "SUBMIT"]),
+  FINAL_MIX_DATE: dateRule(["UNIT", "SUBMIT"]),
+  DATE_OF_CASTING: dateRule(["SUBMIT"]),
+  IR_BATCH_NO: textRule(["SUBMIT"], 50, S.FIELD_REQUIRED),
+  DATE_OF_MFG: dateRule(["SUBMIT"]),
 
   // System-generated labels (MDM article names) — presence only, no pattern.
   ARTICLE_TYPE: {
-    valueType: "text" as const,
-    requiredIn: [] as ValidationTier[],
+    valueType: "text",
+    requiredIn: [],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     maxLength: S.LENGTH.MAX_STANDARD,
   },
-  RUBBER_MATERIAL: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
-    maxLength: S.LENGTH.MAX_STANDARD,
-  },
-  SLEEVE_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  MOULD_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  BEM_MOULD_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  BEM_NO: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
-  DATE_OF_NDT: {
-    valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-  },
-  VACUUM_LEVEL: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
-  BATCH_SIZE: {
-    valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
+  RUBBER_MATERIAL: textRule(["UNIT", "SUBMIT"]),
+  SLEEVE_NO: textRule(["UNIT", "SUBMIT"], 50),
+  MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
+  BEM_MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
+  BEM_NO: textRule(["UNIT", "SUBMIT"], 50),
+  SIZE_MM: textRule([], S.LENGTH.MAX_STANDARD),
+  THICKNESS_MM: numberRule(),
+  LINER_APPLIED: textRule([], S.LENGTH.MAX_STANDARD),
+  OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
+  CASTING_PIT_NO: textRule([], S.LENGTH.MAX_STANDARD),
+  CASTING_START_TIME: timeRule(),
+  CASTING_END_TIME: timeRule(),
+  REMARKS: textRule([], S.LENGTH.MAX_LONG_TEXT),
+  OVEN_NO: textRule([], S.LENGTH.MAX_STANDARD),
+  TEMPERATURE: numberRule(),
+  HARDNESS: numberRule(),
+  DECORING_DATE: dateRule(),
+  DECORING_LOAD: numberRule(),
+  CURING_START_DATE: dateRule(),
+  CURING_END_DATE: dateRule(),
+  GRAIN_SURFACE_OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
+  ACTOR: textRule([], S.LENGTH.MAX_STANDARD),
+  DATE_OF_NDT: dateRule(["UNIT", "SUBMIT"]),
+  DATE_OF_APPLICATION: dateRule(["UNIT", "SUBMIT"]),
+  VACUUM_LEVEL: numberRule(["SUBMIT"]),
+  BATCH_SIZE: numberRule(["UNIT", "SUBMIT"]),
+
+  // Inhibition weights
+  LINER_COATED_SLEEVE_WEIGHT: numberRule(),
+  WEIGHT_BEFORE_INHIBITION: numberRule(),
+  WEIGHT_AFTER_INHIBITION: numberRule(),
+  IR_APPLIED_WEIGHT: numberRule(),
+
+  // Trimming measurements
+  HE_OD: numberRule(),
+  HE_PORT_INNER: numberRule(),
+  HE_PORT_OUTER: numberRule(),
+  HE_BEFORE_INHIBITION_INNER: numberRule(),
+  HE_BEFORE_INHIBITION_OUTER: numberRule(),
+  NE_OD: numberRule(),
+  NE_PORT_INNER: numberRule(),
+  NE_PORT_OUTER: numberRule(),
+  NE_WEB_INNER: numberRule(),
+  NE_WEB_OUTER: numberRule(),
+  LENGTH_BEFORE_INHIBITION: numberRule(),
+
+  // Static testing
+  PROPELLANT_MASS: numberRule(),
+  DT: numberRule(),
+  WEB_THICKNESS: numberRule(),
+  N_VALUE: numberRule(),
+  PRESSURE_AVG: numberRule(),
+  THRUST_AVG: numberRule(),
+  BURN_RATE: numberRule(),
+
+  // Mechanical properties
+  TS: numberRule(),
+  ELONGATION: numberRule(),
+  MODULUS: numberRule(),
+  SBS: numberRule(),
+  TBS: numberRule(),
+  PEEL_STRENGTH: numberRule(),
+  DENSITY: numberRule(),
 
   // Mixing Cycle Particulars Fields
-  rpm: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
-  time: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
-  temp: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
-  vacuum: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
-  },
-  stage: {
-    valueType: "text" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
-    maxLength: S.LENGTH.MAX_STANDARD,
-  },
-  mixingCycleCode: {
-    valueType: "text" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.MASTER_CODE,
-    maxLength: 50,
-  },
+  rpm: numberRule(["SUBMIT"]),
+  time: numberRule(["SUBMIT"]),
+  temp: numberRule(["SUBMIT"]),
+  vacuum: numberRule(["SUBMIT"]),
+  stage: textRule(["SUBMIT"]),
+  mixingCycleCode: textRule(["SUBMIT"], 50),
 };
+
+/** Live FORMAT message for a single field value (empty values are valid). */
+export function getSubscaleFieldFormatError(
+  fieldId: string,
+  value: unknown,
+): string | undefined {
+  const rule = subscaleHardwareFieldRules[fieldId];
+  if (!rule) return undefined;
+
+  const state = validateFieldState(value, {
+    valueType: rule.valueType,
+    required: false,
+    pattern: rule.pattern,
+    minLength: rule.minLength,
+    maxLength: rule.maxLength,
+    minVal: rule.minVal,
+    maxVal: rule.maxVal,
+  });
+
+  return stateToMessage(
+    state,
+    false,
+    rule.messages.required,
+    rule.messages.invalid,
+    {
+      minLength: rule.messages.minLength,
+      maxLength: rule.messages.maxLength,
+      minVal: rule.messages.minVal,
+      maxVal: rule.messages.maxVal,
+    },
+    {
+      minLength: rule.minLength,
+      maxLength: rule.maxLength,
+      minVal: rule.minVal,
+      maxVal: rule.maxVal,
+    },
+  );
+}
 
 function resolveFieldPaths(data: any) {
   const paths: Array<{ path: string; value: unknown; ruleKey: string }> = [];
-  const isMain = String(data?.batchType ?? "")
-    .toUpperCase()
-    .includes("MAIN");
+  const isMain = mapSubscaleBatchType(data?.batchType) === "MAIN_SCALE";
   const subType = String(data?.subBatchType ?? "").toUpperCase();
   const isExperimental = subType === "EXPERIMENTAL";
 
@@ -224,7 +231,6 @@ function resolveFieldPaths(data: any) {
           });
         }
 
-        // Premix Particulars Rows
         if (Array.isArray(cycle.premixParticulars)) {
           cycle.premixParticulars.forEach((row: any, rIndex: number) => {
             ["rpm", "time", "temp", "vacuum"].forEach((fld) => {
@@ -237,7 +243,6 @@ function resolveFieldPaths(data: any) {
           });
         }
 
-        // Final Mix Particulars Rows
         if (Array.isArray(cycle.finalMixParticulars)) {
           cycle.finalMixParticulars.forEach((row: any, rIndex: number) => {
             ["rpm", "time", "temp", "vacuum"].forEach((fld) => {
@@ -255,14 +260,80 @@ function resolveFieldPaths(data: any) {
 
   // 4. Table Traversals — skip SR_NO / ARTICLE_TYPE (system-generated, display-only).
   const tableMappings: Record<string, string[]> = {
-    ARTICLE_TYPE_TABLE: ["RUBBER_MATERIAL", "SLEEVE_NO", "MOULD_NO"],
-    CASTING_TABLE: ["BEM_NO", "BEM_MOULD_NO", "VACUUM_LEVEL"],
-    CURING_TABLE: ["BEM_MOULD_NO"],
-    NDT_TABLE: ["BEM_NO", "DATE_OF_NDT"],
-    TRIMMING_TABLE: ["BEM_NO"],
-    INHIBITION_TABLE: ["BEM_NO"],
-    STATIC_TESTING_TABLE: ["BEM_NO"],
-    MECHANICAL_PROPERTIES_TABLE: ["BEM_NO"],
+    ARTICLE_TYPE_TABLE: [
+      "RUBBER_MATERIAL",
+      "SLEEVE_NO",
+      "MOULD_NO",
+      "SIZE_MM",
+      "THICKNESS_MM",
+      "LINER_APPLIED",
+      "OBSERVATIONS",
+    ],
+    CASTING_TABLE: [
+      "BEM_NO",
+      "BEM_MOULD_NO",
+      "CASTING_PIT_NO",
+      "CASTING_START_TIME",
+      "CASTING_END_TIME",
+      "VACUUM_LEVEL",
+      "REMARKS",
+    ],
+    CURING_TABLE: [
+      "BEM_NO",
+      "CURING_START_DATE",
+      "CURING_END_DATE",
+      "OVEN_NO",
+      "TEMPERATURE",
+      "HARDNESS",
+      "DECORING_DATE",
+      "DECORING_LOAD",
+      "GRAIN_SURFACE_OBSERVATIONS",
+    ],
+    NDT_TABLE: ["BEM_NO", "DATE_OF_NDT", "OBSERVATIONS"],
+    TRIMMING_TABLE: [
+      "BEM_NO",
+      "HE_OD",
+      "HE_PORT_INNER",
+      "HE_PORT_OUTER",
+      "HE_BEFORE_INHIBITION_INNER",
+      "HE_BEFORE_INHIBITION_OUTER",
+      "NE_OD",
+      "NE_PORT_INNER",
+      "NE_PORT_OUTER",
+      "NE_WEB_INNER",
+      "NE_WEB_OUTER",
+      "LENGTH_BEFORE_INHIBITION",
+    ],
+    INHIBITION_TABLE: [
+      "BEM_NO",
+      "LINER_COATED_SLEEVE_WEIGHT",
+      "WEIGHT_BEFORE_INHIBITION",
+      "WEIGHT_AFTER_INHIBITION",
+      "IR_APPLIED_WEIGHT",
+      "DATE_OF_APPLICATION",
+      "REMARKS",
+    ],
+    STATIC_TESTING_TABLE: [
+      "BEM_NO",
+      "PROPELLANT_MASS",
+      "DT",
+      "WEB_THICKNESS",
+      "N_VALUE",
+      "PRESSURE_AVG",
+      "THRUST_AVG",
+      "BURN_RATE",
+    ],
+    MECHANICAL_PROPERTIES_TABLE: [
+      "BEM_NO",
+      "TS",
+      "ELONGATION",
+      "MODULUS",
+      "SBS",
+      "TBS",
+      "PEEL_STRENGTH",
+      "DENSITY",
+      "ACTOR",
+    ],
   };
 
   Object.entries(tableMappings).forEach(([tableName, fields]) => {
@@ -285,7 +356,7 @@ function resolveFieldPaths(data: any) {
 
 export const subscaleHardwareValidationConfig: SubDeptValidationConfig<any> = {
   id: "subscaleHardware",
-  fields: subscaleHardwareFieldRules as any,
+  fields: subscaleHardwareFieldRules,
   resolveFieldPaths,
   customRules: [],
 };

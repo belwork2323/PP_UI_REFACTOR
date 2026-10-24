@@ -55,8 +55,8 @@ type STFApproverDetailDialogProps = {
   loading: boolean;
   activeMotorId?: string | null;
   onActiveMotorChange?: (motorId: string) => void;
-  onApprove: (item: STFApproverDetailItem) => void;
-  onReject: (item: STFApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
   subDepartment?: "static-test-facility";
@@ -150,8 +150,8 @@ const STFApproverDetailDialog = ({
               loading={loading}
               activeMotorId={activeMotorId}
               onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
-              onApprove={() => onApprove(item)}
-              onReject={() => onReject(item)}
+              onApprove={onApprove ? () => onApprove(item) : undefined}
+              onReject={onReject ? () => onReject(item) : undefined}
               actionLoading={actionLoading}
               qcTheme={qcTheme}
               approverTheme={theme}
@@ -211,6 +211,7 @@ const STFApproverDetailDialog = ({
         formId={formId}
         department="qualityControl"
         subDepartment={subDepartment}
+        subDepartmentId={Number(item.subDepartmentId) || undefined}
         dialogTitle={`${typeOfMotor === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE} Report — ${displayId}`}
       />
     </>

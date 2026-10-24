@@ -21,6 +21,7 @@ import QCPostCureMotorPanel from "./QCPostCureMotorPanel";
 import QCNdtMotorPanel from "./QCNdtMotorPanel";
 import QCPropellantMotorPanel from "./QCPropellantMotorPanel";
 import QCWeighmentMotorPanel from "./QCWeighmentMotorPanel";
+import QCStfMotorPanel from "./QCStfMotorPanel";
 import {
   applyMixingDivisionEntryToValues,
   createInitialPremixDetailsValues,
@@ -66,6 +67,10 @@ import {
   createInitialNdtValues,
   hydrateNdtValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcNdtTables";
+import {
+  buildInitialStfValuesForMotor,
+  createInitialStfValues,
+} from "../../../../../hooks/user/qualityControl/qcStfTables";
 import {
   createInitialPropellantValues,
   hydratePropellantValuesFromSections,
@@ -169,6 +174,7 @@ const QCDivisionEntryPanel = ({
       entry.kind === "TRIMMING_MOTOR" ||
       entry.kind === "POST_CURE_MOTOR" ||
       entry.kind === "NDT_MOTOR" ||
+      entry.kind === "STF" ||
       entry.kind === "PROPELLANT_MOTOR" ||
       entry.kind === "PROPELLANT_PROCESS"
     ) {
@@ -312,6 +318,7 @@ const QCDivisionEntryPanel = ({
       entry.kind !== "TRIMMING_MOTOR" &&
       entry.kind !== "POST_CURE_MOTOR" &&
       entry.kind !== "NDT_MOTOR" &&
+      entry.kind !== "STF" &&
       entry.kind !== "PROPELLANT_MOTOR" &&
       entry.kind !== "PROPELLANT_PROCESS" &&
       entry.kind !== "WEIGHTMENT_MOTOR";
@@ -445,6 +452,14 @@ const QCDivisionEntryPanel = ({
         return hydrateNdtValuesFromSections(entry.savedSections);
       }
       return createInitialNdtValues();
+    }
+    if (entry.kind === "STF") {
+      if (entry.motorId && divisionAutoPopulateData) {
+        return buildInitialStfValuesForMotor(divisionAutoPopulateData, entry.motorId);
+      }
+      return createInitialStfValues(
+        String(entry.subType ?? "").toUpperCase() === "MAIN_MOTOR" ? "MAIN_MOTOR" : "BEM",
+      );
     }
     if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
       const fmCount = resolveQcPropellantPremixCount(divisionAutoPopulateData, batchPayload);
@@ -603,6 +618,20 @@ const QCDivisionEntryPanel = ({
         disabled={fieldsDisabled}
         headerActions={headerActions}
         validationErrors={validationErrors}
+      />
+    );
+  }
+
+  if (entry.kind === "STF") {
+    return (
+      <QCStfMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+        batchId={batchId}
       />
     );
   }

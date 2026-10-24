@@ -1,6 +1,8 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { TrimmingCommonTable } from "../../manufacturing/Trimming/TrimmingCommonTable";
 import { getQcTrimmingMotorLabel } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
@@ -30,6 +32,8 @@ const QCTrimmingMotorPanel = ({
   headerActions,
   validationErrors = null,
 }: QCTrimmingMotorPanelProps) => {
+  const mode = useThemeStore((state) => state.mode);
+  const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const session = useMemo(() => getTrimmingSessionFromValues(values), [values]);
   const resolvedMotorId = String(motorId ?? "").trim() || "MOTOR";
   const inputsLocked = Boolean(disabled || readOnly);
@@ -42,6 +46,8 @@ const QCTrimmingMotorPanel = ({
       trimmingDetails: session.trimmingDetails,
       commonFormatParameters: session.commonFormatParameters,
       commonFormatLocations: session.commonFormatLocations,
+      dimensionsQaRemarks: session.dimensionsQaRemarks,
+      manufacturingRemarks: session.manufacturingRemarks ?? "",
       motorRemarks: session.motorRemarks,
       reportFiles: session.reportFiles ?? [],
     }),
@@ -59,6 +65,8 @@ const QCTrimmingMotorPanel = ({
           trimmingDetails: nextSession.trimmingDetails ?? [],
           commonFormatParameters: nextSession.commonFormatParameters ?? [],
           commonFormatLocations: nextSession.commonFormatLocations ?? [],
+          dimensionsQaRemarks: String(nextSession.dimensionsQaRemarks ?? ""),
+          manufacturingRemarks: String(nextSession.manufacturingRemarks ?? ""),
           motorRemarks: String(nextSession.motorRemarks ?? ""),
           reportFiles: nextSession.reportFiles ?? [],
         }),
@@ -95,7 +103,9 @@ const QCTrimmingMotorPanel = ({
         allowStructureActions={false}
         fileSubDeptSlug="qc-division"
         useQcDivisionFileField
+        qaRemarksMode
         theme={{
+          ...manufacturingTheme,
           palette: {
             primary: BRAND.primary,
             primaryLight: BRAND.primaryLight,

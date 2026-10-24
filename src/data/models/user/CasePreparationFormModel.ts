@@ -18,6 +18,12 @@ import {
   type CasePrepMotorDetailsPayload,
   type CasePrepMotorSectionPayload,
 } from "./CasePrepMotorDataModel";
+import {
+  collectDiscardedMotorIds,
+  isDiscardedMotorId,
+  isMotorWorkflowTabDisabled,
+  preferMotorSubmissionStatus,
+} from "@data/models/common/motorWorkflowGuards";
 
 export {
   formatPrepSectionLabel as formatCasePrepSectionLabel,
@@ -128,7 +134,8 @@ export type MotorSubmissionStatus =
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
   | "APPROVED"
-  | "REJECTED";
+  | "REJECTED"
+  | "DISCARDED";
 
 export type MotorStatusMeta = {
   motorSubmissionType?: MotorSubmissionType;
@@ -142,15 +149,21 @@ export type MotorStatusMeta = {
 
 export const isMotorLocked = (status?: MotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isMotorEditable = (status?: MotorSubmissionStatus | string | null) =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const isMotorApproverTabDisabled = (
   status?: MotorSubmissionStatus | string | null,
-): boolean => !status || status === "TO_BE_INITIATED";
+): boolean =>
+  isMotorWorkflowTabDisabled(status) || !status || status === "TO_BE_INITIATED";
 
 export const isMotorApproverActionable = (
   status?: MotorSubmissionStatus | string | null,
@@ -263,7 +276,8 @@ const normalizeMotorStatus = (value: unknown): MotorSubmissionStatus => {
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }
@@ -332,7 +346,10 @@ export const mapCasePreparationMotorStatusesFromApi = (
       motorSubmissionType:
         normalizeMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeMotorStatus(
-        motor?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
+        preferMotorSubmissionStatus(
+          existing?.motorSubmissionStatus,
+          motor?.motorSubmissionStatus,
+        ),
       ),
       submittedAt: motor?.submittedAt ?? existing?.submittedAt ?? null,
       reviewedBy: motor?.actionBy ?? motor?.reviewedBy ?? existing?.reviewedBy ?? null,
@@ -346,6 +363,26 @@ export const mapCasePreparationMotorStatusesFromApi = (
     const id = String(motorId ?? "").trim();
     if (!id || statusById[id]) return;
     statusById[id] = { motorSubmissionStatus: "TO_BE_INITIATED" };
+  });
+
+  const discardedIds = collectDiscardedMotorIds(details);
+  discardedIds.forEach((lowerId) => {
+    const existingKey =
+      Object.keys(statusById).find((key) => key.toLowerCase() === lowerId) ?? lowerId;
+    const existing = statusById[existingKey];
+    statusById[existingKey] = {
+      ...(existing ?? { motorSubmissionStatus: "DISCARDED" }),
+      motorSubmissionStatus: "DISCARDED",
+    };
+  });
+
+  Object.keys(statusById).forEach((motorId) => {
+    if (isDiscardedMotorId(discardedIds, motorId)) {
+      statusById[motorId] = {
+        ...statusById[motorId],
+        motorSubmissionStatus: "DISCARDED",
+      };
+    }
   });
 
   return statusById;
@@ -1091,7 +1128,10 @@ export const sortCasePrepMotorsByPreferredIds = <T extends { motorId: string }>(
 export const mapCasePreparationDetailsForDisplay = (
   data: Record<string, unknown> | null | undefined,
   _schema?: unknown,
-  options?: { preferredMotorIds?: Array<string | number> | null },
+  options?: {
+    preferredMotorIds?: Array<string | number> | null;
+    batchContext?: Record<string, unknown> | null;
+  },
 ): CasePreparationDetailView | null => {
   if (!data) return null;
 
@@ -1099,6 +1139,10 @@ export const mapCasePreparationDetailsForDisplay = (
   const details = (data.casePreparationDetails ?? data) as Record<string, unknown>;
   const rawMotors = Array.isArray(details.motors) ? details.motors : [];
   const statusById = mapCasePreparationMotorStatusesFromApi(data);
+  const discardedIds = collectDiscardedMotorIds({
+    ...data,
+    ...(options?.batchContext ?? {}),
+  });
 
   const preferredMotorIds =
     options?.preferredMotorIds ??
@@ -1117,6 +1161,11 @@ export const mapCasePreparationDetailsForDisplay = (
           ),
         );
 
+        const resolvedStatus = isDiscardedMotorId(discardedIds, motorId)
+          ? ("DISCARDED" as MotorSubmissionStatus)
+          : (statusMeta?.motorSubmissionStatus ??
+            normalizeMotorStatus(entry.motorSubmissionStatus));
+
         return {
           motorId,
           prrcClearanceDate: String(
@@ -1125,8 +1174,7 @@ export const mapCasePreparationDetailsForDisplay = (
           motorSubmissionType:
             statusMeta?.motorSubmissionType ??
             normalizeMotorSubmissionType(entry.motorSubmissionType),
-          motorSubmissionStatus:
-            statusMeta?.motorSubmissionStatus ?? normalizeMotorStatus(entry.motorSubmissionStatus),
+          motorSubmissionStatus: resolvedStatus,
           submittedAt:
             statusMeta?.submittedAt ?? (entry.submittedAt as string | null | undefined) ?? null,
           reviewedBy:

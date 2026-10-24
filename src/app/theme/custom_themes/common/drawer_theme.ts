@@ -16,7 +16,7 @@ export const DRAWER_NAV = [
     label: "Dashboard",
     route: "", // Base route path
     Icon: icons.drawerDashboard,
-    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+    allowedRoles: ["ADMIN", "CENTRE_HEAD", "SYSTEM_MANAGER"],
   },
   {
     key: "users",
@@ -31,6 +31,13 @@ export const DRAWER_NAV = [
     route: "/batch",
     Icon: icons.drawerBatch,
     allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
+  {
+    key: "motors",
+    label: "Motor Management",
+    route: "/motors",
+    Icon: icons.drawerMotors,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD", "SYSTEM_MANAGER"],
   },
   {
     key: "projects",

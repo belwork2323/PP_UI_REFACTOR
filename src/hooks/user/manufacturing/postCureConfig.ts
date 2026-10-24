@@ -34,6 +34,7 @@ export const POST_CURE_OPERATION_OPTIONS = [
 export const POST_CURE_INHIBITOR_TYPE_OPTIONS = [
   { value: "IR1", label: "IR1" },
   { value: "Hemcoat-3K", label: "Hemcoat-3K" },
+  { value: "Others", label: "Others" },
   { value: "not-applicable", label: S.INHIBITOR_TYPE_NOT_APPLICABLE },
 ];
 
@@ -71,10 +72,28 @@ export const formatPostCureMotorOperationLabel = (operation: string, inhibitorTy
   const operationLabel =
     POST_CURE_OPERATION_OPTIONS.find((option) => option.value === operation)?.label ?? operation;
   if (!isPostCureInhibitionOperation(operation)) return operationLabel || "—";
-  const inhibitorLabel =
-    POST_CURE_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === inhibitorType)?.label ??
-    inhibitorType;
+  const inhibitorLabel = formatPostCureInhibitorTypeLabel(inhibitorType);
   return inhibitorLabel ? `${operationLabel} · ${inhibitorLabel}` : operationLabel || "—";
+};
+
+/** UI / API inhibitor type → display label (includes OTHERS / OTHER). */
+export const formatPostCureInhibitorTypeLabel = (inhibitorType: string) => {
+  const normalized = String(inhibitorType ?? "").trim();
+  if (!normalized) return "";
+  const upper = normalized.toUpperCase().replace(/[-\s]/g, "_");
+  if (normalized === "Others" || upper === "OTHERS" || upper === "OTHER") return "Others";
+  if (normalized === "Hemcoat-3K" || upper === "HEMCOAT_3K") return "Hemcoat-3K";
+  if (normalized === "IR1" || upper === "IR1") return "IR1";
+  if (normalized === "not-applicable" || upper === "NOT_APPLICABLE") {
+    return (
+      POST_CURE_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === "not-applicable")?.label ??
+      normalized
+    );
+  }
+  return (
+    POST_CURE_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === normalized)?.label ??
+    normalized
+  );
 };
 
 export const mapPostCureOperationToApi = (operation: string): "LOOSE_FLAP_FILLING" | "INHIBITION" | null => {
@@ -91,11 +110,12 @@ export const mapPostCureOperationToApi = (operation: string): "LOOSE_FLAP_FILLIN
 
 export const mapPostCureInhibitorTypeToApi = (
   inhibitorType: string,
-): "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE" | null => {
+): "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE" | null => {
   const normalized = String(inhibitorType ?? "").trim();
   const upper = normalized.toUpperCase().replace(/[-\s]/g, "_");
   if (normalized === "IR1" || upper === "IR1") return "IR1";
   if (normalized === "Hemcoat-3K" || upper === "HEMCOAT_3K") return "HEMCOAT_3K";
+  if (normalized === "Others" || upper === "OTHERS" || upper === "OTHER") return "OTHERS";
   if (normalized === "not-applicable" || upper === "NOT_APPLICABLE") return "NOT_APPLICABLE";
   return null;
 };

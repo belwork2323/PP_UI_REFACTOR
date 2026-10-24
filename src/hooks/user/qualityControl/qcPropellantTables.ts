@@ -81,6 +81,7 @@ const FIXED_PROPERTY_KEYS = new Set([
   "PROPERTY",
   "SPECIFICATION",
   "REMARKS",
+  "QA_REMARKS",
   "UPLOAD_GRAPH",
   QC_PROPELLANT_AVG_COLUMN,
   QC_PROPELLANT_STD_COLUMN,
@@ -217,7 +218,7 @@ const emptyMechanicalRows = (columns: readonly string[] = buildQcPropellantFmCol
     SAMPLE_NO: preset.SAMPLE_NO ?? "",
     PROPERTY: preset.PROPERTY,
     SPECIFICATION: "",
-    REMARKS: "",
+    QA_REMARKS: "",
     kind: preset.kind,
     ...emptyFmValues(columns),
     ...emptyRowStats(),
@@ -228,7 +229,7 @@ const emptyInterfaceRows = (columns: readonly string[] = buildQcPropellantFmColu
     SAMPLE_NO: preset.SAMPLE_NO ?? "",
     PROPERTY: preset.PROPERTY,
     SPECIFICATION: "",
-    REMARKS: "",
+    QA_REMARKS: "",
     kind: preset.kind,
     ...emptyFmValues(columns),
     ...emptyRowStats(),
@@ -259,6 +260,7 @@ const emptySsbrRows = (columns: readonly string[] = buildQcPropellantFmColumnIds
   QC_PROPELLANT_SSBR_PRESET.map((preset) => ({
     PROPERTY: preset.PROPERTY,
     SPECIFICATION: "",
+    QA_REMARKS: "",
     kind: preset.kind,
     locked: preset.locked,
     ...emptyFmValues(columns),
@@ -270,6 +272,7 @@ const emptyBallisticRows = (columns: readonly string[] = buildQcPropellantFmColu
   QC_PROPELLANT_BALLISTIC_PRESET.map((preset) => ({
     DETAILS: preset.DETAILS,
     SPECIFICATION: "",
+    QA_REMARKS: "",
     ...emptyFmValues(columns),
   })) as QcPropellantBallisticRow[];
 
@@ -300,7 +303,12 @@ const overlayPropertyRows = (
       ...preset,
       SAMPLE_NO: preset.SAMPLE_NO ?? "",
       SPECIFICATION: pickEditableString(savedRow?.SPECIFICATION, savedRow?.specification),
-      REMARKS: pickEditableString(savedRow?.REMARKS, savedRow?.remarks),
+      QA_REMARKS: pickEditableString(
+        savedRow?.QA_REMARKS,
+        savedRow?.qaRemarks,
+        savedRow?.REMARKS,
+        savedRow?.remarks,
+      ),
       ...emptyFmValues(columns),
     };
     columns.forEach((columnId) => {
@@ -324,6 +332,12 @@ const overlayPropertyRows = (
     const extra: QcPropellantPropertyRow = {
       PROPERTY: property,
       SPECIFICATION: pickEditableString(savedRow.SPECIFICATION, savedRow.specification),
+      QA_REMARKS: pickEditableString(
+        savedRow.QA_REMARKS,
+        savedRow.qaRemarks,
+        savedRow.REMARKS,
+        savedRow.remarks,
+      ),
       kind: "data",
       locked: false,
       ...emptyFmValues(columns),
@@ -352,6 +366,7 @@ const overlayBallisticRows = (
     const next: QcPropellantBallisticRow = {
       ...preset,
       SPECIFICATION: pickEditableString(savedRow?.SPECIFICATION, savedRow?.specification),
+      QA_REMARKS: pickEditableString(savedRow?.QA_REMARKS, savedRow?.qaRemarks),
       ...emptyFmValues(columns),
     };
     columns.forEach((columnId) => {
@@ -695,7 +710,7 @@ const serializePropertyRow = (
   columns: string[],
   options?: {
     includeRowStats?: boolean;
-    includeRemarks?: boolean;
+    includeQaRemarks?: boolean;
     includeSampleNo?: boolean;
     includeGraph?: boolean;
   },
@@ -709,9 +724,9 @@ const serializePropertyRow = (
   }
   const specification = String(row.SPECIFICATION ?? "").trim();
   if (specification) payload.SPECIFICATION = specification;
-  if (options?.includeRemarks) {
-    const remarks = String(row.REMARKS ?? "").trim();
-    if (remarks) payload.REMARKS = remarks;
+  if (options?.includeQaRemarks !== false) {
+    const qaRemarks = String(row.QA_REMARKS ?? "").trim();
+    if (qaRemarks) payload.QA_REMARKS = qaRemarks;
   }
   columns.forEach((columnId) => {
     const value = toApiScalar(row[columnId], true);
@@ -744,7 +759,6 @@ const serializeMechanicalSamples = (values: SchemaFormValues | undefined) => {
   return getPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES).map((row) =>
     serializePropertyRow(row, columns, {
       includeRowStats: true,
-      includeRemarks: true,
       includeSampleNo: true,
     }),
   );
@@ -755,7 +769,6 @@ const serializeInterfaceSamples = (values: SchemaFormValues | undefined) => {
   return getPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES).map((row) =>
     serializePropertyRow(row, columns, {
       includeRowStats: true,
-      includeRemarks: true,
       includeSampleNo: true,
       includeGraph: true,
     }),
@@ -778,6 +791,8 @@ const serializeBallisticDetails = (values: SchemaFormValues | undefined) => {
     const payload: Record<string, unknown> = { DETAILS: row.DETAILS };
     const specification = String(row.SPECIFICATION ?? "").trim();
     if (specification) payload.SPECIFICATION = specification;
+    const qaRemarks = String(row.QA_REMARKS ?? "").trim();
+    if (qaRemarks) payload.QA_REMARKS = qaRemarks;
     // Always emit every BEM column key so FM_1_BEM_NO_2+ survive save/reload
     // even when some cells are blank.
     columns.forEach((columnId) => {

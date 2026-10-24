@@ -48,18 +48,18 @@ export const QC_DIVISION_DEFINITIONS: QcDivisionDefinition[] = [
   { flowKey: "TRIMMING", label: "Trimming", panelType: "TRIMMING", apiDivision: "TRIMMING" },
   { flowKey: "POST_CURE", label: "Post Cure", panelType: "POST_CURE", apiDivision: "POST_CURE" },
   { flowKey: "NDT", label: "NDT", panelType: "NDT", apiDivision: "NDT" },
+  {
+    flowKey: "STATIC_TEST_FACILITY",
+    label: "Static Test Facility",
+    panelType: "STF",
+    apiDivision: "STATIC_TEST_FACILITY",
+  },
   { flowKey: "QC", label: "QC", panelType: "PROPELLANT", apiDivision: "QC" },
   {
     flowKey: "WEIGHTMENT",
     label: "Weighment",
     panelType: "WEIGHTMENT",
     apiDivision: "WEIGHTMENT",
-  },
-  {
-    flowKey: "STATIC_TEST_FACILITY",
-    label: "Static Test Facility",
-    panelType: "STF",
-    apiDivision: "STATIC_TEST_FACILITY",
   },
 ];
 
@@ -185,11 +185,8 @@ export const resolveDivisionSchemaRequest = (
   }
 
   if (definition.panelType === "STF") {
-    if (!state.stfMotorType) return null;
-    return {
-      division: definition.apiDivision,
-      subType: state.stfMotorType as QcApiSubType,
-    };
+    // Custom panel — Motor Navigation seeds forms; no schema fetch / FlowBar load.
+    return null;
   }
 
   return {
@@ -290,13 +287,8 @@ export const canLoadDivisionSchema = (divisionFlowKey: string, state: QcDivision
   }
 
   if (panelType === "STF") {
-    if (!state.stfMotorType) return false;
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "STF",
-      subType: state.stfMotorType as QcApiSubType,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds the STF form — no FlowBar Motor Type picker / Load Form.
+    return false;
   }
 
   const dedupKey = buildDivisionEntryDedupKey({
@@ -329,6 +321,9 @@ export const isPostCureDivisionFlow = (divisionFlowKey: string) =>
 
 export const isNdtDivisionFlow = (divisionFlowKey: string) =>
   getQcDivisionPanelType(divisionFlowKey) === "NDT";
+
+export const isStfDivisionFlow = (divisionFlowKey: string) =>
+  getQcDivisionPanelType(divisionFlowKey) === "STF";
 
 export const isPropellantDivisionFlow = (divisionFlowKey: string) =>
   getQcDivisionPanelType(divisionFlowKey) === "PROPELLANT";

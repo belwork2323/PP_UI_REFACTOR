@@ -8,11 +8,13 @@ import {
 } from "./CastingCuringFormModel";
 import { formatPrepSectionLabel } from "./RawMaterialPreparationModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 const TRIMMING_SECTION_LABELS: Record<string, string> = {
   TRIMMING_DETAILS: "Trimming Details",
   TRIMMING_COMMON_FORMAT: "Dimensions After Trimming",
   DIMENSIONS_AFTER_TRIMMING: "Dimensions After Trimming",
+  TRIMMING_DRAWING: "Drawing",
   TRIMMING_REMARKS: "Remarks & Attachments",
 };
 
@@ -81,6 +83,14 @@ const resolveReportDisplayValue = (row: Record<string, unknown>): unknown => {
     return name;
   }
   return String(row.reportLink ?? "").trim();
+};
+
+const resolveDrawingDisplayValue = (row: Record<string, unknown>): unknown => {
+  const raw = row.drawingFiles ?? row.drawingFile ?? row.drawingImage ?? undefined;
+  if (isTrimmingFileRefList(raw) || isTrimmingFileRefLike(raw)) {
+    return raw;
+  }
+  return undefined;
 };
 
 /** Expand nested readings into table columns matching the user-side trimming form. */
@@ -196,6 +206,26 @@ export const parseTrimmingSectionData = (
     };
   }
 
+  if (sectionId === "TRIMMING_DRAWING") {
+    const row = (rows[0] ?? {}) as Record<string, unknown>;
+    const description = String(row.description ?? row.drawingDescription ?? "").trim();
+    const drawingValue = resolveDrawingDisplayValue(row);
+
+    if (description) {
+      fields.push({ key: "description", label: "Description", value: description });
+    }
+    if (drawingValue) {
+      fields.push({ key: "drawingFiles", label: "Drawing", value: drawingValue });
+    }
+
+    return {
+      sectionId,
+      label: TRIMMING_SECTION_LABELS[sectionId] ?? formatPrepSectionLabel(sectionId),
+      fields,
+      tables,
+    };
+  }
+
   if (sectionId === "TRIMMING_REMARKS") {
     const row = (rows[0] ?? {}) as Record<string, unknown>;
     const remarks = String(row.remarks ?? "").trim();
@@ -244,7 +274,8 @@ export type TrimmingMotorSubmissionStatus =
   | "IN_PROGRESS"
   | "WAITING_FOR_APPROVAL"
   | "APPROVED"
-  | "REJECTED";
+  | "REJECTED"
+  | "DISCARDED";
 
 export type TrimmingMotorStatusMeta = {
   motorSubmissionType?: TrimmingMotorSubmissionType;
@@ -258,11 +289,16 @@ export type TrimmingMotorStatusMeta = {
 
 export const isTrimmingMotorLocked = (status?: TrimmingMotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+  return (
+    isMotorWorkflowTabDisabled(normalized) ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED"
+  );
 };
 
 export const isTrimmingMotorEditable = (status?: TrimmingMotorSubmissionStatus | string | null) =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+  !isMotorWorkflowTabDisabled(status) &&
+  (!status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED");
 
 export const isTrimmingMotorApproverTabDisabled = (
   status?: TrimmingMotorSubmissionStatus | string | null,
@@ -271,7 +307,7 @@ export const isTrimmingMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED";
 };
 
 export const isTrimmingMotorApproverActionable = (
@@ -345,7 +381,8 @@ export const normalizeTrimmingMotorStatus = (value: unknown): TrimmingMotorSubmi
     normalized === "IN_PROGRESS" ||
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
-    normalized === "REJECTED"
+    normalized === "REJECTED" ||
+    normalized === "DISCARDED"
   ) {
     return normalized;
   }
@@ -429,6 +466,8 @@ export type TrimmingDetailsRow = {
   arborSize: string;
   cutterSize: string;
   remarks: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type TrimmingCommonFormatStage = {
@@ -459,6 +498,8 @@ export type TrimmingMotorSession = {
   savedSections?: SchemaSectionSubmission[];
   trimmingDetails: TrimmingDetailsRow[];
   commonFormatParameters: TrimmingCommonFormatParameter[];
+  drawingDescription: string;
+  drawingFiles: FileRef[];
   motorRemarks: string;
   reportFiles: FileRef[];
   /** Legacy hydrate only — do not bind UI. */
@@ -536,6 +577,7 @@ const createDefaultTrimmingDetailsRows = (): TrimmingDetailsRow[] => [
     arborSize: "",
     cutterSize: "",
     remarks: "",
+    qaRemarks: "",
   },
 ];
 
@@ -581,6 +623,8 @@ export const createEmptyTrimmingMotorSession = (
   savedSections: undefined,
   trimmingDetails: createDefaultTrimmingDetailsRows(),
   commonFormatParameters: createDefaultCommonFormatParameters(),
+  drawingDescription: "",
+  drawingFiles: [],
   motorRemarks: "",
   reportFiles: [],
 });
@@ -600,9 +644,11 @@ export const mapTrimmingDetailsToFormState = (
       // Extract section-specific data if available
       const detailsSection = motorSections.find((s) => s.sectionId === "TRIMMING_DETAILS");
       const commonSection = motorSections.find((s) => s.sectionId === "TRIMMING_COMMON_FORMAT");
+      const drawingSection = motorSections.find((s) => s.sectionId === "TRIMMING_DRAWING");
       const remarksSection = motorSections.find((s) => s.sectionId === "TRIMMING_REMARKS");
 
       const remarksData = (remarksSection?.sectionData?.[0] as any) ?? {};
+      const drawingData = (drawingSection?.sectionData?.[0] as any) ?? {};
 
       return {
         motorId: String(motor?.motorId ?? "").trim(),
@@ -617,6 +663,12 @@ export const mapTrimmingDetailsToFormState = (
         commonFormatParameters:
           (commonSection?.sectionData as TrimmingCommonFormatParameter[]) ??
           createDefaultCommonFormatParameters(),
+        drawingDescription: String(
+          drawingData.description ?? drawingData.drawingDescription ?? "",
+        ),
+        drawingFiles: parseFileRefs(
+          drawingData.drawingFiles ?? drawingData.drawingFile ?? drawingData.drawingImage,
+        ),
         motorRemarks: remarksData.remarks ?? "",
         reportFiles: parseFileRefs(
           remarksData.reportFiles ?? remarksData.reportFile ?? remarksData.reportLink,
@@ -633,6 +685,8 @@ export const mapTrimmingDetailsToFormState = (
       savedSections,
       trimmingDetails: createDefaultTrimmingDetailsRows(),
       commonFormatParameters: createDefaultCommonFormatParameters(),
+      drawingDescription: "",
+      drawingFiles: [],
       motorRemarks: "",
       reportFiles: [],
     });
@@ -676,7 +730,22 @@ export const mapTrimmingFormStateToPayload = (
         });
       }
 
-      // 3. Trimming Remarks & File Upload
+      // 3. Drawing image + description
+      const readyDrawingFiles = toFileIdListPayload(motor.drawingFiles ?? []);
+      if (motor.drawingDescription?.trim() || readyDrawingFiles.length) {
+        const drawingPayload: Record<string, unknown> = {
+          description: motor.drawingDescription ?? "",
+        };
+        if (readyDrawingFiles.length) {
+          drawingPayload.drawingFile = readyDrawingFiles;
+        }
+        sections.push({
+          sectionId: "TRIMMING_DRAWING",
+          sectionData: [drawingPayload],
+        });
+      }
+
+      // 4. Trimming Remarks & File Upload
       const readyReportFiles = toFileIdListPayload(motor.reportFiles ?? []);
       const legacyReportLink = String(motor.reportLink ?? "").trim();
       if (
@@ -725,6 +794,10 @@ export const mapTrimmingFormStateToPayload = (
 };
 
 const motorHasTrimmingValue = (motor: TrimmingMotorSession) => {
+  if (motor.drawingDescription?.trim()) return true;
+  if ((motor.drawingFiles ?? []).some((ref) => isFileReady(ref) || ref.fileName?.trim())) {
+    return true;
+  }
   if (motor.motorRemarks?.trim()) return true;
   if ((motor.reportFiles ?? []).some((ref) => isFileReady(ref) || ref.fileName?.trim())) {
     return true;
@@ -772,6 +845,7 @@ export const collectTrimmingFileRefsFromForm = (form: {
 }): FileRef[] => {
   const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
+    refs.push(...(motor.drawingFiles ?? []));
     refs.push(...(motor.reportFiles ?? []));
   }
   return refs;

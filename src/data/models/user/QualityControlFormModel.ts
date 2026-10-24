@@ -43,6 +43,7 @@ import {
   postCureMotorDetailToSections,
 } from "../../../hooks/user/qualityControl/qcPostCureTables";
 import { buildNdtMotorDetailPayload, isNdtNestedMotorDetail, ndtMotorDetailToSections } from "../../../hooks/user/qualityControl/qcNdtTables";
+import { buildStfMotorDetailPayload } from "../../../hooks/user/qualityControl/qcStfTables";
 import {
   buildPropellantMotorPayload,
   isPropellantNestedMotorDetail,
@@ -55,6 +56,7 @@ import type {
 } from "../../../hooks/user/qualityControl/qcDivisionEntryTypes";
 import type { QcProcessingSlot } from "../../../hooks/user/qualityControl/qcProcessingConfig";
 import { schemaValuesHaveUserData, SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
 
 export type { QcDivisionEntry, QcDivisionEntryValues } from "../../../hooks/user/qualityControl/qcDivisionEntryTypes";
 
@@ -395,6 +397,11 @@ const buildDivisionEntrySections = (
     return [];
   }
 
+  if (entry.kind === "STF") {
+    // STF create/update uses nested motors[].staticTestingDetails (not flat sections).
+    return [];
+  }
+
   if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
     // QC create/update uses nested motors[].processes (not flat sections).
     return [];
@@ -709,6 +716,24 @@ const wrapNdtDivisionDataFromEntries = (
     });
 
   return { motorDetails };
+};
+
+const wrapStfDivisionDataFromEntries = (
+  form: QualityControlFormState,
+  entries: QcDivisionEntry[],
+  options?: MapQualityControlPayloadOptions,
+): Record<string, unknown> => {
+  const motorSubmissionType: QcUnitSubmissionType = options?.unitSubmissionType ?? "DRAFT";
+  const motors = entries
+    .filter((entry) => entry.kind === "STF")
+    .flatMap((entry) => {
+      const motorId = String(entry.motorId ?? "").trim();
+      if (!motorId) return [];
+      const values = form.divisionEntryValues?.[entry.entryId]?.schemaValues;
+      return [buildStfMotorDetailPayload(values, motorId, motorSubmissionType)];
+    });
+
+  return { motors };
 };
 
 const wrapPropellantDivisionDataFromEntries = (
@@ -1031,6 +1056,15 @@ export const mapQualityControlPayload = (
           };
         }
 
+        if (division === "STATIC_TEST_FACILITY") {
+          return {
+            division: "STATIC_TEST_FACILITY" as const,
+            subType: null,
+            divisionSubmissionType,
+            data: wrapStfDivisionDataFromEntries(form, entries, options),
+          };
+        }
+
         if (division === "PROPELLANT_PROPERTIES" || division === "QC") {
           return {
             division: "QC" as const,
@@ -1132,12 +1166,6 @@ export const mapQCDivisionDetailsForDisplay = (
 ): QCDivisionDetailView | null => {
   if (!data) return null;
 
-  const submittedByRaw = data.submittedBy;
-  const submittedBy =
-    typeof submittedByRaw === "object" && submittedByRaw !== null && "fullName" in submittedByRaw
-      ? String((submittedByRaw as { fullName?: string }).fullName ?? "")
-      : String(submittedByRaw ?? "");
-
   const workflowInsights = data.workflowInsights as { currentStatus?: string } | undefined;
   const divisionDetails = data.divisionDetails;
 
@@ -1146,9 +1174,9 @@ export const mapQCDivisionDetailsForDisplay = (
     batchId: String(data.batchId ?? ""),
     status: String(data.status ?? workflowInsights?.currentStatus ?? ""),
     formSubmissionType: String(data.formSubmissionType ?? ""),
-    submittedBy,
+    submittedBy: mapCastingCuringPersonLabel(data.submittedBy) ?? "",
     submittedAt: String(data.submittedAt ?? ""),
-    createdBy: String(data.createdBy ?? ""),
+    createdBy: mapCastingCuringPersonLabel(data.createdBy) ?? "",
     createdAt: String(data.createdAt ?? ""),
     divisionCount: Array.isArray(divisionDetails) ? divisionDetails.length : 0,
   };

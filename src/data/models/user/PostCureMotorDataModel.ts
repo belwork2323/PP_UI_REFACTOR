@@ -23,13 +23,19 @@ type LegacySectionSubmission = {
 };
 
 export type PostCureDataVariant =
-  "loose-flap-filling" | "inhibition-ir1" | "inhibition-hemcoat-3k" | "inhibition-not-applicable";
+  | "loose-flap-filling"
+  | "inhibition-ir1"
+  | "inhibition-hemcoat-3k"
+  | "inhibition-others"
+  | "inhibition-not-applicable";
 
 export type LocationDateRow = {
   location: string;
   fromDate: string;
   toDate: string;
   observations: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type LocationQtyRow = {
@@ -38,6 +44,8 @@ export type LocationQtyRow = {
   toDate: string;
   qtyFilled: string;
   observations: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type LocationAppliedRow = {
@@ -46,6 +54,8 @@ export type LocationAppliedRow = {
   toDate: string;
   qtyApplied: string;
   observations: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type IngredientQuantityRow = {
@@ -58,6 +68,8 @@ export type IngredientQuantityRow = {
   mfgLot: string;
   partsByWeight: string;
   quantity: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type IngredientTakenRow = {
@@ -70,6 +82,8 @@ export type IngredientTakenRow = {
   mfgLot: string;
   partsByWeight: string;
   qtyTaken: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type QualificationRow = {
@@ -77,6 +91,8 @@ export type QualificationRow = {
   parameter: string;
   specification: string;
   result: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  qaRemarks?: string;
 };
 
 export type LooseFlapMotorData = {
@@ -117,6 +133,7 @@ export type InhibitionIr1MotorData = {
   inhibitionBatchDetails: {
     inhibitorBatchNo: string;
     inhibitorBatchSize: string;
+    qaRemarks?: string;
   };
   inhibitionApplicationDetails: {
     inhibitionApplicationTable: LocationAppliedRow[];
@@ -124,6 +141,7 @@ export type InhibitionIr1MotorData = {
   dispatchDetails: {
     dispatchDate: string;
     dispatchStation: string;
+    qaRemarks?: string;
   };
 };
 
@@ -148,6 +166,7 @@ export type InhibitionHemcoatMotorData = {
   inhibitionBatchDetails: {
     inhibitorBatchNo: string;
     inhibitorBatchSize: string;
+    qaRemarks?: string;
   };
   inhibitionApplicationDetails: {
     inhibitionApplicationTable: LocationAppliedRow[];
@@ -155,6 +174,41 @@ export type InhibitionHemcoatMotorData = {
   dispatchDetails: {
     dispatchDate: string;
     dispatchStation: string;
+    qaRemarks?: string;
+  };
+};
+
+/** Others: flexible premix/final mixes + shared inhibition trailing sections. */
+export type InhibitionOthersMotorData = {
+  variant: "inhibition-others";
+  othersPremix: {
+    othersPremixBatchNo: string;
+    othersPremixDate: string;
+    othersPremixTable: IngredientTakenRow[];
+  };
+  othersFinalMix: {
+    othersFinalMixBatchNo: string;
+    othersFinalMixDate: string;
+    othersFinalMixTable: IngredientTakenRow[];
+  };
+  othersQualification: {
+    qualificationBatchNo: string;
+    qualificationPreparationDate: string;
+    qualificationTable: QualificationRow[];
+    qualificationQcReport: FileRef[];
+  };
+  inhibitionBatchDetails: {
+    inhibitorBatchNo: string;
+    inhibitorBatchSize: string;
+    qaRemarks?: string;
+  };
+  inhibitionApplicationDetails: {
+    inhibitionApplicationTable: LocationAppliedRow[];
+  };
+  dispatchDetails: {
+    dispatchDate: string;
+    dispatchStation: string;
+    qaRemarks?: string;
   };
 };
 
@@ -167,13 +221,36 @@ export type PostCureMotorData =
   | LooseFlapMotorData
   | InhibitionIr1MotorData
   | InhibitionHemcoatMotorData
+  | InhibitionOthersMotorData
   | InhibitionNotApplicableMotorData;
+
+const emptyFlexibleTakenTable = (): IngredientTakenRow[] => [
+  {
+    srNo: 1,
+    ingredient: "",
+    materialId: null,
+    materialCode: null,
+    mfgLot: "",
+    partsByWeight: "",
+    qtyTaken: "",
+  },
+  {
+    srNo: "TOTAL",
+    ingredient: "Total Quantity",
+    materialId: null,
+    materialCode: null,
+    mfgLot: "",
+    partsByWeight: "",
+    qtyTaken: "",
+  },
+];
 
 const locationDateRow = (location: string): LocationDateRow => ({
   location,
   fromDate: "",
   toDate: "",
   observations: "",
+  qaRemarks: "",
 });
 
 const locationQtyRow = (location: string): LocationQtyRow => ({
@@ -182,6 +259,7 @@ const locationQtyRow = (location: string): LocationQtyRow => ({
   toDate: "",
   qtyFilled: "",
   observations: "",
+  qaRemarks: "",
 });
 
 const locationAppliedRow = (location: string): LocationAppliedRow => ({
@@ -190,6 +268,7 @@ const locationAppliedRow = (location: string): LocationAppliedRow => ({
   toDate: "",
   qtyApplied: "",
   observations: "",
+  qaRemarks: "",
 });
 const qualificationRows = (
   specs: Array<{ parameter: string; specification: string }>,
@@ -199,6 +278,7 @@ const qualificationRows = (
     parameter: row.parameter,
     specification: row.specification,
     result: "",
+    qaRemarks: "",
   }));
 
 export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): PostCureMotorData => {
@@ -252,14 +332,14 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
           ]),
           qualificationQcReport: [],
         },
-        inhibitionBatchDetails: { inhibitorBatchNo: "", inhibitorBatchSize: "" },
+        inhibitionBatchDetails: { inhibitorBatchNo: "", inhibitorBatchSize: "", qaRemarks: "" },
         inhibitionApplicationDetails: {
           inhibitionApplicationTable: [
             locationAppliedRow("HE_SIDE"),
             locationAppliedRow("NE_SIDE"),
           ],
         },
-        dispatchDetails: { dispatchDate: "", dispatchStation: "" },
+        dispatchDetails: { dispatchDate: "", dispatchStation: "", qaRemarks: "" },
       };
     case "inhibition-hemcoat-3k":
       return {
@@ -285,14 +365,45 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
           ]),
           qualificationQcReport: [],
         },
-        inhibitionBatchDetails: { inhibitorBatchNo: "", inhibitorBatchSize: "" },
+        inhibitionBatchDetails: { inhibitorBatchNo: "", inhibitorBatchSize: "", qaRemarks: "" },
         inhibitionApplicationDetails: {
           inhibitionApplicationTable: [
             locationAppliedRow("HE_SIDE"),
             locationAppliedRow("NE_SIDE"),
           ],
         },
-        dispatchDetails: { dispatchDate: "", dispatchStation: "" },
+        dispatchDetails: { dispatchDate: "", dispatchStation: "", qaRemarks: "" },
+      };
+    case "inhibition-others":
+      return {
+        variant: "inhibition-others",
+        othersPremix: {
+          othersPremixBatchNo: "",
+          othersPremixDate: "",
+          othersPremixTable: emptyFlexibleTakenTable(),
+        },
+        othersFinalMix: {
+          othersFinalMixBatchNo: "",
+          othersFinalMixDate: "",
+          othersFinalMixTable: emptyFlexibleTakenTable(),
+        },
+        othersQualification: {
+          qualificationBatchNo: "",
+          qualificationPreparationDate: "",
+          qualificationTable: qualificationRows([
+            { parameter: "Tensile Strength", specification: "" },
+            { parameter: "% Elongation", specification: "" },
+          ]),
+          qualificationQcReport: [],
+        },
+        inhibitionBatchDetails: { inhibitorBatchNo: "", inhibitorBatchSize: "", qaRemarks: "" },
+        inhibitionApplicationDetails: {
+          inhibitionApplicationTable: [
+            locationAppliedRow("HE_SIDE"),
+            locationAppliedRow("NE_SIDE"),
+          ],
+        },
+        dispatchDetails: { dispatchDate: "", dispatchStation: "", qaRemarks: "" },
       };
     case "inhibition-not-applicable":
       return {
@@ -310,6 +421,15 @@ const sectionDataRow = (sections: LegacySectionSubmission[] | undefined, section
   return asRecord(row) ?? {};
 };
 
+const pickLocationQaRemarks = (rec: Record<string, unknown>) => {
+  // Prefer camelCase API field; skip empty strings so legacy remarks keys do not blank QA.
+  for (const key of ["qaRemarks", "QA_REMARKS", "remarks", "REMARKS"] as const) {
+    const value = str(rec[key]).trim();
+    if (value) return value;
+  }
+  return str(pickField(rec, "qaRemarks", "QA_REMARKS", "remarks", "REMARKS")).trim();
+};
+
 const parseLocationDateRows = (rows: unknown): LocationDateRow[] =>
   asArray(rows).map((row) => {
     const rec = asRecord(row) ?? {};
@@ -318,6 +438,7 @@ const parseLocationDateRows = (rows: unknown): LocationDateRow[] =>
       fromDate: toUiDate(pickField(rec, "FROM_DATE", "fromDate")),
       toDate: toUiDate(pickField(rec, "TO_DATE", "toDate")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
+      qaRemarks: pickLocationQaRemarks(rec),
     };
   });
 
@@ -330,6 +451,7 @@ const parseLocationQtyRows = (rows: unknown): LocationQtyRow[] =>
       toDate: toUiDate(pickField(rec, "TO_DATE", "toDate")),
       qtyFilled: str(pickField(rec, "QTY_FILLED", "qtyFilled", "quantityFilled")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
+      qaRemarks: pickLocationQaRemarks(rec),
     };
   });
 
@@ -342,6 +464,7 @@ const parseLocationAppliedRows = (rows: unknown): LocationAppliedRow[] =>
       toDate: toUiDate(pickField(rec, "TO_DATE", "toDate")),
       qtyApplied: str(pickField(rec, "QTY_APPLIED", "qtyApplied", "quantityApplied")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
+      qaRemarks: pickLocationQaRemarks(rec),
     };
   });
 
@@ -404,6 +527,7 @@ const parseIngredientQuantityRowsFromSaved = (saved: unknown): IngredientQuantit
       mfgLot: resolvedMfgLot,
       partsByWeight: str(pickField(rec, "PARTS_BY_WEIGHT", "partsByWeight")),
       quantity: resolvedQuantity,
+      qaRemarks: pickLocationQaRemarks(rec),
     };
   });
 
@@ -424,8 +548,63 @@ const parseIngredientTakenRowsFromSaved = (saved: unknown): IngredientTakenRow[]
       mfgLot: str(pickField(rec, "MFG_LOT", "mfgLot", "Mfg Lot")),
       partsByWeight: str(pickField(rec, "PARTS_BY_WEIGHT", "partsByWeight")),
       qtyTaken: str(pickField(rec, "QTY_TAKEN", "qtyTaken", "quantityTaken", "quantity")),
+      qaRemarks: pickLocationQaRemarks(rec),
     };
   });
+
+/**
+ * Others flexible mixes: rebuild rows from API ingredients (no fixed recipe preset).
+ * Recipe-style merge would keep empty preset ingredient/partsByWeight and drop saved values.
+ */
+const parseFlexibleIngredientTakenRowsFromSaved = (saved: unknown): IngredientTakenRow[] => {
+  const savedRows = asArray(saved);
+  if (!savedRows.length) return emptyFlexibleTakenTable();
+
+  const rows: IngredientTakenRow[] = savedRows.map((entry, index) => {
+    const rec = asRecord(entry) ?? {};
+    const ingredientRaw = str(pickField(rec, "INGREDIENT", "ingredient"));
+    const materialCodeRaw = str(pickField(rec, "materialCode", "MATERIAL_CODE"));
+    const srRaw = pickField(rec, "srNo", "rowKey", "SR_NO");
+    const srNo =
+      str(srRaw).trim().toUpperCase() === "TOTAL" ? "TOTAL" : (srRaw as string | number) ?? index + 1;
+    const isTotal = isIngredientTotalRow(srNo, ingredientRaw);
+    return {
+      srNo: isTotal ? "TOTAL" : srNo,
+      ingredient: isTotal ? "Total Quantity" : ingredientRaw,
+      materialId: null,
+      // Only honor explicit materialCode — free-text ingredient must not become a code.
+      materialCode: isTotal ? null : materialCodeRaw || null,
+      mfgLot: isTotal ? "" : str(pickField(rec, "MFG_LOT", "mfgLot", "Mfg Lot")),
+      partsByWeight: isTotal ? "" : str(pickField(rec, "PARTS_BY_WEIGHT", "partsByWeight")),
+      qtyTaken: str(pickField(rec, "QTY_TAKEN", "qtyTaken", "quantityTaken", "quantity")),
+      qaRemarks: isTotal ? "" : pickLocationQaRemarks(rec),
+    };
+  });
+
+  const hasTotal = rows.some((row) => isIngredientTotalRow(row.srNo, row.ingredient));
+  if (!hasTotal) {
+    const totalQty = rows.reduce((acc, row) => {
+      const val = parseFloat(row.qtyTaken || "0");
+      return !isNaN(val) ? acc + val : acc;
+    }, 0);
+    rows.push({
+      srNo: "TOTAL",
+      ingredient: "Total Quantity",
+      materialId: null,
+      materialCode: null,
+      mfgLot: "",
+      partsByWeight: "",
+      qtyTaken: totalQty > 0 ? String(totalQty) : "",
+    });
+  }
+
+  let n = 1;
+  return rows.map((row) =>
+    isIngredientTotalRow(row.srNo, row.ingredient)
+      ? { ...row, srNo: "TOTAL", ingredient: "Total Quantity" }
+      : { ...row, srNo: n++ },
+  );
+};
 
 const mergeIngredientQuantityRows = (
   preset: IngredientQuantityRow[],
@@ -465,6 +644,7 @@ const mergeIngredientQuantityRows = (
       mfgLot: resolvedMfgLot,
       quantity: resolvedQuantity,
       qtyTaken: resolvedQuantity,
+      qaRemarks: pickLocationQaRemarks(savedRow) || presetRow.qaRemarks || "",
     };
   });
 };
@@ -486,6 +666,7 @@ const mergeIngredientTakenRows = (
       mfgLot: str(pickField(savedRow, "MFG_LOT", "mfgLot", "Mfg Lot")) || presetRow.mfgLot,
       qtyTaken:
         str(pickField(savedRow, "QTY_TAKEN", "qtyTaken", "quantityTaken")) || presetRow.qtyTaken,
+      qaRemarks: pickLocationQaRemarks(savedRow) || presetRow.qaRemarks || "",
     };
   });
 };
@@ -496,7 +677,10 @@ const mergeQualificationRows = (preset: QualificationRow[], saved: unknown): Qua
     const savedRow = asRecord(savedRows[index]) ?? {};
     return {
       ...presetRow,
+      specification:
+        str(pickField(savedRow, "SPECIFICATION", "specification")) || presetRow.specification,
       result: str(pickField(savedRow, "RESULT", "result")) || presetRow.result,
+      qaRemarks: pickLocationQaRemarks(savedRow) || presetRow.qaRemarks || "",
     };
   });
 };
@@ -610,6 +794,7 @@ export const parsePostCureMotorDataFromSections = (
         inhibitionBatchDetails: {
           inhibitorBatchNo: str(pickField(batch, "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
           inhibitorBatchSize: str(pickField(batch, "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize")),
+          qaRemarks: pickLocationQaRemarks(batch),
         },
         inhibitionApplicationDetails: {
           inhibitionApplicationTable: appRows.length
@@ -619,6 +804,7 @@ export const parsePostCureMotorDataFromSections = (
         dispatchDetails: {
           dispatchDate: toUiDate(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
           dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
+          qaRemarks: pickLocationQaRemarks(dispatch),
         },
       };
     }
@@ -677,7 +863,8 @@ export const parsePostCureMotorDataFromSections = (
         inhibitionBatchDetails: {
           inhibitorBatchNo: str(pickField(batch, "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
           inhibitorBatchSize: str(pickField(batch, "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize")),
-        },
+        qaRemarks: pickLocationQaRemarks(batch),
+      },
         inhibitionApplicationDetails: {
           inhibitionApplicationTable: appRows.length
             ? appRows
@@ -686,7 +873,73 @@ export const parsePostCureMotorDataFromSections = (
         dispatchDetails: {
           dispatchDate: toUiDate(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
           dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
+        qaRemarks: pickLocationQaRemarks(dispatch),
+      },
+      };
+    }
+    case "inhibition-others": {
+      const empty = createEmptyPostCureMotorData("inhibition-others") as InhibitionOthersMotorData;
+      const premix = sectionDataRow(sections, "OTHERS_PREMIX");
+      const finalMix = sectionDataRow(sections, "OTHERS_FINAL_MIX");
+      const qual = sectionDataRow(sections, "OTHERS_QUALIFICATION");
+      const batch = sectionDataRow(sections, "INHIBITION_BATCH_DETAILS");
+      const app = sectionDataRow(sections, "INHIBITION_APPLICATION_DETAILS");
+      const dispatch = sectionDataRow(sections, "DISPATCH_DETAILS");
+      const appRows = parseLocationAppliedRows(
+        pickField(app, "INHIBITION_APPLICATION_TABLE", "inhibitionApplicationTable"),
+      );
+      return {
+        variant: "inhibition-others",
+        othersPremix: {
+          othersPremixBatchNo: str(
+            pickField(premix, "OTHERS_PREMIX_BATCH_NO", "othersPremixBatchNo"),
+          ),
+          othersPremixDate: toUiDate(pickField(premix, "OTHERS_PREMIX_DATE", "othersPremixDate")),
+          othersPremixTable: parseFlexibleIngredientTakenRowsFromSaved(
+            pickField(premix, "OTHERS_PREMIX_TABLE", "othersPremixTable"),
+          ),
         },
+        othersFinalMix: {
+          othersFinalMixBatchNo: str(
+            pickField(finalMix, "OTHERS_FINAL_MIX_BATCH_NO", "othersFinalMixBatchNo"),
+          ),
+          othersFinalMixDate: toUiDate(
+            pickField(finalMix, "OTHERS_FINAL_MIX_DATE", "othersFinalMixDate"),
+          ),
+          othersFinalMixTable: parseFlexibleIngredientTakenRowsFromSaved(
+            pickField(finalMix, "OTHERS_FINAL_MIX_TABLE", "othersFinalMixTable"),
+          ),
+        },
+        othersQualification: {
+          qualificationBatchNo: str(
+            pickField(qual, "QUALIFICATION_BATCH_NO", "qualificationBatchNo"),
+          ),
+          qualificationPreparationDate: toUiDate(
+            pickField(qual, "QUALIFICATION_PREPARATION_DATE", "qualificationPreparationDate"),
+          ),
+          qualificationTable: mergeQualificationRows(
+            empty.othersQualification.qualificationTable,
+            pickField(qual, "QUALIFICATION_TABLE", "qualificationTable"),
+          ),
+          qualificationQcReport: parseFileRefs(
+            pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport"),
+          ),
+        },
+        inhibitionBatchDetails: {
+          inhibitorBatchNo: str(pickField(batch, "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
+          inhibitorBatchSize: str(pickField(batch, "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize")),
+        qaRemarks: pickLocationQaRemarks(batch),
+      },
+        inhibitionApplicationDetails: {
+          inhibitionApplicationTable: appRows.length
+            ? appRows
+            : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
+        },
+        dispatchDetails: {
+          dispatchDate: toUiDate(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
+          dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
+        qaRemarks: pickLocationQaRemarks(dispatch),
+      },
       };
     }
     case "inhibition-not-applicable": {
@@ -709,6 +962,9 @@ const payloadLocationDateRows = (rows: LocationDateRow[]) =>
     FROM_DATE: (toApiDate(row.fromDate) ?? row.fromDate.trim()) || undefined,
     TO_DATE: (toApiDate(row.toDate) ?? row.toDate.trim()) || undefined,
     OBSERVATIONS: row.observations.trim() || undefined,
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 const payloadLocationQtyRows = (rows: LocationQtyRow[]) =>
@@ -718,6 +974,9 @@ const payloadLocationQtyRows = (rows: LocationQtyRow[]) =>
     TO_DATE: (toApiDate(row.toDate) ?? row.toDate.trim()) || undefined,
     QTY_FILLED: toApiNumber(row.qtyFilled),
     OBSERVATIONS: row.observations.trim() || undefined,
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 const payloadLocationAppliedRows = (rows: LocationAppliedRow[]) =>
@@ -727,6 +986,9 @@ const payloadLocationAppliedRows = (rows: LocationAppliedRow[]) =>
     TO_DATE: (toApiDate(row.toDate) ?? row.toDate.trim()) || undefined,
     QTY_APPLIED: toApiNumber(row.qtyApplied),
     OBSERVATIONS: row.observations.trim() || undefined,
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 /** Case Prep style: prefer master code in payload `ingredient` when known. */
@@ -746,6 +1008,9 @@ const payloadIngredientQuantityRows = (rows: IngredientQuantityRow[]) =>
     MFG_LOT: row.mfgLot.trim() || undefined,
     PARTS_BY_WEIGHT: row.partsByWeight,
     QUANTITY: toApiNumber(row.quantity),
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 const payloadIngredientTakenRows = (rows: IngredientTakenRow[]) =>
@@ -755,6 +1020,9 @@ const payloadIngredientTakenRows = (rows: IngredientTakenRow[]) =>
     MFG_LOT: row.mfgLot.trim() || undefined,
     PARTS_BY_WEIGHT: row.partsByWeight,
     QTY_TAKEN: toApiNumber(row.qtyTaken),
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 const payloadQualificationRows = (rows: QualificationRow[]) =>
@@ -763,6 +1031,9 @@ const payloadQualificationRows = (rows: QualificationRow[]) =>
     PARAMETER: row.parameter,
     SPECIFICATION: row.specification,
     RESULT: row.result.trim() || undefined,
+    ...(String(row.qaRemarks ?? "").trim()
+      ? { QA_REMARKS: String(row.qaRemarks).trim() }
+      : {}),
   }));
 
 const makeSection = (
@@ -806,6 +1077,7 @@ export type LooseFlapFillingDetailsApi = {
     fromDate?: string;
     toDate?: string;
     observations?: string;
+    qaRemarks?: string;
   }>;
   epoxyPreparationIngredients?: {
     batchNo?: string;
@@ -835,17 +1107,19 @@ export type LooseFlapFillingDetailsApi = {
     toDate?: string;
     quantityFilled?: number;
     observations?: string;
+    qaRemarks?: string;
   }>;
 };
 
 export type InhibitionDetailsApi = {
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE";
   premixDetails?: {
     batchNo?: string;
     preparationDate?: string;
     ingredients?: Array<{
       rowKey?: string | number;
       ingredient?: string;
+      materialCode?: string;
       mfgLot?: string;
       partsByWeight?: string;
       quantityTaken?: number;
@@ -857,6 +1131,7 @@ export type InhibitionDetailsApi = {
     ingredients?: Array<{
       rowKey?: string | number;
       ingredient?: string;
+      materialCode?: string;
       mfgLot?: string;
       partsByWeight?: string;
       quantityTaken?: number;
@@ -876,6 +1151,7 @@ export type InhibitionDetailsApi = {
   inhibitorBatchDetails?: {
     batchNo?: string;
     batchSize?: number;
+    qaRemarks?: string;
   };
   applicationDetails?: Array<{
     location?: string;
@@ -883,10 +1159,12 @@ export type InhibitionDetailsApi = {
     toDate?: string;
     quantityApplied?: number;
     observations?: string;
+    qaRemarks?: string;
   }>;
   dispatchDetails?: {
     dispatchDate?: string;
     dispatchStation?: string;
+    qaRemarks?: string;
   };
   notApplicableRemarks?: string;
 };
@@ -903,6 +1181,7 @@ const mapLocationDateRowsForApi = (rows: LocationDateRow[]) =>
       fromDate: apiDateOrUi(row.fromDate),
       toDate: apiDateOrUi(row.toDate),
       observations: row.observations.trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
   );
 
@@ -914,6 +1193,7 @@ const mapLocationQtyRowsForApi = (rows: LocationQtyRow[]) =>
       toDate: apiDateOrUi(row.toDate),
       quantityFilled: toApiNumber(row.qtyFilled),
       observations: row.observations.trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
   );
 
@@ -925,6 +1205,7 @@ const mapLocationAppliedRowsForApi = (rows: LocationAppliedRow[]) =>
       toDate: apiDateOrUi(row.toDate),
       quantityApplied: toApiNumber(row.qtyApplied),
       observations: row.observations.trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
   );
 
@@ -946,15 +1227,19 @@ const mapIngredientQuantityRowsForApi = (rows: IngredientQuantityRow[]) =>
       ...base,
       mfgLot: row.mfgLot.trim() || undefined,
       partsByWeight: row.partsByWeight,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     });
   });
 
 const mapIngredientTakenRowsForApi = (rows: IngredientTakenRow[]) =>
   rows.map((row, index) => {
     const isTotal = isIngredientTotalRow(row.srNo, row.ingredient);
+    const name = str(row.ingredient).trim();
+    const code = str(row.materialCode).trim();
     const base = {
       rowKey: ingredientRowKey(row.srNo, index),
-      ingredient: payloadIngredientValue(row),
+      // Prefer display name so Others free-text / selected labels survive reload.
+      ingredient: name || code,
       quantityTaken: toApiNumber(row.qtyTaken),
     };
     if (isTotal) {
@@ -962,8 +1247,10 @@ const mapIngredientTakenRowsForApi = (rows: IngredientTakenRow[]) =>
     }
     return omitEmpty({
       ...base,
+      materialCode: code || undefined,
       mfgLot: row.mfgLot.trim() || undefined,
-      partsByWeight: row.partsByWeight,
+      partsByWeight: row.partsByWeight?.trim() ? row.partsByWeight : undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     });
   });
 
@@ -971,9 +1258,11 @@ const mapQualificationParamsForApi = (rows: QualificationRow[]) =>
   rows.map((row) =>
     omitEmpty({
       srNo: row.srNo,
-      parameter: row.parameter,
-      specification: row.specification,
+      parameter: row.parameter?.trim() || undefined,
+      // Keep non-empty specification — backend SubmitGroup requires it.
+      specification: row.specification?.trim() || undefined,
       result: row.result.trim() || undefined,
+      qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
   );
 
@@ -1021,6 +1310,7 @@ const buildInhibitionIr1DetailsPayload = (data: InhibitionIr1MotorData): Inhibit
   inhibitorBatchDetails: omitEmpty({
     batchNo: data.inhibitionBatchDetails.inhibitorBatchNo.trim() || undefined,
     batchSize: toApiNumber(data.inhibitionBatchDetails.inhibitorBatchSize),
+    qaRemarks: String(data.inhibitionBatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["inhibitorBatchDetails"],
   applicationDetails: mapLocationAppliedRowsForApi(
     data.inhibitionApplicationDetails.inhibitionApplicationTable,
@@ -1028,6 +1318,7 @@ const buildInhibitionIr1DetailsPayload = (data: InhibitionIr1MotorData): Inhibit
   dispatchDetails: omitEmpty({
     dispatchDate: apiDateOrUi(data.dispatchDetails.dispatchDate),
     dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
+    qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["dispatchDetails"],
 });
 
@@ -1055,7 +1346,8 @@ const buildInhibitionHemcoatDetailsPayload = (
   }) as InhibitionDetailsApi["qualificationDetails"],
   inhibitorBatchDetails: omitEmpty({
     batchNo: data.inhibitionBatchDetails.inhibitorBatchNo.trim() || undefined,
-    batchSize: toApiNumber(data.inhibitionBatchDetails.inhibitorBatchNo),
+    batchSize: toApiNumber(data.inhibitionBatchDetails.inhibitorBatchSize),
+    qaRemarks: String(data.inhibitionBatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["inhibitorBatchDetails"],
   applicationDetails: mapLocationAppliedRowsForApi(
     data.inhibitionApplicationDetails.inhibitionApplicationTable,
@@ -1063,6 +1355,44 @@ const buildInhibitionHemcoatDetailsPayload = (
   dispatchDetails: omitEmpty({
     dispatchDate: apiDateOrUi(data.dispatchDetails.dispatchDate),
     dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
+    qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
+  }) as InhibitionDetailsApi["dispatchDetails"],
+});
+
+const buildInhibitionOthersDetailsPayload = (
+  data: InhibitionOthersMotorData,
+): InhibitionDetailsApi => ({
+  premixDetails: omitEmpty({
+    batchNo: data.othersPremix.othersPremixBatchNo.trim() || undefined,
+    preparationDate: apiDateOrUi(data.othersPremix.othersPremixDate),
+    ingredients: mapIngredientTakenRowsForApi(data.othersPremix.othersPremixTable),
+  }) as InhibitionDetailsApi["premixDetails"],
+  finalMixDetails: omitEmpty({
+    batchNo: data.othersFinalMix.othersFinalMixBatchNo.trim() || undefined,
+    preparationDate: apiDateOrUi(data.othersFinalMix.othersFinalMixDate),
+    ingredients: mapIngredientTakenRowsForApi(data.othersFinalMix.othersFinalMixTable),
+  }) as InhibitionDetailsApi["finalMixDetails"],
+  qualificationDetails: omitEmpty({
+    batchNo: data.othersQualification.qualificationBatchNo.trim() || undefined,
+    preparationDate: apiDateOrUi(data.othersQualification.qualificationPreparationDate),
+    parameters: mapQualificationParamsForApi(data.othersQualification.qualificationTable),
+    qcReport: (() => {
+      const files = toFileIdListPayload(data.othersQualification.qualificationQcReport);
+      return files.length ? files : undefined;
+    })(),
+  }) as InhibitionDetailsApi["qualificationDetails"],
+  inhibitorBatchDetails: omitEmpty({
+    batchNo: data.inhibitionBatchDetails.inhibitorBatchNo.trim() || undefined,
+    batchSize: toApiNumber(data.inhibitionBatchDetails.inhibitorBatchSize),
+    qaRemarks: String(data.inhibitionBatchDetails.qaRemarks ?? "").trim() || undefined,
+  }) as InhibitionDetailsApi["inhibitorBatchDetails"],
+  applicationDetails: mapLocationAppliedRowsForApi(
+    data.inhibitionApplicationDetails.inhibitionApplicationTable,
+  ),
+  dispatchDetails: omitEmpty({
+    dispatchDate: apiDateOrUi(data.dispatchDetails.dispatchDate),
+    dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
+    qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["dispatchDetails"],
 });
 
@@ -1076,6 +1406,8 @@ export const buildPostCureMotorDetailsPayload = (
       return { inhibitionDetails: buildInhibitionIr1DetailsPayload(data) };
     case "inhibition-hemcoat-3k":
       return { inhibitionDetails: buildInhibitionHemcoatDetailsPayload(data) };
+    case "inhibition-others":
+      return { inhibitionDetails: buildInhibitionOthersDetailsPayload(data) };
     case "inhibition-not-applicable":
       return {
         inhibitionDetails: omitEmpty({
@@ -1089,7 +1421,7 @@ export const buildPostCureMotorDetailsPayload = (
 };
 
 export type DualPostCureMotorPayload = PostCureMotorDetailsPayload & {
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE";
 };
 
 export const buildDualPostCureMotorPayload = (session: {
@@ -1106,6 +1438,7 @@ export const buildDualPostCureMotorPayload = (session: {
   let apiInhibitor: DualPostCureMotorPayload["inhibitorType"];
   if (inhibitor === "IR1" || upper === "IR1") apiInhibitor = "IR1";
   else if (inhibitor === "Hemcoat-3K" || upper === "HEMCOAT_3K") apiInhibitor = "HEMCOAT_3K";
+  else if (inhibitor === "Others" || upper === "OTHERS" || upper === "OTHER") apiInhibitor = "OTHERS";
   else if (inhibitor === "not-applicable" || upper === "NOT_APPLICABLE")
     apiInhibitor = "NOT_APPLICABLE";
 
@@ -1129,16 +1462,9 @@ export const buildDualPostCureMotorPayload = (session: {
 const parseQualificationParamsFromApi = (
   preset: QualificationRow[],
   saved: unknown,
-): QualificationRow[] => {
-  const savedRows = asArray(saved);
-  return preset.map((presetRow, index) => {
-    const savedRow = asRecord(savedRows[index]) ?? {};
-    return {
-      ...presetRow,
-      result: str(pickField(savedRow, "RESULT", "result")) || presetRow.result,
-    };
-  });
-};
+): QualificationRow[] =>
+  // Same merge as sections hydrate — must round-trip QC qaRemarks from details API.
+  mergeQualificationRows(preset, saved);
 
 const parseLooseFlapFromApi = (details: Record<string, unknown>): LooseFlapMotorData => {
   const empty = createEmptyPostCureMotorData("loose-flap-filling") as LooseFlapMotorData;
@@ -1267,6 +1593,7 @@ const parseInhibitionFromApi = (
         inhibitorBatchSize: str(
           pickField(batch, "batchSize", "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize"),
         ),
+        qaRemarks: pickLocationQaRemarks(batch),
       },
       inhibitionApplicationDetails: {
         inhibitionApplicationTable: appRows.length
@@ -1276,6 +1603,62 @@ const parseInhibitionFromApi = (
       dispatchDetails: {
         dispatchDate: resolveDispatchDate(),
         dispatchStation: resolveDispatchStation(),
+        qaRemarks: pickLocationQaRemarks(dispatch),
+      },
+    };
+  }
+
+  if (variant === "inhibition-others") {
+    const empty = createEmptyPostCureMotorData("inhibition-others") as InhibitionOthersMotorData;
+    return {
+      variant: "inhibition-others",
+      othersPremix: {
+        othersPremixBatchNo: str(pickField(premix, "batchNo", "OTHERS_PREMIX_BATCH_NO")),
+        othersPremixDate: toUiDate(pickField(premix, "preparationDate", "OTHERS_PREMIX_DATE")),
+        othersPremixTable: parseFlexibleIngredientTakenRowsFromSaved(
+          premix.ingredients ?? premix.parameters,
+        ),
+      },
+      othersFinalMix: {
+        othersFinalMixBatchNo: str(pickField(finalMix, "batchNo", "OTHERS_FINAL_MIX_BATCH_NO")),
+        othersFinalMixDate: toUiDate(
+          pickField(finalMix, "preparationDate", "OTHERS_FINAL_MIX_DATE"),
+        ),
+        othersFinalMixTable: parseFlexibleIngredientTakenRowsFromSaved(
+          finalMix.ingredients ?? finalMix.parameters,
+        ),
+      },
+      othersQualification: {
+        qualificationBatchNo: str(pickField(qual, "batchNo", "QUALIFICATION_BATCH_NO")),
+        qualificationPreparationDate: toUiDate(
+          pickField(qual, "preparationDate", "QUALIFICATION_PREPARATION_DATE"),
+        ),
+        qualificationTable: parseQualificationParamsFromApi(
+          empty.othersQualification.qualificationTable,
+          qual.parameters ?? qual.qualification,
+        ),
+        qualificationQcReport: parseFileRefs(
+          pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT"),
+        ),
+      },
+      inhibitionBatchDetails: {
+        inhibitorBatchNo: str(
+          pickField(batch, "batchNo", "INHIBITOR_BATCH_NO", "inhibitorBatchNo"),
+        ),
+        inhibitorBatchSize: str(
+          pickField(batch, "batchSize", "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize"),
+        ),
+        qaRemarks: pickLocationQaRemarks(batch),
+      },
+      inhibitionApplicationDetails: {
+        inhibitionApplicationTable: appRows.length
+          ? appRows
+          : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
+      },
+      dispatchDetails: {
+        dispatchDate: resolveDispatchDate(),
+        dispatchStation: resolveDispatchStation(),
+        qaRemarks: pickLocationQaRemarks(dispatch),
       },
     };
   }
@@ -1332,7 +1715,8 @@ const parseInhibitionFromApi = (
       inhibitorBatchSize: str(
         pickField(batch, "batchSize", "INHIBITOR_BATCH_SIZE", "inhibitorBatchSize"),
       ),
-    },
+        qaRemarks: pickLocationQaRemarks(batch),
+      },
     inhibitionApplicationDetails: {
       inhibitionApplicationTable: appRows.length
         ? appRows
@@ -1341,7 +1725,8 @@ const parseInhibitionFromApi = (
     dispatchDetails: {
       dispatchDate: resolveDispatchDate(),
       dispatchStation: resolveDispatchStation(),
-    },
+        qaRemarks: pickLocationQaRemarks(dispatch),
+      },
   };
 };
 
@@ -1485,6 +1870,48 @@ export const buildPostCureSectionsPayload = (
           DISPATCH_STATION: data.dispatchDetails.dispatchStation.trim() || undefined,
         }),
       ];
+    case "inhibition-others":
+      return [
+        makeSection("OTHERS_PREMIX", {
+          OTHERS_PREMIX_BATCH_NO: data.othersPremix.othersPremixBatchNo.trim() || undefined,
+          OTHERS_PREMIX_DATE: apiDateOrUi(data.othersPremix.othersPremixDate),
+          OTHERS_PREMIX_TABLE: payloadIngredientTakenRows(data.othersPremix.othersPremixTable),
+        }),
+        makeSection("OTHERS_FINAL_MIX", {
+          OTHERS_FINAL_MIX_BATCH_NO: data.othersFinalMix.othersFinalMixBatchNo.trim() || undefined,
+          OTHERS_FINAL_MIX_DATE: apiDateOrUi(data.othersFinalMix.othersFinalMixDate),
+          OTHERS_FINAL_MIX_TABLE: payloadIngredientTakenRows(
+            data.othersFinalMix.othersFinalMixTable,
+          ),
+        }),
+        makeSection("OTHERS_QUALIFICATION", {
+          QUALIFICATION_BATCH_NO:
+            data.othersQualification.qualificationBatchNo.trim() || undefined,
+          QUALIFICATION_PREPARATION_DATE: apiDateOrUi(
+            data.othersQualification.qualificationPreparationDate,
+          ),
+          QUALIFICATION_TABLE: payloadQualificationRows(
+            data.othersQualification.qualificationTable,
+          ),
+          QUALIFICATION_QC_REPORT: (() => {
+            const files = toFileIdListPayload(data.othersQualification.qualificationQcReport);
+            return files.length ? files : undefined;
+          })(),
+        }),
+        makeSection("INHIBITION_BATCH_DETAILS", {
+          INHIBITOR_BATCH_NO: data.inhibitionBatchDetails.inhibitorBatchNo.trim() || undefined,
+          INHIBITOR_BATCH_SIZE: toApiNumber(data.inhibitionBatchDetails.inhibitorBatchSize),
+        }),
+        makeSection("INHIBITION_APPLICATION_DETAILS", {
+          INHIBITION_APPLICATION_TABLE: payloadLocationAppliedRows(
+            data.inhibitionApplicationDetails.inhibitionApplicationTable,
+          ),
+        }),
+        makeSection("DISPATCH_DETAILS", {
+          DISPATCH_DATE: apiDateOrUi(data.dispatchDetails.dispatchDate),
+          DISPATCH_STATION: data.dispatchDetails.dispatchStation.trim() || undefined,
+        }),
+      ];
     case "inhibition-not-applicable":
       return [
         makeSection("INHIBITION_NOT_APPLICABLE", {
@@ -1508,6 +1935,9 @@ export const collectPostCureFileRefsFromMotorData = (
   }
   if (data.variant === "inhibition-hemcoat-3k") {
     return data.hemcoat3kQualification?.qualificationQcReport ?? [];
+  }
+  if (data.variant === "inhibition-others") {
+    return data.othersQualification?.qualificationQcReport ?? [];
   }
   return [];
 };
@@ -1600,6 +2030,7 @@ export const resolveInhibitionVariantFromInhibitorType = (
   const upper = inhibitor.toUpperCase().replace(/[-\s]/g, "_");
   if (inhibitor === "IR1" || upper === "IR1") return "inhibition-ir1";
   if (inhibitor === "Hemcoat-3K" || upper === "HEMCOAT_3K") return "inhibition-hemcoat-3k";
+  if (inhibitor === "Others" || upper === "OTHERS" || upper === "OTHER") return "inhibition-others";
   if (inhibitor === "not-applicable" || upper === "NOT_APPLICABLE")
     return "inhibition-not-applicable";
   return null;
@@ -1607,7 +2038,11 @@ export const resolveInhibitionVariantFromInhibitorType = (
 
 export const isPostCureInhibitionDetailsRequired = (inhibitorType: string): boolean => {
   const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
-  return variant === "inhibition-ir1" || variant === "inhibition-hemcoat-3k";
+  return (
+    variant === "inhibition-ir1" ||
+    variant === "inhibition-hemcoat-3k" ||
+    variant === "inhibition-others"
+  );
 };
 
 /** True when any inhibition panel should show (IR1, Hemcoat, or Not Applicable remarks). */
@@ -1627,10 +2062,14 @@ export const parseInhibitionMotorDataFromApi = (
   motor: Record<string, unknown> | null | undefined,
   inhibitorType: string,
 ): PostCureMotorData | null => {
-  const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
+  const details = asRecord(motor?.inhibitionDetails) ?? {};
+  const resolvedType =
+    String(inhibitorType ?? "").trim() ||
+    str(pickField(details, "inhibitorType", "INHIBITOR_TYPE")) ||
+    str(pickField(asRecord(motor) ?? {}, "inhibitorType", "INHIBITOR_TYPE"));
+  const variant = resolveInhibitionVariantFromInhibitorType(resolvedType);
   if (!variant) return null;
   if (variant === "inhibition-not-applicable") {
-    const details = asRecord(motor?.inhibitionDetails) ?? {};
     return {
       variant: "inhibition-not-applicable",
       inhibitionNotApplicable: {

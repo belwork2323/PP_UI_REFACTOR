@@ -138,6 +138,7 @@ const dryingFormFromDto = (dto: DryingTrayOvenDto | null | undefined): DryingTra
   endDatetime: str(dto?.endDatetime),
   moisture: str(dto?.moisture),
   observation: str(dto?.observation),
+  qaRemarks: str(dto?.qaRemarks),
 });
 
 const sievingFormFromDto = (dto: SievingDto | null | undefined): SievingForm => ({
@@ -146,6 +147,7 @@ const sievingFormFromDto = (dto: SievingDto | null | undefined): SievingForm => 
   sievedQuantity: str(dto?.sievedQuantity),
   sieveMeshSize: str(dto?.sieveMeshSize),
   observation: str(dto?.observation),
+  qaRemarks: str(dto?.qaRemarks),
 });
 
 const dryingDtoFromForm = (drying: DryingTrayOvenForm): DryingTrayOvenDto | null => {
@@ -159,6 +161,7 @@ const dryingDtoFromForm = (drying: DryingTrayOvenForm): DryingTrayOvenDto | null
     endDatetime: end || null,
     moisture: drying.moisture.trim() || null,
     observation: drying.observation.trim() || null,
+    qaRemarks: drying.qaRemarks.trim() || null,
   };
   const hasValue = Object.values(dto).some((v) => v != null && String(v).trim() !== "");
   return hasValue ? dto : null;
@@ -171,6 +174,7 @@ const sievingDtoFromForm = (sieving: SievingForm): SievingDto | null => {
     sievedQuantity: sieving.sievedQuantity.trim() || null,
     sieveMeshSize: sieving.sieveMeshSize.trim() || null,
     observation: sieving.observation.trim() || null,
+    qaRemarks: sieving.qaRemarks.trim() || null,
   };
   const hasValue = Object.values(dto).some((v) => v != null && String(v).trim() !== "");
   return hasValue ? dto : null;
@@ -183,6 +187,7 @@ const apCoarseDtoFromForm = (form: ApCoarseProcessForm): ApCoarseProcessDto => (
     setParameter: str(row?.setParameter) || null,
     actualParameter: str(row?.actualParameter) || null,
   })),
+  blendingDryingQaRemarks: str(form.blendingDryingQaRemarks) || null,
   dryingOperationRvd: (form.dryingOperationRvd ?? []).map((row) => ({
     operation: str(row?.operation) || null,
     setParameter: str(row?.setParameter) || null,
@@ -190,11 +195,13 @@ const apCoarseDtoFromForm = (form: ApCoarseProcessForm): ApCoarseProcessDto => (
     startTime: str(row?.startTime) || null,
     endTime: str(row?.endTime) || null,
   })),
+  dryingOperationRvdQaRemarks: str(form.dryingOperationRvdQaRemarks) || null,
   particleSizeDistribution: (form.particleSizeDistribution ?? []).map((row) => ({
     psdRequirement: str(row?.psdRequirement) || null,
     specification: str(row?.specification) || null,
     result: str(row?.result) || null,
   })),
+  particleSizeDistributionQaRemarks: str(form.particleSizeDistributionQaRemarks) || null,
 });
 
 const apCoarseFormFromDto = (
@@ -208,6 +215,7 @@ const apCoarseFormFromDto = (
   return {
     uiKey: "apCoarse",
     lotDetails,
+    lotDetailsQaRemarks: seeded.lotDetailsQaRemarks,
     equipmentType: str(dto.equipmentType) || "RVD",
     blendingDryingParameters: dto.blendingDryingParameters?.length
       ? dto.blendingDryingParameters.map((row) => ({
@@ -216,6 +224,7 @@ const apCoarseFormFromDto = (
           actualParameter: str(row?.actualParameter),
         }))
       : seeded.blendingDryingParameters,
+    blendingDryingQaRemarks: str(dto.blendingDryingQaRemarks),
     dryingOperationRvd: dto.dryingOperationRvd?.length
       ? dto.dryingOperationRvd.map((row) => ({
           operation: str(row?.operation),
@@ -225,6 +234,7 @@ const apCoarseFormFromDto = (
           endTime: str(row?.endTime),
         }))
       : seeded.dryingOperationRvd,
+    dryingOperationRvdQaRemarks: str(dto.dryingOperationRvdQaRemarks),
     particleSizeDistribution: dto.particleSizeDistribution?.length
       ? dto.particleSizeDistribution.map((row) => ({
           psdRequirement: str(row?.psdRequirement),
@@ -232,6 +242,7 @@ const apCoarseFormFromDto = (
           result: str(row?.result),
         }))
       : seeded.particleSizeDistribution,
+    particleSizeDistributionQaRemarks: str(dto.particleSizeDistributionQaRemarks),
   };
 };
 
@@ -245,6 +256,7 @@ const apFineDtoFromForm = (form: ApFineProcessForm): ApFineProcessDto => ({
   grindingStartDatetime: formatDateTimeForApi(form.grindingStartDatetime) || null,
   grindingEndDatetime: formatDateTimeForApi(form.grindingEndDatetime) || null,
   grindingObservation: form.grindingObservation.trim() || null,
+  grindingQaRemarks: form.grindingQaRemarks.trim() || null,
   particleSizeDistribution: (form.particleSizeDistribution ?? []).map((row) => ({
     psdRequirement: row.psdRequirement.trim() || null,
     specification: row.specification.trim() || null,
@@ -256,6 +268,7 @@ const apFineDtoFromForm = (form: ApFineProcessForm): ApFineProcessDto => ({
     setParameter: row.setParameter.trim() || null,
     actualParameter: row.actualParameter.trim() || null,
   })),
+  blendingDryingQaRemarks: form.blendingDryingQaRemarks.trim() || null,
   dryingOperationRvd: (form.dryingOperationRvd ?? []).map((row) => ({
     operation: row.operation.trim() || null,
     setParameter: row.setParameter.trim() || null,
@@ -263,6 +276,7 @@ const apFineDtoFromForm = (form: ApFineProcessForm): ApFineProcessDto => ({
     startTime: row.startTime.trim() || null,
     endTime: row.endTime.trim() || null,
   })),
+  dryingOperationRvdQaRemarks: form.dryingOperationRvdQaRemarks.trim() || null,
   trayOvenStorage: dryingDtoFromForm(form.trayOvenStorage as DryingTrayOvenForm),
   sieving: sievingDtoFromForm(form.sieving as SievingForm),
 });
@@ -278,6 +292,7 @@ const apFineFormFromDto = (
   return {
     uiKey: "apFine",
     lotDetails,
+    lotDetailsQaRemarks: seeded.lotDetailsQaRemarks,
     acmEquipmentId: str(dto.acmEquipmentId),
     millRpm: str(dto.millRpm),
     classifierRpm: str(dto.classifierRpm),
@@ -287,6 +302,7 @@ const apFineFormFromDto = (
     grindingStartDatetime: str(dto.grindingStartDatetime),
     grindingEndDatetime: str(dto.grindingEndDatetime),
     grindingObservation: str(dto.grindingObservation),
+    grindingQaRemarks: str(dto.grindingQaRemarks),
     particleSizeDistribution: dto.particleSizeDistribution?.length
       ? dto.particleSizeDistribution.map((row) => ({
           psdRequirement: str(row?.psdRequirement),
@@ -302,6 +318,7 @@ const apFineFormFromDto = (
           actualParameter: str(row?.actualParameter),
         }))
       : seeded.blendingDryingParameters,
+    blendingDryingQaRemarks: str(dto.blendingDryingQaRemarks),
     dryingOperationRvd: dto.dryingOperationRvd?.length
       ? dto.dryingOperationRvd.map((row) => ({
           operation: str(row?.operation),
@@ -311,6 +328,7 @@ const apFineFormFromDto = (
           endTime: str(row?.endTime),
         }))
       : seeded.dryingOperationRvd,
+    dryingOperationRvdQaRemarks: str(dto.dryingOperationRvdQaRemarks),
     trayOvenStorage: dryingFormFromDto(dto.trayOvenStorage) as ApFineProcessForm["trayOvenStorage"],
     sieving: sievingFormFromDto(dto.sieving) as ApFineProcessForm["sieving"],
   };
@@ -324,6 +342,7 @@ const apUltraFineDtoFromForm = (form: ApUltraFineProcessForm): ApUltraFineProces
   grindingStartDatetime: formatDateTimeForApi(form.grindingStartDatetime) || null,
   grindingEndDatetime: formatDateTimeForApi(form.grindingEndDatetime) || null,
   grindingObservation: form.grindingObservation.trim() || null,
+  grindingQaRemarks: form.grindingQaRemarks.trim() || null,
   particleSizeResult: form.particleSizeResult.trim() || null,
   qtyKgQualified: form.qtyKgQualified.trim() || null,
   drying: dryingDtoFromForm(form.drying as DryingTrayOvenForm),
@@ -341,6 +360,7 @@ const apUltraFineFormFromDto = (
   return {
     uiKey: "apUltraFine",
     lotDetails,
+    lotDetailsQaRemarks: seeded.lotDetailsQaRemarks,
     equipmentId: str(dto.equipmentId),
     screwFeederRpm: str(dto.screwFeederRpm),
     feedPressure: str(dto.feedPressure),
@@ -348,6 +368,7 @@ const apUltraFineFormFromDto = (
     grindingStartDatetime: str(dto.grindingStartDatetime),
     grindingEndDatetime: str(dto.grindingEndDatetime),
     grindingObservation: str(dto.grindingObservation),
+    grindingQaRemarks: str(dto.grindingQaRemarks),
     particleSizeResult: str(dto.particleSizeResult),
     qtyKgQualified: str(dto.qtyKgQualified),
     drying: dryingFormFromDto(dto.drying) as ApUltraFineProcessForm["drying"],
@@ -361,6 +382,7 @@ const aluminumDtoFromForm = (form: AluminumProcessForm): AluminumProcessDto => (
   startDatetime: formatDateTimeForApi(form.startDatetime) || null,
   endDatetime: formatDateTimeForApi(form.endDatetime) || null,
   observation: form.observation.trim() || null,
+  qaRemarks: form.qaRemarks.trim() || null,
   qtyKgQualified: form.qtyKgQualified.trim() || null,
   dispatchDatetime: formatDateTimeForApi(form.dispatchDatetime) || null,
 });
@@ -376,11 +398,13 @@ const aluminumFormFromDto = (
   return {
     uiKey: "aluminum",
     lotDetails,
+    lotDetailsQaRemarks: empty.lotDetailsQaRemarks,
     equipmentId: str(dto.equipmentId),
     setRpm: str(dto.setRpm),
     startDatetime: str(dto.startDatetime),
     endDatetime: str(dto.endDatetime),
     observation: str(dto.observation),
+    qaRemarks: str(dto.qaRemarks),
     qtyKgQualified: str(dto.qtyKgQualified),
     dispatchDatetime: str(dto.dispatchDatetime),
   };
@@ -389,6 +413,7 @@ const aluminumFormFromDto = (
 const doaDtoFromForm = (form: {
   dispatchDatetime: string;
   observation: string;
+  qaRemarks?: string;
   totalQtySentForPremix: string;
   sievingDatetime?: string;
   quantitySieved?: string;
@@ -400,6 +425,7 @@ const doaDtoFromForm = (form: {
   sieveMeshSize: form.sieveMeshSize != null ? form.sieveMeshSize.trim() || null : null,
   dispatchDatetime: formatDateTimeForApi(form.dispatchDatetime) || null,
   observation: form.observation.trim() || null,
+  qaRemarks: form.qaRemarks != null ? form.qaRemarks.trim() || null : null,
   totalQtySentForPremix: form.totalQtySentForPremix.trim() || null,
 });
 
@@ -415,8 +441,10 @@ const doaFormFromDto = (
   return {
     uiKey,
     lotDetails,
+    lotDetailsQaRemarks: empty.lotDetailsQaRemarks,
     dispatchDatetime: str(dto.dispatchDatetime),
     observation: str(dto.observation),
+    qaRemarks: str(dto.qaRemarks),
     totalQtySentForPremix: str(dto.totalQtySentForPremix),
   };
 };
@@ -435,9 +463,11 @@ const ccFormFromDto = (
   return {
     uiKey,
     lotDetails,
+    lotDetailsQaRemarks: empty.lotDetailsQaRemarks,
     sievingDatetime: str(dto.sievingDatetime),
     dispatchDatetime: str(dto.dispatchDatetime),
     observation: str(dto.observation),
+    qaRemarks: str(dto.qaRemarks),
     totalQtySentForPremix: str(dto.totalQtySentForPremix),
     drying,
     sieving,
@@ -455,10 +485,12 @@ const nonoxDFormFromDto = (
   return {
     uiKey: "nonoxD",
     lotDetails,
+    lotDetailsQaRemarks: empty.lotDetailsQaRemarks,
     quantitySieved: str(dto.quantitySieved),
     sieveMeshSize: str(dto.sieveMeshSize),
     dispatchDatetime: str(dto.dispatchDatetime),
     observation: str(dto.observation),
+    qaRemarks: str(dto.qaRemarks),
     totalQtySentForPremix: str(dto.totalQtySentForPremix),
   };
 };
@@ -502,6 +534,7 @@ const migrateLegacySections = (
       endDatetime: pickField(dryingRow, "endDatetime", "END_DATETIME") || null,
       moisture: pickField(dryingRow, "moisture", "MOISTURE") || null,
       observation: pickField(dryingRow, "observation", "OBSERVATION") || null,
+      qaRemarks: pickField(dryingRow, "qaRemarks", "QA_REMARKS") || null,
     };
   }
 
@@ -513,6 +546,7 @@ const migrateLegacySections = (
       sievedQuantity: pickField(sievingRow, "sievedQuantity", "SIEVED_QUANTITY") || null,
       sieveMeshSize: pickField(sievingRow, "sieveMeshSize", "SIEVE_MESH_SIZE") || null,
       observation: pickField(sievingRow, "observation", "OBSERVATION") || null,
+      qaRemarks: pickField(sievingRow, "qaRemarks", "QA_REMARKS") || null,
     };
   }
 
@@ -529,52 +563,114 @@ export const hydrateProcessFormFromEntry = (
 
   const migrated = migrateLegacySections(entry);
   const lotDetails = toLotFormRows(migrated.lotDetails);
+  // Prefer typed field; fall back to display/legacy section after details reload.
+  const lotDetailsQaRemarks =
+    str(entry.lotDetailsQaRemarks) ||
+    pickField(firstSectionRow(entry.sections, "lotDetailsQaRemarks"), "qaRemarks", "QA_REMARKS");
+  const processRootQaRemarks =
+    str(entry.qaRemarks) ||
+    pickField(firstSectionRow(entry.sections, "processQaRemarks"), "qaRemarks", "QA_REMARKS");
+
+  const withLotQa = <T extends { lotDetailsQaRemarks?: string }>(form: T): T => ({
+    ...form,
+    lotDetailsQaRemarks,
+  });
 
   if (uiKey === "defaultLiquid") {
     const form: DefaultLiquidProcessForm = {
       uiKey: "defaultLiquid",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: processRootQaRemarks,
     };
     return form;
   }
 
   if (uiKey === "apCoarse") {
-    return apCoarseFormFromDto(entry.apCoarse ?? null, lotDetails);
+    const form = withLotQa(apCoarseFormFromDto(entry.apCoarse ?? null, lotDetails));
+    return {
+      ...form,
+      blendingDryingQaRemarks:
+        form.blendingDryingQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "blendingDryingQaRemarks"), "qaRemarks"),
+      dryingOperationRvdQaRemarks:
+        form.dryingOperationRvdQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "dryingOperationRvdQaRemarks"), "qaRemarks"),
+      particleSizeDistributionQaRemarks:
+        form.particleSizeDistributionQaRemarks ||
+        pickField(
+          firstSectionRow(entry.sections, "particleSizeDistributionQaRemarks"),
+          "qaRemarks",
+        ),
+    };
   }
 
   if (uiKey === "apFine") {
-    return apFineFormFromDto(entry.apFine ?? null, lotDetails);
+    const form = withLotQa(apFineFormFromDto(entry.apFine ?? null, lotDetails));
+    return {
+      ...form,
+      grindingQaRemarks:
+        form.grindingQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "grinding"), "grindingQaRemarks", "qaRemarks"),
+      blendingDryingQaRemarks:
+        form.blendingDryingQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "blendingDryingQaRemarks"), "qaRemarks"),
+      dryingOperationRvdQaRemarks:
+        form.dryingOperationRvdQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "dryingOperationRvdQaRemarks"), "qaRemarks"),
+    };
   }
 
   if (uiKey === "apUltraFine") {
-    return apUltraFineFormFromDto(entry.apUltraFine ?? null, lotDetails);
+    const form = withLotQa(apUltraFineFormFromDto(entry.apUltraFine ?? null, lotDetails));
+    return {
+      ...form,
+      grindingQaRemarks:
+        form.grindingQaRemarks ||
+        pickField(firstSectionRow(entry.sections, "grinding"), "grindingQaRemarks", "qaRemarks"),
+    };
   }
 
   if (uiKey === "aluminum") {
-    return aluminumFormFromDto(entry.aluminum ?? null, lotDetails);
+    const form = withLotQa(aluminumFormFromDto(entry.aluminum ?? null, lotDetails));
+    return {
+      ...form,
+      qaRemarks:
+        form.qaRemarks ||
+        pickField(firstSectionRow(entry.sections, "aluminumProcessing"), "qaRemarks"),
+    };
   }
 
   if (uiKey === "doa" || uiKey === "htpb" || uiKey === "tdi") {
-    return doaFormFromDto(uiKey, entry.doa ?? null, lotDetails);
+    const form = withLotQa(doaFormFromDto(uiKey, entry.doa ?? null, lotDetails));
+    return {
+      ...form,
+      qaRemarks:
+        form.qaRemarks ||
+        pickField(firstSectionRow(entry.sections, "doaProcessing"), "qaRemarks"),
+    };
   }
 
   if (uiKey === "cc" || uiKey === "io") {
-    return ccFormFromDto(
-      uiKey,
-      entry.doa ?? null,
-      lotDetails,
-      dryingFormFromDto(migrated.drying),
-      sievingFormFromDto(migrated.sieving),
+    return withLotQa(
+      ccFormFromDto(
+        uiKey,
+        entry.doa ?? null,
+        lotDetails,
+        dryingFormFromDto(migrated.drying),
+        sievingFormFromDto(migrated.sieving),
+      ),
     );
   }
 
   if (uiKey === "nonoxD") {
-    return nonoxDFormFromDto(entry.doa ?? null, lotDetails);
+    return withLotQa(nonoxDFormFromDto(entry.doa ?? null, lotDetails));
   }
 
   const form: DefaultSolidProcessForm = {
     uiKey: "defaultSolid",
     lotDetails,
+    lotDetailsQaRemarks,
     drying: dryingFormFromDto(migrated.drying),
     sieving: sievingFormFromDto(migrated.sieving),
   };
@@ -603,6 +699,8 @@ export const processFormToTypedFields = (
   PreparationProcessEntry,
   | "processType"
   | "lotDetails"
+  | "lotDetailsQaRemarks"
+  | "qaRemarks"
   | "drying"
   | "sieving"
   | "apCoarse"
@@ -612,10 +710,14 @@ export const processFormToTypedFields = (
   | "doa"
 > => {
   const lotDetails = toLotDtos(form.lotDetails);
+  const lotDetailsQaRemarks =
+    "lotDetailsQaRemarks" in form ? String(form.lotDetailsQaRemarks ?? "").trim() || null : null;
   if (form.uiKey === "defaultLiquid") {
     return {
       processType: "DEFAULT_LIQUID",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: String(form.qaRemarks ?? "").trim() || null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -629,6 +731,8 @@ export const processFormToTypedFields = (
     return {
       processType: "AP_COARSE",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: apCoarseDtoFromForm(form),
@@ -642,6 +746,8 @@ export const processFormToTypedFields = (
     return {
       processType: "AP_FINE",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -655,6 +761,8 @@ export const processFormToTypedFields = (
     return {
       processType: "AP_ULTRA_FINE",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -668,6 +776,8 @@ export const processFormToTypedFields = (
     return {
       processType: "ALUMINUM",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -681,6 +791,8 @@ export const processFormToTypedFields = (
     return {
       processType: uiKeyToProcessType(form.uiKey),
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -694,6 +806,8 @@ export const processFormToTypedFields = (
     return {
       processType: "CC",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: dryingDtoFromForm(form.drying),
       sieving: sievingDtoFromForm(form.sieving),
       apCoarse: null,
@@ -707,6 +821,8 @@ export const processFormToTypedFields = (
     return {
       processType: "IO",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -720,6 +836,8 @@ export const processFormToTypedFields = (
     return {
       processType: "NONOX_D",
       lotDetails,
+      lotDetailsQaRemarks,
+      qaRemarks: null,
       drying: null,
       sieving: null,
       apCoarse: null,
@@ -732,6 +850,8 @@ export const processFormToTypedFields = (
   return {
     processType: "DEFAULT_SOLID",
     lotDetails,
+    lotDetailsQaRemarks,
+    qaRemarks: null,
     drying: dryingDtoFromForm(form.drying),
     sieving: sievingDtoFromForm(form.sieving),
     apCoarse: null,
@@ -756,6 +876,18 @@ export const typedProcessToDisplaySections = (
         lotId: lot.lotId,
         quantity: lot.quantity,
       })),
+    });
+  }
+  if (entry.lotDetailsQaRemarks && String(entry.lotDetailsQaRemarks).trim()) {
+    sections.push({
+      sectionId: "lotDetailsQaRemarks",
+      sectionData: [{ qaRemarks: entry.lotDetailsQaRemarks }],
+    });
+  }
+  if (entry.qaRemarks && String(entry.qaRemarks).trim()) {
+    sections.push({
+      sectionId: "processQaRemarks",
+      sectionData: [{ qaRemarks: entry.qaRemarks }],
     });
   }
   if (migrated.drying) {
@@ -802,6 +934,24 @@ export const typedProcessToDisplaySections = (
         sectionData: ap.particleSizeDistribution as Record<string, unknown>[],
       });
     }
+    if (ap.blendingDryingQaRemarks) {
+      sections.push({
+        sectionId: "blendingDryingQaRemarks",
+        sectionData: [{ qaRemarks: ap.blendingDryingQaRemarks }],
+      });
+    }
+    if (ap.dryingOperationRvdQaRemarks) {
+      sections.push({
+        sectionId: "dryingOperationRvdQaRemarks",
+        sectionData: [{ qaRemarks: ap.dryingOperationRvdQaRemarks }],
+      });
+    }
+    if (ap.particleSizeDistributionQaRemarks) {
+      sections.push({
+        sectionId: "particleSizeDistributionQaRemarks",
+        sectionData: [{ qaRemarks: ap.particleSizeDistributionQaRemarks }],
+      });
+    }
   }
   if (entry.apFine) {
     const ap = entry.apFine;
@@ -818,6 +968,7 @@ export const typedProcessToDisplaySections = (
           grindingStartDatetime: ap.grindingStartDatetime,
           grindingEndDatetime: ap.grindingEndDatetime,
           grindingObservation: ap.grindingObservation,
+          grindingQaRemarks: ap.grindingQaRemarks,
           qtyKgQualified: ap.qtyKgQualified,
         },
       ],
@@ -872,6 +1023,7 @@ export const typedProcessToDisplaySections = (
           grindingStartDatetime: ap.grindingStartDatetime,
           grindingEndDatetime: ap.grindingEndDatetime,
           grindingObservation: ap.grindingObservation,
+          grindingQaRemarks: ap.grindingQaRemarks,
           particleSizeResult: ap.particleSizeResult,
           qtyKgQualified: ap.qtyKgQualified,
         },
@@ -907,6 +1059,7 @@ export const typedProcessToDisplaySections = (
           startDatetime: al.startDatetime,
           endDatetime: al.endDatetime,
           observation: al.observation,
+          qaRemarks: al.qaRemarks,
           qtyKgQualified: al.qtyKgQualified,
           dispatchDatetime: al.dispatchDatetime,
         },
@@ -924,6 +1077,7 @@ export const typedProcessToDisplaySections = (
           sieveMeshSize: d.sieveMeshSize,
           dispatchDatetime: d.dispatchDatetime,
           observation: d.observation,
+          qaRemarks: d.qaRemarks,
           totalQtySentForPremix: d.totalQtySentForPremix,
         },
       ],

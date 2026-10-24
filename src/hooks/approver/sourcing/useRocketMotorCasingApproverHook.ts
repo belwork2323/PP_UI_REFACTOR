@@ -305,12 +305,23 @@ export const useRocketMotorCasingApproverHook = () => {
     }
 
     const model = response.data as RocketMotorCasingDetailsModel;
+    const header = RocketMotorCasingDetailsModel.toDetailHeaderFields(model, row);
 
     setSelected({
       ...row,
       motorCasingId,
       batchId: motorCasingId,
       formId: motorCasingId,
+      subDepartmentId: model.subDepartmentId || row.subDepartmentId || subDepartmentId || undefined,
+      projectId: model.projectId || row.projectId,
+      motorId: model.motorId || row.motorId || row.motorNo,
+      motorStage: model.motorStage || row.motorStage,
+      status: model.status || row.status,
+      casingType: header.casingType,
+      insulationType: header.insulationType,
+      receivingDate: header.receivingDate,
+      submittedBy: header.submittedBy || row.submittedBy,
+      createdOn: header.createdOn || row.createdOn,
       casingBlocks: RocketMotorCasingDetailsModel.toDetailBlocks(model),
     });
   };

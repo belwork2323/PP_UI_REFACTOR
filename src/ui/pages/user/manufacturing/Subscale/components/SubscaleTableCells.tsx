@@ -1,9 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Box, TableCell, TableRow } from "@mui/material";
 import FormInput, { type FormInputProps } from "../../../../../components/common/FormInput";
+import FieldErrorText from "../../../../../components/validation/FieldErrorText";
 import { useDebouncedCallback } from "../../../../../../hooks/useDebouncedCallback";
 import { uniformTableBodyCellSx } from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { ProcessParticularRow } from "../../../../../../hooks/user/manufacturing/subscaleBatchConfig";
+import { getSubscaleFieldFormatError } from "../../../../../../data/validation/configs/subscale.validation.config";
 import { registerSubscalePendingDraft } from "../utils/subscalePendingDrafts";
 
 export type SubscaleCellChangeHandler = (
@@ -28,14 +30,8 @@ export type SubscaleFieldErrorGetter = (
   field: keyof ProcessParticularRow,
 ) => string | undefined;
 
-const DEFERRED_COMMIT_MS = 120;
-
-const PROCESS_PARTICULAR_FIELDS = [
-  ["rpm", "RPM"],
-  ["time", "Time"],
-  ["temp", "Temp"],
-  ["vacuum", "Vacuum"],
-] as const;
+/** Parent form commit delay — keep short; live format errors use local draft (no wait). */
+const DEFERRED_COMMIT_MS = 200;
 
 /**
  * Deferred table text cell — local draft for instant typing; parent commits debounced + on blur.
@@ -46,12 +42,13 @@ type SubscaleTableTextCellProps = Omit<FormInputProps, "value" | "onChange" | "d
   fieldId: string;
   value: string;
   onCellChange: SubscaleCellChangeHandler;
-  errorMessage?: string; // Accepts the dynamic path error message directly
+  errorMessage?: string;
 };
 
 /**
  * Deferred table text cell — local draft for instant typing; parent commits debounced + on blur.
- * Completely independent of React Hook Form (RHF) and control props.
+ * Live FORMAT errors render via FieldErrorText (same pattern as Trimming / Mixing).
+ * `type="number"` is coerced to text + inputMode=decimal so invalid chars can be typed and flagged.
  */
 export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
   tableId,
@@ -61,6 +58,8 @@ export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
   onCellChange,
   disabled,
   errorMessage,
+  type,
+  inputMode,
   ...rest
 }: SubscaleTableTextCellProps) {
   const [draft, setDraft] = useState(value ?? "");
@@ -113,24 +112,41 @@ export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
     commit(draftRef.current);
   }, [commit, debouncedCommit]);
 
-  const hasError = Boolean(errorMessage);
+  const liveFormatError = getSubscaleFieldFormatError(fieldId, draft);
+  const displayError = liveFormatError || errorMessage;
+  const hasError = Boolean(displayError);
   const fieldPath = `${tableId}.${rowIndex}.${fieldId}`;
 
+  // Match Trimming: prefer text + inputMode=decimal over native type=number.
+  const isNumeric = type === "number";
+  const resolvedType = isNumeric ? undefined : type;
+  const resolvedInputMode = isNumeric ? inputMode ?? "decimal" : inputMode;
+
   return (
-    <Box data-ss-field={fieldPath}>
+    <Box data-ss-field={fieldPath} sx={{ minWidth: 0 }}>
       <FormInput
+        {...rest}
         inputRef={inputRef}
         value={draft}
         disabled={disabled}
+        type={resolvedType}
+        inputMode={resolvedInputMode}
         onChange={handleChange}
         onBlur={handleBlur}
         error={hasError}
-        helperText={errorMessage || ""}
-        {...rest}
+        helperText=""
       />
+      <FieldErrorText message={displayError} />
     </Box>
   );
 });
+
+const PROCESS_PARTICULAR_FIELDS = [
+  ["rpm", "RPM"],
+  ["time", "Time"],
+  ["temp", "Temp"],
+  ["vacuum", "Vacuum"],
+] as const;
 
 type SubscaleProcessParticularRowProps = {
   row: ProcessParticularRow;
@@ -141,7 +157,7 @@ type SubscaleProcessParticularRowProps = {
   border: string;
   text: string;
   getFieldError?: SubscaleFieldErrorGetter;
-  clearFieldError?: (path: string) => void; // <-- Add this
+  clearFieldError?: (path: string) => void;
 };
 
 /** Memoized process particulars row — only re-renders when its row data changes. */
@@ -190,7 +206,7 @@ export const SubscaleProcessParticularRow = memo(function SubscaleProcessParticu
 });
 
 type ProcessParticularFieldCellProps = {
-  field: "rpm" | "time" | "temp" | "vacuum";
+  field: (typeof PROCESS_PARTICULAR_FIELDS)[number][0];
   placeholder: string;
   value: string;
   cycleIndex: number;
@@ -214,7 +230,6 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
   border,
   text,
   errorMessage,
-  clearFieldError,
 }: ProcessParticularFieldCellProps) {
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(draft);
@@ -257,9 +272,8 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
       const nextValue = event.target.value;
       setDraft(nextValue);
       debouncedCommit(nextValue);
-      clearFieldError?.(fieldName); // Clear the error for this field when user types
     },
-    [debouncedCommit, clearFieldError, fieldName],
+    [debouncedCommit],
   );
 
   const handleBlur = useCallback(() => {
@@ -267,18 +281,23 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
     commit(draftRef.current);
   }, [commit, debouncedCommit]);
 
+  const liveFormatError = getSubscaleFieldFormatError(field, draft);
+  const displayError = liveFormatError || errorMessage;
+
   return (
     <TableCell sx={uniformTableBodyCellSx({ border, text })}>
-      <Box data-ss-field={fieldName}>
+      <Box data-ss-field={fieldName} sx={{ minWidth: 0 }}>
         <FormInput
           inputRef={inputRef}
           value={draft}
           placeholder={placeholder}
+          inputMode="decimal"
           onChange={handleChange}
           onBlur={handleBlur}
-          error={Boolean(errorMessage)}
-          helperText={errorMessage}
+          error={Boolean(displayError)}
+          helperText=""
         />
+        <FieldErrorText message={displayError} />
       </Box>
     </TableCell>
   );

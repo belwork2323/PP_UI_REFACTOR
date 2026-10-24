@@ -207,7 +207,7 @@ export type QcCuringCycleColumnId =
   | "PROPELLANT_PRESSURE"
   | "PEAK_PRESSURE_ACHIEVED"
   | "HOT_WATER_STATUS"
-  | "REMARKS";
+  | "QA_REMARKS";
 
 export const resolveCuringCycleColumnIds = (
   subType: string | null | undefined,
@@ -223,10 +223,10 @@ export const resolveCuringCycleColumnIds = (
   ];
   const normalized = normalizeQcCuringType(subType);
   if (normalized === "CONFINED") {
-    return [...base, "PROPELLANT_PRESSURE", "PEAK_PRESSURE_ACHIEVED", "HOT_WATER_STATUS", "REMARKS"];
+    return [...base, "PROPELLANT_PRESSURE", "PEAK_PRESSURE_ACHIEVED", "HOT_WATER_STATUS", "QA_REMARKS"];
   }
   if (normalized === "N2_PRESSURE") {
-    return [...base, "PROPELLANT_PRESSURE", "HOT_WATER_STATUS", "REMARKS"];
+    return [...base, "PROPELLANT_PRESSURE", "HOT_WATER_STATUS", "QA_REMARKS"];
   }
-  return [...base, "HOT_WATER_STATUS", "REMARKS"];
+  return [...base, "HOT_WATER_STATUS", "QA_REMARKS"];
 };

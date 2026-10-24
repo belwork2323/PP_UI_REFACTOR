@@ -9,6 +9,8 @@ import {
 
 export type QcDeCoringMotorSubmissionType = "DRAFT" | "SUBMIT";
 
+export const DE_CORING_QA_REMARKS_BLOCK_ID = "QA_REMARKS";
+
 const formKey = (sectionId: string, blockId: string) => `${sectionId}::${blockId}`;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -37,6 +39,7 @@ export const createInitialDeCoringValues = (): SchemaFormValues => ({
   [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "DE_CORING_LOAD")]: "",
   [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "DE_CORING_DATE_TIME")]: "",
   [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "OBSERVATIONS")]: "",
+  [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, DE_CORING_QA_REMARKS_BLOCK_ID)]: "",
 });
 
 const getField = (values: SchemaFormValues | null | undefined, field: QcDeCoringField) =>
@@ -61,6 +64,17 @@ export const setDeCoringField = (
   field: QcDeCoringField,
   value: string,
 ) => setField(values, field, value);
+
+export const getDeCoringQaRemarks = (values: SchemaFormValues | null | undefined): string =>
+  String(values?.[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, DE_CORING_QA_REMARKS_BLOCK_ID)] ?? "");
+
+export const setDeCoringQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+  qaRemarks: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, DE_CORING_QA_REMARKS_BLOCK_ID)]: qaRemarks,
+});
 
 const isDeCoringSectionId = (sectionId: string) => {
   const normalized = sectionId.trim().toUpperCase().replace(/-/g, "_");
@@ -169,6 +183,8 @@ export const hydrateDeCoringValuesFromSections = (
     (Object.keys(mapped) as QcDeCoringField[]).forEach((field) => {
       values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, field)] = mapped[field];
     });
+    values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, DE_CORING_QA_REMARKS_BLOCK_ID)] =
+      pickFirstValue(data.QA_REMARKS, data.qaRemarks);
   }
 
   return values;
@@ -217,6 +233,7 @@ export const buildDeCoringMotorDetailPayload = (
   const load = toDeCoringApiLoad(getDeCoringField(values, "DE_CORING_LOAD"));
   const dateTime = toDeCoringApiDateTime(getDeCoringField(values, "DE_CORING_DATE_TIME"));
   const observations = getDeCoringField(values, "OBSERVATIONS");
+  const qaRemarks = getDeCoringQaRemarks(values).trim();
 
   return omitEmpty({
     motorId,
@@ -226,6 +243,7 @@ export const buildDeCoringMotorDetailPayload = (
       // Full datetime (YYYY-MM-DDTHH:mm:ss) — same for create and update.
       decoringDate: dateTime,
       decoringRemarks: observations || undefined,
+      qaRemarks: qaRemarks || undefined,
     }),
   });
 };
@@ -288,25 +306,40 @@ export const deCoringMotorDetailToSections = (
     const sectionId = String(sec.sectionId ?? "").trim();
     if (!isDeCoringSectionId(sectionId)) continue;
     const data = asRecord(asArray(sec.sectionData)[0]) ?? {};
-    const mapped = mapDeCoringDetailsFromRecord({
+    const resolved = {
       ...resolveDeCoringDetailsRecord(rec),
       ...data,
-    });
+    };
+    const mapped = mapDeCoringDetailsFromRecord(resolved);
+    const qaRemarks = pickFirstValue(resolved.qaRemarks, resolved.QA_REMARKS);
     sections.push({
       sectionId: QC_DE_CORING_SECTION_IDS.DETAILS,
-      sectionData: [mapped],
+      sectionData: [{ ...mapped, ...(qaRemarks ? { QA_REMARKS: qaRemarks } : {}) }],
       motorId,
     } as SchemaSectionSubmission);
   }
 
   if (!sections.length) {
-    const mapped = mapDeCoringDetailsFromRecord(resolveDeCoringDetailsRecord(rec));
-    if (Object.values(mapped).some(hasValue)) {
+    const resolved = resolveDeCoringDetailsRecord(rec);
+    const mapped = mapDeCoringDetailsFromRecord(resolved);
+    const qaRemarks = pickFirstValue(resolved.qaRemarks, resolved.QA_REMARKS);
+    if (Object.values(mapped).some(hasValue) || hasValue(qaRemarks)) {
       sections.push({
         sectionId: QC_DE_CORING_SECTION_IDS.DETAILS,
-        sectionData: [mapped],
+        sectionData: [{ ...mapped, ...(qaRemarks ? { QA_REMARKS: qaRemarks } : {}) }],
         motorId,
       } as SchemaSectionSubmission);
+    }
+  } else {
+    // Ensure nested API qaRemarks lands on the first section payload for hydrate.
+    const resolved = resolveDeCoringDetailsRecord(rec);
+    const qaRemarks = pickFirstValue(resolved.qaRemarks, resolved.QA_REMARKS);
+    if (qaRemarks) {
+      const first = asRecord(asArray(sections[0].sectionData)[0]) ?? {};
+      sections[0] = {
+        ...sections[0],
+        sectionData: [{ ...first, QA_REMARKS: qaRemarks }],
+      };
     }
   }
 
@@ -318,6 +351,7 @@ export const buildDeCoringSectionPayload = (
   values: SchemaFormValues | null | undefined,
   motorId?: string | null,
 ): SchemaSectionSubmission[] => {
+  const qaRemarks = getDeCoringQaRemarks(values);
   const section: SchemaSectionSubmission = {
     sectionId: QC_DE_CORING_SECTION_IDS.DETAILS,
     sectionData: [
@@ -325,6 +359,7 @@ export const buildDeCoringSectionPayload = (
         DE_CORING_LOAD: getDeCoringField(values, "DE_CORING_LOAD"),
         DE_CORING_DATE_TIME: getDeCoringField(values, "DE_CORING_DATE_TIME"),
         OBSERVATIONS: getDeCoringField(values, "OBSERVATIONS"),
+        ...(qaRemarks ? { QA_REMARKS: qaRemarks } : {}),
       },
     ],
   };
@@ -338,4 +373,4 @@ export const buildDeCoringSectionPayload = (
 export const deCoringValuesHaveData = (values: SchemaFormValues | null | undefined) =>
   (["DE_CORING_LOAD", "DE_CORING_DATE_TIME", "OBSERVATIONS"] as const).some((field) =>
     hasValue(getDeCoringField(values, field)),
-  );
+  ) || hasValue(getDeCoringQaRemarks(values));

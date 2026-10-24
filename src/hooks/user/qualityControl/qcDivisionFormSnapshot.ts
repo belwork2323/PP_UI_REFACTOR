@@ -8,6 +8,7 @@ import {
   isRawMaterialRevalidationType,
 } from "./qcProcessingConfig";
 import { collectTempFileIdsFromQcNdtValues } from "./qcNdtTables";
+import { collectTempFileIdsFromQcStfValues } from "./qcStfTables";
 import { collectTempFileIdsFromQcPropellantValues } from "./qcPropellantTables";
 import { collectTempFileIdsFromQcHardwareValues } from "./qcHardwareTables";
 import { collectTempFileIdsFromQcPostCureValues } from "./qcPostCureTables";
@@ -246,6 +247,8 @@ const collectTempFileIdsFromEntryValues = (
 
   if (entry.kind === "NDT_MOTOR") {
     ids.push(...collectTempFileIdsFromQcNdtValues(schemaValues));
+  } else if (entry.kind === "STF") {
+    ids.push(...collectTempFileIdsFromQcStfValues(schemaValues));
   } else if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
     ids.push(...collectTempFileIdsFromQcPropellantValues(schemaValues));
   } else if (entry.kind === "HARDWARE_PROCESS") {

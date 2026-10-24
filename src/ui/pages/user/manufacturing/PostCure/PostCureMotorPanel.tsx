@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Autocomplete,
   Box,
+  Button,
   CircularProgress,
+  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -13,8 +16,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { fetchCastingStationsApi } from "../../../../../data/api/users/operationsApi";
 import postCureController from "../../../../../controllers/user/manufacturing/postCureController";
+import { operationsController } from "../../../../../controllers/user/operationsController";
+import type { MaterialsListItem } from "../../../../../data/models/user/MaterialsListModel";
 import {
   buildPostCureIngredientRowsFromApi,
   POST_CURE_RECIPE_TYPES,
@@ -62,6 +69,7 @@ export const LocationDateTable = ({
   clearFieldError,
   disabled,
   readOnly = false,
+  qaRemarksMode = false,
 }: {
   basePath: string;
   value?: any[];
@@ -70,8 +78,17 @@ export const LocationDateTable = ({
   clearFieldError?: (path: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  /** QC Division only: show QA Remarks column beside Observations. */
+  qaRemarksMode?: boolean;
 }) => {
   const rows = value || [];
+  const headers = [
+    "Location",
+    "From Date",
+    "To Date",
+    "Observations",
+    ...(qaRemarksMode ? ["QA Remarks"] : []),
+  ];
 
   const handleFieldChange = (index: number, fieldName: string, val: any) => {
     const updated = [...rows];
@@ -86,11 +103,11 @@ export const LocationDateTable = ({
       <Table size="small">
         <TableHead>
           <TableRow>
-            {["Location", "From Date", "To Date", "Observations"].map((label, idx) => (
+            {headers.map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
                 <FieldLabelWithAsterisk
                   label={label}
-                  required={!readOnly}
+                  required={!readOnly && label !== "QA Remarks"}
                   sx={postCureTableHeaderLabelSx}
                 />
               </TableCell>
@@ -104,6 +121,7 @@ export const LocationDateTable = ({
               const fromDateErrKey = `${basePath}.${index}.fromDate`;
               const toDateErrKey = `${basePath}.${index}.toDate`;
               const obsErrKey = `${basePath}.${index}.observations`;
+              const qaErrKey = `${basePath}.${index}.qaRemarks`;
 
               return (
                 <TableRow key={`loc-date-${locationVal || index}`} sx={postCureTableRowSx(index)}>
@@ -161,12 +179,31 @@ export const LocationDateTable = ({
                       />
                     )}
                   </TableCell>
+                  {qaRemarksMode ? (
+                    <TableCell sx={postCureTableCellSx}>
+                      {readOnly ? (
+                        <WorkflowReadOnlyText value={row.qaRemarks} />
+                      ) : (
+                        <TableTextInput
+                          value={row.qaRemarks ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "qaRemarks", val)}
+                          error={Boolean(validationErrors[qaErrKey])}
+                          helperText={validationErrors[qaErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          multiline
+                          minRows={2}
+                          fieldPath={qaErrKey}
+                        />
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ py: 2 }}>
+              <TableCell colSpan={headers.length} align="center" sx={{ py: 2 }}>
                 <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
@@ -192,6 +229,7 @@ export const LocationQtyTable = ({
   clearFieldError,
   disabled = false,
   readOnly = false,
+  qaRemarksMode = false,
 }: {
   basePath: string;
   value?: any[];
@@ -202,8 +240,18 @@ export const LocationQtyTable = ({
   clearFieldError?: (path: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  /** QC Division only: show QA Remarks column beside Observations. */
+  qaRemarksMode?: boolean;
 }) => {
   const rows = value || [];
+  const headers = [
+    "Location",
+    "From Date",
+    "To Date",
+    qtyLabel,
+    "Observations",
+    ...(qaRemarksMode ? ["QA Remarks"] : []),
+  ];
 
   const handleFieldChange = (index: number, fieldName: string, val: any) => {
     const updated = [...rows];
@@ -220,11 +268,11 @@ export const LocationQtyTable = ({
       <Table size="small">
         <TableHead>
           <TableRow>
-            {["Location", "From Date", "To Date", qtyLabel, "Observations"].map((label, idx) => (
+            {headers.map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
                 <FieldLabelWithAsterisk
                   label={label}
-                  required={idx >= 1 && !readOnly}
+                  required={idx >= 1 && !readOnly && label !== "QA Remarks"}
                   sx={postCureTableHeaderLabelSx}
                 />
               </TableCell>
@@ -239,6 +287,7 @@ export const LocationQtyTable = ({
               const toDateErrKey = `${basePath}.${index}.toDate`;
               const qtyErrKey = `${basePath}.${index}.${qtyKey}`;
               const obsErrKey = `${basePath}.${index}.observations`;
+              const qaErrKey = `${basePath}.${index}.qaRemarks`;
 
               return (
                 <TableRow key={`loc-qty-${locationVal || index}`} sx={postCureTableRowSx(index)}>
@@ -312,12 +361,31 @@ export const LocationQtyTable = ({
                       />
                     )}
                   </TableCell>
+                  {qaRemarksMode ? (
+                    <TableCell sx={postCureTableCellSx}>
+                      {readOnly ? (
+                        <WorkflowReadOnlyText value={row.qaRemarks} />
+                      ) : (
+                        <TableTextInput
+                          value={row.qaRemarks ?? ""}
+                          onChange={(val: any) => handleFieldChange(index, "qaRemarks", val)}
+                          error={Boolean(validationErrors[qaErrKey])}
+                          helperText={validationErrors[qaErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          multiline
+                          minRows={2}
+                          fieldPath={qaErrKey}
+                        />
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
+              <TableCell colSpan={headers.length} align="center" sx={{ py: 2 }}>
                 <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
@@ -496,6 +564,7 @@ export const IngredientQuantityTable = ({
   clearFieldError,
   disabled = false,
   readOnly = false,
+  qaRemarksMode = false,
 }: {
   basePath: string;
   value?: any[];
@@ -505,8 +574,18 @@ export const IngredientQuantityTable = ({
   clearFieldError?: (path: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  /** QC Division only: show QA Remarks column. */
+  qaRemarksMode?: boolean;
 }) => {
   const rows = value || [];
+  const headers = [
+    "Sr No.",
+    "Ingredient",
+    "Mfg Lot",
+    "Parts By Weight",
+    qtyKey === "quantity" ? "Quantity (g)" : "Qty Taken (g)",
+    ...(qaRemarksMode ? ["QA Remarks"] : []),
+  ];
 
   const {
     fetchLotsForMaterialCode,
@@ -552,22 +631,23 @@ export const IngredientQuantityTable = ({
     onChange(updatedRows);
   };
 
+  const handleQaRemarksChange = (currentIndex: number, newValue: string) => {
+    const updatedRows = [...rows];
+    updatedRows[currentIndex] = { ...updatedRows[currentIndex], qaRemarks: newValue };
+    clearFieldError?.(`${basePath}.${currentIndex}.qaRemarks`);
+    onChange(updatedRows);
+  };
+
   return (
     <TableContainer sx={{ ...postCureTableContainerSx, overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 720 }}>
+      <Table size="small" sx={{ minWidth: qaRemarksMode ? 900 : 720 }}>
         <TableHead>
           <TableRow>
-            {[
-              "Sr No.",
-              "Ingredient",
-              "Mfg Lot",
-              "Parts By Weight",
-              qtyKey === "quantity" ? "Quantity (g)" : "Qty Taken (g)",
-            ].map((label, idx) => (
+            {headers.map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
                 <FieldLabelWithAsterisk
                   label={label}
-                  required={!readOnly}
+                  required={!readOnly && label !== "QA Remarks"}
                   sx={postCureTableHeaderLabelSx}
                 />
               </TableCell>
@@ -584,6 +664,7 @@ export const IngredientQuantityTable = ({
 
               const mfgLotErrKey = `${basePath}.${index}.mfgLot`;
               const qtyErrKey = `${basePath}.${index}.${qtyKey}`;
+              const qaErrKey = `${basePath}.${index}.qaRemarks`;
 
               return (
                 <TableRow key={`ing-${srNo || index}`} sx={postCureTableRowSx(index)}>
@@ -630,12 +711,33 @@ export const IngredientQuantityTable = ({
                       />
                     )}
                   </TableCell>
+                  {qaRemarksMode ? (
+                    <TableCell sx={postCureTableCellSx}>
+                      {isTotal ? (
+                        <WorkflowReadOnlyText value="" muted />
+                      ) : readOnly ? (
+                        <WorkflowReadOnlyText value={row.qaRemarks} />
+                      ) : (
+                        <TableTextInput
+                          value={String(row.qaRemarks ?? "")}
+                          onChange={(next: any) => handleQaRemarksChange(index, next)}
+                          error={Boolean(validationErrors[qaErrKey])}
+                          helperText={validationErrors[qaErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          multiline
+                          minRows={2}
+                          fieldPath={qaErrKey}
+                        />
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
+              <TableCell colSpan={headers.length} align="center" sx={{ py: 2 }}>
                 <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
@@ -645,6 +747,412 @@ export const IngredientQuantityTable = ({
         </TableBody>
       </Table>
     </TableContainer>
+  );
+};
+
+/** Others-only flexible mix table (IR1/Hemcoat keep IngredientQuantityTable unchanged). */
+export const FlexibleOthersIngredientTable = ({
+  basePath,
+  value = [],
+  onChange,
+  qtyKey = "qtyTaken",
+  validationErrors = {},
+  clearFieldError,
+  disabled = false,
+  readOnly = false,
+  qaRemarksMode = false,
+}: {
+  basePath: string;
+  value?: any[];
+  onChange: (updatedRows: any[]) => void;
+  qtyKey?: "quantity" | "qtyTaken" | string;
+  validationErrors?: Record<string, string>;
+  clearFieldError?: (path: string) => void;
+  disabled?: boolean;
+  readOnly?: boolean;
+  qaRemarksMode?: boolean;
+}) => {
+  const rows = value || [];
+  const [materials, setMaterials] = useState<MaterialsListItem[]>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+
+  const {
+    fetchLotsForMaterialCode,
+    getCachedLotOptions,
+    getApiLotCount,
+    hasFetchedLots,
+    isLoadingLots,
+  } = useCasePrepLinerMaterials();
+
+  useEffect(() => {
+    let active = true;
+    setMaterialsLoading(true);
+    void operationsController
+      .fetchAllMaterialsList()
+      .then((res) => {
+        if (!active) return;
+        if (res.success && Array.isArray(res.data)) {
+          setMaterials(res.data);
+        } else {
+          setMaterials([]);
+        }
+      })
+      .catch(() => {
+        if (active) setMaterials([]);
+      })
+      .finally(() => {
+        if (active) setMaterialsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const renumberRows = (next: any[]) => {
+    let n = 1;
+    return next.map((row) => {
+      if (String(row?.srNo ?? "").toUpperCase() === "TOTAL") {
+        return { ...row, srNo: "TOTAL", ingredient: "Total Quantity" };
+      }
+      return { ...row, srNo: n++ };
+    });
+  };
+
+  const recomputeTotal = (next: any[]) => {
+    const totalQty = next.reduce((acc: number, row: any) => {
+      if (String(row?.srNo ?? "").toUpperCase() === "TOTAL") return acc;
+      const val = parseFloat(row[qtyKey] ?? row.quantity ?? row.qtyTaken ?? 0);
+      return !isNaN(val) ? acc + val : acc;
+    }, 0);
+    const totalIdx = next.findIndex(
+      (row: any) => String(row?.srNo ?? "").toUpperCase() === "TOTAL",
+    );
+    if (totalIdx === -1) {
+      return [
+        ...next,
+        {
+          srNo: "TOTAL",
+          ingredient: "Total Quantity",
+          materialId: null,
+          materialCode: null,
+          mfgLot: "",
+          partsByWeight: "",
+          [qtyKey]: totalQty > 0 ? String(totalQty) : "",
+        },
+      ];
+    }
+    const copy = [...next];
+    copy[totalIdx] = {
+      ...copy[totalIdx],
+      [qtyKey]: totalQty > 0 ? String(totalQty) : "",
+    };
+    return copy;
+  };
+
+  const commitRows = (next: any[]) => onChange(renumberRows(recomputeTotal(next)));
+
+  const handleFieldChange = (index: number, field: string, newValue: unknown) => {
+    const updated = [...rows];
+    updated[index] = { ...updated[index], [field]: newValue };
+    clearFieldError?.(`${basePath}.${index}.${field}`);
+    commitRows(updated);
+  };
+
+  const handleIngredientInput = (index: number, typed: string, selected?: MaterialsListItem | null) => {
+    const updated = [...rows];
+    if (selected) {
+      updated[index] = {
+        ...updated[index],
+        ingredient: selected.materialName || selected.materialCode,
+        materialId: selected.materialId,
+        materialCode: selected.materialCode,
+      };
+    } else {
+      updated[index] = {
+        ...updated[index],
+        ingredient: typed,
+        materialId: null,
+        materialCode: null,
+      };
+    }
+    clearFieldError?.(`${basePath}.${index}.ingredient`);
+    commitRows(updated);
+  };
+
+  const handleAddRow = () => {
+    const withoutTotal = rows.filter(
+      (row) => String(row?.srNo ?? "").toUpperCase() !== "TOTAL",
+    );
+    commitRows([
+      ...withoutTotal,
+      {
+        srNo: withoutTotal.length + 1,
+        ingredient: "",
+        materialId: null,
+        materialCode: null,
+        mfgLot: "",
+        partsByWeight: "",
+        [qtyKey]: "",
+      },
+      rows.find((row) => String(row?.srNo ?? "").toUpperCase() === "TOTAL") ?? {
+        srNo: "TOTAL",
+        ingredient: "Total Quantity",
+        materialId: null,
+        materialCode: null,
+        mfgLot: "",
+        partsByWeight: "",
+        [qtyKey]: "",
+      },
+    ]);
+  };
+
+  const handleDeleteRow = (index: number) => {
+    const row = rows[index];
+    if (!row || String(row.srNo ?? "").toUpperCase() === "TOTAL") return;
+    const next = rows.filter((_, i) => i !== index);
+    commitRows(next.length ? next : [
+      {
+        srNo: 1,
+        ingredient: "",
+        materialId: null,
+        materialCode: null,
+        mfgLot: "",
+        partsByWeight: "",
+        [qtyKey]: "",
+      },
+      {
+        srNo: "TOTAL",
+        ingredient: "Total Quantity",
+        materialId: null,
+        materialCode: null,
+        mfgLot: "",
+        partsByWeight: "",
+        [qtyKey]: "",
+      },
+    ]);
+  };
+
+  const flexibleHeaders = [
+    "Sr No.",
+    "Ingredient",
+    "Mfg Lot",
+    "Parts By Weight",
+    qtyKey === "quantity" ? "Quantity (g)" : "Qty Taken (g)",
+    ...(qaRemarksMode ? ["QA Remarks"] : []),
+    "",
+  ];
+
+  return (
+    <Box>
+      <TableContainer sx={{ ...postCureTableContainerSx, overflowX: "auto" }}>
+        <Table size="small" sx={{ minWidth: qaRemarksMode ? 960 : 780 }}>
+          <TableHead>
+            <TableRow>
+              {flexibleHeaders.map((label, idx) => (
+                <TableCell key={`${label}-${idx}`} sx={postCureTableHeaderCellSx(idx === 0)}>
+                  {label ? (
+                    <FieldLabelWithAsterisk
+                      label={label}
+                      required={!readOnly && label !== "" && label !== "QA Remarks"}
+                      sx={postCureTableHeaderLabelSx}
+                    />
+                  ) : null}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length > 0 ? (
+              rows.map((row: any, index: number) => {
+                const srNo = row.srNo ?? row.SR_NO;
+                const isTotal = String(srNo ?? "").toUpperCase() === "TOTAL";
+                const ingredientErr = `${basePath}.${index}.ingredient`;
+                const partsErr = `${basePath}.${index}.partsByWeight`;
+                const mfgLotErr = `${basePath}.${index}.mfgLot`;
+                const qtyErr = `${basePath}.${index}.${qtyKey}`;
+                const qaErr = `${basePath}.${index}.qaRemarks`;
+                const selectedMaterial =
+                  materials.find(
+                    (m) =>
+                      m.materialCode === String(row.materialCode ?? "").trim() ||
+                      m.materialId === Number(row.materialId),
+                  ) ?? null;
+
+                return (
+                  <TableRow key={`others-ing-${srNo || index}`} sx={postCureTableRowSx(index)}>
+                    <TableCell sx={{ ...postCureTableCellSx, fontWeight: 600 }}>{srNo}</TableCell>
+                    <TableCell sx={postCureTableCellSx}>
+                      {isTotal || readOnly ? (
+                        <Typography sx={{ fontWeight: isTotal ? 700 : 500, fontSize: "0.78rem" }}>
+                          {row.ingredient ?? row.INGREDIENT}
+                        </Typography>
+                      ) : (
+                        <Autocomplete
+                          freeSolo
+                          options={materials}
+                          loading={materialsLoading}
+                          value={selectedMaterial}
+                          inputValue={String(row.ingredient ?? "")}
+                          getOptionLabel={(opt) =>
+                            typeof opt === "string"
+                              ? opt
+                              : `${opt.materialName} (${opt.materialCode})`
+                          }
+                          filterOptions={(options, state) => {
+                            const q = String(state.inputValue ?? "")
+                              .trim()
+                              .toLowerCase();
+                            if (!q) return options.slice(0, 50);
+                            return options
+                              .filter(
+                                (opt) =>
+                                  opt.materialName.toLowerCase().includes(q) ||
+                                  opt.materialCode.toLowerCase().includes(q),
+                              )
+                              .slice(0, 50);
+                          }}
+                          onInputChange={(_, next, reason) => {
+                            if (reason === "reset") return;
+                            handleIngredientInput(index, next, null);
+                          }}
+                          onChange={(_, next) => {
+                            if (typeof next === "string") {
+                              handleIngredientInput(index, next, null);
+                            } else {
+                              handleIngredientInput(index, next?.materialName ?? "", next);
+                            }
+                          }}
+                          disabled={disabled}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              size="small"
+                              placeholder="Search or type ingredient"
+                              error={Boolean(validationErrors[ingredientErr])}
+                              helperText={validationErrors[ingredientErr]}
+                              sx={postCureTableInputSx}
+                              inputProps={{
+                                ...params.inputProps,
+                                "data-qc-field": ingredientErr,
+                              }}
+                            />
+                          )}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={postCureTableCellSx}>
+                      {isTotal ? (
+                        <WorkflowReadOnlyText value={row.mfgLot} muted />
+                      ) : (
+                        <MfgLotCell
+                          row={row}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(validationErrors[mfgLotErr])}
+                          helperText={validationErrors[mfgLotErr]}
+                          fieldPath={mfgLotErr}
+                          onChange={(mfgLot) => handleFieldChange(index, "mfgLot", mfgLot)}
+                          fetchLotsForMaterialCode={fetchLotsForMaterialCode}
+                          getCachedLotOptions={getCachedLotOptions}
+                          getApiLotCount={getApiLotCount}
+                          hasFetchedLots={hasFetchedLots}
+                          isLoadingLots={isLoadingLots}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={postCureTableCellSx}>
+                      {isTotal || readOnly ? (
+                        <WorkflowReadOnlyText value={row.partsByWeight} />
+                      ) : (
+                        <TableTextInput
+                          value={String(row.partsByWeight ?? "")}
+                          onChange={(next: any) =>
+                            handleFieldChange(index, "partsByWeight", next)
+                          }
+                          error={Boolean(validationErrors[partsErr])}
+                          helperText={validationErrors[partsErr]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          fieldPath={partsErr}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={postCureTableCellSx}>
+                      {readOnly ? (
+                        <WorkflowReadOnlyText value={row[qtyKey]} />
+                      ) : (
+                        <TableTextInput
+                          value={String(row[qtyKey] ?? "")}
+                          onChange={(next: any) => handleFieldChange(index, qtyKey, next)}
+                          error={Boolean(validationErrors[qtyErr])}
+                          helperText={validationErrors[qtyErr]}
+                          disabled={disabled || isTotal}
+                          readOnly={readOnly}
+                          type="number"
+                          fieldPath={qtyErr}
+                        />
+                      )}
+                    </TableCell>
+                    {qaRemarksMode ? (
+                      <TableCell sx={postCureTableCellSx}>
+                        {isTotal ? (
+                          <WorkflowReadOnlyText value="" muted />
+                        ) : readOnly ? (
+                          <WorkflowReadOnlyText value={row.qaRemarks} />
+                        ) : (
+                          <TableTextInput
+                            value={String(row.qaRemarks ?? "")}
+                            onChange={(next: any) => handleFieldChange(index, "qaRemarks", next)}
+                            error={Boolean(validationErrors[qaErr])}
+                            helperText={validationErrors[qaErr]}
+                            disabled={disabled}
+                            readOnly={readOnly}
+                            multiline
+                            minRows={2}
+                            fieldPath={qaErr}
+                          />
+                        )}
+                      </TableCell>
+                    ) : null}
+                    <TableCell sx={postCureTableCellSx}>
+                      {!readOnly && !isTotal ? (
+                        <IconButton
+                          size="small"
+                          aria-label="Remove ingredient row"
+                          disabled={disabled}
+                          onClick={() => handleDeleteRow(index)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 2 }}>
+                  <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
+                    No ingredients yet. Add a row to begin.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {!readOnly ? (
+        <Button
+          size="small"
+          startIcon={<AddRoundedIcon />}
+          onClick={handleAddRow}
+          disabled={disabled}
+          sx={{ mt: 1, textTransform: "none" }}
+        >
+          Add Row
+        </Button>
+      ) : null}
+    </Box>
   );
 };
 
@@ -660,6 +1168,9 @@ export const QualificationSection = ({
   disabled = false,
   readOnly = false,
   useQcDivisionFileField = false,
+  /** Others: allow editing specification (IR1/Hemcoat keep fixed recipe specs). */
+  editableSpecification = false,
+  qaRemarksMode = false,
 }: {
   basePath: string;
   value?: any;
@@ -669,8 +1180,16 @@ export const QualificationSection = ({
   disabled?: boolean;
   readOnly?: boolean;
   useQcDivisionFileField?: boolean;
+  editableSpecification?: boolean;
+  qaRemarksMode?: boolean;
 }) => {
   const tableValues = value?.qualificationTable || [];
+  const qualHeaders = [
+    "Parameter",
+    "Specification",
+    "Result",
+    ...(qaRemarksMode ? ["QA Remarks"] : []),
+  ];
 
   const handleSectionFieldChange = (fieldName: string, val: any) => {
     const updated = { ...(value || {}), [fieldName]: val };
@@ -686,6 +1205,22 @@ export const QualificationSection = ({
     const errKey = `${basePath}.qualificationTable.${index}.result`;
     clearFieldError?.(errKey); // Clears only this specific qualification table row result
 
+    onChange({ ...(value || {}), qualificationTable: updatedTable });
+  };
+
+  const handleTableSpecificationChange = (index: number, specificationVal: any) => {
+    const updatedTable = [...tableValues];
+    updatedTable[index] = { ...updatedTable[index], specification: specificationVal };
+    const errKey = `${basePath}.qualificationTable.${index}.specification`;
+    clearFieldError?.(errKey);
+    onChange({ ...(value || {}), qualificationTable: updatedTable });
+  };
+
+  const handleTableQaRemarksChange = (index: number, qaRemarksVal: any) => {
+    const updatedTable = [...tableValues];
+    updatedTable[index] = { ...updatedTable[index], qaRemarks: qaRemarksVal };
+    const errKey = `${basePath}.qualificationTable.${index}.qaRemarks`;
+    clearFieldError?.(errKey);
     onChange({ ...(value || {}), qualificationTable: updatedTable });
   };
 
@@ -734,11 +1269,11 @@ export const QualificationSection = ({
         <Table size="small">
           <TableHead>
             <TableRow>
-              {["Parameter", "Specification", "Result"].map((label, idx) => (
+              {qualHeaders.map((label, idx) => (
                 <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
                   <FieldLabelWithAsterisk
                     label={label}
-                    required={!readOnly}
+                    required={!readOnly && label !== "QA Remarks"}
                     sx={postCureTableHeaderLabelSx}
                   />
                 </TableCell>
@@ -750,6 +1285,9 @@ export const QualificationSection = ({
               const parameter = row.parameter ?? row.PARAMETER;
               const specification = row.specification ?? row.SPECIFICATION;
               const resultErrKey = `${basePath}.qualificationTable.${index}.result`;
+              const specificationErrKey = `${basePath}.qualificationTable.${index}.specification`;
+              const qaErrKey = `${basePath}.qualificationTable.${index}.qaRemarks`;
+              const canEditSpec = editableSpecification && !readOnly;
 
               return (
                 <TableRow key={`qual-${index}`} sx={postCureTableRowSx(index)}>
@@ -757,7 +1295,20 @@ export const QualificationSection = ({
                     {parameter}
                   </TableCell>
                   <TableCell sx={{ ...postCureTableCellSx, fontWeight: 500 }}>
-                    {specification}
+                    {canEditSpec ? (
+                      <TableTextInput
+                        value={specification ?? ""}
+                        onChange={(e: any) => handleTableSpecificationChange(index, e)}
+                        error={Boolean(validationErrors[specificationErrKey])}
+                        helperText={validationErrors[specificationErrKey]}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                        required
+                        fieldPath={specificationErrKey}
+                      />
+                    ) : (
+                      specification
+                    )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
@@ -775,6 +1326,25 @@ export const QualificationSection = ({
                       />
                     )}
                   </TableCell>
+                  {qaRemarksMode ? (
+                    <TableCell sx={postCureTableCellSx}>
+                      {readOnly ? (
+                        <WorkflowReadOnlyText value={row.qaRemarks} />
+                      ) : (
+                        <TableTextInput
+                          value={row.qaRemarks ?? ""}
+                          onChange={(e: any) => handleTableQaRemarksChange(index, e)}
+                          error={Boolean(validationErrors[qaErrKey])}
+                          helperText={validationErrors[qaErrKey]}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          multiline
+                          minRows={2}
+                          fieldPath={qaErrKey}
+                        />
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })}
@@ -827,6 +1397,7 @@ export const InhibitionSharedSections = ({
   onChange,
   validationErrors = {},
   clearFieldError,
+  qaRemarksMode = false,
 }: {
   disabled?: boolean;
   readOnly?: boolean;
@@ -836,6 +1407,7 @@ export const InhibitionSharedSections = ({
   onChange: (updated: any) => void;
   validationErrors?: Record<string, string>;
   clearFieldError?: (path: string) => void;
+  qaRemarksMode?: boolean;
 }) => {
   const handleAppTableChange = (tableRows: any[]) => {
     const updated = {
@@ -902,6 +1474,26 @@ export const InhibitionSharedSections = ({
             />
           </Box>
         </FieldGrid>
+        {qaRemarksMode ? (
+          <Box sx={{ mt: 1.5 }} data-qc-field="inhibitionBatchDetails.qaRemarks">
+            <FieldLabelWithAsterisk label="QA Remarks" />
+            {readOnly ? (
+              <WorkflowReadOnlyText value={value?.inhibitionBatchDetails?.qaRemarks} />
+            ) : (
+              <TableTextInput
+                value={value?.inhibitionBatchDetails?.qaRemarks ?? ""}
+                onChange={(e: any) => handleBatchDetailsChange("qaRemarks", e)}
+                error={Boolean(validationErrors["inhibitionBatchDetails.qaRemarks"])}
+                helperText={validationErrors["inhibitionBatchDetails.qaRemarks"]}
+                disabled={disabled}
+                readOnly={readOnly}
+                multiline
+                minRows={2}
+                fieldPath={"inhibitionBatchDetails.qaRemarks"}
+              />
+            )}
+          </Box>
+        ) : null}
       </SectionCard>
 
       <SectionCard title="Inhibition Application Details" theme={theme}>
@@ -915,6 +1507,7 @@ export const InhibitionSharedSections = ({
           clearFieldError={clearFieldError}
           disabled={disabled}
           readOnly={readOnly}
+          qaRemarksMode={qaRemarksMode}
         />
       </SectionCard>
 
@@ -950,6 +1543,26 @@ export const InhibitionSharedSections = ({
             </Box>
           </Box>
         </FieldGrid>
+        {qaRemarksMode ? (
+          <Box sx={{ mt: 1.5 }} data-qc-field="dispatchDetails.qaRemarks">
+            <FieldLabelWithAsterisk label="QA Remarks" />
+            {readOnly ? (
+              <WorkflowReadOnlyText value={value?.dispatchDetails?.qaRemarks} />
+            ) : (
+              <TableTextInput
+                value={value?.dispatchDetails?.qaRemarks ?? ""}
+                onChange={(e: any) => handleDispatchChange("qaRemarks", e)}
+                error={Boolean(validationErrors["dispatchDetails.qaRemarks"])}
+                helperText={validationErrors["dispatchDetails.qaRemarks"]}
+                disabled={disabled}
+                readOnly={readOnly}
+                multiline
+                minRows={2}
+                fieldPath={"dispatchDetails.qaRemarks"}
+              />
+            )}
+          </Box>
+        ) : null}
       </SectionCard>
     </>
   );
@@ -967,6 +1580,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
   readOnly = false,
   theme,
   useQcDivisionFileField = false,
+  qaRemarksMode = false,
   motorId,
 }) => {
   const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
@@ -1146,6 +1760,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1206,6 +1821,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1219,6 +1835,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             disabled={disabled}
             readOnly={readOnly}
             useQcDivisionFileField={useQcDivisionFileField}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1233,6 +1850,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
       </Box>
@@ -1311,6 +1929,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1364,6 +1983,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1377,6 +1997,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             disabled={disabled}
             readOnly={readOnly}
             useQcDivisionFileField={useQcDivisionFileField}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1389,6 +2010,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
           onChange={onChange}
           validationErrors={validationErrors}
           clearFieldError={clearFieldError}
+          qaRemarksMode={qaRemarksMode}
         />
       </Box>
     );
@@ -1453,6 +2075,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1512,6 +2135,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1525,6 +2149,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             disabled={disabled}
             readOnly={readOnly}
             useQcDivisionFileField={useQcDivisionFileField}
+            qaRemarksMode={qaRemarksMode}
           />
         </SectionCard>
 
@@ -1537,6 +2162,158 @@ export const PostCureMotorPanel: React.FC<any> = ({
           onChange={onChange}
           validationErrors={validationErrors}
           clearFieldError={clearFieldError}
+          qaRemarksMode={qaRemarksMode}
+        />
+      </Box>
+    );
+  }
+
+  if (variant === "inhibition-others") {
+    return (
+      <Box>
+        <SectionCard title="Premix" theme={theme}>
+          <FieldGrid columns={2}>
+            <Box>
+              <FieldLabelWithAsterisk label="Batch No" required />
+              <TableTextInput
+                value={value?.othersPremix?.othersPremixBatchNo ?? ""}
+                onChange={(e: any) => {
+                  clearFieldError?.("othersPremix.othersPremixBatchNo");
+                  updateSubSection("othersPremix", {
+                    ...value?.othersPremix,
+                    othersPremixBatchNo: e,
+                  });
+                }}
+                error={Boolean(validationErrors["othersPremix.othersPremixBatchNo"])}
+                helperText={validationErrors["othersPremix.othersPremixBatchNo"]}
+                disabled={disabled}
+                readOnly={readOnly}
+                fieldPath={"othersPremix.othersPremixBatchNo"}
+              />
+            </Box>
+            <Box>
+              <FieldLabelWithAsterisk label="Premix Date" required />
+              <Box data-qc-field={"othersPremix.othersPremixDate"}>
+                <DateField
+                  value={value?.othersPremix?.othersPremixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("othersPremix.othersPremixDate");
+                    updateSubSection("othersPremix", {
+                      ...value?.othersPremix,
+                      othersPremixDate: val,
+                    });
+                  }}
+                  error={Boolean(validationErrors["othersPremix.othersPremixDate"])}
+                  helperText={validationErrors["othersPremix.othersPremixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
+            </Box>
+          </FieldGrid>
+          <FlexibleOthersIngredientTable
+            basePath="othersPremix.othersPremixTable"
+            value={value?.othersPremix?.othersPremixTable || []}
+            onChange={(rows) =>
+              updateSubSection("othersPremix", {
+                ...value?.othersPremix,
+                othersPremixTable: rows,
+              })
+            }
+            qtyKey="qtyTaken"
+            validationErrors={validationErrors}
+            clearFieldError={clearFieldError}
+            disabled={disabled}
+            readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
+          />
+        </SectionCard>
+
+        <SectionCard title="Final Mix" theme={theme}>
+          <FieldGrid columns={2}>
+            <Box>
+              <FieldLabelWithAsterisk label="Batch No" required />
+              <TableTextInput
+                value={value?.othersFinalMix?.othersFinalMixBatchNo ?? ""}
+                onChange={(e: any) => {
+                  clearFieldError?.("othersFinalMix.othersFinalMixBatchNo");
+                  updateSubSection("othersFinalMix", {
+                    ...value?.othersFinalMix,
+                    othersFinalMixBatchNo: e,
+                  });
+                }}
+                error={Boolean(validationErrors["othersFinalMix.othersFinalMixBatchNo"])}
+                helperText={validationErrors["othersFinalMix.othersFinalMixBatchNo"]}
+                disabled={disabled}
+                readOnly={readOnly}
+                fieldPath={"othersFinalMix.othersFinalMixBatchNo"}
+              />
+            </Box>
+            <Box>
+              <FieldLabelWithAsterisk label="Final Mix Date" required />
+              <Box data-qc-field={"othersFinalMix.othersFinalMixDate"}>
+                <DateField
+                  value={value?.othersFinalMix?.othersFinalMixDate ?? ""}
+                  onChange={(val: any) => {
+                    clearFieldError?.("othersFinalMix.othersFinalMixDate");
+                    updateSubSection("othersFinalMix", {
+                      ...value?.othersFinalMix,
+                      othersFinalMixDate: val,
+                    });
+                  }}
+                  error={Boolean(validationErrors["othersFinalMix.othersFinalMixDate"])}
+                  helperText={validationErrors["othersFinalMix.othersFinalMixDate"]}
+                  disabled={disabled}
+                  readOnly={readOnly}
+                  compact
+                />
+              </Box>
+            </Box>
+          </FieldGrid>
+          <FlexibleOthersIngredientTable
+            basePath="othersFinalMix.othersFinalMixTable"
+            value={value?.othersFinalMix?.othersFinalMixTable || []}
+            onChange={(rows) =>
+              updateSubSection("othersFinalMix", {
+                ...value?.othersFinalMix,
+                othersFinalMixTable: rows,
+              })
+            }
+            qtyKey="qtyTaken"
+            validationErrors={validationErrors}
+            clearFieldError={clearFieldError}
+            disabled={disabled}
+            readOnly={readOnly}
+            qaRemarksMode={qaRemarksMode}
+          />
+        </SectionCard>
+
+        <SectionCard title="Qualification Details" theme={theme}>
+          <QualificationSection
+            basePath="othersQualification"
+            value={value?.othersQualification}
+            onChange={(sec) => updateSubSection("othersQualification", sec)}
+            validationErrors={validationErrors}
+            clearFieldError={clearFieldError}
+            disabled={disabled}
+            readOnly={readOnly}
+            useQcDivisionFileField={useQcDivisionFileField}
+            editableSpecification
+            qaRemarksMode={qaRemarksMode}
+          />
+        </SectionCard>
+
+        <InhibitionSharedSections
+          disabled={disabled}
+          readOnly={readOnly}
+          stationOptions={stationOptions}
+          theme={theme}
+          value={value}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          clearFieldError={clearFieldError}
+          qaRemarksMode={qaRemarksMode}
         />
       </Box>
     );

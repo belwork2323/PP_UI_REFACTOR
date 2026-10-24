@@ -61,8 +61,8 @@ type QCDivisionApproverDetailDialogProps = {
   divisionApprovalRows: QcApprovalTableRow[];
   finalApprovalGroups?: QcFinalApprovalDivisionGroup[];
   finalApprovalRows: QcApprovalTableRow[];
-  onApprove: (item: QCDivisionApproverDetailItem) => void;
-  onReject: (item: QCDivisionApproverDetailItem) => void;
+  onApprove?: (item: any) => void;
+  onReject?: (item: any) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };

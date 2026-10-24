@@ -76,6 +76,7 @@ const MOTOR_FLOW_KEYS = new Set([
   "DE_CORING",
   "POST_CURE",
   "NDT",
+  "STATIC_TEST_FACILITY",
   "QC",
   "WEIGHTMENT",
 ]);
@@ -161,6 +162,8 @@ const extractMotorIds = (data: Record<string, unknown>): Array<{ motorId: string
   const fromObjects = [
     ...asArray(data.motorDetails),
     ...asArray(data.motors),
+    ...asArray(data.staticTestings),
+    ...asArray(data.static_testings),
     ...asArray(data.curingDetails),
     ...asArray(data.deCoringDetails),
     ...asArray(data.decoringDetails),

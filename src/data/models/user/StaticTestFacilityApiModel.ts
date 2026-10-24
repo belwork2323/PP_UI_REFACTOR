@@ -22,6 +22,7 @@ import {
   formatCasePrepSectionLabel,
   type CasePrepDetailSection,
 } from "./CasePreparationFormModel";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 type LegacySectionSubmission = { sectionId?: string; sectionData?: unknown };
 
@@ -366,7 +367,7 @@ export const isStfMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return !normalized || normalized === "TO_BE_INITIATED";
+  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED";
 };
 
 export const isStfMotorApproverActionable = (

@@ -31,17 +31,31 @@ import { operationsController } from "../../../controllers/user/operationsContro
 import {
   buildMaterialSelectionFromSheetRow,
   findPrepMaterialByCode,
+  formatRmpMaterialNavLabel,
   mergeMaterialsLists,
   type RawMaterialPrepMaterialOption,
 } from "../manufacturing/rawMaterialPrepFlowConfig";
 import { buildProcessFromTypedForm } from "../../../data/models/user/rmp/buildProcessFromTypedForm";
 import { typedProcessToDisplaySections } from "../../../data/models/user/rmp/processFormMapper";
 import type { RawMaterialPrepMaterialProcessSlot } from "../../../data/models/user/RawMaterialPreparationModel";
-import { resolveBatchDetailsRoot } from "./qcBatchContext";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const createProcessingEntryId = () =>
   `qc-div-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+/** Local unwrap — avoid importing qcBatchContext (cycle via QualityControlFormModel). */
+const resolveBatchPayloadRoot = (batchPayload: unknown): Record<string, unknown> | null => {
+  const root =
+    batchPayload && typeof batchPayload === "object" && !Array.isArray(batchPayload)
+      ? (batchPayload as Record<string, unknown>)
+      : null;
+  if (!root) return null;
+  const nested = root.__batchDetails;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return root;
+};
 
 /** Expand flat division-details section rows into schema table/repeat shape (same as RMP). */
 export const normalizeProcessingSectionsForSchema = (
@@ -186,6 +200,12 @@ const processEntryFromApiRecord = (
     null;
   const sections = normalizeSections(rec.sections);
 
+  const lotDetailsQaRemarks = pickString(
+    rec.lotDetailsQaRemarks,
+    rec.lot_details_qa_remarks,
+  );
+  const qaRemarks = pickString(rec.qaRemarks, rec.qa_remarks);
+
   return {
     materialId: identity.materialId,
     materialCode: identity.materialCode,
@@ -194,6 +214,8 @@ const processEntryFromApiRecord = (
     gradeCode: derivedGrade,
     processType,
     lotDetails: normalizeLotDetails(rec.lotDetails ?? rec.lot_details),
+    ...(lotDetailsQaRemarks ? { lotDetailsQaRemarks } : {}),
+    ...(qaRemarks ? { qaRemarks } : {}),
     drying: (asRecord(rec.drying) as PreparationProcessEntry["drying"]) ?? null,
     sieving: (asRecord(rec.sieving) as PreparationProcessEntry["sieving"]) ?? null,
     apCoarse: (asRecord(rec.apCoarse ?? rec.ap_coarse) as PreparationProcessEntry["apCoarse"]) ?? null,
@@ -338,10 +360,24 @@ export const getQcProcessingMaterialDedupKey = (params: {
 }) =>
   `RAW_MATERIAL:PROCESSING:${params.premixNo}:${params.processSlot}:${params.materialId}:${String(params.gradeCode ?? "").trim() || "NONE"}`;
 
+/** Match RMP / user material nav: `Premix-1 AP - COARSE` when a grade is present. */
 export const getQcProcessingMaterialLabel = (params: {
   premixNo: number;
   materialCode: string;
-}) => `Premix-${params.premixNo} ${params.materialCode}`;
+  gradeCode?: string | null;
+  gradeName?: string | null;
+}) => {
+  const materialPart = formatRmpMaterialNavLabel({
+    materialCode: params.materialCode,
+    gradeCode: params.gradeCode ?? undefined,
+    gradeName: params.gradeName ?? undefined,
+  });
+  const premixNo = Number(params.premixNo);
+  const premixPrefix = Number.isFinite(premixNo) && premixNo > 0 ? `Premix-${premixNo}` : "";
+  if (!premixPrefix) return materialPart || String(params.materialCode ?? "").trim();
+  if (!materialPart) return premixPrefix;
+  return `${premixPrefix} ${materialPart}`;
+};
 
 /** RMP weighment sheet from QC Raw Material Processing division-details autopopulate. */
 export const parseWeightmentSheetFromDivisionDetails = (
@@ -838,9 +874,6 @@ export type QcProcessingMaterialCatalog = {
   liquidMaterials: RawMaterialPrepMaterialOption[];
 };
 
-const resolveBatchPayloadRoot = (batchPayload: unknown): Record<string, unknown> | null =>
-  resolveBatchDetailsRoot(batchPayload);
-
 export const fetchProcessingMaterialCatalog = async (): Promise<QcProcessingMaterialCatalog> => {
   const [solidResp, liquidResp] = await Promise.all([
     operationsController.fetchMaterialsList({ materialType: "SOLID" }),
@@ -1149,6 +1182,8 @@ export const buildProcessingMaterialEntry = (
     gradeId: seed.gradeId,
     gradeCode: seed.gradeCode,
     lotDetails: seed.process?.lotDetails ?? [],
+    lotDetailsQaRemarks: seed.process?.lotDetailsQaRemarks ?? null,
+    qaRemarks: seed.process?.qaRemarks ?? null,
     drying: seed.process?.drying ?? null,
     sieving: seed.process?.sieving ?? null,
     apCoarse: seed.process?.apCoarse ?? null,
@@ -1239,6 +1274,8 @@ export type QcProcessingProcessApiPayload = {
   /** RMP-parity typed blocks — persisted so empty drafts still reload with template data. */
   processType?: string;
   lotDetails?: LotDetailDto[];
+  lotDetailsQaRemarks?: string | null;
+  qaRemarks?: string | null;
   drying?: PreparationProcessEntry["drying"];
   sieving?: PreparationProcessEntry["sieving"];
   apCoarse?: PreparationProcessEntry["apCoarse"];
@@ -1301,6 +1338,8 @@ const buildProcessingProcessFromEntry = (
     ...base,
     ...(process.processType ? { processType: process.processType } : {}),
     lotDetails: process.lotDetails ?? [],
+    lotDetailsQaRemarks: process.lotDetailsQaRemarks ?? null,
+    qaRemarks: process.qaRemarks ?? null,
     drying: process.drying ?? null,
     sieving: process.sieving ?? null,
     apCoarse: process.apCoarse ?? null,

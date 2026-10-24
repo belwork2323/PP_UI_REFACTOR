@@ -166,7 +166,7 @@ const SUBSCALE_TABLE_COLUMNS: Record<string, string[]> = {
   CURING_TABLE: [
     "SR_NO",
     "ARTICLE_TYPE",
-    "BEM_MOULD_NO",
+    "BEM_NO",
     "CURING_START_DATE",
     "CURING_END_DATE",
     "OVEN_NO",
@@ -299,11 +299,25 @@ const parseSubscaleDisplaySections = (
       return {
         ...parsed,
         label: SUBSCALE_SECTION_LABELS[section.sectionId] ?? parsed.label,
-        fields: parsed.fields.map((field) => ({
-          ...field,
-          label: SUBSCALE_FIELD_LABELS[field.key.split(".").pop() ?? ""] ?? field.label,
-        })),
-        tables: parsed.tables.map((table) => ensureSubscaleTableColumns(table)),
+        fields: parsed.fields.map((field) => {
+          const leaf = field.key.split(".").pop() ?? "";
+          // Keep explicit BEM article count labels as-is.
+          const label =
+            leaf.startsWith("No. of Parts") || leaf.startsWith("No. of Articles")
+              ? leaf
+              : (SUBSCALE_FIELD_LABELS[leaf] ?? field.label);
+          return { ...field, label };
+        }),
+        // Hide article-selection table; BEM no-of-parts are shown on preparation fields.
+        tables: parsed.tables
+          .filter((table) => {
+            const id = String(table.blockId ?? "").toUpperCase();
+            return (
+              !id.includes("HARDWARE_ARTICLE_SELECTIONS") &&
+              !id.includes("SELECTED_ARTICLES")
+            );
+          })
+          .map((table) => ensureSubscaleTableColumns(table)),
       };
     })
     .filter((section) => section.fields.length > 0 || section.tables.length > 0);

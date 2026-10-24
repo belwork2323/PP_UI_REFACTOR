@@ -53,7 +53,7 @@ export const qcMixingValidationFields: Record<string, FieldRuleConfig> = {
   dateOfPremix: date(["SUBMIT"]),
   dateOfFinalMix: date(["SUBMIT"]),
   // Auto-seeded as "MX-1 & BLD-1" (mixer + building), not a bare building code
-  mixerBldgNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  mixerBldgNo: text(["SUBMIT"], S.PATTERNS.MIXER_AND_BLDG_NO),
   batchSize: number(["SUBMIT"]),
 
   // Specs from quality-check master (e.g. "NA", "0 - 0.08 %") — not numeric

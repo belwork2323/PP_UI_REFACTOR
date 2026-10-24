@@ -19,6 +19,7 @@ import {
   isQcMixingStage,
   type QcMixingStage,
 } from "./qcMixingConfig";
+import { formatRmpMaterialNavLabel } from "../manufacturing/rawMaterialPrepFlowConfig";
 import type { SchemaDocumentV2 } from "@/data/models/shared/sectionFormTypes";
 import type { QualityControlFormState } from "../../../data/models/user/QualityControlFormModel";
 
@@ -64,7 +65,7 @@ export const buildDivisionEntryDedupKey = (params: {
     return `RAW_MATERIAL:BOTH:${params.premixNo}`;
   }
   if (params.kind === "STF") {
-    return `STATIC_TEST_FACILITY:${params.subType ?? "NONE"}`;
+    return `STATIC_TEST_FACILITY:${params.motorId ?? "NONE"}`;
   }
   if (params.kind === "REVALIDATION") {
     return "RAW_MATERIAL:REVALIDATION";
@@ -193,6 +194,7 @@ export const buildDivisionEntryLabel = (params: {
   mixingStage?: QcMixingStage;
   motorId?: string;
   materialCode?: string;
+  gradeCode?: string | null;
 }): string => {
   if (params.kind === "MIXING_PREMIX" && params.premixNo && params.mixingStage) {
     return `Mixing · ${getQcMixingStageLabel(params.mixingStage)} · ${getQcMixingNumberLabel(params.mixingStage, params.premixNo)}`;
@@ -207,7 +209,14 @@ export const buildDivisionEntryLabel = (params: {
   }
 
   if (params.kind === "PROCESSING_MATERIAL" && params.premixNo && params.materialCode) {
-    return `Premix-${params.premixNo} ${params.materialCode}`;
+    // Same shape as getQcProcessingMaterialLabel (RMP-style grade in nav).
+    const materialPart = formatRmpMaterialNavLabel({
+      materialCode: params.materialCode,
+      gradeCode: params.gradeCode ?? undefined,
+    });
+    return materialPart
+      ? `Premix-${params.premixNo} ${materialPart}`
+      : `Premix-${params.premixNo} ${params.materialCode}`;
   }
 
   if (params.kind === "BOTH_PREMIX" && params.premixNo) {
@@ -229,6 +238,10 @@ export const buildDivisionEntryLabel = (params: {
       params.processingType ?? "",
     );
     return `${base} · ${getQcPremixLabel(params.premixNo)}`;
+  }
+
+  if (params.kind === "STF" && params.motorId) {
+    return params.motorId;
   }
 
   if (params.kind === "STF" && params.subType) {
@@ -329,6 +342,7 @@ export const getSchemaForDivisionEntry = (
     entry.kind === "TRIMMING_MOTOR" ||
     entry.kind === "POST_CURE_MOTOR" ||
     entry.kind === "NDT_MOTOR" ||
+    entry.kind === "STF" ||
     entry.kind === "PROPELLANT_MOTOR" ||
     entry.kind === "PROPELLANT_PROCESS" ||
     entry.kind === "WEIGHTMENT_MOTOR"

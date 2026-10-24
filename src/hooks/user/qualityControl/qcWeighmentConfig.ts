@@ -20,6 +20,7 @@ export const QC_WEIGHMENT_FIELD_LABELS = {
   SR_NO: "Sr. No.",
   WEIGHT_PARAMETER: "Rocket Motor Id. No.",
   WEIGHT_KG: "Weight (kg)",
+  QA_REMARKS: "QA Remarks",
   UPLOAD_REPORT: "Upload Report",
 } as const;
 
@@ -31,6 +32,7 @@ export type QcWeighmentWeightRow = {
   SR_NO: string;
   WEIGHT_PARAMETER: string;
   WEIGHT_KG: string;
+  QA_REMARKS?: string;
   locked?: boolean;
 };
 
@@ -107,6 +109,7 @@ export const emptyQcWeighmentWeightRows = (): QcWeighmentWeightRow[] =>
       SR_NO: preset.SR_NO,
       WEIGHT_PARAMETER: preset.WEIGHT_PARAMETER,
       WEIGHT_KG: "",
+      QA_REMARKS: "",
       locked: Boolean(preset.locked),
     })),
   );

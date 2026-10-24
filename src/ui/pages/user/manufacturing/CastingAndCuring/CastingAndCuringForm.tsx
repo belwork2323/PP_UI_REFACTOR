@@ -421,6 +421,7 @@ const CastingAndCuringForm = ({
       return STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED;
     }
     if (!(isMotorEditable?.(activeMotorId) ?? true)) {
+      if (activeMotorStatus === "DISCARDED") return S.MOTOR_LOCKED_DISCARDED;
       return activeMotorStatus === "APPROVED" ? S.MOTOR_LOCKED_APPROVED : S.MOTOR_LOCKED_WAITING;
     }
     return undefined;
@@ -736,9 +737,11 @@ const CastingAndCuringForm = ({
                       ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
                       : !activeMotorPriorEnabled
                         ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-                        : activeMotorStatus === "APPROVED"
-                          ? S.MOTOR_LOCKED_APPROVED
-                          : S.MOTOR_LOCKED_WAITING}
+                        : activeMotorStatus === "DISCARDED"
+                          ? S.MOTOR_LOCKED_DISCARDED
+                          : activeMotorStatus === "APPROVED"
+                            ? S.MOTOR_LOCKED_APPROVED
+                            : S.MOTOR_LOCKED_WAITING}
                   </Typography>
                 </Box>
               ) : null}

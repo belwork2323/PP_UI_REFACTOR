@@ -175,29 +175,33 @@ export const buildRevalidationMaterialsPayload = (
     return text === "" ? null : text;
   };
 
-  const byIngredient = new Map<
-    string,
-    Array<{
-      lotBatchNumber: string;
-      parameter: string;
-      specification: string;
-      result: string;
-      acemResult?: string | null;
-      validity: string;
-      remarks: string;
-      qcCertificate: string[];
-    }>
-  >();
+  type QcDetail = {
+    lotBatchNumber: string;
+    parameter: string;
+    specification: string;
+    result: string;
+    acemResult?: string | null;
+    validity: string;
+    remarks: string;
+    qcCertificate: string[];
+  };
 
-  // Carry ingredient/lot across merged parameter rows in the same group.
+  const byIngredient = new Map<string, QcDetail[]>();
+
+  // Carry ingredient/lot/certificate across merged parameter rows in the same group.
   const ingredientByGroup = new Map<string, string>();
   const lotByGroup = new Map<string, string>();
+  const certByGroup = new Map<string, string[]>();
   rows.forEach((row) => {
     const groupId = String(row._groupId ?? "");
     const ingredient = String(row.INGREDIENT ?? "").trim();
     const lot = String(row.LOT_BATCH_NUMBER ?? "").trim();
+    const certIds = normalizeCertificateFileIds(row.QC_CERTIFICATE);
     if (groupId && ingredient) ingredientByGroup.set(groupId, ingredient);
     if (groupId && lot) lotByGroup.set(groupId, lot);
+    if (groupId && certIds.length && !certByGroup.has(groupId)) {
+      certByGroup.set(groupId, certIds);
+    }
   });
 
   rows.forEach((row) => {
@@ -206,29 +210,23 @@ export const buildRevalidationMaterialsPayload = (
       String(row.INGREDIENT ?? "").trim() ||
       (groupId ? ingredientByGroup.get(groupId) ?? "" : "");
     if (!ingredient) return;
+    const lotBatchNumber =
+      String(row.LOT_BATCH_NUMBER ?? "").trim() ||
+      (groupId ? lotByGroup.get(groupId) ?? "" : "");
+    const rowCert = normalizeCertificateFileIds(row.QC_CERTIFICATE);
+    const groupCert = groupId ? certByGroup.get(groupId) ?? [] : [];
     const list = byIngredient.get(ingredient) ?? [];
-    const detail: {
-      lotBatchNumber: string;
-      parameter: string;
-      specification: string;
-      result: string;
-      acemResult?: string | null;
-      validity: string;
-      remarks: string;
-      qcCertificate: string[];
-    } = {
-      lotBatchNumber:
-        String(row.LOT_BATCH_NUMBER ?? "").trim() ||
-        (groupId ? lotByGroup.get(groupId) ?? "" : ""),
+    list.push({
+      lotBatchNumber,
       parameter: String(row.PARAMETER ?? "").trim(),
       specification: String(row.SPECIFICATION ?? "").trim(),
       result: String(row.RESULT ?? "").trim(),
       acemResult: toOptionalAcemResult(row.ACEM_QC_RESULT),
       validity: String(row.VALIDITY ?? "").trim(),
       remarks: String(row.REMARKS ?? "").trim(),
-      qcCertificate: normalizeCertificateFileIds(row.QC_CERTIFICATE),
-    };
-    list.push(detail);
+      // Prefer row cert; fall back to first non-empty cert found for the lot group.
+      qcCertificate: rowCert.length ? rowCert : groupCert,
+    });
     byIngredient.set(ingredient, list);
   });
 
@@ -278,13 +276,16 @@ export const hydrateRevalidationValuesFromSections = (
   if (!rows.length) return createInitialRevalidationSchemaValues();
 
   const expanded = syncGroupCertificates(
-    rows.map((row) => {
+    rows.map((row, index) => {
       const record = row as Record<string, unknown>;
       const ingredient = String(row.INGREDIENT ?? "").trim();
       const lotId = String(row.LOT_BATCH_NUMBER ?? "").trim();
-      const fallbackGroupId = ingredient || lotId ? `${ingredient}::${lotId}` : "group";
+      const fallbackGroupId =
+        ingredient || lotId ? revalidationLotGroupId(ingredient || "ingredient", lotId, index) : `group-${index}`;
       return {
         ...row,
+        INGREDIENT: ingredient,
+        LOT_BATCH_NUMBER: lotId,
         RESULT: String(row.RESULT ?? row.ANALYSED_RESULT ?? "").trim(),
         ACEM_QC_RESULT: String(row.ACEM_QC_RESULT ?? row.acemQcResult ?? "").trim(),
         QC_CERTIFICATE: readQcCertificateValue(record),
@@ -313,7 +314,7 @@ export const expandRevalidationIngredient = (
   const lot = String(picker?.LOT_BATCH_NUMBER ?? "").trim();
   if (!picker || !ingredient || !specs.length) return null;
 
-  const groupId = `${ingredient}-${Date.now()}`;
+  const groupId = revalidationLotGroupId(ingredient, lot || `new-${Date.now()}`);
   const expanded = specs.map((spec) => ({
     SR_NO: 0,
     INGREDIENT: ingredient,
@@ -482,55 +483,93 @@ const normalizeSpecRows = (
     })
     .filter(Boolean) as QcRevalidationRow[];
 
+/** Stable UI group key — one card per ingredient+lot (not per materials[] index). */
+const revalidationLotGroupId = (ingredient: string, lotId: string, fallbackIndex = 0): string => {
+  const lot = String(lotId ?? "").trim();
+  if (lot) return `${ingredient}::${lot}`;
+  return `${ingredient}::__nolot_${fallbackIndex}`;
+};
+
+const readSpecLotBatchNumber = (
+  spec: Record<string, unknown>,
+  fallbackLot: string,
+): string =>
+  String(
+    spec.lotBatchNumber ??
+      spec.LOT_BATCH_NUMBER ??
+      spec.lotId ??
+      spec.lotNo ??
+      fallbackLot ??
+      "",
+  ).trim();
+
 const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => {
   const rows: QcRevalidationRow[] = [];
-  materials.forEach((material, index) => {
+  materials.forEach((material, materialIndex) => {
     const record = asRecord(material);
     if (!record) return;
+    // Prefer display name; materialCode is kept for seed lookups separately.
     const ingredient = String(
-      record.INGREDIENT ??
-        record.materialName ??
-        record.materialCode ??
+      record.materialName ??
+        record.INGREDIENT ??
         record.ingredient ??
+        record.materialCode ??
         "",
     ).trim();
     if (!ingredient) return;
-    const lotId = String(
+    const materialLotId = String(
       record.LOT_BATCH_NUMBER ?? record.lotId ?? record.lotNo ?? record.lotBatchNumber ?? "",
     ).trim();
-    const groupId = `${ingredient}-${index}`;
     const materialCertificate = readQcCertificateValue(record);
-    const specs = Array.isArray(record.qcDetails)
-      ? record.qcDetails
-      : Array.isArray(record.specifications)
+    const qcDetails = Array.isArray(record.qcDetails) ? record.qcDetails : null;
+    const specs: unknown[] =
+      qcDetails ??
+      (Array.isArray(record.specifications)
         ? record.specifications
         : Array.isArray(record.parameters)
           ? record.parameters
           : Array.isArray(record.rows)
             ? record.rows
-            : [];
+            : []);
+    const isPersistedQcDetails = qcDetails !== null;
 
     if (specs.length) {
-      rows.push(
-        ...normalizeSpecRows(ingredient, lotId, specs, groupId).map((row, specIndex) => {
-          const originalSpec = asRecord(specs[specIndex]) ?? {};
-          const lotFromDetail = String(
-            originalSpec.lotBatchNumber ??
-              originalSpec.LOT_BATCH_NUMBER ??
-              originalSpec.lotId ??
-              lotId,
-          ).trim();
-          const fromRow = Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : [];
-          const fromSpec = readQcCertificateValue(originalSpec);
-          return {
-            ...row,
-            LOT_BATCH_NUMBER: lotFromDetail || row.LOT_BATCH_NUMBER,
-            RESULT: row.RESULT || readAnalysedResult(originalSpec),
-            ACEM_QC_RESULT: row.ACEM_QC_RESULT || readAcemQcResult(originalSpec),
-            QC_CERTIFICATE: fromRow.length ? fromRow : fromSpec.length ? fromSpec : materialCertificate,
-          };
-        }),
-      );
+      // Persisted shape: one materials entry may hold many lots in qcDetails — split by lot.
+      // Seed shape: one materials entry per lot with specifications — single lot bucket.
+      const specsByLot = new Map<string, unknown[]>();
+      specs.forEach((spec, specIndex) => {
+        const specRecord = asRecord(spec) ?? {};
+        const lotKey = isPersistedQcDetails
+          ? readSpecLotBatchNumber(specRecord, materialLotId) || `__nolot_${materialIndex}_${specIndex}`
+          : materialLotId || `__nolot_${materialIndex}`;
+        const bucket = specsByLot.get(lotKey) ?? [];
+        bucket.push(spec);
+        specsByLot.set(lotKey, bucket);
+      });
+
+      specsByLot.forEach((lotSpecs, lotKey) => {
+        const lotId = lotKey.startsWith("__nolot_") ? materialLotId : lotKey;
+        const groupId = revalidationLotGroupId(ingredient, lotId || lotKey, materialIndex);
+        rows.push(
+          ...normalizeSpecRows(ingredient, lotId, lotSpecs, groupId).map((row, specIndex) => {
+            const originalSpec = asRecord(lotSpecs[specIndex]) ?? {};
+            const lotFromDetail = readSpecLotBatchNumber(originalSpec, lotId);
+            const fromRow = Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : [];
+            const fromSpec = readQcCertificateValue(originalSpec);
+            return {
+              ...row,
+              LOT_BATCH_NUMBER: lotFromDetail || row.LOT_BATCH_NUMBER,
+              RESULT: row.RESULT || readAnalysedResult(originalSpec),
+              ACEM_QC_RESULT: row.ACEM_QC_RESULT || readAcemQcResult(originalSpec),
+              QC_CERTIFICATE: fromRow.length
+                ? fromRow
+                : fromSpec.length
+                  ? fromSpec
+                  : materialCertificate,
+            };
+          }),
+        );
+      });
       return;
     }
 
@@ -538,10 +577,11 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
     const parameter = String(record.PARAMETER ?? record.parameter ?? "").trim();
     if (!parameter) return;
 
+    const groupId = revalidationLotGroupId(ingredient, materialLotId, materialIndex);
     rows.push({
       SR_NO: 0,
       INGREDIENT: ingredient,
-      LOT_BATCH_NUMBER: lotId,
+      LOT_BATCH_NUMBER: materialLotId,
       PARAMETER: parameter,
       SPECIFICATION: String(record.SPECIFICATION ?? record.specification ?? "").trim(),
       RESULT: readAnalysedResult(record),
@@ -558,24 +598,21 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
 
 const extractFlatTableRows = (rows: unknown[]): QcRevalidationRow[] => {
   const expanded: QcRevalidationRow[] = [];
-  const groupOrdinalByKey = new Map<string, number>();
   rows.forEach((row, index) => {
     const record = asRecord(row);
     if (!record) return;
     const ingredient = String(
-      record.INGREDIENT ?? record.materialCode ?? record.ingredient ?? "",
+      record.materialName ??
+        record.INGREDIENT ??
+        record.ingredient ??
+        record.materialCode ??
+        "",
     ).trim();
     if (!ingredient) return;
     const lotId = String(
       record.LOT_BATCH_NUMBER ?? record.lotId ?? record.lotNo ?? "",
     ).trim();
-    const groupKey = `${ingredient}::${lotId}`;
-    if (!groupOrdinalByKey.has(groupKey)) {
-      groupOrdinalByKey.set(groupKey, groupOrdinalByKey.size);
-    }
-    const groupId = String(
-      record._groupId ?? `${ingredient}-${groupOrdinalByKey.get(groupKey)}`,
-    );
+    const groupId = String(record._groupId ?? revalidationLotGroupId(ingredient, lotId, index));
     expanded.push({
       SR_NO: Number(record.SR_NO ?? index + 1),
       INGREDIENT: ingredient,
@@ -715,7 +752,10 @@ export const createRevalidationSchemaValuesFromAutoPopulate = (
   mapDivisionDetailsToRevalidationValues(payload) ?? createInitialRevalidationSchemaValues();
 
 export type QcRevalidationMaterialSeed = {
+  /** Catalog code for specs API lookup. */
   materialCode: string;
+  /** Display label for the ingredient column. */
+  materialName: string;
   lotId: string;
   /** Required for graded materials (e.g. AP) when specs are grade-scoped. */
   gradeCode?: string;
@@ -729,31 +769,58 @@ export const extractRevalidationMaterialSeeds = (
 
   const seeds: QcRevalidationMaterialSeed[] = [];
   const seen = new Set<string>();
-  for (const material of materials) {
-    const record = asRecord(material);
-    if (!record) continue;
-    const materialCode = String(
-      record.INGREDIENT ??
-        record.materialCode ??
-        record.materialName ??
-        record.ingredient ??
-        "",
-    ).trim();
-    if (!materialCode) continue;
-    const lotId = String(
-      record.LOT_BATCH_NUMBER ?? record.lotId ?? record.lotNo ?? record.lotBatchNumber ?? "",
-    ).trim();
-    const gradeCode = String(
-      record.gradeCode ?? record.grade_code ?? record.GRADE_CODE ?? record.grade ?? "",
-    ).trim();
-    const key = `${materialCode}::${lotId}::${gradeCode}`;
-    if (seen.has(key)) continue;
+  const pushSeed = (
+    lookupCode: string,
+    materialName: string,
+    lotId: string,
+    gradeCode: string,
+  ) => {
+    const key = `${lookupCode}::${lotId}::${gradeCode}`;
+    if (seen.has(key)) return;
     seen.add(key);
     seeds.push({
-      materialCode,
+      materialCode: lookupCode,
+      materialName: materialName || lookupCode,
       lotId,
       ...(gradeCode ? { gradeCode } : {}),
     });
+  };
+
+  for (const material of materials) {
+    const record = asRecord(material);
+    if (!record) continue;
+    // Prefer materialCode for specs lookup; materialName is display-only.
+    const materialCode = String(record.materialCode ?? "").trim();
+    const ingredientFallback = String(record.ingredient ?? record.INGREDIENT ?? "").trim();
+    const materialName = String(
+      record.materialName ?? (ingredientFallback || materialCode),
+    ).trim();
+    const lookupCode = materialCode || ingredientFallback || materialName;
+    if (!lookupCode) continue;
+    const gradeCode = String(
+      record.gradeCode ?? record.grade_code ?? record.GRADE_CODE ?? record.grade ?? "",
+    ).trim();
+    const materialLotId = String(
+      record.LOT_BATCH_NUMBER ?? record.lotId ?? record.lotNo ?? record.lotBatchNumber ?? "",
+    ).trim();
+
+    const qcDetails = Array.isArray(record.qcDetails) ? record.qcDetails : [];
+    if (qcDetails.length) {
+      const lots = new Set<string>();
+      for (const detail of qcDetails) {
+        const detailRecord = asRecord(detail) ?? {};
+        const lot = readSpecLotBatchNumber(detailRecord, materialLotId);
+        if (lot) lots.add(lot);
+      }
+      if (lots.size) {
+        for (const lotId of lots) {
+          pushSeed(lookupCode, materialName || lookupCode, lotId, gradeCode);
+        }
+        continue;
+      }
+    }
+
+    pushSeed(lookupCode, materialName || lookupCode, materialLotId, gradeCode);
   }
   return seeds;
 };
@@ -780,11 +847,12 @@ export const buildRevalidationValuesFromDivisionDetails = async (
     try {
       const specs = await loadSpecs(seed.materialCode, seed.gradeCode ?? null);
       if (!specs.length) continue;
-      const groupId = `${seed.materialCode}-${seed.gradeCode ?? "NONE"}-${index}`;
+      const displayName = seed.materialName || seed.materialCode;
+      const groupId = revalidationLotGroupId(displayName, seed.lotId, index);
       for (const spec of specs) {
         expanded.push({
           SR_NO: 0,
-          INGREDIENT: seed.materialCode,
+          INGREDIENT: displayName,
           LOT_BATCH_NUMBER: seed.lotId,
           PARAMETER: spec.specificationName,
           SPECIFICATION: spec.specsLabel,

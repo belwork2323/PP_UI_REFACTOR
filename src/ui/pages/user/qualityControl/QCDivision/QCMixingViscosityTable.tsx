@@ -19,7 +19,9 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
+  getViscosityQaRemarks,
   getViscosityRows,
+  setViscosityQaRemarks,
   setViscosityRows,
   type QcMixingViscosityRow,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
@@ -72,6 +74,7 @@ const QCMixingViscosityTable = ({
   validationErrors = null,
 }: QCMixingViscosityTableProps) => {
   const rows = useMemo(() => getViscosityRows(values), [values]);
+  const qaRemarks = useMemo(() => getViscosityQaRemarks(values), [values]);
   const err = useCallback(
     (path: string) => fieldError(validationErrors ?? undefined, path),
     [validationErrors],
@@ -264,6 +267,28 @@ const QCMixingViscosityTable = ({
           </Button>
         </Box>
       ) : null}
+      <Box sx={{ mt: 1.5 }} data-qc-field="viscosityQaRemarks">
+        {readOnly ? (
+          <>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}>
+              QA Remarks
+            </Typography>
+            <QCDivisionReadOnlyValue value={qaRemarks} />
+          </>
+        ) : (
+          <TextField
+            label="QA Remarks"
+            size="small"
+            fullWidth
+            multiline
+            minRows={2}
+            value={qaRemarks}
+            onChange={(event) => onChange(setViscosityQaRemarks(values, event.target.value))}
+            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
+            inputProps={{ "data-qc-field": "viscosityQaRemarks" }}
+          />
+        )}
+      </Box>
     </Box>
   );
 };

@@ -32,6 +32,7 @@ const ROLE_ICON_MAP = {
 const ROLE_BASE_PATHS = {
   ADMIN: "/admin",
   CENTRE_HEAD: "/centre-head",
+  SYSTEM_MANAGER: "/system-manager",
 };
 
 const getInitials = (name = "") =>

@@ -141,6 +141,7 @@ const MOTOR_STATUS_CHIP_COLORS: Record<string, { bg: string; color: string }> = 
   WAITING_FOR_APPROVAL: { bg: "rgba(212,172,13,0.1)", color: "#7D6608" },
   APPROVED: { bg: "rgba(20,143,119,0.1)", color: "#0E6655" },
   REJECTED: { bg: "rgba(192,57,43,0.1)", color: "#922B21" },
+  DISCARDED: { bg: "rgba(192,57,43,0.12)", color: "#C0392B" },
 };
 
 type MotorProcessTab = "CASTING" | "CURING";

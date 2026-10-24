@@ -58,6 +58,8 @@ export const buildProcessFromTypedForm = (params: {
     gradeCode: grade?.gradeCode ?? (gradeCode.trim() ? gradeCode : null),
     processType: uiKeyToProcessType(uiKey) || typed.processType,
     lotDetails: typed.lotDetails ?? [],
+    lotDetailsQaRemarks: typed.lotDetailsQaRemarks ?? null,
+    qaRemarks: typed.qaRemarks ?? null,
     drying: typed.drying ?? null,
     sieving: typed.sieving ?? null,
     apCoarse: typed.apCoarse ?? null,

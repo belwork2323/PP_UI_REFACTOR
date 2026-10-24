@@ -13,6 +13,9 @@ const UserManagementPage = lazy(() => import("@ui/pages/admin/UserManagement/Use
 const BatchManagementPage = lazy(
   () => import("@ui/pages/admin/BatchManagement/BatchManagementPage"),
 );
+const MotorManagementPage = lazy(
+  () => import("@ui/pages/admin/MotorManagement/MotorManagementPage"),
+);
 const ProjectManagementPage = lazy(
   () => import("@ui/pages/admin/ProjectManagement/ProjectManagementPage"),
 );
@@ -87,6 +90,12 @@ export const routes = [
     roles: ["ADMIN"],
   },
   {
+    path: "/admin/motors",
+    element: <MotorManagementPage />,
+    isProtected: true,
+    roles: ["ADMIN"],
+  },
+  {
     path: "/admin/projects",
     element: <ProjectManagementPage />,
     isProtected: true,
@@ -122,7 +131,12 @@ export const routes = [
     isProtected: true,
     roles: ["CENTRE_HEAD"],
   },
-
+  {
+    path: "/centre-head/motors",
+    element: <MotorManagementPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
   {
     path: "/centre-head/projects",
     element: <CHProjectManagementPage />,
@@ -138,6 +152,12 @@ export const routes = [
   {
     path: "/system-manager",
     element: <SystemManagerDashboard />,
+    isProtected: true,
+    roles: ["SYSTEM_MANAGER"],
+  },
+  {
+    path: "/system-manager/motors",
+    element: <MotorManagementPage />,
     isProtected: true,
     roles: ["SYSTEM_MANAGER"],
   },

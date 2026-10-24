@@ -38,7 +38,11 @@ import {
   formatMasterDataAttributeValue,
   getMasterDataAttributeOptions,
 } from "./masterDataAttributeOptions";
-import { getMasterDataFieldLabel, requiredFieldLabel } from "./masterDataLabels";
+import {
+  getMasterDataFieldLabel,
+  getMasterDataNameColumnLabel,
+  requiredFieldLabel,
+} from "./masterDataLabels";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import {
   getMasterDataFieldErrors,
@@ -48,6 +52,11 @@ import {
   type MasterDataRecord,
   type MasterDataTypeDescriptor,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import {
+  SUBSCALE_ARTICLES_TYPE,
+  isSubscaleBemArticle,
+  resolveDefaultBemUnit,
+} from "@data/models/admin/MasterData/subscaleArticleMasterForm";
 import { useAlertStore } from "@app/store/alertStore";
 
 const S = STRINGS.MASTER_DATA;
@@ -165,10 +174,15 @@ const MasterDataList = ({
   const showNameInput = !nameField?.serverGenerated;
   const showNameColumn = showNameInput;
   const codeRequired = !hideCodeColumn && !codeField?.serverGenerated;
+  const isSubscaleArticles = selectedType === SUBSCALE_ARTICLES_TYPE;
+  /** List columns for subscale: Article Type only (Size/Unit stay form-only). */
+  const listAttributeFields = isSubscaleArticles
+    ? attributeFields.filter((field) => field.key === "isBem")
+    : attributeFields;
   const colCount =
     (hideCodeColumn ? 0 : 1) +
     (showNameColumn ? 1 : 0) +
-    attributeFields.length +
+    listAttributeFields.length +
     MASTER_DATA_AUDIT_COLUMN_COUNT +
     2;
 
@@ -213,7 +227,40 @@ const MasterDataList = ({
     );
   };
 
+  const subscaleIsBem = isSubscaleArticles && isSubscaleBemArticle(form);
+  const bemUnitOptions = dynamicAttributeOptions?.bemUnit ?? null;
+  const bemSizeField = attributeFields.find((field) => field.key === "bemSize");
+  const bemUnitField = attributeFields.find((field) => field.key === "bemUnit");
+
+  // When Unit Master loads, remap a preferred "Kg" default onto the real option value (case/symbol).
+  // Do not refill after the user clears the dropdown — they need an empty value to pick another unit.
+  useEffect(() => {
+    if (!isSubscaleArticles || !subscaleIsBem || !inlineMode) return;
+    if (!bemUnitOptions?.length) return;
+    const current = String(form.attributes.bemUnit ?? "").trim();
+    if (!current) return;
+    const exact = bemUnitOptions.some((opt) => opt.value === current);
+    if (exact) return;
+    const fuzzy = bemUnitOptions.find(
+      (opt) =>
+        opt.value.toLowerCase() === current.toLowerCase() ||
+        String(opt.label).toLowerCase() === current.toLowerCase(),
+    );
+    if (fuzzy) onFormChange("bemUnit", fuzzy.value, true);
+  }, [
+    isSubscaleArticles,
+    subscaleIsBem,
+    inlineMode,
+    bemUnitOptions,
+    form.attributes.bemUnit,
+    onFormChange,
+  ]);
+
   const renderAttributeInput = (field: MasterDataFieldDef) => {
+    if (isSubscaleArticles && (field.key === "bemSize" || field.key === "bemUnit") && !subscaleIsBem) {
+      return <Typography sx={table.bodyText}>—</Typography>;
+    }
+
     if (field.key === "projectId") {
       const placeholder = projectSelectLoading
         ? "Loading projects..."
@@ -249,13 +296,39 @@ const MasterDataList = ({
       dynamicAttributeOptions,
     );
     if (dropdownOptions) {
+      const isBooleanKind = field.dataType === "BOOLEAN" || field.key === "isBem";
+      const currentValue = isBooleanKind
+        ? form.attributes[field.key] === true
+          ? "true"
+          : form.attributes[field.key] === false
+            ? "false"
+            : ""
+        : String(form.attributes[field.key] ?? "");
       return (
         <AppSearchableDropdown
           compact
           fullWidth
-          placeholder={`Select ${requiredFieldLabel(getMasterDataFieldLabel(selectedType, field), Boolean(field.required))}`}
-          value={String(form.attributes[field.key] ?? "")}
-          onChange={(value) => onFormChange(field.key, value, true)}
+          placeholder={`Select ${requiredFieldLabel(
+            getMasterDataFieldLabel(selectedType, field),
+            Boolean(field.required) || (isSubscaleArticles && field.key === "isBem") || (subscaleIsBem && field.key === "bemUnit"),
+          )}`}
+          value={currentValue}
+          onChange={(value) => {
+            if (isBooleanKind) {
+              if (field.key === "isBem" && value === "true") {
+                onFormChange(field.key, true, true);
+                // Ensure Kg from Unit Master is applied once options are available.
+                const defaultUnit = resolveDefaultBemUnit(bemUnitOptions);
+                if (defaultUnit) {
+                  onFormChange("bemUnit", defaultUnit, true);
+                }
+                return;
+              }
+              onFormChange(field.key, value === "true", true);
+              return;
+            }
+            onFormChange(field.key, value, true);
+          }}
           disabled={saving}
           error={Boolean(visibleError(field.key))}
           helperText={visibleError(field.key)}
@@ -334,6 +407,52 @@ const MasterDataList = ({
     return table.headerCell;
   };
 
+  const nameInlineCell = showNameInput ? (
+    <TableCell sx={{ ...table.cell, minWidth: isSubscaleArticles && subscaleIsBem ? 280 : undefined }}>
+      {isSubscaleArticles && subscaleIsBem ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, minWidth: 240 }}>
+          <Box sx={{ display: "flex", gap: 0.75, alignItems: "flex-start" }}>
+            {bemSizeField ? (
+              <Box sx={{ flex: 1, minWidth: 88 }}>{renderAttributeInput(bemSizeField)}</Box>
+            ) : null}
+            {bemUnitField ? (
+              <Box sx={{ flex: 1, minWidth: 88 }}>{renderAttributeInput(bemUnitField)}</Box>
+            ) : null}
+          </Box>
+          <AppTextField
+            compact
+            fullWidth
+            placeholder="Article Name (auto)"
+            value={form.name}
+            disabled
+            helperText={form.name ? undefined : "Enter size & unit to preview name"}
+            sx={cellSx}
+          />
+        </Box>
+      ) : (
+        <AppTextField
+          compact
+          fullWidth
+          placeholder={requiredFieldLabel(getMasterDataNameColumnLabel(selectedType), true)}
+          value={form.name}
+          onChange={(e) => onFormChange("name", e.target.value)}
+          disabled={saving}
+          error={Boolean(visibleError("name"))}
+          helperText={visibleError("name")}
+          sx={cellSx}
+        />
+      )}
+    </TableCell>
+  ) : showNameColumn ? (
+    <TableCell sx={table.cell} />
+  ) : null;
+
+  const attributeInlineCells = listAttributeFields.map((field) => (
+    <TableCell key={field.key} sx={attributeCellSx(field)}>
+      {renderAttributeInput(field)}
+    </TableCell>
+  ));
+
   const renderInlineFields = () => {
     return (
       <TableRow sx={{ ...table.row, bgcolor: (theme) => theme.palette.action.hover }}>
@@ -352,28 +471,8 @@ const MasterDataList = ({
             />
           </TableCell>
         ) : null}
-        {showNameInput ? (
-          <TableCell sx={table.cell}>
-            <AppTextField
-              compact
-              fullWidth
-              placeholder={requiredFieldLabel(S.TABLE.COL_NAME, true)}
-              value={form.name}
-              onChange={(e) => onFormChange("name", e.target.value)}
-              disabled={saving}
-              error={Boolean(visibleError("name"))}
-              helperText={visibleError("name")}
-              sx={cellSx}
-            />
-          </TableCell>
-        ) : showNameColumn ? (
-          <TableCell sx={table.cell} />
-        ) : null}
-        {attributeFields.map((field) => (
-          <TableCell key={field.key} sx={attributeCellSx(field)}>
-            {renderAttributeInput(field)}
-          </TableCell>
-        ))}
+        {nameInlineCell}
+        {attributeInlineCells}
         <MasterDataAuditRowCells table={table} />
         <TableCell sx={table.cell}>
           <MasterDataEnableDisableField
@@ -448,14 +547,14 @@ const MasterDataList = ({
               ) : null}
               {showNameColumn ? (
                 <TableCell sx={table.headerCell}>
-                  {requiredFieldLabel(S.TABLE.COL_NAME, showNameInput)}
+                  {requiredFieldLabel(getMasterDataNameColumnLabel(selectedType), showNameInput)}
                 </TableCell>
               ) : null}
-              {attributeFields.map((field) => (
+              {listAttributeFields.map((field) => (
                 <TableCell key={field.key} sx={attributeHeaderCellSx(field)}>
                   {requiredFieldLabel(
                     getMasterDataFieldLabel(selectedType, field),
-                    Boolean(field.required),
+                    Boolean(field.required) || (isSubscaleArticles && field.key === "isBem"),
                   )}
                 </TableCell>
               ))}
@@ -494,7 +593,7 @@ const MasterDataList = ({
                       <Typography sx={table.bodyText}>{row.name}</Typography>
                     </TableCell>
                   ) : null}
-                  {attributeFields.map((field) => (
+                  {listAttributeFields.map((field) => (
                     <TableCell key={field.key} sx={attributeCellSx(field)}>
                       {field.key === "projectId" ? (
                         renderProjectCell(row.attributes?.[field.key])

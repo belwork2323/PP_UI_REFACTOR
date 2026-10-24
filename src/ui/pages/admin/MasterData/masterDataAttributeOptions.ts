@@ -6,9 +6,17 @@ export const CASTING_STATION_TYPE_OPTIONS: AppDropdownOption[] = [
   { value: "VERTICAL_CASTING", label: "Vertical Casting" },
 ];
 
+export const SUBSCALE_ARTICLE_KIND_OPTIONS: AppDropdownOption[] = [
+  { value: "true", label: "BEM article" },
+  { value: "false", label: "Other article" },
+];
+
 const ATTRIBUTE_OPTIONS_BY_TYPE: Record<string, Record<string, AppDropdownOption[]>> = {
   "casting-stations": {
     stationType: CASTING_STATION_TYPE_OPTIONS,
+  },
+  "subscale-articles": {
+    isBem: SUBSCALE_ARTICLE_KIND_OPTIONS,
   },
 };
 
@@ -49,6 +57,11 @@ export const formatMasterDataAttributeValue = (
   raw: unknown,
   dynamicOptions?: Record<string, AppDropdownOption[]>,
 ): string => {
+  if (selectedType === "subscale-articles" && field.key === "isBem") {
+    if (raw === true || raw === "true") return "BEM";
+    if (raw === false || raw === "false") return "Other";
+    return "—";
+  }
   const value = String(raw ?? "").trim();
   if (!value) return "—";
   if (selectedType === "motor-stages" && field.key === "motorStage") {

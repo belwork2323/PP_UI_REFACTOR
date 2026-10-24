@@ -14,6 +14,7 @@ import {
   isNdtDivisionFlow,
   isPostCureDivisionFlow,
   isPropellantDivisionFlow,
+  isStfDivisionFlow,
   isTrimmingDivisionFlow,
   isWeighmentDivisionFlow,
   STF_MOTOR_TYPE_SELECT_OPTIONS,
@@ -155,6 +156,7 @@ const QCFlowBar = ({
   const isDeCoringFlow = isDeCoringDivisionFlow(selectedDivision);
   const isPostCureFlow = isPostCureDivisionFlow(selectedDivision);
   const isNdtFlow = isNdtDivisionFlow(selectedDivision);
+  const isStfFlow = isStfDivisionFlow(selectedDivision);
   const isPropellantFlow = isPropellantDivisionFlow(selectedDivision);
   const isWeightmentFlow = isWeighmentDivisionFlow(selectedDivision);
   const autoSeededPartialFlow =
@@ -166,6 +168,7 @@ const QCFlowBar = ({
         isTrimmingFlow ||
         isPostCureFlow ||
         isNdtFlow ||
+        isStfFlow ||
         isPropellantFlow ||
         isWeightmentFlow ||
         isMixingFlow ||
@@ -175,7 +178,8 @@ const QCFlowBar = ({
   const showMixingNumber =
     isMixingFlow && isQcMixingStage(selectedMixingStage) && !autoSeededPartialFlow;
   const showPremixSelect = isRawMaterialPremixFlow && !autoSeededPartialFlow;
-  const showStfMotorType = panelType === "STF";
+  // Motor Navigation seeds STF forms — hide motor-type / Load Form when partial nav is active.
+  const showStfMotorType = isStfFlow && !autoSeededPartialFlow;
   const showMotorIdSelect = false;
   const showPropellantProcess = false;
   const showHardwareProcesses = false;

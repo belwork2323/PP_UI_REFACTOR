@@ -12,6 +12,7 @@ import {
   usesParallelUnitLocks,
 } from "../../utils/batchStageUtils";
 import { OPERATION_STATUS } from "../operationStatus";
+import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 export type BatchStageContext = Pick<
   BatchView,
@@ -93,14 +94,8 @@ const PREDECESSOR_BY_SLUG: Record<string, { kind: PartialFlowUnitKind; predecess
   },
   "static-test-facility": {
     kind: "motor",
-    predecessors: [
-      "qc-division",
-      "quality-control",
-      "ndt",
-      "trimming",
-      "post-cure-operations",
-      "casting-and-curing",
-    ],
+    // MAIN: NDT + subscale (see resolveStfPreviousStageApprovedUnits). Not QC.
+    predecessors: ["ndt", "subscale"],
   },
   dispatch: {
     kind: "motor",
@@ -206,96 +201,11 @@ const collectApprovedMotorIds = (entry: StageProgressEntry | null): Set<string> 
   return ids;
 };
 
-/** QC divisions that use motors as units — STF requires approval in every one. */
-const QC_MOTOR_UNIT_DIVISIONS = new Set([
-  "HARDWARE",
-  "CASTING",
-  "CURING",
-  "DE_CORING",
-  "TRIMMING",
-  "POST_CURE",
-  "NDT",
-  "QC",
-  "WEIGHTMENT",
-]);
-
-const normalizeQcMotorDivision = (value: unknown): string => {
-  const raw = String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-  if (!raw) return "";
-  if (raw === "DECORING" || raw === "DE_CORING") return "DE_CORING";
-  if (raw === "POSTCURE" || raw === "POST_CURE") return "POST_CURE";
-  if (raw === "PROPELLANT_PROPERTIES" || raw === "PROPELLANT") return "QC";
-  if (raw === "WEIGHMENT" || raw === "WEIGHTMENT") return "WEIGHTMENT";
-  return raw;
-};
-
 const normalizeStageNameKey = (value: unknown) =>
   String(value ?? "")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
-
-/** QC Quality Control catalog — not QC NDT or Static Test Facility. */
-const isQcQualityControlStage = (stage: StageProgressEntry): boolean => {
-  const sub = normalizeStageNameKey(stage.subDepartmentName);
-  if (!sub || sub === "ndt" || sub === "statictestfacility") return false;
-  return sub === "qualitycontrol" || sub === "qcdivision" || sub === "qc";
-};
-
-const findQcQualityControlStage = (stages: StageProgressEntry[]): StageProgressEntry | null => {
-  const matches = stages.filter(isQcQualityControlStage);
-  if (!matches.length) return null;
-  const withMotorRows = matches.find((stage) =>
-    Array.isArray(stage.motorStatuses) ? stage.motorStatuses.length > 0 : false,
-  );
-  return withMotorRows ?? matches[matches.length - 1] ?? null;
-};
-
-/**
- * Enable a motor in STF only when every motor-unit QC division in stage
- * progress has APPROVED that motor. Partial approval (e.g. Hardware only)
- * must not unlock STF.
- */
-const collectMotorsApprovedInAllQcMotorDivisions = (
-  entry: StageProgressEntry | null,
-): Set<string> => {
-  const ids = new Set<string>();
-  if (!entry) return ids;
-
-  const rows = Array.isArray(entry.motorStatuses) ? entry.motorStatuses : [];
-  const tagged = rows.filter((row) => {
-    const division = normalizeQcMotorDivision(row.division);
-    return Boolean(division) && QC_MOTOR_UNIT_DIVISIONS.has(division);
-  });
-
-  if (!tagged.length) return collectApprovedMotorIds(entry);
-
-  const requiredDivisions = new Set(
-    tagged.map((row) => normalizeQcMotorDivision(row.division)).filter(Boolean),
-  );
-  const byMotor = new Map<string, Map<string, boolean>>();
-
-  tagged.forEach((row) => {
-    const motorId = String(row.motorId ?? "").trim();
-    const division = normalizeQcMotorDivision(row.division);
-    if (!motorId || !division) return;
-    const approved = isApprovedUnitStatus(row.motorSubmissionStatus ?? row.status);
-    if (!byMotor.has(motorId)) byMotor.set(motorId, new Map());
-    const divisionMap = byMotor.get(motorId)!;
-    const previous = divisionMap.get(division);
-    divisionMap.set(division, previous === undefined ? approved : previous && approved);
-  });
-
-  byMotor.forEach((divisionMap, motorId) => {
-    const complete = [...requiredDivisions].every((division) => divisionMap.get(division) === true);
-    if (complete) ids.add(motorId);
-  });
-
-  return ids;
-};
 
 const isCompletelyApprovedStageStatus = (status: unknown): boolean => {
   const upper = String(status ?? "")
@@ -317,46 +227,98 @@ const findSubscaleStageEntry = (stages: StageProgressEntry[]): StageProgressEntr
 const DEFAULT_STF_SUBSCALE_BLOCKED_MESSAGE =
   "Wait until Subscale is completely approved before starting Static Test.";
 
+const DEFAULT_STF_NDT_BLOCKED_MESSAGE =
+  "Wait until NDT approves the motor before starting Static Test.";
+
+const findNdtStageEntry = (stages: StageProgressEntry[]): StageProgressEntry | null => {
+  const byId = stages.find((stage) => Number(stage.subDepartmentId) === 10);
+  if (byId) return byId;
+  return (
+    stages.find((stage) => {
+      const name = normalizeStageNameKey(stage.subDepartmentName);
+      return name === "ndt" || name === "nondestructivetesting";
+    }) ?? null
+  );
+};
+
+/**
+ * STF gate (no QC):
+ * - Always require Subscale COMPLETELY_APPROVED.
+ * - MAIN: motors approved in manufacturing NDT.
+ * - SUBSCALE (Qualification / Experimental): subscale alone unlocks (BEM / ID-sheet mains).
+ */
 const resolveStfPreviousStageApprovedUnits = (
   stages: StageProgressEntry[],
-  fallback: PreviousStageApprovedUnits,
+  _fallback: PreviousStageApprovedUnits,
   options?: {
     batchType?: string | null;
     parallelFlowEnabled?: boolean | null;
   },
 ): PreviousStageApprovedUnits => {
-  const qcStage = findQcQualityControlStage(stages);
-  if (!qcStage) return fallback;
-
-  const qcGate: PreviousStageApprovedUnits = {
-    enableAll: false,
-    kind: "motor",
-    previousSubDepartmentId: Number(qcStage.subDepartmentId ?? 0) || null,
-    previousSubDepartmentName: String(qcStage.subDepartmentName ?? "").trim() || "Quality Control",
-    approvedPremixNos: new Set(),
-    approvedMotorIds: collectMotorsApprovedInAllQcMotorDivisions(qcStage),
-  };
+  void options?.parallelFlowEnabled;
+  const subscaleStage = findSubscaleStageEntry(stages);
+  if (!subscaleStage || !isCompletelyApprovedStageStatus(subscaleStage.status)) {
+    return {
+      enableAll: false,
+      kind: "motor",
+      previousSubDepartmentId: Number(subscaleStage?.subDepartmentId ?? 0) || null,
+      previousSubDepartmentName:
+        String(subscaleStage?.subDepartmentName ?? "").trim() || "Subscale",
+      approvedPremixNos: new Set(),
+      approvedMotorIds: new Set(),
+      blockedMessage: DEFAULT_STF_SUBSCALE_BLOCKED_MESSAGE,
+    };
+  }
 
   const batchType = String(options?.batchType ?? "")
     .trim()
     .toUpperCase();
-  const isMainParallel = batchType === "MAIN" && options?.parallelFlowEnabled === true;
-  if (!isMainParallel) return qcGate;
 
-  const subscaleStage = findSubscaleStageEntry(stages);
-  if (!subscaleStage || isCompletelyApprovedStageStatus(subscaleStage.status)) {
-    return qcGate;
+  // Subscale Qualification / Experimental — no NDT / QC gate after subscale approval.
+  if (batchType === "SUBSCALE") {
+    return {
+      enableAll: true,
+      kind: "motor",
+      previousSubDepartmentId: Number(subscaleStage.subDepartmentId ?? 0) || null,
+      previousSubDepartmentName: String(subscaleStage.subDepartmentName ?? "").trim() || "Subscale",
+      approvedPremixNos: new Set(),
+      approvedMotorIds: new Set(),
+    };
+  }
+
+  const ndtStage = findNdtStageEntry(stages);
+  if (!ndtStage) {
+    return {
+      enableAll: false,
+      kind: "motor",
+      previousSubDepartmentId: null,
+      previousSubDepartmentName: "NDT",
+      approvedPremixNos: new Set(),
+      approvedMotorIds: new Set(),
+      blockedMessage: DEFAULT_STF_NDT_BLOCKED_MESSAGE,
+    };
+  }
+
+  const approvedMotorIds = collectApprovedMotorIds(ndtStage);
+  if (approvedMotorIds.size === 0) {
+    return {
+      enableAll: false,
+      kind: "motor",
+      previousSubDepartmentId: Number(ndtStage.subDepartmentId ?? 0) || null,
+      previousSubDepartmentName: String(ndtStage.subDepartmentName ?? "").trim() || "NDT",
+      approvedPremixNos: new Set(),
+      approvedMotorIds,
+      blockedMessage: DEFAULT_STF_NDT_BLOCKED_MESSAGE,
+    };
   }
 
   return {
     enableAll: false,
     kind: "motor",
-    previousSubDepartmentId: Number(subscaleStage.subDepartmentId ?? 0) || null,
-    previousSubDepartmentName: String(subscaleStage.subDepartmentName ?? "").trim() || "Subscale",
+    previousSubDepartmentId: Number(ndtStage.subDepartmentId ?? 0) || null,
+    previousSubDepartmentName: String(ndtStage.subDepartmentName ?? "").trim() || "NDT",
     approvedPremixNos: new Set(),
-    // Keep QC motors empty until Subscale is completely approved (ACEM diagram).
-    approvedMotorIds: new Set(),
-    blockedMessage: DEFAULT_STF_SUBSCALE_BLOCKED_MESSAGE,
+    approvedMotorIds,
   };
 };
 
@@ -686,13 +648,20 @@ export const buildMotorNavGateHelpers = (
     return !isMotorDisabled(unit);
   };
 
-  const isMotorWorkflowEnabledForBatch = (motorId: string | null | undefined) =>
-    batchContext && usesParallelUnitLocks(batchContext)
+  const isMotorWorkflowEnabledForBatch = (motorId: string | null | undefined) => {
+    if (isMotorWorkflowTabDisabled(resolveMotorStatus(String(motorId ?? "").trim()))) {
+      return false;
+    }
+    return batchContext && usesParallelUnitLocks(batchContext)
       ? parallelMotorEnabled(motorId)
       : legacyMotorEnabled(motorId);
+  };
 
   const getMotorTabTooltipForBatch = (index: number) => {
     const motorId = motorCards[index]?.motorId;
+    if (isMotorWorkflowTabDisabled(resolveMotorStatus(String(motorId ?? "").trim()))) {
+      return "Motor discarded";
+    }
     if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
       const unit = findMotorUnit(
         getActiveStage(batchContext, subDepartmentId),

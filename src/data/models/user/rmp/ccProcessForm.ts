@@ -12,9 +12,11 @@ export type CcIoUiKey = "cc" | "io";
 export type CcProcessForm = {
   uiKey: CcIoUiKey;
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   sievingDatetime: string;
   dispatchDatetime: string;
   observation: string;
+  qaRemarks: string;
   totalQtySentForPremix: string;
   /** Used by CC (default-solid drying / sieving). Empty for IO. */
   drying: DryingTrayOvenForm;
@@ -29,6 +31,7 @@ const emptyDrying = (): DryingTrayOvenForm => ({
   endDatetime: "",
   moisture: "",
   observation: "",
+  qaRemarks: "",
 });
 
 const emptySieving = (): SievingForm => ({
@@ -36,14 +39,17 @@ const emptySieving = (): SievingForm => ({
   sievedQuantity: "",
   sieveMeshSize: "",
   observation: "",
+  qaRemarks: "",
 });
 
 export const createEmptyCcProcessForm = (uiKey: CcIoUiKey = "cc"): CcProcessForm => ({
   uiKey,
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   sievingDatetime: "",
   dispatchDatetime: "",
   observation: "",
+  qaRemarks: "",
   totalQtySentForPremix: "",
   drying: emptyDrying(),
   sieving: emptySieving(),
@@ -54,9 +60,14 @@ const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 export const ccFormHasUserData = (form: CcProcessForm): boolean => {
   if (lotDetailsHaveUserData(form.lotDetails)) return true;
   if (
-    [form.sievingDatetime, form.dispatchDatetime, form.observation, form.totalQtySentForPremix].some(
-      (v) => str(v),
-    )
+    [
+      form.sievingDatetime,
+      form.dispatchDatetime,
+      form.observation,
+      form.qaRemarks,
+      form.lotDetailsQaRemarks,
+      form.totalQtySentForPremix,
+    ].some((v) => str(v))
   ) {
     return true;
   }

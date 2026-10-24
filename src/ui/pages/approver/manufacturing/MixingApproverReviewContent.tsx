@@ -42,8 +42,8 @@ type MixingApproverReviewContentProps = {
   loading: boolean;
   activeMixCardId: string | null;
   onActiveMixCardChange: (mixCardId: string) => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
   actionLoading?: boolean;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -249,7 +249,7 @@ const MixingApproverReviewContent = ({
             </Typography>
           ) : null}
 
-          {canApproveOrReject ? (
+          {canApproveOrReject && onApprove && onReject ? (
             <Stack
               direction={{ xs: "column", sm: "row" }}
               gap={1}

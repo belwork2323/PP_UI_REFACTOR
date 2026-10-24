@@ -12,6 +12,7 @@ import { getSchemaForDivisionEntry } from "../../../../../hooks/user/qualityCont
 import {
   ensureWeightmentRowsForPremixMaterials,
   filterWeightmentSheetForPremix,
+  getQcProcessingMaterialLabel,
   hydrateProcessingMaterialValues,
   mergeWeightmentSheetForPremix,
   resolveQcProcessingWeightmentSheet,
@@ -43,6 +44,7 @@ import {
   lotOptionsForMaterial,
   quantityPerPremixForMaterial,
 } from "../../../../../hooks/user/qualityControl/qcProcessing.validation";
+import { useQcApprovedLotOptions } from "../../../../../hooks/user/qualityControl/useQcApprovedLotOptions";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -201,6 +203,26 @@ const QCProcessingMaterialsPanel = ({
       materials,
     };
   }, [batchPayload, divisionAutoPopulateData]);
+
+  const sheetLotIdsForActive = useMemo(
+    () =>
+      lotOptionsForMaterial(
+        identificationSheet?.materials,
+        activeEntry?.materialCode,
+        (activeEntry?.savedProcess?.lotDetails ?? [])
+          .map((lot) => String(lot.lotId ?? "").trim())
+          .filter(Boolean),
+      ),
+    [
+      identificationSheet?.materials,
+      activeEntry?.materialCode,
+      activeEntry?.savedProcess?.lotDetails,
+    ],
+  );
+  const approvedLotFallback = useQcApprovedLotOptions(
+    activeEntry?.materialCode,
+    sheetLotIdsForActive,
+  );
 
   // Seed QC-owned weighment from autopopulate/batch once — table shows API rows first;
   // compare stays off until the user checks it (no auto rewrite of entered values).
@@ -392,6 +414,8 @@ const QCProcessingMaterialsPanel = ({
       gradeId: activeEntry.savedProcess?.gradeId ?? activeEntry.gradeId ?? null,
       gradeCode: gradeCode ?? null,
       lotDetails: activeEntry.savedProcess?.lotDetails ?? [],
+      lotDetailsQaRemarks: activeEntry.savedProcess?.lotDetailsQaRemarks ?? null,
+      qaRemarks: activeEntry.savedProcess?.qaRemarks ?? null,
       drying: activeEntry.savedProcess?.drying ?? null,
       sieving: activeEntry.savedProcess?.sieving ?? null,
       apCoarse: activeEntry.savedProcess?.apCoarse ?? null,
@@ -476,7 +500,12 @@ const QCProcessingMaterialsPanel = ({
     () =>
       materialEntries.map((entry) => ({
         id: entry.entryId,
-        label: entry.label,
+        // Recompute from code+grade so AP grades stay distinct (user + approver parity).
+        label: getQcProcessingMaterialLabel({
+          premixNo: Number(entry.premixNo ?? 0),
+          materialCode: String(entry.materialCode ?? "").trim(),
+          gradeCode: entry.gradeCode,
+        }),
       })),
     [materialEntries],
   );
@@ -572,7 +601,11 @@ const QCProcessingMaterialsPanel = ({
           {schemaLoading || mappingValues ? <QCSchemaBufferingLoader overlay /> : null}
 
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
-            {activeEntry.label}
+            {getQcProcessingMaterialLabel({
+              premixNo: Number(activeEntry.premixNo ?? 0),
+              materialCode: String(activeEntry.materialCode ?? "").trim(),
+              gradeCode: activeEntry.gradeCode,
+            })}
             {activeEntry.materialName ? (
               <Box
                 component="span"
@@ -599,9 +632,12 @@ const QCProcessingMaterialsPanel = ({
                     lotOptions={lotOptionsForMaterial(
                       identificationSheet?.materials,
                       activeEntry.materialCode,
-                      (activeEntry.savedProcess?.lotDetails ?? [])
-                        .map((lot) => String(lot.lotId ?? "").trim())
-                        .filter(Boolean),
+                      [
+                        ...(activeEntry.savedProcess?.lotDetails ?? [])
+                          .map((lot) => String(lot.lotId ?? "").trim())
+                          .filter(Boolean),
+                        ...approvedLotFallback,
+                      ],
                     )}
                     quantityPerPremix={quantityPerPremixForMaterial(
                       identificationSheet?.materials,
@@ -610,6 +646,7 @@ const QCProcessingMaterialsPanel = ({
                     readOnly={inputsLocked}
                     theme={manufacturingTheme}
                     validationErrors={processingFieldErrors[activeEntry.entryId]}
+                    showQaRemarks
                   />
                 </Box>
               ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (

@@ -3,16 +3,20 @@
 // Batch row opens the popup; department stages load from batch-dept-stages API.
 // Clicking a department loads sub-department timeline from batch-subdept-stages API.
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Box, Stack, Typography, IconButton, CircularProgress } from "@mui/material";
 import Modal from "@mui/material/Modal";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import useBatchStages from "../../../../../hooks/system_manager/useBatchStagesHook";
 import useBatchSubDeptStages from "../../../../../hooks/system_manager/useBatchSubDeptStagesHook";
+import type { SubDeptStageItemModel } from "../../../../../data/models/SystemManagerModel";
 import StatusChip from "../../../../components/common/StatusChip";
 import ProgressBar from "../../../../components/common/ProgressBar";
 import BatchSubDeptTimeline from "./BatchSubDeptTimeline";
+import BatchSubDeptFormPreview, {
+  type BatchSubDeptFormPreviewTarget,
+} from "../../../systemManager/components/BatchSubDeptFormPreview";
 
 const { Close, FiberManualRecord, Inventory2, Science, Verified, LocalShipping } =
   icons.systemManager;
@@ -57,6 +61,27 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
     reset: resetSubDeptStages,
   } = useBatchSubDeptStages();
   const [activeStageIdx, setActiveStageIdx] = useState(0);
+  const [formPreviewTarget, setFormPreviewTarget] =
+    useState<BatchSubDeptFormPreviewTarget>(null);
+
+  const handleViewForm = useCallback(
+    (item: SubDeptStageItemModel) => {
+      const batchId = batch?.batchId || batch?.id;
+      if (!batchId || !item.subDepartmentId) return;
+      setFormPreviewTarget({
+        batchId: String(batchId),
+        formId: item.formId || "",
+        subDepartmentId: item.subDepartmentId,
+        subDepartmentName: item.subDepartmentName,
+        status: item.status,
+      });
+    },
+    [batch?.batchId, batch?.id],
+  );
+
+  const handleCloseFormPreview = useCallback(() => {
+    setFormPreviewTarget(null);
+  }, []);
 
   useEffect(() => {
     if (batch?.id || batch?.batchId) {
@@ -126,6 +151,7 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
     : null;
 
   return (
+    <>
     <Modal open disableAutoFocus onClose={onClose} sx={t.popup.modal}>
       <Box role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} sx={t.popup.paper}>
         <Box sx={ph.wrapper}>
@@ -281,6 +307,7 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                   error={subDeptError}
                   t={t}
                   accentColor={activeVisuals?.color}
+                  onViewForm={handleViewForm}
                 />
               </>
             ) : (
@@ -292,5 +319,12 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
         </Box>
       </Box>
     </Modal>
+
+    <BatchSubDeptFormPreview
+      open={Boolean(formPreviewTarget)}
+      target={formPreviewTarget}
+      onClose={handleCloseFormPreview}
+    />
+    </>
   );
 }

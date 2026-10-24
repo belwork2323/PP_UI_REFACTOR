@@ -38,6 +38,7 @@ const DEPT_NAME_SLUG_MAP = {
   sourcing: "sourcing",
   manufacturing: "manufacturing",
   "quality-control": "quality",
+  "quality-assurance": "quality",
   quality: "quality",
   dispatch: "dispatch",
 };
@@ -58,6 +59,7 @@ const SUBDEPT_NAME_SLUG_MAP = {
   },
   quality: {
     "quality-control": "qc-division",
+    "quality-assurance": "qc-division",
     "raw-material-revalidation": "qc-division",
     "qc-division": "qc-division",
     ndt: "ndt",

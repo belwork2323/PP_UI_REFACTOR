@@ -381,7 +381,11 @@ export function normalizeWorkflowStatus(status: unknown): string {
     INITIATED: "To Be Initiated",
     IN_PROGRESS: "In Progress",
     WAITING_FOR_APPROVAL: "Waiting for Approval",
+    WAITING_FOR_PARTIAL_APPROVAL: "Waiting for Partial Approval",
+    WAITING_FOR_COMPLETE_APPROVAL: "Waiting for Complete Approval",
     APPROVED: "Approved",
+    COMPLETELY_APPROVED: "Completely Approved",
+    FINAL_APPROVAL_COMPLETED: "Completely Approved",
     REJECTED: "Rejected",
     NOT_STARTED: "Not Started",
     COMPLETED: "Completed",
@@ -395,8 +399,23 @@ export function normalizeWorkflowStatus(status: unknown): string {
 }
 
 export function isApprovedStageStatus(status: unknown): boolean {
-  const normalized = normalizeWorkflowStatus(status);
-  return normalized === "Approved" || normalized === "Completed";
+  const upper = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return (
+    upper === "APPROVED" ||
+    upper === "COMPLETELY_APPROVED" ||
+    upper === "FINAL_APPROVAL_COMPLETED" ||
+    upper === "COMPLETED" ||
+    upper === "WAITING_FOR_PARTIAL_APPROVAL"
+  );
+}
+
+/** Whether Admin/SM/CH can open Approver-style form preview from the batch timeline. */
+export function canViewBatchSubDeptFormDetails(status: unknown, _formId?: string | null): boolean {
+  // formId may be absent on older stage payloads; preview resolves it on open via batch/details.
+  return isApprovedStageStatus(status);
 }
 
 export class AuditActorModel {

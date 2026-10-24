@@ -9,20 +9,24 @@ import {
 export type NonoxDProcessForm = {
   uiKey: "nonoxD";
   lotDetails: LotDetailFormRow[];
+  lotDetailsQaRemarks: string;
   quantitySieved: string;
   sieveMeshSize: string;
   dispatchDatetime: string;
   observation: string;
+  qaRemarks: string;
   totalQtySentForPremix: string;
 };
 
 export const createEmptyNonoxDProcessForm = (): NonoxDProcessForm => ({
   uiKey: "nonoxD",
   lotDetails: [createEmptyLotDetailRow()],
+  lotDetailsQaRemarks: "",
   quantitySieved: "",
   sieveMeshSize: "",
   dispatchDatetime: "",
   observation: "",
+  qaRemarks: "",
   totalQtySentForPremix: "",
 });
 
@@ -35,6 +39,8 @@ export const nonoxDFormHasUserData = (form: NonoxDProcessForm): boolean => {
     form.sieveMeshSize,
     form.dispatchDatetime,
     form.observation,
+    form.qaRemarks,
+    form.lotDetailsQaRemarks,
     form.totalQtySentForPremix,
   ].some((v) => str(v));
 };

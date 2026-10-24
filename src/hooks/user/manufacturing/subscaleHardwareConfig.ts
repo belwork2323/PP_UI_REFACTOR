@@ -55,12 +55,15 @@ export type HardwareArticleSelection = {
   subscaleArticleName: string;
   noOfArticles: number;
   noOfParts: number;
+  /** Snapshotted from Subscale Article Master at add time. */
+  isBem: boolean;
 };
 
 export type HardwareArticleOption = {
   subscaleArticleId: number;
   subscaleArticleCode: string;
   subscaleArticleName: string;
+  isBem: boolean;
 };
 
 export type ArticleTypeRow = {
@@ -113,12 +116,14 @@ export const getHardwareArticleSelections = (
   return raw
     .map((item) => {
       const row = (item ?? {}) as Partial<HardwareArticleSelection>;
+      const isBem = row.isBem === true;
       return {
         subscaleArticleId: Number(row.subscaleArticleId ?? 0),
         subscaleArticleCode: String(row.subscaleArticleCode ?? "").trim(),
         subscaleArticleName: String(row.subscaleArticleName ?? "").trim(),
         noOfArticles: parseCount(row.noOfArticles),
-        noOfParts: parseCount(row.noOfParts),
+        noOfParts: isBem ? parseCount(row.noOfParts) : 0,
+        isBem,
       };
     })
     .filter((row) => row.subscaleArticleName && row.noOfArticles > 0);
@@ -168,14 +173,15 @@ export type TrimmingTableRow = {
   LENGTH_BEFORE_INHIBITION: string;
 };
 
-/** Resolve No. of Parts for a casting article type from hardware selections. */
+/** Resolve No. of Parts for a casting article type from hardware selections (BEM only). */
 const getNoOfPartsForArticleType = (values: SchemaFormValues, articleType: string): number => {
   const name = String(articleType ?? "").trim();
   if (!name) return 0;
   const selection = getHardwareArticleSelections(values).find(
     (row) => row.subscaleArticleName === name,
   );
-  return selection?.noOfParts ?? 0;
+  if (!selection || selection.isBem !== true) return 0;
+  return selection.noOfParts ?? 0;
 };
 
 /**
@@ -238,24 +244,19 @@ export const buildTrimmingRowsFromCasting = (
   return rows;
 };
 
-/** Aligns with backend BemArticleTypeUtil — BEM sizes / names containing BEM. */
-const ELIGIBLE_BEM_ARTICLE_TYPES = new Set([
-  "40KGBEM",
-  "20KGBEM",
-  "10KGBEM",
-  "2KGBEM",
-  "BEM40KG",
-  "BEM20KG",
-  "BEM10KG",
-  "BEM2KG",
-]);
-
-export const isEligibleBemArticleType = (articleType: unknown): boolean => {
+/** BEM eligibility from snapshotted hardware selection {@code isBem} only. */
+export const isEligibleBemArticleType = (
+  articleType: unknown,
+  values?: SchemaFormValues,
+): boolean => {
   const raw = String(articleType ?? "").trim();
   if (!raw) return false;
-  const normalized = raw.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  if (ELIGIBLE_BEM_ARTICLE_TYPES.has(normalized)) return true;
-  return normalized.includes("BEM") || normalized.includes("BALLISTICEVALUATIONMOTOR");
+  if (!values) return false;
+  return getHardwareArticleSelections(values).some(
+    (selection) =>
+      selection.isBem === true &&
+      (selection.subscaleArticleName === raw || selection.subscaleArticleCode === raw),
+  );
 };
 
 export type StaticTestingTableRow = {
@@ -273,12 +274,15 @@ export type StaticTestingTableRow = {
 };
 
 /**
- * Build Static Testing Of BEM rows from Trimming part IDs for BEM article types only.
+ * Build Static Testing Of BEM rows from Trimming part IDs.
+ * Qualification: BEM article types only ({@code isBem}).
+ * Experimental: all trimming rows with a BEM/Article No (batch articles often omit isBem).
  * Existing measurement/graph cells are preserved when BEM_NO matches.
  */
 export const buildStaticTestingRowsFromTrimming = (
   values: SchemaFormValues,
   existingStaticRows?: Partial<StaticTestingTableRow>[],
+  options?: { subBatchType?: string | null },
 ): StaticTestingTableRow[] => {
   const trimmingRows = Array.isArray(values.TRIMMING_TABLE)
     ? (values.TRIMMING_TABLE as Record<string, unknown>[])
@@ -289,12 +293,17 @@ export const buildStaticTestingRowsFromTrimming = (
     if (bemNo) existingByBemNo.set(bemNo, row);
   });
 
+  const isExperimental = String(options?.subBatchType ?? "")
+    .trim()
+    .toUpperCase()
+    .includes("EXPERIMENTAL");
+
   const rows: StaticTestingTableRow[] = [];
   let srNo = 1;
 
   trimmingRows.forEach((trim) => {
     const articleType = String(trim?.ARTICLE_TYPE ?? "");
-    if (!isEligibleBemArticleType(articleType)) return;
+    if (!isExperimental && !isEligibleBemArticleType(articleType, values)) return;
 
     const bemNo = String(trim?.BEM_NO ?? "").trim();
     if (!bemNo) return;
@@ -434,6 +443,7 @@ export const synthesizeSelectionsFromLegacyCounts = (
       subscaleArticleName: articleType,
       noOfArticles: count,
       noOfParts: 0,
+      isBem: false,
     });
   });
   return selections;

@@ -88,6 +88,8 @@ export type QcPostCureLocationRow = {
   FROM_DATE: string;
   TO_DATE: string;
   OBSERVATIONS: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  QA_REMARKS?: string;
   QTY_FILLED?: string;
   QTY_APPLIED?: string;
 };
@@ -97,6 +99,8 @@ export type QcPostCureQualificationRow = {
   PARAMETER: string;
   SPECIFICATION: string;
   RESULT: string;
+  /** QC Division QA Remarks column (API: qaRemarks). */
+  QA_REMARKS?: string;
   QC_REPORT?: FileRef[];
 };
 
@@ -146,6 +150,7 @@ export const normalizeQcInhibitorType = (
   if (!raw) return null;
   if (raw === "IR1" || raw === "IR_1") return "IR1";
   if (raw === "HEMCOAT_3K" || raw === "HEMCOAT3K") return "HEMCOAT-3K";
+  if (raw === "OTHERS" || raw === "OTHER") return "OTHERS";
   if (raw === "NOT_APPLICABLE" || raw === "N_A" || raw === "NA") return "NOT_APPLICABLE";
   return null;
 };

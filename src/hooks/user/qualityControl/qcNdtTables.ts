@@ -91,6 +91,7 @@ const emptyObservationRows = (): QcNdtRadiographyObservationRow[] =>
     TYPE_OF_DEFECT: row.TYPE_OF_DEFECT,
     OBSERVATIONS: "",
     LOCATION: "",
+    QA_REMARKS: "",
   }));
 
 const emptyVisualRows = (): QcNdtVisualInspectionRow[] =>
@@ -99,6 +100,7 @@ const emptyVisualRows = (): QcNdtVisualInspectionRow[] =>
     OBSERVATION_TYPE: row.OBSERVATION_TYPE,
     OBSERVATION: "",
     LOCATION: "",
+    QA_REMARKS: "",
     UPLOAD_IMAGE: [],
   }));
 
@@ -114,6 +116,7 @@ const normalizeRadiographyDetailRows = (value: unknown): QcNdtRadiographyDetailR
       NO_OF_ORIENTATIONS: pickString(row?.NO_OF_ORIENTATIONS, row?.noOfOrientations),
       NORMAL_EXPOSURES: pickString(row?.NORMAL_EXPOSURES, row?.normalExposures),
       TANGENTIAL_EXPOSURES: pickString(row?.TANGENTIAL_EXPOSURES, row?.tangentialExposures),
+      QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
     }));
   return rows.length ? rows : [emptyNdtRadiographyDetailRow()];
 };
@@ -141,6 +144,7 @@ const normalizeObservationRows = (value: unknown): QcNdtRadiographyObservationRo
         pickEditableString(row?.OBSERVATIONS, row?.observations, row?.OBSERVATION, row?.observation) ||
         split.observations,
       LOCATION: pickEditableString(row?.LOCATION, row?.location) || split.location,
+      QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
     };
   });
 };
@@ -252,6 +256,7 @@ const normalizeVisualRows = (value: unknown): QcNdtVisualInspectionRow[] => {
       OBSERVATION: pickEditableString(row?.OBSERVATION, row?.observation, row?.OBSERVATIONS),
       // Do not derive Location from sectionNumber/orientation on seed.
       LOCATION: pickEditableString(row?.LOCATION, row?.location),
+      QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
       UPLOAD_IMAGE: parseNdtUploadFiles(
         row?.UPLOAD_IMAGE,
         row?.uploadImage,
@@ -293,6 +298,8 @@ const applyManufacturingNdtDetails = (
             row?.TANGENTIAL_EXPOSURES,
             row?.tangentialExposures,
           ),
+          // Manufacturing seed: do not copy into QA Remarks.
+          QA_REMARKS: "",
         }))
       : machineNo
         ? [{ ...emptyNdtRadiographyDetailRow(), MACHINE_NO: machineNo }]
@@ -334,6 +341,11 @@ const applyManufacturingNdtDetails = (
   if (remarks) {
     values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")] = remarks;
   }
+  // Prefer QC qaRemarks; do not seed QA from manufacturing additionalRemarks.
+  values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "QA_REMARKS")] = pickEditableString(
+    signedReport?.qaRemarks,
+    data.QA_REMARKS,
+  );
   return values;
 };
 
@@ -387,6 +399,7 @@ export const createInitialNdtValues = (): SchemaFormValues => ({
   [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: [],
   [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")]: [],
   [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")]: "",
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "QA_REMARKS")]: "",
 });
 
 export const getNdtRadiographyDetailRows = (values: SchemaFormValues | null | undefined) =>
@@ -441,6 +454,7 @@ export const mergeBatchRadiographyPlanIntoNdtValues = (
       NO_OF_ORIENTATIONS: pickString(row.orientations),
       NORMAL_EXPOSURES: pickString(row.normalExposures),
       TANGENTIAL_EXPOSURES: pickString(row.tangentialExposures),
+      QA_REMARKS: "",
     })),
   );
 };
@@ -505,6 +519,17 @@ export const setNdtAdditionalRemarks = (
 ): SchemaFormValues => ({
   ...(values ?? {}),
   [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")]: next ?? "",
+});
+
+export const getNdtQaRemarks = (values: SchemaFormValues | null | undefined): string =>
+  pickEditableString(values?.[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "QA_REMARKS")]);
+
+export const setNdtQaRemarks = (
+  values: SchemaFormValues | null | undefined,
+  next: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "QA_REMARKS")]: next ?? "",
 });
 
 export const collectNdtFileRefsFromQcValues = (
@@ -616,7 +641,9 @@ const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, dat
     normalized === QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT ||
     data.SIGNED_REPORT != null ||
     data.signedNdtReport != null ||
-    data.ADDITIONAL_REMARKS != null
+    data.ADDITIONAL_REMARKS != null ||
+    data.QA_REMARKS != null ||
+    data.qaRemarks != null
   ) {
     const signedReport = asRecord(data.signedNdtReport);
     const reportFiles = parseNdtUploadFiles(
@@ -634,6 +661,14 @@ const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, dat
     );
     if (remarks) {
       values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")] = remarks;
+    }
+    const qaRemarks = pickEditableString(
+      data.QA_REMARKS,
+      data.qaRemarks,
+      signedReport?.qaRemarks,
+    );
+    if (qaRemarks) {
+      values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "QA_REMARKS")] = qaRemarks;
     }
   }
 };
@@ -683,6 +718,7 @@ const mapApiObservationsToQcRows = (value: unknown): QcNdtRadiographyObservation
         rec.OBSERVATION,
       ),
       LOCATION: pickEditableString(rec.LOCATION, rec.location, rec.orientation),
+      QA_REMARKS: pickEditableString(rec.QA_REMARKS, rec.qaRemarks),
     };
   });
   return defaults;
@@ -815,6 +851,7 @@ export const ndtMotorDetailToSections = (
                       recRow.tangentialExposures,
                       recRow.TANGENTIAL_EXPOSURES,
                     ),
+                    QA_REMARKS: pickEditableString(recRow.qaRemarks, recRow.QA_REMARKS),
                   };
                 })
               : machineNo
@@ -851,6 +888,7 @@ export const ndtMotorDetailToSections = (
                 OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
                 OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
                 LOCATION: pickEditableString(recRow.LOCATION, recRow.location),
+                QA_REMARKS: pickEditableString(recRow.qaRemarks, recRow.QA_REMARKS),
                 UPLOAD_IMAGE: parseNdtUploadFiles(
                   recRow.uploadedImages,
                   recRow.uploadImage,
@@ -876,13 +914,15 @@ export const ndtMotorDetailToSections = (
     const signedReport = asRecord(source.signedNdtReport);
     const reportFiles = parseNdtUploadFiles(signedReport?.report, signedReport?.documentId);
     const remarks = pickEditableString(signedReport?.additionalRemarks);
-    if (reportFiles.length || remarks) {
+    const qaRemarks = pickEditableString(signedReport?.qaRemarks);
+    if (reportFiles.length || remarks || qaRemarks) {
       sections.push({
         sectionId: QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT,
         sectionData: [
           omitEmpty({
             SIGNED_REPORT: reportFiles.length ? reportFiles : undefined,
             ADDITIONAL_REMARKS: remarks || undefined,
+            QA_REMARKS: qaRemarks || undefined,
           }),
         ],
         motorId,
@@ -964,6 +1004,7 @@ export const buildNdtMotorDetailPayload = (
   const uploadMediaPayload = toFileIdListPayload(getNdtUploadMedia(values));
   const signedReportPayload = toFileIdListPayload(getNdtSignedReport(values));
   const additionalRemarks = getNdtAdditionalRemarks(values).trim();
+  const qaRemarks = getNdtQaRemarks(values).trim();
 
   return omitEmpty({
     motorId,
@@ -978,6 +1019,7 @@ export const buildNdtMotorDetailPayload = (
           numberOfOrientations: toApiNumber(row.NO_OF_ORIENTATIONS),
           numberOfNormalExposures: toApiNumber(row.NORMAL_EXPOSURES),
           numberOfTangentialExposures: toApiNumber(row.TANGENTIAL_EXPOSURES),
+          qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
         }),
         sfd: null,
         detectorType: null,
@@ -989,6 +1031,7 @@ export const buildNdtMotorDetailPayload = (
         location: String(row.LOCATION ?? "").trim() || undefined,
         observation: String(row.OBSERVATIONS ?? "").trim() || undefined,
         typeOfDefect: row.TYPE_OF_DEFECT || undefined,
+        qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
       }),
       uploadedImages: [] as Array<{ fileId: string }>,
     })),
@@ -998,14 +1041,16 @@ export const buildNdtMotorDetailPayload = (
         sectionNumber: row.SR_NO,
         location: String(row.LOCATION ?? "").trim() || undefined,
         observation: String(row.OBSERVATION ?? "").trim() || undefined,
+        qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
       }),
       uploadedImages: toFileIdListPayload(row.UPLOAD_IMAGE),
     })),
     uploadedVideos: uploadMediaPayload.length ? uploadMediaPayload : undefined,
     signedNdtReport:
-      signedReportPayload.length || additionalRemarks
+      signedReportPayload.length || additionalRemarks || qaRemarks
         ? omitEmpty({
             additionalRemarks: additionalRemarks || undefined,
+            qaRemarks: qaRemarks || undefined,
             report: signedReportPayload[0],
           })
         : undefined,
@@ -1028,6 +1073,7 @@ export const buildNdtSectionPayload = (
               NO_OF_ORIENTATIONS: row.NO_OF_ORIENTATIONS || undefined,
               NORMAL_EXPOSURES: row.NORMAL_EXPOSURES || undefined,
               TANGENTIAL_EXPOSURES: row.TANGENTIAL_EXPOSURES || undefined,
+              QA_REMARKS: String(row.QA_REMARKS ?? "").trim() || undefined,
             }),
           ),
         },
@@ -1043,6 +1089,7 @@ export const buildNdtSectionPayload = (
               TYPE_OF_DEFECT: row.TYPE_OF_DEFECT,
               OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim() || undefined,
               LOCATION: String(row.LOCATION ?? "").trim() || undefined,
+              QA_REMARKS: String(row.QA_REMARKS ?? "").trim() || undefined,
             }),
           ),
         },
@@ -1058,6 +1105,7 @@ export const buildNdtSectionPayload = (
               OBSERVATION_TYPE: row.OBSERVATION_TYPE,
               OBSERVATION: String(row.OBSERVATION ?? "").trim() || undefined,
               LOCATION: String(row.LOCATION ?? "").trim() || undefined,
+              QA_REMARKS: String(row.QA_REMARKS ?? "").trim() || undefined,
               UPLOAD_IMAGE: toFileIdListPayload(row.UPLOAD_IMAGE).length
                 ? toFileIdListPayload(row.UPLOAD_IMAGE)
                 : undefined,
@@ -1084,6 +1132,7 @@ export const buildNdtSectionPayload = (
             ? toFileIdListPayload(getNdtSignedReport(values))
             : undefined,
           ADDITIONAL_REMARKS: getNdtAdditionalRemarks(values).trim() || undefined,
+          QA_REMARKS: getNdtQaRemarks(values).trim() || undefined,
         }),
       ],
     },

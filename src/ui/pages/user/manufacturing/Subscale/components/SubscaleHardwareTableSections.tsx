@@ -38,6 +38,8 @@ type RowsProps = {
   rows: any[];
   onCellChange: SubscaleCellChangeHandler;
   getSyncedBemNo?: (rowIndex: number) => string;
+  /** Article Type MOULD_NO mirrored into Casting Mould No (same row). */
+  getSyncedMouldNo?: (rowIndex: number) => string;
   errors?: Record<string, string> | null;
   clearFieldError?: (path: string) => void; // <-- Add this
 };
@@ -74,12 +76,14 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
         </TableHead>
         <TableBody>
           {rows.map((row, idx) => {
+            const errMap = errors as Record<string, any>;
             const fieldPath = `ARTICLE_TYPE_TABLE.${idx}.RUBBER_MATERIAL`;
-            const sleeveNoPath = `ARTICLE_TYPE_TABLE.${idx}.SLEEVE_NO`;
-            const mouldNoPath = `ARTICLE_TYPE_TABLE.${idx}.MOULD_NO`;
-            const fieldError = (errors as Record<string, any>)?.[fieldPath];
-            const sleeveNoError = (errors as Record<string, any>)?.[sleeveNoPath];
-            const mouldNoError = (errors as Record<string, any>)?.[mouldNoPath];
+            const fieldError = errMap?.[fieldPath];
+            const sleeveNoError = errMap?.[`ARTICLE_TYPE_TABLE.${idx}.SLEEVE_NO`];
+            const mouldNoError = errMap?.[`ARTICLE_TYPE_TABLE.${idx}.MOULD_NO`];
+            const sizeMmError = errMap?.[`ARTICLE_TYPE_TABLE.${idx}.SIZE_MM`];
+            const linerAppliedError = errMap?.[`ARTICLE_TYPE_TABLE.${idx}.LINER_APPLIED`];
+            const observationsError = errMap?.[`ARTICLE_TYPE_TABLE.${idx}.OBSERVATIONS`];
             return (
               <TableRow key={idx}>
                 <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
@@ -147,6 +151,7 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                     fieldId="SIZE_MM"
                     value={row.SIZE_MM ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={sizeMmError}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -158,6 +163,7 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                     fieldId="THICKNESS_MM"
                     value={row.THICKNESS_MM ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errMap?.[`ARTICLE_TYPE_TABLE.${idx}.THICKNESS_MM`]}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -168,6 +174,7 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                     fieldId="LINER_APPLIED"
                     value={row.LINER_APPLIED ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={linerAppliedError}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -178,6 +185,7 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                     fieldId="OBSERVATIONS"
                     value={row.OBSERVATIONS ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={observationsError}
                   />
                 </TableCell>
               </TableRow>
@@ -273,6 +281,7 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
 export const CastingTableSection = memo(function CastingTableSection({
   rows,
   onCellChange,
+  getSyncedMouldNo = () => "",
   errors,
 }: RowsProps) {
   return (
@@ -305,9 +314,11 @@ export const CastingTableSection = memo(function CastingTableSection({
 
             const bemNoError = errMap?.[`CASTING_TABLE.${idx}.BEM_NO`];
             const bemMouldError = errMap?.[`CASTING_TABLE.${idx}.BEM_MOULD_NO`];
+            const castingPitError = errMap?.[`CASTING_TABLE.${idx}.CASTING_PIT_NO`];
             const startError = errMap?.[`CASTING_TABLE.${idx}.CASTING_START_TIME`];
             const endError = errMap?.[`CASTING_TABLE.${idx}.CASTING_END_TIME`];
             const vacuumError = errMap?.[`CASTING_TABLE.${idx}.VACUUM_LEVEL`];
+            const remarksError = errMap?.[`CASTING_TABLE.${idx}.REMARKS`];
             return (
               <TableRow key={idx}>
                 <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
@@ -326,17 +337,17 @@ export const CastingTableSection = memo(function CastingTableSection({
                     errorMessage={bemNoError}
                   />
                 </TableCell>
-                <TableCell sx={tableBodyCellSx}>
-                  <SubscaleTableTextCell
-                    compact
-                    tableId="CASTING_TABLE"
-                    rowIndex={idx}
-                    fieldId="BEM_MOULD_NO"
-                    value={row.BEM_MOULD_NO ?? ""}
-                    onCellChange={onCellChange}
-                    required
-                    errorMessage={bemMouldError}
-                  />
+                <TableCell
+                  sx={{
+                    ...bemNoTextSx,
+                    ...(bemMouldError
+                      ? { color: "error.main", outline: "1px solid", outlineColor: "error.main" }
+                      : null),
+                  }}
+                >
+                  <Box data-ss-field={`CASTING_TABLE.${idx}.BEM_MOULD_NO`}>
+                    {getSyncedMouldNo(idx) || row.BEM_MOULD_NO || "—"}
+                  </Box>
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
@@ -346,6 +357,7 @@ export const CastingTableSection = memo(function CastingTableSection({
                     fieldId="CASTING_PIT_NO"
                     value={row.CASTING_PIT_NO ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={castingPitError}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -397,6 +409,7 @@ export const CastingTableSection = memo(function CastingTableSection({
                     fieldId="REMARKS"
                     value={row.REMARKS ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={remarksError}
                   />
                 </TableCell>
               </TableRow>
@@ -623,6 +636,8 @@ export const CuringTableSection = memo(function CuringTableSection({
             const startError = errors?.[`CURING_TABLE.${idx}.CURING_START_DATE`];
             const endError = errors?.[`CURING_TABLE.${idx}.CURING_END_DATE`];
             const decorError = errors?.[`CURING_TABLE.${idx}.DECORING_DATE`];
+            const ovenNoError = errors?.[`CURING_TABLE.${idx}.OVEN_NO`];
+            const grainObsError = errors?.[`CURING_TABLE.${idx}.GRAIN_SURFACE_OBSERVATIONS`];
 
             return (
               <TableRow key={idx}>
@@ -667,6 +682,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                     fieldId="OVEN_NO"
                     value={row.OVEN_NO ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={ovenNoError}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -678,6 +694,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                     fieldId="TEMPERATURE"
                     value={row.TEMPERATURE ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errors?.[`CURING_TABLE.${idx}.TEMPERATURE`]}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -689,6 +706,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                     fieldId="HARDNESS"
                     value={row.HARDNESS ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errors?.[`CURING_TABLE.${idx}.HARDNESS`]}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -714,6 +732,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                     fieldId="DECORING_LOAD"
                     value={row.DECORING_LOAD ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errors?.[`CURING_TABLE.${idx}.DECORING_LOAD`]}
                   />
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
@@ -724,6 +743,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                     fieldId="GRAIN_SURFACE_OBSERVATIONS"
                     value={row.GRAIN_SURFACE_OBSERVATIONS ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={grainObsError}
                   />
                 </TableCell>
               </TableRow>
@@ -793,6 +813,7 @@ export const NdtTableSection = memo(function NdtTableSection({
                     fieldId="OBSERVATIONS"
                     value={row.OBSERVATIONS ?? ""}
                     onCellChange={onCellChange}
+                    errorMessage={errors?.[`NDT_TABLE.${idx}.OBSERVATIONS`]}
                   />
                 </TableCell>
               </TableRow>

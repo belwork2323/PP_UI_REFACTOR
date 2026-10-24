@@ -9,7 +9,7 @@ import {
 
 export const QC_SCHEMA_TYPE = "QC";
 
-export type QcInhibitorType = "IR1" | "HEMCOAT-3K" | "NOT_APPLICABLE";
+export type QcInhibitorType = "IR1" | "HEMCOAT-3K" | "OTHERS" | "NOT_APPLICABLE";
 
 export type QcApiDivision =
   | "RAW_MATERIAL"

@@ -43,7 +43,7 @@ type QCRawMaterialRevalidationTableProps = {
   onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   batchId?: string;
   readOnly?: boolean;
-  /** Path keys: rows.{index}.RESULT | ACEM_QC_RESULT | VALIDITY | REMARKS | LOT_BATCH_NUMBER */
+  /** Path keys: rows.{index}.RESULT (read-only) | ACEM_QC_RESULT | VALIDITY | REMARKS | LOT_BATCH_NUMBER */
   validationErrors?: Record<string, string> | null;
 };
 
@@ -384,22 +384,10 @@ const QCRawMaterialRevalidationTable = ({
                         </TableCell>
                         <TableCell sx={{ ...baseCellSx, background: "#fff", minWidth: 110 }}>
                           {isExpanded ? (
-                            readOnly ? (
+                            <Box data-qc-field={`rows.${rowIndex}.RESULT`}>
                               <ReadOnlyValue value={row.RESULT} />
-                            ) : (
-                              <Box>
-                                {renderText(
-                                  String(row.RESULT ?? ""),
-                                  (next) => updateRow(rowIndex, { RESULT: next }),
-                                  "Analysed Result",
-                                  {
-                                    fieldPath: `rows.${rowIndex}.RESULT`,
-                                    errorMessage: err(`rows.${rowIndex}.RESULT`),
-                                  },
-                                )}
-                                <FieldErrorText message={err(`rows.${rowIndex}.RESULT`)} />
-                              </Box>
-                            )
+                              <FieldErrorText message={err(`rows.${rowIndex}.RESULT`)} />
+                            </Box>
                           ) : null}
                         </TableCell>
                         <TableCell sx={{ ...baseCellSx, background: "#fff", minWidth: 110 }}>
