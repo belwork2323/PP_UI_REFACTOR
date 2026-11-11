@@ -23,8 +23,8 @@
           {
             "type": "field",
             "id": "DATE_OF_CASTING",
-            "fieldType": "date",
-            "label": "Date Of Casting"
+            "fieldType": "datetime",
+            "label": "Date & Time Of Casting"
           },
           {
             "type": "table",
@@ -56,14 +56,14 @@
               {
                 "type": "column",
                 "id": "CASTING_START_TIME",
-                "fieldType": "time",
-                "label": "Casting Start Time"
+                "fieldType": "datetime",
+                "label": "Casting Start Date & Time"
               },
               {
                 "type": "column",
                 "id": "CASTING_END_TIME",
-                "fieldType": "time",
-                "label": "Casting End Time"
+                "fieldType": "datetime",
+                "label": "Casting End Date & Time"
               },
               {
                 "type": "column",
@@ -110,14 +110,14 @@
               {
                 "type": "column",
                 "id": "CURING_START_DATE",
-                "fieldType": "date",
-                "label": "Curing Start Date"
+                "fieldType": "datetime",
+                "label": "Curing Start Date & Time"
               },
               {
                 "type": "column",
                 "id": "CURING_END_DATE",
-                "fieldType": "date",
-                "label": "Curing End Date"
+                "fieldType": "datetime",
+                "label": "Curing End Date & Time"
               },
               {
                 "type": "column",
@@ -140,8 +140,8 @@
               {
                 "type": "column",
                 "id": "DECORING_DATE",
-                "fieldType": "date",
-                "label": "Decoring Date"
+                "fieldType": "datetime",
+                "label": "Decoring Date & Time"
               },
               {
                 "type": "column",
@@ -187,8 +187,8 @@
               {
                 "type": "column",
                 "id": "DATE_OF_NDT",
-                "fieldType": "date",
-                "label": "Date Of NDT"
+                "fieldType": "datetime",
+                "label": "Date & Time Of NDT"
               },
               {
                 "type": "column",
@@ -308,14 +308,14 @@
           {
             "type": "field",
             "id": "DATE_OF_MFG",
-            "fieldType": "date",
-            "label": "Date Of Manufacturing"
+            "fieldType": "datetime",
+            "label": "Date & Time Of Manufacturing"
           },
           {
             "type": "field",
             "id": "DATE_OF_APPLICATION",
-            "fieldType": "date",
-            "label": "Date Of Application"
+            "fieldType": "datetime",
+            "label": "Date & Time Of Application"
           },
           {
             "type": "table",

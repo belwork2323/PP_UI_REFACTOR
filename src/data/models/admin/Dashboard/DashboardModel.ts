@@ -149,32 +149,18 @@ export class DashboardModel {
       pagination: data?.pagination || { page: 1, pageSize: 10, totalRecords: 0, totalPages: 0 },
     };
   }
-
-  static fromBlockchainEventsApi(apiResponse: any) {
-    const data = getApiData(apiResponse);
-    const events = data?.events || [];
-
-    const formattedEvents: BlockchainEventModel[] = events.map((e: any) => {
-      const style = EVENT_STYLE[e.eventType] ?? { color: DEFAULT_EVENT_COLOR, icon: "Tx" };
-      return {
-        transactionId: e.transactionId ?? "",
-        batchId: e.batchId ?? "",
-        eventType: e.eventType ?? "",
-        eventStatusMessage: e.eventStatusMessage ?? e.label ?? "",
-        department: e.department ?? "",
-        subDepartment: e.subDepartment ?? "",
-        performedBy: e.performedBy ?? "",
-        timestamp: e.timestamp ?? e.time ?? "",
-        blockNumber: e.blockNumber ?? "",
-        channelName: e.channelName ?? "",
-        color: style.color,
-        icon: style.icon,
-      };
-    });
-
+  static fromBlockchainBatchesApi(data: any) {
     return {
-      events: formattedEvents,
-      pagination: data?.pagination || { page: 1, pageSize: 10, totalRecords: 0, totalPages: 0 },
+      batches: data?.data?.batches ?? data?.content ?? [],
+      pagination: data?.pagination ?? null,
+    };
+  }
+
+  // Mapper for the child Events / Transactions API
+  static fromBlockchainEventsApi(data: any) {
+    return {
+      events: data?.data?.events ?? data?.transactions ?? data ?? [],
+      pagination: data?.pagination ?? null,
     };
   }
 }

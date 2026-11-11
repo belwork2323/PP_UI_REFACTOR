@@ -329,6 +329,8 @@ export const useRawMaterialPrepHook = () => {
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formHydrationKey, setFormHydrationKey] = useState(0);
+  /** Survives RawMaterialBuilderForm remount after silent draft/submit reload. */
+  const [preferredPremixNo, setPreferredPremixNo] = useState<number | null>(null);
   const skipSessionRebuildRef = useRef(false);
   /** Premix last validated on save/submit — scopes live weighment revalidation. */
   const validationContextPremixRef = useRef<number | null>(null);
@@ -615,6 +617,7 @@ export const useRawMaterialPrepHook = () => {
     setWeightmentErrorsByBatch({});
     setValidationAttempt({ format: false, unit: false, submit: false });
     setPreviousStageGate(null);
+    setPreferredPremixNo(null);
     setInitialSnapshot(
       JSON.stringify({
         addedPremixSelections: [],
@@ -1140,16 +1143,30 @@ export const useRawMaterialPrepHook = () => {
         submit: !isDraft,
       });
 
-      // Draft save: no required-field validation (lots / weighment / process optional).
+      // Draft save skips required fields but still blocks invalid date ranges.
       if (isDraft) {
+        const validationResult = validateRawMaterialPreparation(
+          {
+            premixNo,
+            addedPremixSelections,
+            premixSessions: sessionsForPayload,
+            weightmentSheet,
+            identificationSheetMaterials: identificationSheet?.materials ?? [],
+          },
+          "UNIT",
+        );
         setPremixFieldErrorsByBatch((prev) => ({
           ...prev,
-          [activeFormBatchKey]: {},
+          [activeFormBatchKey]: validationResult.premixFieldErrors,
         }));
         setWeightmentErrorsByBatch((prev) => ({
           ...prev,
-          [activeFormBatchKey]: {},
+          [activeFormBatchKey]: validationResult.weightmentErrors,
         }));
+        if (Object.keys(validationResult.premixFieldErrors).length > 0) {
+          emitValidationFocus(validationResult.premixFieldErrors, validationResult.weightmentErrors);
+          return false;
+        }
       }
 
       if (!isDraft) {
@@ -1610,6 +1627,8 @@ export const useRawMaterialPrepHook = () => {
     handleViewPreparationDetails: handleViewDetails,
     handleBackFromDetails,
     formHydrationKey,
+    preferredPremixNo,
+    setPreferredPremixNo,
   };
 };
 

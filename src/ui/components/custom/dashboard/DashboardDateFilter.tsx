@@ -9,7 +9,7 @@ import {
   type SelectProps,
 } from "@mui/material";
 import AppDropdown from "@ui/components/common/AppDropdown";
-import DateRangeRow from "@ui/components/common/DateRangeRow";
+import DateRangeRow, { isDateRangeOrderValid } from "@ui/components/common/DateRangeRow";
 import { APP_CONTROL_HEIGHT } from "@ui/components/common/fieldStyles";
 
 export interface DateFilterStrings {
@@ -92,10 +92,12 @@ function DashboardDateFilter({
 }: DashboardDateFilterProps) {
   const isCustom = filterType === s.VALUES.CUSTOM;
   const isDefaultFilter = filterType === s.VALUES.ONE_YEAR;
+  const rangeOrderValid = isDateRangeOrderValid(customStartDate, customEndDate);
   const canApplyCustom =
     isCustom &&
     customStartDate.length === 10 &&
     customEndDate.length === 10 &&
+    rangeOrderValid &&
     Boolean(onApplyCustom);
 
   return (

@@ -14,9 +14,7 @@ import {
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { useAlertStore } from "../../../../../app/store/alertStore";
-import {
-  hasValidationErrors,
-} from "../../../../../data/validation/validationErrors";
+import { hasValidationErrors } from "../../../../../data/validation/validationErrors";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import {
   CASTING_CURING_FLOW_LABELS,
@@ -58,10 +56,21 @@ import CuringProcessFlowBar from "./CuringProcessFlowBar";
 import CuringSetupHeaderCard from "./CuringSetupHeaderCard";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import {
+  mapOvensToOptions,
+  type OvenSelectOption,
+} from "../../../../../hooks/user/manufacturing/ovenSelectOptions";
+import {
   buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
-import { SUB_DEPT, findMotorUnit, getActiveStage, getCastingUpstreamMixingGate, isMotorDisabled, usesParallelUnitLocks } from "../../../../../utils/batchStageUtils";
+import {
+  SUB_DEPT,
+  findMotorUnit,
+  getActiveStage,
+  getCastingUpstreamMixingGate,
+  isMotorDisabled,
+  usesParallelUnitLocks,
+} from "../../../../../utils/batchStageUtils";
 import type { BatchView } from "../../../../../data/models/user/BatchStageTypes";
 import {
   UserWorkflowNavPanel,
@@ -167,11 +176,18 @@ const CastingAndCuringForm = ({
   );
   const motorNavGate = useMemo(
     () =>
-      buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
-        previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
-        sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-        notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
-      }, batch, SUB_DEPT.CC),
+      buildMotorNavGateHelpers(
+        motorCards,
+        previousStageGate,
+        resolveMotorStatus,
+        {
+          previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+          sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+          notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+        },
+        batch,
+        SUB_DEPT.CC,
+      ),
     [batch, motorCards, previousStageGate, resolveMotorStatus],
   );
   const prevMotorCountRef = useRef(0);
@@ -184,9 +200,7 @@ const CastingAndCuringForm = ({
     id: number;
     fieldPath: string;
   } | null>(null);
-  const [ovenOptions, setOvenOptions] = useState<
-    Array<{ value: string; label: string; noOfOvenAvailable?: number }>
-  >([]);
+  const [ovenOptions, setOvenOptions] = useState<OvenSelectOption[]>([]);
   const [ovensLoading, setOvensLoading] = useState(false);
   const batchMotorCount = useMemo(() => resolveCastingCuringBatchMotorCount(batch), [batch]);
   const bowlSeedRows = useMemo(() => getCastingBowlSeedRowsFromBatch(batch), [batch]);
@@ -196,30 +210,33 @@ const CastingAndCuringForm = ({
     prevMotorCountRef.current = 0;
   }, [formSessionKey]);
 
-  const emitCastingCuringValidationFailure = useCallback((errors: Record<string, string>) => {
-    setValidationErrors(errors);
-    const focus = resolveFirstCastingCuringValidationFocus(errors);
-    const firstMessage =
-      (focus?.fieldPath && (errors[focus.fieldPath] ||
-        Object.entries(errors).find(([k]) =>
-          k === focus.fieldPath ||
-          k === focus.fieldPath.replace(/\.START_DATE$/, ".START_TIME") ||
-          k === focus.fieldPath.replace(/\.END_DATE$/, ".END_TIME"),
-        )?.[1])) ||
-      Object.values(errors).find((m) => String(m ?? "").trim()) ||
-      "";
-    const base = S.SUBMIT_VALIDATION_FAILED;
-    showValidationAlert(
-      firstMessage ? `${base} (${String(firstMessage).trim()})` : base,
-    );
-    if (focus) {
-      setActiveProcessTab(focus.processTab);
-      setValidationFocusRequest((prev) => ({
-        id: (prev?.id ?? 0) + 1,
-        fieldPath: focus.fieldPath,
-      }));
-    }
-  }, [showValidationAlert]);
+  const emitCastingCuringValidationFailure = useCallback(
+    (errors: Record<string, string>) => {
+      setValidationErrors(errors);
+      const focus = resolveFirstCastingCuringValidationFocus(errors);
+      const firstMessage =
+        (focus?.fieldPath &&
+          (errors[focus.fieldPath] ||
+            Object.entries(errors).find(
+              ([k]) =>
+                k === focus.fieldPath ||
+                k === focus.fieldPath.replace(/\.START_DATE$/, ".START_TIME") ||
+                k === focus.fieldPath.replace(/\.END_DATE$/, ".END_TIME"),
+            )?.[1])) ||
+        Object.values(errors).find((m) => String(m ?? "").trim()) ||
+        "";
+      const base = S.SUBMIT_VALIDATION_FAILED;
+      showValidationAlert(firstMessage ? `${base} (${String(firstMessage).trim()})` : base);
+      if (focus) {
+        setActiveProcessTab(focus.processTab);
+        setValidationFocusRequest((prev) => ({
+          id: (prev?.id ?? 0) + 1,
+          fieldPath: focus.fieldPath,
+        }));
+      }
+    },
+    [showValidationAlert],
+  );
 
   // Focus once per validation failure request. Do NOT depend on validationErrors —
   // live clear-on-edit updates would steal focus mid-typing.
@@ -260,27 +277,7 @@ const CastingAndCuringForm = ({
           setOvenOptions([]);
           return;
         }
-        setOvenOptions(
-          response.data
-            .map(
-              (oven: {
-                code?: string;
-                name?: string;
-                noOfOvenAvailable?: number;
-                noOfOvenAdded?: number;
-              }) => {
-                const code = String(oven.code ?? oven.name ?? "").trim();
-                const available = Number(oven.noOfOvenAvailable ?? oven.noOfOvenAdded ?? 0);
-                return {
-                  value: code,
-                  label: String(oven.name ?? code).trim() || code,
-                  noOfOvenAvailable:
-                    Number.isFinite(available) && available > 0 ? available : undefined,
-                };
-              },
-            )
-            .filter((option) => option.value),
-        );
+        setOvenOptions(mapOvensToOptions(response.data));
       } catch {
         if (!cancelled) setOvenOptions([]);
       } finally {
@@ -360,9 +357,7 @@ const CastingAndCuringForm = ({
 
   useEffect(() => {
     if (!curingFormLoaded) return;
-    setValidationErrors((prev) =>
-      stripValidationErrorsByPrefix(prev, CURING_VALIDATION_PREFIXES),
-    );
+    setValidationErrors((prev) => stripValidationErrorsByPrefix(prev, CURING_VALIDATION_PREFIXES));
   }, [curingFormLoaded, activeMotorEntry?.motorId]);
   const showMotorNav = motorCards.length > 0;
   const showMotorWorkspace = Boolean(activeMotorEntry && activeMotorSession);
@@ -582,7 +577,12 @@ const CastingAndCuringForm = ({
                   variant="outlined"
                   size="small"
                   disabled={actionLoading || activeMotorLocked}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+                  onClick={() => {
+                    if (!activeMotorEntry) return;
+                    if (!activeMotorSession) return;
+                    setValidationErrors({});
+                    onSaveMotorDraft?.(activeMotorEntry.motorId);
+                  }}
                   sx={{ textTransform: "none", fontWeight: 700 }}
                 >
                   {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
@@ -786,7 +786,7 @@ const CastingAndCuringForm = ({
                     py: 1.25,
                   }}
                 >
-                  <Typography
+                  {/* <Typography
                     sx={{
                       fontSize: "0.8rem",
                       fontWeight: 700,
@@ -795,7 +795,7 @@ const CastingAndCuringForm = ({
                     }}
                   >
                     {S.CASTING_SECTION_TITLE} — {activeMotorEntry.motorId}
-                  </Typography>
+                  </Typography> */}
                   <CastingCuringSetupHeaderCard
                     castingStation={headerCastingStation}
                     motorId={headerMotorId}
@@ -853,6 +853,7 @@ const CastingAndCuringForm = ({
                       setup={activeMotorSession.curingSetup}
                       curingCycleConfig={curingCycleConfig}
                       batch={batch}
+                      ovenOptions={ovenOptions}
                       theme={theme}
                     />
                   ) : null}

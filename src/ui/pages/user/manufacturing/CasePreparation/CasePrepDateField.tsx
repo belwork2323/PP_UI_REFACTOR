@@ -1,5 +1,5 @@
 import { Box, Typography } from "@mui/material";
-import DateField from "../../../../components/common/DateField";
+import DateField, { DateTimeField } from "../../../../components/common/DateField";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
@@ -14,6 +14,7 @@ type CasePrepDateFieldProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string;
+  type?: "date" | "datetime";
   /** Validation focus target (`data-cp-field`). */
   dataCpField?: string;
 };
@@ -24,15 +25,22 @@ const CasePrepDateField = ({
   onChange,
   disabled = false,
   readOnly = false,
-  placeholder = "DD-MM-YYYY",
+  placeholder,
   theme,
   required = false,
   error = false,
   helperText,
+  type = "date",
   dataCpField,
 }: CasePrepDateFieldProps) => {
   const accentColor = theme?.palette?.primaryLight ?? theme?.palette?.primary ?? "#2E86C1";
   const labelSx = theme?.manufacturing?.casePreparation?.flowBar?.selectLabel;
+  const resolvedPlaceholder = placeholder ?? (type === "datetime" ? "DD-MM-YYYY HH:mm" : "DD-MM-YYYY");
+  const inputSx = {
+    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: accentColor,
+    },
+  };
 
   return (
     <Box
@@ -54,22 +62,30 @@ const CasePrepDateField = ({
       ) : null}
       {readOnly ? (
         <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
+      ) : type === "datetime" ? (
+        <DateTimeField
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          placeholder={resolvedPlaceholder}
+          required={required}
+          error={error}
+          helperText={helperText}
+          compact
+          inputSx={inputSx}
+        />
       ) : (
-      <DateField
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        placeholder={placeholder}
-        required={required}
-        error={error}
-        helperText={helperText}
-        compact
-        inputSx={{
-          "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: accentColor,
-          },
-        }}
-      />
+        <DateField
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          placeholder={resolvedPlaceholder}
+          required={required}
+          error={error}
+          helperText={helperText}
+          compact
+          inputSx={inputSx}
+        />
       )}
     </Box>
   );

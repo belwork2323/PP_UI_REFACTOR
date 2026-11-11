@@ -22,12 +22,16 @@ import { getNdtTheme } from "../../../../../../app/theme/custom_themes/user/qual
 import { STRINGS } from "../../../../../../app/config/strings";
 import { formatCasePrepCellValue } from "../../../../../../data/models/user/CasePreparationFormModel";
 import { parseFileRefs, type FileRef } from "../../../../../../data/models/common/FileUploadModel";
-import type { NDTDetailView, NDTMotorDetailView } from "../../../../../../data/models/user/NDTFormModel";
+import type {
+  NDTDetailView,
+  NDTMotorDetailView,
+} from "../../../../../../data/models/user/NDTFormModel";
 import { NDT_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/ndtFlowConfig";
 import { NDT_ORIENTATION_OPTIONS } from "../../../../../../hooks/user/qualityControl/ndtApiMappings";
 import { useFilePreview } from "../../../../../../hooks/useFilePreview";
 import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
 import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
@@ -51,16 +55,7 @@ const L = NDT_FLOW_LABELS;
 export type NDTDetailsTheme = ReturnType<typeof getNdtTheme>["details"];
 
 const formatDateTime = (value?: string | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value, value || "—");
 };
 
 const formatOrientationLabel = (value?: string) => {
@@ -151,11 +146,7 @@ const NdtCellValue = ({
 }) => {
   if (looksLikeNdtFiles(value)) {
     return (
-      <NdtFileLinks
-        refs={parseFileRefs(value)}
-        subDepartmentId={subDepartmentId}
-        onOpen={onOpen}
-      />
+      <NdtFileLinks refs={parseFileRefs(value)} subDepartmentId={subDepartmentId} onOpen={onOpen} />
     );
   }
   return <>{formatCasePrepCellValue(value)}</>;
@@ -312,11 +303,14 @@ export const MotorDetailPanel = ({
         (row.files?.length ?? 0) > 0,
     )
     .map((row) => ({
-      observation: row.isPreset
+      observation: row.observation,
+
+      observationValue: row.isPreset
         ? row.observationNotes
-          ? `${row.observation}: ${row.observationNotes}`
+          ? `${row.observationNotes}`
           : row.observation
-        : row.observation,
+        : row.observationNotes || "",
+
       section: row.section,
       orientation: formatOrientationLabel(row.orientation),
       files: row.files ?? [],
@@ -345,16 +339,6 @@ export const MotorDetailPanel = ({
         <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
           {motor.motorId}
         </Typography>
-        {motor.equipment ? (
-          <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
-            {L.equipment}: {motor.equipment}
-          </Typography>
-        ) : null}
-        {motor.radiographyPlanLabel ? (
-          <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
-            {L.radiographyPlan}: {motor.radiographyPlanLabel}
-          </Typography>
-        ) : null}
       </Stack>
 
       {!hasMotorData ? (
@@ -374,9 +358,9 @@ export const MotorDetailPanel = ({
                 { key: "sections", label: "Sections" },
                 { key: "orientations", label: "Orientations" },
                 { key: "sfd", label: "SFD" },
-                { key: "normalExposures", label: "Normal" },
-                { key: "tangentialExposures", label: "Tangential" },
-                { key: "detectorType", label: "Detector" },
+                { key: "normalExposures", label: "No. of Normal Exposure" },
+                { key: "tangentialExposures", label: "No. of Tangential Exposure" },
+                { key: "detectorType", label: "Type of Detector" },
               ]}
               rows={planRows}
             />
@@ -406,7 +390,6 @@ export const MotorDetailPanel = ({
             ]}
             rows={observationRows}
           />
-
           <SimpleDataTable
             title="Visual inspection"
             dt={dt}
@@ -414,6 +397,7 @@ export const MotorDetailPanel = ({
             onOpen={onOpen}
             columns={[
               { key: "observation", label: "Observation" },
+              { key: "observationValue", label: "Values" },
               { key: "section", label: "Section" },
               { key: "orientation", label: "Orientation" },
               { key: "files", label: "Images" },
@@ -423,7 +407,9 @@ export const MotorDetailPanel = ({
 
           {(motor.visualInspectionMedia?.length ?? 0) > 0 ? (
             <Box sx={{ mb: 1.5 }}>
-              <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
+              <Typography
+                sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}
+              >
                 Visual inspection media
               </Typography>
               <NdtFileLinks
@@ -436,7 +422,9 @@ export const MotorDetailPanel = ({
 
           {motor.signedReport ? (
             <Box sx={{ mb: 1.5 }}>
-              <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
+              <Typography
+                sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}
+              >
                 Signed NDT report
               </Typography>
               <NdtFileLinks
@@ -449,7 +437,9 @@ export const MotorDetailPanel = ({
 
           {String(motor.additionalRemarks ?? "").trim() ? (
             <Box>
-              <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
+              <Typography
+                sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}
+              >
                 Additional remarks
               </Typography>
               <Typography sx={dt.remarksText}>{motor.additionalRemarks}</Typography>
@@ -488,7 +478,8 @@ const NDTDetailsContent = ({
   };
 
   const motors = detailView?.motors ?? [];
-  const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
+  const activeMotorIndexSafe =
+    motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
   const activeMotor = motors[activeMotorIndexSafe] ?? null;
   const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -598,11 +589,7 @@ const NDTDetailsContent = ({
         <Typography sx={dt.emptyText}>No form data recorded</Typography>
       )}
 
-      <FilePreviewDialog
-        preview={preview}
-        onClose={closePreview}
-        onDownload={downloadCurrent}
-      />
+      <FilePreviewDialog preview={preview} onClose={closePreview} onDownload={downloadCurrent} />
     </>
   );
 };

@@ -1,4 +1,8 @@
-import type { MaterialBlock, MaterialFormGroup, MaterialLotBlock } from "../data/models/user/RawMaterialProcurementModel";
+import type {
+  MaterialBlock,
+  MaterialFormGroup,
+  MaterialLotBlock,
+} from "../data/models/user/RawMaterialProcurementModel";
 
 const PREFIX = "[RM-CertUpload]";
 
@@ -43,9 +47,9 @@ export function rmCertDebug(step: string, data?: Record<string, unknown>) {
   if (!RM_CERT_UPLOAD_DEBUG) return;
   const ts = new Date().toISOString().slice(11, 23);
   if (data !== undefined) {
-    console.log(`${PREFIX} ${ts} ${step}`, data);
+    // console.log(`${PREFIX} ${ts} ${step}`, data);
   } else {
-    console.log(`${PREFIX} ${ts} ${step}`);
+    // console.log(`${PREFIX} ${ts} ${step}`);
   }
 }
 

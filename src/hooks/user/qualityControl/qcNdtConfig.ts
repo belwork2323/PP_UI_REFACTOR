@@ -63,6 +63,8 @@ export type QcNdtRadiographyObservationRow = {
   OBSERVATIONS: string;
   LOCATION: string;
   QA_REMARKS: string;
+  /** True for seeded defect presets; false/undefined for user-added rows. */
+  isPreset?: boolean;
 };
 
 export type QcNdtVisualInspectionRow = {
@@ -72,6 +74,8 @@ export type QcNdtVisualInspectionRow = {
   LOCATION: string;
   QA_REMARKS: string;
   UPLOAD_IMAGE: FileRef[];
+  /** True for seeded visual presets; false/undefined for user-added rows. */
+  isPreset?: boolean;
 };
 
 export const QC_NDT_RADIOGRAPHY_OBSERVATION_PRESET: Array<
@@ -120,6 +124,50 @@ export const emptyNdtRadiographyDetailRow = (): QcNdtRadiographyDetailRow => ({
   TANGENTIAL_EXPOSURES: "",
   QA_REMARKS: "",
 });
+
+export const emptyNdtObservationCustomRow = (
+  srNo: number,
+): QcNdtRadiographyObservationRow => ({
+  SR_NO: srNo,
+  TYPE_OF_DEFECT: "",
+  OBSERVATIONS: "",
+  LOCATION: "",
+  QA_REMARKS: "",
+  isPreset: false,
+});
+
+export const emptyNdtVisualCustomRow = (srNo: number): QcNdtVisualInspectionRow => ({
+  SR_NO: srNo,
+  OBSERVATION_TYPE: "",
+  OBSERVATION: "",
+  LOCATION: "",
+  QA_REMARKS: "",
+  UPLOAD_IMAGE: [],
+  isPreset: false,
+});
+
+export const isQcNdtObservationPresetLabel = (typeOfDefect: string): boolean => {
+  const trimmed = String(typeOfDefect ?? "").trim();
+  if (!trimmed) return false;
+  return QC_NDT_RADIOGRAPHY_OBSERVATION_PRESET.some(
+    (preset) =>
+      preset.TYPE_OF_DEFECT === trimmed ||
+      preset.TYPE_OF_DEFECT.toLowerCase() === trimmed.toLowerCase(),
+  );
+};
+
+export const isQcNdtVisualPresetLabel = (observationType: string): boolean => {
+  const trimmed = String(observationType ?? "").trim();
+  if (!trimmed) return false;
+  return QC_NDT_VISUAL_INSPECTION_PRESET.some(
+    (preset) =>
+      preset.OBSERVATION_TYPE === trimmed ||
+      preset.OBSERVATION_TYPE.toLowerCase() === trimmed.toLowerCase(),
+  );
+};
+
+export const renumberQcNdtRows = <T extends { SR_NO: number }>(rows: T[]): T[] =>
+  rows.map((row, index) => ({ ...row, SR_NO: index + 1 }));
 
 export const getQcNdtMotorLabel = (motorId?: string | null) =>
   motorId?.trim() ? `${motorId.trim()} — NDT` : "NDT";

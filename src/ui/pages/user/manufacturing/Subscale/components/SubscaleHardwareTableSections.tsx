@@ -11,13 +11,13 @@ import {
 } from "@mui/material";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import FormInput from "../../../../../components/common/FormInput";
-import DateField, { TimeField } from "../../../../../components/common/DateField";
+import { DateTimeField } from "../../../../../components/common/DateField";
 import {
   APP_CONTROL_FONT_SIZE,
   appDropdownMenuProps,
   appDropdownPlaceholderSx,
 } from "../../../../../components/common/fieldStyles";
-import { formatToUiDate } from "../../../../../../utils/dateUtils";
+import { toUiDateTime } from "../../../../../../data/models/user/castingCuringFieldCodec";
 import { FILE_PICKER_ACCEPT } from "../../../../../../utils/FileUtils";
 import { SUBSCALE_BRAND } from "../../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import {
@@ -37,11 +37,23 @@ import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAst
 type RowsProps = {
   rows: any[];
   onCellChange: SubscaleCellChangeHandler;
+  fallbackDate?: unknown;
   getSyncedBemNo?: (rowIndex: number) => string;
   /** Article Type MOULD_NO mirrored into Casting Mould No (same row). */
   getSyncedMouldNo?: (rowIndex: number) => string;
   errors?: Record<string, string> | null;
   clearFieldError?: (path: string) => void; // <-- Add this
+};
+
+const toSubscaleUiDateTime = (value: unknown, fallbackDate?: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(raw)) {
+    const date = toUiDateTime(fallbackDate).slice(0, 10);
+    return date ? `${date} ${raw.slice(0, 5)}` : "";
+  }
+  const formatted = toUiDateTime(raw);
+  return /^\d{1,2}-\d{1,2}-\d{4}$/.test(formatted) ? `${formatted} 00:00` : formatted;
 };
 
 export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
@@ -157,7 +169,6 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
                     compact
-                    type="number"
                     tableId={ARTICLE_TYPE_TABLE_ID}
                     rowIndex={idx}
                     fieldId="THICKNESS_MM"
@@ -259,7 +270,6 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
                   <TableCell key={fieldId} sx={tableBodyCellSx}>
                     <SubscaleTableTextCell
                       compact
-                      type="number"
                       tableId="TRIMMING_TABLE"
                       rowIndex={idx}
                       fieldId={fieldId}
@@ -281,6 +291,7 @@ export const TrimmingTableSection = memo(function TrimmingTableSection({
 export const CastingTableSection = memo(function CastingTableSection({
   rows,
   onCellChange,
+  fallbackDate,
   getSyncedMouldNo = () => "",
   errors,
 }: RowsProps) {
@@ -300,8 +311,8 @@ export const CastingTableSection = memo(function CastingTableSection({
               <FieldLabelWithAsterisk label="Mould No" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>Casting Pit No</TableCell>
-            <TableCell sx={tableHeaderCellSx}>Start Time</TableCell>
-            <TableCell sx={tableHeaderCellSx}>End Time</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Casting Start Date &amp; Time</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Casting End Date &amp; Time</TableCell>
             <TableCell sx={tableHeaderCellSx}>
               <FieldLabelWithAsterisk label="Vacuum Level" required sx={tableHeaderCellSx} />
             </TableCell>
@@ -362,13 +373,13 @@ export const CastingTableSection = memo(function CastingTableSection({
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={`CASTING_TABLE.${idx}.CASTING_START_TIME`}>
-                    <TimeField
+                    <DateTimeField
                       compact
-                      value={String(row.CASTING_START_TIME ?? "")}
+                      value={toSubscaleUiDateTime(row.CASTING_START_TIME, fallbackDate)}
                       onChange={(next) => {
                         onCellChange("CASTING_TABLE", idx, "CASTING_START_TIME", next);
                       }}
-                      placeholder="HH:mm"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!startError}
                       helperText={startError || ""}
                     />
@@ -377,13 +388,14 @@ export const CastingTableSection = memo(function CastingTableSection({
 
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={`CASTING_TABLE.${idx}.CASTING_END_TIME`}>
-                    <TimeField
+                    <DateTimeField
                       compact
-                      value={String(row.CASTING_END_TIME ?? "")}
+                      value={toSubscaleUiDateTime(row.CASTING_END_TIME, fallbackDate)}
+                      minDate={toSubscaleUiDateTime(row.CASTING_START_TIME, fallbackDate)}
                       onChange={(next) => {
                         onCellChange("CASTING_TABLE", idx, "CASTING_END_TIME", next);
                       }}
-                      placeholder="HH:mm"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!endError}
                       helperText={endError || ""}
                     />
@@ -392,7 +404,6 @@ export const CastingTableSection = memo(function CastingTableSection({
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
                     compact
-                    type="number"
                     tableId="CASTING_TABLE"
                     rowIndex={idx}
                     fieldId="VACUUM_LEVEL"
@@ -621,12 +632,12 @@ export const CuringTableSection = memo(function CuringTableSection({
             <TableCell sx={tableHeaderCellSx}>
               <FieldLabelWithAsterisk label="Article No / BEM No" required sx={tableHeaderCellSx} />
             </TableCell>
-            <TableCell sx={tableHeaderCellSx}>Curing Start Date</TableCell>
-            <TableCell sx={tableHeaderCellSx}>Curing End Date</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Curing Start Date &amp; Time</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Curing End Date &amp; Time</TableCell>
             <TableCell sx={tableHeaderCellSx}>Oven No</TableCell>
             <TableCell sx={tableHeaderCellSx}>Temperature (°C)</TableCell>
             <TableCell sx={tableHeaderCellSx}>Hardness</TableCell>
-            <TableCell sx={tableHeaderCellSx}>Decoring Date</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Decoring Date &amp; Time</TableCell>
             <TableCell sx={tableHeaderCellSx}>Decoring Load</TableCell>
             <TableCell sx={tableHeaderCellSx}>Grain Surface Obs.</TableCell>
           </TableRow>
@@ -648,13 +659,13 @@ export const CuringTableSection = memo(function CuringTableSection({
                 <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={`CURING_TABLE.${idx}.CURING_START_DATE`}>
-                    <DateField
+                    <DateTimeField
                       compact
-                      value={formatToUiDate(String(row.CURING_START_DATE ?? ""))}
+                      value={toSubscaleUiDateTime(row.CURING_START_DATE)}
                       onChange={(next) => {
                         onCellChange("CURING_TABLE", idx, "CURING_START_DATE", next);
                       }}
-                      placeholder="DD-MM-YYYY"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!startError}
                       helperText={startError || ""}
                     />
@@ -662,13 +673,14 @@ export const CuringTableSection = memo(function CuringTableSection({
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={`CURING_TABLE.${idx}.CURING_END_DATE`}>
-                    <DateField
+                    <DateTimeField
                       compact
-                      value={formatToUiDate(String(row.CURING_END_DATE ?? ""))}
+                      value={toSubscaleUiDateTime(row.CURING_END_DATE)}
+                      minDate={toSubscaleUiDateTime(row.CURING_START_DATE)}
                       onChange={(next) => {
                         onCellChange("CURING_TABLE", idx, "CURING_END_DATE", next);
                       }}
-                      placeholder="DD-MM-YYYY"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!endError}
                       helperText={endError || ""}
                     />
@@ -688,7 +700,6 @@ export const CuringTableSection = memo(function CuringTableSection({
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
                     compact
-                    type="number"
                     tableId="CURING_TABLE"
                     rowIndex={idx}
                     fieldId="TEMPERATURE"
@@ -700,7 +711,6 @@ export const CuringTableSection = memo(function CuringTableSection({
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
                     compact
-                    type="number"
                     tableId="CURING_TABLE"
                     rowIndex={idx}
                     fieldId="HARDNESS"
@@ -711,13 +721,13 @@ export const CuringTableSection = memo(function CuringTableSection({
                 </TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={`CURING_TABLE.${idx}.DECORING_DATE`}>
-                    <DateField
+                    <DateTimeField
                       compact
-                      value={formatToUiDate(String(row.DECORING_DATE ?? ""))}
+                      value={toSubscaleUiDateTime(row.DECORING_DATE)}
                       onChange={(next) => {
                         onCellChange("CURING_TABLE", idx, "DECORING_DATE", next);
                       }}
-                      placeholder="DD-MM-YYYY"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!decorError}
                       helperText={decorError || ""}
                     />
@@ -726,7 +736,6 @@ export const CuringTableSection = memo(function CuringTableSection({
                 <TableCell sx={tableBodyCellSx}>
                   <SubscaleTableTextCell
                     compact
-                    type="number"
                     tableId="CURING_TABLE"
                     rowIndex={idx}
                     fieldId="DECORING_LOAD"
@@ -774,7 +783,7 @@ export const NdtTableSection = memo(function NdtTableSection({
               <FieldLabelWithAsterisk label="BEM No" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>
-              <FieldLabelWithAsterisk label="Date Of NDT" required sx={tableHeaderCellSx} />
+              <FieldLabelWithAsterisk label="Date & Time Of NDT" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>Observations</TableCell>
           </TableRow>
@@ -792,14 +801,14 @@ export const NdtTableSection = memo(function NdtTableSection({
                 <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
                 <TableCell sx={tableBodyCellSx}>
                   <Box data-ss-field={ndtDatePath}>
-                    <DateField
+                    <DateTimeField
                       compact
                       required
-                      value={formatToUiDate(String(row.DATE_OF_NDT ?? ""))}
+                      value={toSubscaleUiDateTime(row.DATE_OF_NDT)}
                       onChange={(next) => {
                         onCellChange("NDT_TABLE", idx, "DATE_OF_NDT", next);
                       }}
-                      placeholder="DD-MM-YYYY"
+                      placeholder="DD-MM-YYYY HH:mm"
                       error={!!ndtError}
                       helperText={ndtError || ""}
                     />

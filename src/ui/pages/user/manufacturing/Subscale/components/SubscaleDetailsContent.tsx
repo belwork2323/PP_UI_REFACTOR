@@ -22,6 +22,7 @@ import {
 } from "../../../../../../data/models/user/CasePreparationFormModel";
 import type { SubscaleDetailView } from "../../../../../../data/models/user/SubscaleFormModel";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -33,16 +34,7 @@ const SS = STRINGS.MANUFACTURING.SUBSCALE;
 export type SubscaleDetailsTheme = ReturnType<typeof getSubscaleTheme>["details"];
 
 const formatDateTime = (value?: string | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value, value || "—");
 };
 
 const formatStatusLabel = (status?: string | null) => {

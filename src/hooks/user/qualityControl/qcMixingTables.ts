@@ -1,9 +1,12 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import { parseMixingSpecificationBounds } from "@/data/validation/specificationBounds";
 import {
   QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID,
   QC_MIXING_PREMIX_SECTION_ID,
   QC_MIXING_VISCOSITY_SECTION_ID,
 } from "./qcMixingConfig";
+
+export { parseMixingSpecificationBounds };
 
 export const QC_MIXING_PREMIX_TABLE_ID = "PREMIX_DETAILS";
 export const QC_MIXING_FINAL_MIX_DETAILS_TABLE_ID = "FINAL_MIX_DETAILS";
@@ -15,7 +18,9 @@ export const QC_MIXING_VISCOSITY_FORM_KEY = `${QC_MIXING_VISCOSITY_SECTION_ID}::
 /** Section-level QA Remarks for Final Mix viscosity (not per-row). */
 export const QC_MIXING_VISCOSITY_QA_REMARKS_KEY = `${QC_MIXING_VISCOSITY_SECTION_ID}::QA_REMARKS`;
 
+/** @deprecated Legacy static labels — QC Mixing rows come from Mixing Cycle MDM. */
 export const QC_MIXING_PREMIX_PARAMETERS = ["Homogeneity", "Moisture"] as const;
+/** @deprecated Legacy static labels — QC Mixing rows come from Mixing Cycle MDM. */
 export const QC_MIXING_FINAL_MIX_DETAIL_PARAMETERS = [
   "End of mix Viscosity (Poise)",
   "End of Mix Temp (°C)",
@@ -91,11 +96,6 @@ export type QcMixingViscosityRow = {
   SR_NO?: number | string;
   TIME?: string;
   VISCOSITY_VALUE?: string;
-};
-
-const DETAILS_PARAMETERS: Record<QcMixingDetailsVariant, readonly string[]> = {
-  premix: QC_MIXING_PREMIX_PARAMETERS,
-  finalMix: QC_MIXING_FINAL_MIX_DETAIL_PARAMETERS,
 };
 
 const DETAILS_DATE_KEY: Record<QcMixingDetailsVariant, "DATE_OF_PREMIX" | "DATE_OF_FINAL_MIX"> = {
@@ -207,45 +207,6 @@ const resolveSpecBound = (value: unknown): string => {
     return pickString(rec.parsedValue, rec.source, rec.value);
   }
   return pickString(value);
-};
-
-/** Parse min/max from Mixing Cycle Master spec object or display string ("1 - 100 mV"). */
-export const parseMixingSpecificationBounds = (
-  specification: unknown,
-): { min?: number; max?: number } => {
-  if (specification && typeof specification === "object" && !Array.isArray(specification)) {
-    const rec = specification as Record<string, unknown>;
-    const minRaw = resolveSpecBound(rec.minValue ?? rec.min);
-    const maxRaw = resolveSpecBound(rec.maxValue ?? rec.max);
-    const min = minRaw !== "" ? Number(minRaw) : NaN;
-    const max = maxRaw !== "" ? Number(maxRaw) : NaN;
-    return {
-      ...(Number.isFinite(min) ? { min } : {}),
-      ...(Number.isFinite(max) ? { max } : {}),
-    };
-  }
-  const text = String(specification ?? "").trim();
-  if (!text || /^na$/i.test(text)) return {};
-  const range = text.match(/(-?\d+(?:\.\d+)?)\s*[-–—]\s*(-?\d+(?:\.\d+)?)/);
-  if (range) {
-    const min = Number(range[1]);
-    const max = Number(range[2]);
-    return {
-      ...(Number.isFinite(min) ? { min } : {}),
-      ...(Number.isFinite(max) ? { max } : {}),
-    };
-  }
-  const le = text.match(/[≤<=]\s*(-?\d+(?:\.\d+)?)/);
-  if (le) {
-    const max = Number(le[1]);
-    return Number.isFinite(max) ? { max } : {};
-  }
-  const ge = text.match(/[≥>=]\s*(-?\d+(?:\.\d+)?)/);
-  if (ge) {
-    const min = Number(ge[1]);
-    return Number.isFinite(min) ? { min } : {};
-  }
-  return {};
 };
 
 /** Format API specification; empty `{}` / missing bounds → `"NA"`. */
@@ -603,7 +564,17 @@ export const extractMixingCycleCodeFromPayload = (payload: unknown): string => {
     asRecord(payload)?.__manufacturingDivisionData,
   ];
   for (const root of roots) {
-    for (const item of asArray(asRecord(root)?.premixes)) {
+    const rootRec = asRecord(root);
+    // Top-level cycle on auto-populate root (rare; batch fallback covers subscale).
+    const topLevelCycle = asRecord(rootRec?.mixingCycle);
+    const topLevelCode = pickString(
+      rootRec?.mixingCycleCode,
+      topLevelCycle?.mixingCycleCode,
+      topLevelCycle?.code,
+    );
+    if (topLevelCode) return topLevelCode;
+
+    for (const item of asArray(rootRec?.premixes)) {
       const rec = asRecord(item);
       if (!rec) continue;
       const cycle = asRecord(rec.mixingCycle);
@@ -612,6 +583,91 @@ export const extractMixingCycleCodeFromPayload = (payload: unknown): string => {
     }
   }
   return "";
+};
+
+/**
+ * mixingCycleCode from batch details / list row when Mixing auto-populate has none
+ * (subscale QC Mixing — no manufacturing Mixing form).
+ */
+export const extractMixingCycleCodeFromBatchPayload = (...payloads: unknown[]): string => {
+  for (const payload of payloads) {
+    const roots = [payload, asRecord(payload)?.data, asRecord(payload)?.batch];
+    for (const root of roots) {
+      const rec = asRecord(root);
+      if (!rec) continue;
+      const cycle = asRecord(rec.mixingCycle);
+      const code = pickString(
+        typeof rec.mixingCycleCode === "string" || typeof rec.mixingCycleCode === "number"
+          ? rec.mixingCycleCode
+          : asRecord(rec.mixingCycleCode)?.mixingCycleCode,
+        cycle?.mixingCycleCode,
+        cycle?.code,
+        typeof rec.mixingCycle === "string" ? rec.mixingCycle : null,
+      );
+      if (code) return code;
+
+      // MAIN approved Mixing metadata nested under identification sheet.
+      const sheet = asRecord(rec.identificationSheet);
+      const metadata = asRecord(sheet?.metadata) ?? asRecord(rec.metadata);
+      const mixingMeta = asRecord(metadata?.mixing);
+      const fromMixingMeta = extractMixingCycleCodeFromPayload(mixingMeta);
+      if (fromMixingMeta) return fromMixingMeta;
+
+      // Batch details: identificationSheet.metadata.subScale.mixingCycle (BE SubScaleMetadata).
+      const subScaleMeta = asRecord(metadata?.subScale) ?? asRecord(rec.subScale);
+      const subScaleCycle = asRecord(subScaleMeta?.mixingCycle);
+      const fromSubScaleMeta = pickString(
+        subScaleMeta?.mixingCycleCode,
+        subScaleCycle?.mixingCycleCode,
+        subScaleCycle?.code,
+      );
+      if (fromSubScaleMeta) return fromSubScaleMeta;
+
+      // Subscale details may be embedded on batch payloads in some responses.
+      const subscale =
+        asRecord(rec.subscaleDetails) ??
+        asRecord(rec.subscale) ??
+        asRecord(subScaleMeta?.subscaleDetails);
+      const subscaleCycle = asRecord(subscale?.mixingCycle);
+      const subscaleCode = pickString(
+        subscale?.mixingCycleCode,
+        subscaleCycle?.mixingCycleCode,
+        subscaleCycle?.code,
+      );
+      if (subscaleCode) return subscaleCode;
+    }
+  }
+  return "";
+};
+
+/** projectId + motorStage from batch details / list row for MDM cycle lookup. */
+export const extractMixingCycleLookupFromBatchPayload = (
+  ...payloads: unknown[]
+): { projectId: string; motorStage: number | null } => {
+  let projectId = "";
+  let motorStage: number | null = null;
+
+  for (const payload of payloads) {
+    const roots = [payload, asRecord(payload)?.data, asRecord(payload)?.batch];
+    for (const root of roots) {
+      const rec = asRecord(root);
+      if (!rec) continue;
+      const project = asRecord(rec.project);
+      if (!projectId) {
+        projectId = pickString(rec.projectId, project?.projectId);
+      }
+      if (motorStage == null) {
+        const stageRaw = rec.motorStage ?? rec.motorType ?? project?.motorStage;
+        if (stageRaw != null && stageRaw !== "" && Number.isFinite(Number(stageRaw))) {
+          motorStage = Number(stageRaw);
+        }
+      }
+      if (projectId && motorStage != null) {
+        return { projectId, motorStage };
+      }
+    }
+  }
+  return { projectId, motorStage };
 };
 
 const buildMixingDetailsSeedFromEntry = (
@@ -935,6 +991,24 @@ const extractTableRows = <T extends Record<string, unknown>>(
   return [];
 };
 
+/** Blank Premix/Final Mix row for manual entry when Mixing Cycle MDM defs are unavailable. */
+export const createBlankMixingDetailsRow = (
+  variant: QcMixingDetailsVariant,
+  shared?: Partial<QcMixingDetailsRow> | null,
+): QcMixingDetailsRow => ({
+  PARAMETER: "",
+  PARAMETER_ID: "",
+  readonly: false,
+  BOWL_NO: String(shared?.BOWL_NO ?? "").trim(),
+  [DETAILS_DATE_KEY[variant]]: String(shared?.[DETAILS_DATE_KEY[variant]] ?? "").trim(),
+  MIXER_BLDG_NO: String(shared?.MIXER_BLDG_NO ?? "").trim(),
+  PREMIX_QTY: String(shared?.PREMIX_QTY ?? "").trim(),
+  SPECIFICATION: "",
+  SAMPLE_COUNT: 1,
+  ...emptyValueFields(1),
+  REMARKS: "",
+});
+
 export const createInitialMixingDetailsRows = (
   variant: QcMixingDetailsVariant,
   qualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null,
@@ -964,19 +1038,9 @@ export const createInitialMixingDetailsRows = (
     });
   }
 
-  // Last-resort static fallback when master data is unavailable.
-  return DETAILS_PARAMETERS[variant].map((parameter) => ({
-    PARAMETER: parameter,
-    readonly: true,
-    BOWL_NO: "",
-    [DETAILS_DATE_KEY[variant]]: "",
-    MIXER_BLDG_NO: "",
-    PREMIX_QTY: "",
-    SPECIFICATION: "NA",
-    SAMPLE_COUNT: 1,
-    ...emptyValueFields(1),
-    REMARKS: "",
-  }));
+  // Manual mode (e.g. subscale without MDM cycle): one blank editable row so
+  // Bowl / Date / Mixer / Batch size inputs mount. Do not hardcode Homogeneity/Moisture.
+  return [createBlankMixingDetailsRow(variant)];
 };
 
 /** Value columns for the table header — max sample count across rows/definitions. */
@@ -988,10 +1052,8 @@ export const getMixingValueFields = (
     const max = Math.max(1, ...rowsOrDefs.map((row) => resolveMixingRowSampleCount(row)));
     return buildMixingValueFields(max);
   }
-  // Legacy fallback when no defs/rows yet.
-  return variant === "premix"
-    ? [...QC_MIXING_PREMIX_VALUE_FIELDS]
-    : [...QC_MIXING_FINAL_MIX_VALUE_FIELDS];
+  // No MDM defs / parameter rows yet — do not paint legacy VALUE_1..VALUE_5 headers.
+  return [];
 };
 
 export const createInitialPremixDetailsValues = (
@@ -1101,22 +1163,12 @@ export const getMixingDetailsRows = (
     return rows.map(normalizePersisted);
   }
 
-  // Legacy static-parameter fallback only when form rows are blank placeholders.
-  const byParameter = new Map(rows.map((row) => [String(row.PARAMETER ?? ""), row]));
-  return DETAILS_PARAMETERS[variant].map((parameter) => {
-    const match = byParameter.get(parameter);
-    const sampleCount = resolveMixingRowSampleCount(match);
-    return (
-      match
-        ? normalizePersisted(match)
-        : {
-            PARAMETER: parameter,
-            readonly: true,
-            SAMPLE_COUNT: sampleCount,
-            ...emptyValueFields(sampleCount),
-          }
-    );
-  });
+  // Manual mode placeholders (blank Bowl/Date/Mixer/Batch size row) — keep as-is.
+  if (rows.length) {
+    return rows.map(normalizePersisted);
+  }
+
+  return [createBlankMixingDetailsRow(variant)];
 };
 
 export const setMixingDetailsRows = (

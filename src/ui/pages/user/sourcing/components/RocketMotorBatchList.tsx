@@ -20,7 +20,11 @@ import FilterToggleButton from "../../../../components/common/FilterToggleButton
 import RefreshIconButton from "../../../../components/common/RefreshIconButton";
 import WorkflowCreateButton from "../../../../components/common/WorkflowCreateButton";
 import DateField from "../../../../components/common/DateField";
-import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
+import {
+  formatDisplayDateTime,
+  formatToIsoDateInput,
+  formatToUiDate,
+} from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
@@ -39,6 +43,7 @@ import {
 } from "../../../../../data/models/user/RocketMotorCasingProcurementModel";
 import { formatMotorStageLabel } from "../../../../../data/models/approver/RocketMotorCasingApproverModel";
 import type { RocketMotorCasingListAdvancedFilters } from "../../../../../hooks/user/sourcing/useRocketMotorCasingList";
+import { getFromToOrderMessages } from "../../../../../data/validation/dateRangeValidation";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -234,13 +239,6 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [theme.palette],
   );
 
-  const formatListDate = (v: string) => {
-    if (!v) return "—";
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return v;
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  };
-
   const COLUMNS = useMemo(
     () => [
       {
@@ -314,7 +312,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => (
           <IconText
             icon={<CalendarMonthRoundedIcon sx={theme.batchList.icon} />}
-            text={formatListDate(v)}
+            text={formatDisplayDateTime(v)}
             textSx={theme.batchList.subtleText}
           />
         ),
@@ -337,21 +335,17 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [statusConfig, theme],
   );
 
+  const draftDateRangeErrors = getFromToOrderMessages(draftFrom, draftTo, "date");
+
   const handleApplyPanelFilters = () => {
-    let from = draftFrom;
-    let to = draftTo;
-    if (from && to && from > to) {
-      const swap = from;
-      from = to;
-      to = swap;
-    }
+    if (draftDateRangeErrors) return;
     const next: RocketMotorCasingListAdvancedFilters & { status: string } = {
       projectIds: draftProjectId === FILTER_ALL ? [] : [draftProjectId],
       motorStages: draftMotorStage === FILTER_ALL ? [] : [draftMotorStage],
       casingTypes: draftCasingType === FILTER_ALL ? [] : [draftCasingType],
       insulationTypes: draftInsulationType === FILTER_ALL ? [] : [draftInsulationType],
-      fromDate: from,
-      toDate: to,
+      fromDate: draftFrom,
+      toDate: draftTo,
       status: draftStatus,
     };
     applyAdvancedFilters(next);
@@ -604,6 +598,8 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             value={formatToUiDate(draftFrom)}
             onChange={(v) => setDraftFrom(formatToIsoDateInput(v))}
             compact
+            error={Boolean(draftDateRangeErrors?.from)}
+            helperText={draftDateRangeErrors?.from}
             sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
         </Box>
@@ -611,8 +607,11 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
             value={formatToUiDate(draftTo)}
+            minDate={formatToUiDate(draftFrom)}
             onChange={(v) => setDraftTo(formatToIsoDateInput(v))}
             compact
+            error={Boolean(draftDateRangeErrors?.to)}
+            helperText={draftDateRangeErrors?.to}
             sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
         </Box>

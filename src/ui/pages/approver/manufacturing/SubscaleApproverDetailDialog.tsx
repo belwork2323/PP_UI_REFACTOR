@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, Dialog, DialogContent, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
@@ -59,7 +68,13 @@ const SubscaleApproverDetailDialog = ({
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{ sx: theme.dialog.paper }}
+      >
         <Box
           sx={{
             ...theme.dialog.header,
@@ -108,7 +123,12 @@ const SubscaleApproverDetailDialog = ({
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
           {canApproveOrReject && onApprove && onReject ? (

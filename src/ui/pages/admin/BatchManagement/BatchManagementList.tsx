@@ -156,9 +156,7 @@ const BatchListTable = ({
         cellSx: { minWidth: 180 },
         render: (batch) => (
           <Box sx={tableCell.batchIdBox}>
-            <icons.batchMgmt.userId
-              sx={{ ...tableCell.batchIdIcon, ...tableCell.projectIdIcon }}
-            />
+            <icons.batchMgmt.userId sx={{ ...tableCell.batchIdIcon, ...tableCell.projectIdIcon }} />
             <Box sx={tableCell.projectInfo}>
               <Typography sx={tableCell.projectName}>{getSystemManagerName(batch)}</Typography>
               <Typography sx={tableCell.projectId}>{getSystemManagerId(batch)}</Typography>
@@ -212,7 +210,7 @@ const BatchListTable = ({
                   </Button>
                 </Tooltip>
               )}
-              {canEditAdminBatch(batch) && (
+              {canEditAdminBatch(batch) && !batch.isBatchLocked && (
                 <Tooltip title={TA.EDIT_BATCH}>
                   <IconButton size="small" onClick={() => onEdit(batch)} sx={tableCell.editButton}>
                     <icons.Edit sx={tableCell.editIcon} />
@@ -221,14 +219,22 @@ const BatchListTable = ({
               )}
               {sheetCompleted && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
-                  <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
+                  <IconButton
+                    size="small"
+                    onClick={() => onDelete(batch)}
+                    sx={tableCell.deleteButton}
+                  >
                     <icons.Delete sx={tableCell.deleteIcon} />
                   </IconButton>
                 </Tooltip>
               )}
               {sheetDraft && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
-                  <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
+                  <IconButton
+                    size="small"
+                    onClick={() => onDelete(batch)}
+                    sx={tableCell.deleteButton}
+                  >
                     <icons.Delete sx={tableCell.deleteIcon} />
                   </IconButton>
                 </Tooltip>
@@ -240,7 +246,6 @@ const BatchListTable = ({
     ],
     [tableCell, onEdit, onDelete, onCompleteImplementation, onViewStatus, onViewDetails],
   );
-
   return (
     <>
       <AdminManagementDataTable

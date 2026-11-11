@@ -18,36 +18,44 @@ import { TokenModel } from "./TokenModel";
    }
 ───────────────────────────────────────────────────────────────────────────── */
 export class UserModel {
-  userId: number;
+  userId: number | string;
+  userUUID: string;
   username: string;
   roleId: number;
   role: string;
   departments: DepartmentModel[];
   tokens: TokenModel;
+  mustChangePassword: boolean;
   /** Optional profile image URL if the API provides one */
   avatarUrl?: string | null;
 
   constructor({
     userId,
+    userUUID,
     username,
     roleId,
     roleName,           // normalized: "ADMIN" | "USER" | "APPROVER" | "SYSTEM_MANAGER"
     departments,        // DepartmentModel[]
     tokens,             // TokenModel
+    mustChangePassword,
   }: {
-    userId: number;
+    userId: number | string;
+    userUUID?: string;
     username: string;
     roleId: number;
     roleName: string;
     departments: DepartmentModel[];
     tokens: TokenModel;
+    mustChangePassword?: boolean;
   }) {
     this.userId = userId;
+    this.userUUID = userUUID ?? "";
     this.username = username;
     this.roleId = roleId;
     this.role = roleName;  // kept as `role` so existing store/selectors don't break
     this.departments = departments;
     this.tokens = tokens;
+    this.mustChangePassword = Boolean(mustChangePassword);
   }
 
   /* ── Static factory — builds from raw API response ── */
@@ -58,9 +66,12 @@ export class UserModel {
     const { user, token } = apiResponse.data as {
       user: {
         userId: any;
+        user_uuid?: string;
+        userUUID?: string;
         username: any;
         role: { roleId: number; roleName: string };
         departments: { departmentId: any; departmentName: any; subDepartments?: any[] }[];
+        mustChangePassword?: boolean;
       };
       token: any;
     };
@@ -70,17 +81,19 @@ export class UserModel {
 
     return new UserModel({
       userId: user.userId as number,
+      userUUID: user.user_uuid ?? user.userUUID ?? "",
       username: user.username as string,
       roleId: user.role.roleId,
       roleName: normalizeRole(user.role.roleName),
-      departments: user.departments.map(
+      departments: (user.departments ?? []).map(
         (d) => new DepartmentModel(d as { departmentId: any; departmentName: any; subDepartments?: any[] }),
       ),
       tokens: new TokenModel({
         accessToken: token.accessToken as string,
         refreshToken: token.refreshToken as string,
-        accessTokenExpiry: (token.expiresIn as number) * 1000, // convert seconds to ms
+        accessTokenExpiry: token.expiresIn != null ? Number(token.expiresIn) * 1000 : 0,
       }),
+      mustChangePassword: Boolean(user.mustChangePassword),
     });
   }
 
@@ -88,9 +101,11 @@ export class UserModel {
   toJSON() {
     return {
       userId: this.userId,
+      userUUID: this.userUUID,
       username: this.username,
       roleId: this.roleId,
       role: this.role,
+      mustChangePassword: this.mustChangePassword,
       departments: this.departments.map((dept) => ({
         departmentId: dept.departmentId,
         departmentName: dept.departmentName,
@@ -115,9 +130,11 @@ export class UserModel {
     const p = plain as Record<string, unknown>;
     return new UserModel({
       userId: p.userId as number,
+      userUUID: (p.userUUID as string) ?? "",
       username: p.username as string,
       roleId: p.roleId as number,
       roleName: p.role as string,
+      mustChangePassword: Boolean(p.mustChangePassword),
       departments: ((p.departments ?? []) as Record<string, unknown>[]).map(
         (d) => new DepartmentModel(d as { departmentId: any; departmentName: any; subDepartments?: any[] }),
       ),
@@ -125,13 +142,19 @@ export class UserModel {
     });
   }
 
-copyWith(patch: { accessToken?: string; refreshToken?: string }): UserModel {
+copyWith(patch: {
+  accessToken?: string;
+  refreshToken?: string;
+  mustChangePassword?: boolean;
+}): UserModel {
   const updated = UserModel.fromJSON(this.toJSON());
   if (!updated) throw new Error("copyWith: fromJSON returned null");
   
-  // ✅ Patch tokens object directly — not the getter properties
   if (patch.accessToken) updated.tokens.accessToken = patch.accessToken;
   if (patch.refreshToken) updated.tokens.refreshToken = patch.refreshToken;
+  if (patch.mustChangePassword !== undefined) {
+    updated.mustChangePassword = patch.mustChangePassword;
+  }
   
   return updated;
 }

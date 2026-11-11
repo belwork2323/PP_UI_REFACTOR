@@ -6,10 +6,7 @@ import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
-const text = (
-  requiredIn: ValidationTier[],
-  pattern?: RegExp,
-): FieldRuleConfig => ({
+const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
   pattern,
@@ -23,24 +20,32 @@ const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
-  valueType: "date",
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
+const datetime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
 export type TrimmingValidationTarget = TrimmingMotorSession;
 
 const DEFAULT_READING_KEYS = ["R2T", "R2B", "R1R", "R1L"] as const;
 
 export const trimmingValidationFields: Record<string, FieldRuleConfig> = {
-  motorReceivedAt: date(["UNIT", "SUBMIT"]),
+  motorReceivedAt: dateTime(["UNIT", "SUBMIT"]),
   // Equipment names from /system/equipment-list (e.g. "4 MeV LINAC", "2/6 MeV LINAC").
   machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  startDate: date(["SUBMIT"]),
-  completionDate: date(["SUBMIT"]),
+  startDate: dateTime(["SUBMIT"]),
+  completionDate: dateTime(["SUBMIT"]),
   arborSize: number(["FORMAT", "SUBMIT"]),
   cutterSize: number(["FORMAT", "SUBMIT"]),
+  ingestSize: number(["FORMAT", "SUBMIT"]),
+  motorTruing: number(["FORMAT", "SUBMIT"]),
+  arborTuring: number(["FORMAT", "SUBMIT"]),
   reading: number(["FORMAT", "SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
@@ -93,6 +98,21 @@ export const trimmingValidationConfig: SubDeptValidationConfig<TrimmingValidatio
           ruleKey: "cutterSize",
         },
         {
+          path: `trimmingDetails.${index}.ingestSize`,
+          value: row.ingestSize,
+          ruleKey: "ingestSize",
+        },
+        {
+          path: `trimmingDetails.${index}.motorTruing`,
+          value: row.motorTruing,
+          ruleKey: "motorTruing",
+        },
+        {
+          path: `trimmingDetails.${index}.arborTuring`,
+          value: row.arborTuring,
+          ruleKey: "arborTuring",
+        },
+        {
           path: `trimmingDetails.${index}.remarks`,
           value: row.remarks,
           ruleKey: "remarks",
@@ -119,8 +139,6 @@ export const trimmingValidationConfig: SubDeptValidationConfig<TrimmingValidatio
   isUnitComplete: (motor) => Boolean(str(motor.motorReceivedAt)),
 };
 
-export function toTrimmingValidationTarget(
-  motor: TrimmingMotorSession,
-): TrimmingValidationTarget {
+export function toTrimmingValidationTarget(motor: TrimmingMotorSession): TrimmingValidationTarget {
   return motor;
 }

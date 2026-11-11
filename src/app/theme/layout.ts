@@ -50,9 +50,9 @@ const layout = {
   },
 
   /**
-   * BEL logo fixed box size (top-right corner of login page).
-   * login_theme belLogo.wrapper uses this as width/height.
-   * These are responsive sizes in px.
+   * Standard BEL logo fixed box width (top-right corner of login / change-password).
+   * login_theme belLogo.wrapper uses these as width; height comes from fixedBarHeight.
+   * Keep these values stable unless intentionally resizing BEL (not DRDO).
    */
   belLogoSize: {
     xs: 140,

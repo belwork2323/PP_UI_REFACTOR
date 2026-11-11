@@ -20,7 +20,12 @@ import FilterToggleButton from "../../../../components/common/FilterToggleButton
 import RefreshIconButton from "../../../../components/common/RefreshIconButton";
 import WorkflowCreateButton from "../../../../components/common/WorkflowCreateButton";
 import DateField from "../../../../components/common/DateField";
-import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
+import {
+  formatDisplayDate,
+  formatDisplayDateTime,
+  formatToIsoDateInput,
+  formatToUiDate,
+} from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
@@ -38,6 +43,7 @@ import {
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { STRINGS } from "../../../../../app/config/strings";
 import type { RawMaterialLotListAdvancedFilters } from "../../../../../hooks/user/sourcing/useRawMaterialLotList";
+import { getFromToOrderMessages } from "../../../../../data/validation/dateRangeValidation";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -142,10 +148,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [theme],
   );
 
-  const statusTabs = useMemo(
-    () => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES],
-    [],
-  );
+  const statusTabs = useMemo(() => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES], []);
 
   const filterToggleSx = useMemo(() => {
     const pl = theme.palette.primaryLight;
@@ -255,7 +258,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => (
           <IconText
             icon={<CalendarMonthRoundedIcon sx={theme.batchList.icon} />}
-            text={v || "—"}
+            text={formatDisplayDate(v)}
             textSx={theme.batchList.subtleText}
           />
         ),
@@ -282,15 +285,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => (
           <IconText
             icon={<CalendarMonthRoundedIcon sx={theme.batchList.icon} />}
-            text={
-              v
-                ? new Date(v).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })
-                : "—"
-            }
+            text={formatDisplayDateTime(v)}
             textSx={theme.batchList.subtleText}
           />
         ),
@@ -313,19 +308,15 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [statusConfig, theme],
   );
 
+  const draftDateRangeErrors = getFromToOrderMessages(draftFrom, draftTo, "date");
+
   const handleApplyPanelFilters = () => {
-    let from = draftFrom;
-    let to = draftTo;
-    if (from && to && from > to) {
-      const swap = from;
-      from = to;
-      to = swap;
-    }
+    if (draftDateRangeErrors) return;
     const next: RawMaterialLotListAdvancedFilters & { status: string } = {
       materialCodes: draftMaterial === FILTER_ALL ? [] : [draftMaterial],
       manufacturer: draftManufacturer,
-      fromDate: from,
-      toDate: to,
+      fromDate: draftFrom,
+      toDate: draftTo,
       status: draftStatus,
     };
     applyAdvancedFilters(next);
@@ -487,6 +478,8 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             value={formatToUiDate(draftFrom)}
             onChange={(v) => setDraftFrom(formatToIsoDateInput(v))}
             compact
+            error={Boolean(draftDateRangeErrors?.from)}
+            helperText={draftDateRangeErrors?.from}
             sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
         </Box>
@@ -494,8 +487,11 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
             value={formatToUiDate(draftTo)}
+            minDate={formatToUiDate(draftFrom)}
             onChange={(v) => setDraftTo(formatToIsoDateInput(v))}
             compact
+            error={Boolean(draftDateRangeErrors?.to)}
+            helperText={draftDateRangeErrors?.to}
             sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
         </Box>
@@ -548,9 +544,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         onSearchChange={setSearch}
         onStatusFilterChange={setStatusFilter}
         isLoading={loading || isRefreshing}
-        loadingMessage={
-          isRefreshing ? STRINGS.SOURCING.BATCH_LIST.REFRESHING_MESSAGE : undefined
-        }
+        loadingMessage={isRefreshing ? STRINGS.SOURCING.BATCH_LIST.REFRESHING_MESSAGE : undefined}
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={

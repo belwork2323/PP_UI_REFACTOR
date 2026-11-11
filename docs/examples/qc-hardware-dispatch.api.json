@@ -44,7 +44,7 @@
             "type": "field",
             "id": "DISPATCH_DATE_TIME",
             "fieldType": "datetime",
-            "label": "Date and Time of dispatch of motor to casting division"
+            "label": "Date & Time Of Dispatch Of Motor To Casting Division"
           }
         ]
       }

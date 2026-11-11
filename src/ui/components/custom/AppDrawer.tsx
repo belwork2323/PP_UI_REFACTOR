@@ -17,7 +17,8 @@ import { STRINGS } from "../../../app/config/strings";
 import { icons } from "../../../app/theme/icons";
 import getDrawerTheme, { DRAWER_NAV } from "../../../app/theme/custom_themes/common/drawer_theme";
 import { images } from "@app/assets/images";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import ProfileDialog from "../common/ProfileDialog";
 
 const S = STRINGS.APP_HEADER;
 const FOOTER = STRINGS.APP_FOOTER;
@@ -65,6 +66,7 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
   const roleName = user?.role ?? "";
   const username = user?.username ?? "User";
   const userId = user?.userId ?? "--";
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // ── Determine active route from location and navigate on click ───────────
   const navigate = useNavigate();
@@ -151,6 +153,22 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
         <List sx={t.logout.list}>
           <ListItem disablePadding>
             <ListItemButton
+              sx={t.logout.menuItem}
+              onClick={() => {
+                setProfileOpen(true);
+              }}
+            >
+              <ListItemIcon sx={t.logout.menuIcon}>
+                <icons.person fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary={S.VIEW_PROFILE_LABEL}
+                primaryTypographyProps={t.logout.menuLabelProps}
+              />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton
               sx={t.logout.item}
               onClick={() => {
                 onClose?.();
@@ -170,6 +188,8 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
           <Typography sx={t.version.date}>{FOOTER.VERSION_DATE}</Typography>
         </Box>
       </Box>
+
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
     </Drawer>
   );
 };

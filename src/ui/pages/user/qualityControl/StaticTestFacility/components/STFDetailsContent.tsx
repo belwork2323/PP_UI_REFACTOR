@@ -33,6 +33,7 @@ import type {
 } from "../../../../../../data/models/user/StaticTestFacilityApiModel";
 import { STF_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
 import { useFilePreview } from "../../../../../../hooks/useFilePreview";
 import { useAuthStore } from "../../../../../../app/store/authStore";
 import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
@@ -41,7 +42,6 @@ import {
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
 import StfMotorPanel from "../StfMotorPanel";
-import { stfMotorDataHasUserInput } from "../../../../../../data/models/user/StfMotorDataModel";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -61,16 +61,7 @@ const L = STF_FLOW_LABELS;
 export type STFDetailsTheme = ReturnType<typeof getStfTheme>["details"];
 
 const formatDateTime = (value?: string | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value, value || "—");
 };
 
 const STF_UPLOAD_FIELD_KEYS = new Set(["PT_CURVE_UPLOAD", "PT_CURVE_FILE", "PTCURVEFILE"]);
@@ -359,7 +350,17 @@ const StfMotorDetailPanel = ({
       ) : null}
     </Stack>
 
-    {motor.sections.length > 0 ? (
+    {motor.stfData ? (
+      <StfMotorPanel
+        value={motor.stfData}
+        onChange={() => undefined}
+        readOnly
+        showQaRemarks
+        theme={theme}
+        motorId={motor.motorId}
+        subDepartmentId={subDepartmentId}
+      />
+    ) : motor.sections.length > 0 ? (
       motor.sections.map((section) => (
         <SectionPanel
           key={section.sectionId}
@@ -369,15 +370,6 @@ const StfMotorDetailPanel = ({
           onOpen={onOpen}
         />
       ))
-    ) : stfMotorDataHasUserInput(motor.stfData) ? (
-      <StfMotorPanel
-        value={motor.stfData}
-        onChange={() => undefined}
-        readOnly
-        theme={theme}
-        motorId={motor.motorId}
-        subDepartmentId={subDepartmentId}
-      />
     ) : (
       <Typography sx={dt.emptyText}>{STF.DETAILS_NO_MOTOR_DATA}</Typography>
     )}

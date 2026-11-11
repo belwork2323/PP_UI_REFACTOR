@@ -508,7 +508,11 @@ const BallisticTable = ({
                 Details / Mix
               </TableCell>
               <TableCell sx={{ ...headerSx, verticalAlign: "middle" }} rowSpan={2}>
-                Spec.
+                <FieldLabelWithAsterisk
+                  label="Spec."
+                  required
+                  sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
               </TableCell>
               {groups.map((group) => (
                 <TableCell
@@ -559,7 +563,11 @@ const BallisticTable = ({
                 group.columnIds.map((columnId) => (
                   <TableCell key={columnId} sx={headerSx}>
                     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={0.5}>
-                      <Box component="span">{getQcPropellantBemSubLabel(columnId)}</Box>
+                      <FieldLabelWithAsterisk
+                        label={getQcPropellantBemSubLabel(columnId)}
+                        required
+                        sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                      />
                       {!readOnly && group.columnIds.length > 1 ? (
                         <IconButton
                           size="small"

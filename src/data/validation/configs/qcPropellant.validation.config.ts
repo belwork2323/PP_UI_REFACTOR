@@ -38,8 +38,8 @@ export const qcPropellantValidationFields: Record<string, FieldRuleConfig> = {
   stdDevOptional: number([]),
   qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   ballisticSpec: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
-  // Ballistic FM/BEM cells are optional notes-style values (UI has no required asterisks)
-  ballisticValue: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Every FM / BEM No cell is required on SUBMIT (headers show asterisk).
+  ballisticValue: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>

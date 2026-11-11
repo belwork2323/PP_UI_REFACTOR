@@ -8,8 +8,9 @@ import {
   parseUiDate,
   UI_DATE_FORMAT,
 } from "./datePickerShared";
-import { APP_CONTROL_HEIGHT, appDatePickerFieldSx } from "./fieldStyles";
+import { APP_CONTROL_HEIGHT } from "./fieldStyles";
 import { formatDateToApiDate, formatToUiDate } from "../../../utils/dateUtils";
+import { getFromToOrderMessages } from "../../../data/validation/dateRangeValidation";
 
 interface DateRangeRowProps {
   from: string;
@@ -40,6 +41,11 @@ interface DateRangeRowProps {
   alignInputs?: "filter";
   /** Styles applied to the outer date-range row container. */
   containerSx?: SxProps<Theme>;
+  /**
+   * When false, allow selecting To before From (still shows order errors).
+   * Default true keeps To ≥ From via minDate.
+   */
+  enforceMinToDate?: boolean;
 }
 
 /** Parse filter value (DD-MM-YYYY or YYYY-MM-DD) to dayjs. */
@@ -76,9 +82,11 @@ const DateRangeRow = ({
   nowrap = false,
   alignInputs,
   containerSx,
+  enforceMinToDate = true,
 }: DateRangeRowProps) => {
   const isFilterLayout = alignInputs === "filter";
   const resolvedControlHeight = controlHeight ?? (isFilterLayout ? APP_CONTROL_HEIGHT : 36);
+  const rangeMessages = getFromToOrderMessages(from, to, "date");
 
   const compactFieldSx = isFilterLayout
     ? {
@@ -139,15 +147,17 @@ const DateRangeRow = ({
           disabled={currentMonthOnly}
           value={toDayjsValue(from)}
           onChange={(value) => {
-            const start = toFilterDate(value);
-
-            onFromChange(start);
-
-            if (to && value && toDayjsValue(to)?.isBefore(value, "day")) {
-              onToChange("");
-            }
+            onFromChange(toFilterDate(value));
           }}
-          slotProps={sharedSlotProps}
+          slotProps={{
+            ...sharedSlotProps,
+            textField: {
+              ...sharedSlotProps.textField,
+              inputProps: { readOnly: true },
+              error: Boolean(rangeMessages?.from),
+              helperText: rangeMessages?.from ?? (sharedSlotProps.textField as any)?.helperText,
+            },
+          }}
         />
 
         <Typography
@@ -170,9 +180,17 @@ const DateRangeRow = ({
           format={UI_DATE_FORMAT}
           disabled={currentMonthOnly}
           value={toDayjsValue(to)}
-          minDate={toDayjsValue(from) ?? undefined}
+          minDate={enforceMinToDate ? toDayjsValue(from) ?? undefined : undefined}
           onChange={(value) => onToChange(toFilterDate(value))}
-          slotProps={sharedSlotProps}
+          slotProps={{
+            ...sharedSlotProps,
+            textField: {
+              ...sharedSlotProps.textField,
+              inputProps: { readOnly: true },
+              error: Boolean(rangeMessages?.to),
+              helperText: rangeMessages?.to ?? (sharedSlotProps.textField as any)?.helperText,
+            },
+          }}
         />
 
         {onToggleMonth && thisMonthChipSx && (
@@ -190,3 +208,7 @@ const DateRangeRow = ({
 };
 
 export default DateRangeRow;
+
+/** True when both ends are empty or From ≤ To. */
+export const isDateRangeOrderValid = (from: string, to: string): boolean =>
+  !getFromToOrderMessages(from, to, "date");

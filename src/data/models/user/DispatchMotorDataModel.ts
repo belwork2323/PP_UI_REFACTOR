@@ -4,6 +4,7 @@ import {
   pickField,
   str,
   toApiDate,
+  toApiDateTime,
   toUiDate,
 } from "./castingCuringFieldCodec";
 import {
@@ -430,8 +431,11 @@ export const parseDispatchMotorDataFromApi = (
   };
 };
 
-const apiDateOrUi = (value: string): string | undefined =>
-  (toApiDate(value) ?? String(value).trim()) || undefined;
+const apiDateTimeOrUi = (value: string): string | undefined => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+  return toApiDateTime(raw) ?? toApiDate(raw) ?? raw;
+};
 
 const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
   Object.fromEntries(
@@ -538,8 +542,8 @@ export const buildDispatchMotorDetailsPayload = (
   return omitEmpty({
     projectName: options?.projectName,
     stage: setup.motorStage ? `STAGE_${setup.motorStage}` : undefined,
-    castingDate: apiDateOrUi(setup.castingDate),
-    dispatchDate: apiDateOrUi(setup.dispatchDate),
+    castingDate: apiDateTimeOrUi(setup.castingDate),
+    dispatchDate: apiDateTimeOrUi(setup.dispatchDate),
     dispatchLocation: setup.dispatchLocation.trim() || undefined,
     ndtClearance: {
       accorded: setup.ndtClearance || "NO",

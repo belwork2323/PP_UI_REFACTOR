@@ -53,6 +53,8 @@ export type QcHardwareValidationTarget = {
 export const qcHardwareValidationFields: Record<string, FieldRuleConfig> = {
   // Abrading cut row (Case Prep abrading details — Date, Start, End, Qty of Dust)
   cutDate: date(["SUBMIT"]),
+  cutStartDate: date(["SUBMIT"]),
+  cutEndDate: date(["SUBMIT"]),
   cutStartTime: time(["SUBMIT"]),
   cutEndTime: time(["SUBMIT"]),
   dustQty: number(["SUBMIT"]),
@@ -135,7 +137,16 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
       const pushCut = (prefix: string, rows: Record<string, unknown>[]) => {
         const list = rows.length ? rows : [{}];
         list.forEach((row, i) => {
-          fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
+          fields.push({
+            path: `${prefix}.${i}.START_DATE`,
+            value: row.START_DATE ?? row.DATE,
+            ruleKey: "cutStartDate",
+          });
+          fields.push({
+            path: `${prefix}.${i}.END_DATE`,
+            value: row.END_DATE ?? row.DATE,
+            ruleKey: "cutEndDate",
+          });
           fields.push({
             path: `${prefix}.${i}.START_TIME`,
             value: row.START_TIME,
@@ -223,7 +234,16 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
             })();
       const prefix = QC_HARDWARE_ERROR_PREFIX.PREHEATING;
       list.forEach((row, i) => {
-        fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
+        fields.push({
+          path: `${prefix}.${i}.START_DATE`,
+          value: row.START_DATE ?? row.DATE,
+          ruleKey: "cutStartDate",
+        });
+        fields.push({
+          path: `${prefix}.${i}.END_DATE`,
+          value: row.END_DATE ?? row.DATE,
+          ruleKey: "cutEndDate",
+        });
         fields.push({
           path: `${prefix}.${i}.START_TIME`,
           value: row.START_TIME,
@@ -281,7 +301,16 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
             })();
       const prefix = QC_HARDWARE_ERROR_PREFIX.LINEAR_COATING;
       list.forEach((row, i) => {
-        fields.push({ path: `${prefix}.${i}.DATE`, value: row.DATE, ruleKey: "cutDate" });
+        fields.push({
+          path: `${prefix}.${i}.START_DATE`,
+          value: row.START_DATE ?? row.DATE,
+          ruleKey: "cutStartDate",
+        });
+        fields.push({
+          path: `${prefix}.${i}.END_DATE`,
+          value: row.END_DATE ?? row.DATE,
+          ruleKey: "cutEndDate",
+        });
         fields.push({
           path: `${prefix}.${i}.START_TIME`,
           value: row.START_TIME,
@@ -356,7 +385,17 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
     const values = asRecord(target.values) ?? {};
     for (const val of Object.values(values)) {
       const arr = asArray(val);
-      if (arr.some((item) => str(asRecord(item)?.DATE) || str(asRecord(item)?.DUST_QTY))) {
+      if (
+        arr.some((item) => {
+          const row = asRecord(item);
+          return (
+            str(row?.START_DATE) ||
+            str(row?.END_DATE) ||
+            str(row?.DATE) ||
+            str(row?.DUST_QTY)
+          );
+        })
+      ) {
         return true;
       }
     }

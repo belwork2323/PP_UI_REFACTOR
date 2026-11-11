@@ -61,8 +61,7 @@ const CastingCuringPage = () => {
 
   const listLoading = loading && !loadingFormDetails && view === "list";
   // Full-page opener only when leaving the list / first open — not on draft refresh.
-  const showFullPageLoader =
-    listLoading || (Boolean(loadingFormDetails) && view !== "form");
+  const showFullPageLoader = listLoading || (Boolean(loadingFormDetails) && view !== "form");
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
@@ -70,9 +69,7 @@ const CastingCuringPage = () => {
         open={showFullPageLoader}
         title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
         message={
-          loadingFormDetails
-            ? S.FORM_OPENING_MESSAGE
-            : "Loading casting and curing batches…"
+          loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading casting and curing batches…"
         }
         color={CASTING_CURING_BRAND.cc}
         accentColor={CASTING_CURING_BRAND.ccLight}

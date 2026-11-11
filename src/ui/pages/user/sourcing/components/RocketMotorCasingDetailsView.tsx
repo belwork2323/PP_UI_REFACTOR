@@ -22,6 +22,7 @@ import { useAuthStore } from "../../../../../app/store/authStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { formatDisplayDate, formatDisplayDateOrDateTime, formatDisplayDateTime } from "../../../../../utils/dateUtils";
 import { useFilePreview } from "../../../../../hooks/useFilePreview";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
@@ -61,13 +62,6 @@ type RocketMotorCasingDetailsViewProps = {
   onBack: () => void;
 };
 
-const formatDate = (value?: string) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
-
 const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMotorCasingDetailsViewProps) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
@@ -81,11 +75,13 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
   const renderResultCell = (specRow: CasingDetailBlock["rows"][number]) => {
     const fileId = String(specRow.fileId ?? "").trim();
     const canOpen = Boolean(fileId && subDepartmentId);
-    if (!canOpen) return specRow.analysedResult || "—";
+    if (!canOpen) {
+      return formatDisplayDateOrDateTime(specRow.analysedResult, specRow.analysedResult || "—");
+    }
     return (
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
         <Typography component="span" sx={dt.resultText}>
-          {specRow.analysedResult || "—"}
+          {formatDisplayDateOrDateTime(specRow.analysedResult, specRow.analysedResult || "—")}
         </Typography>
         <Link
           component="button"
@@ -127,9 +123,9 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
     { label: BL.COL_MOTOR_TYPE, value: row.motorStage || "—" },
     { label: BL.COL_BATCH_TYPE, value: row.casingType || "—" },
     { label: "Insulation type", value: row.insulationType || "—" },
-    { label: "Receiving date", value: formatDate(row.receivingDate) },
+    { label: "Receiving date", value: formatDisplayDate(row.receivingDate) },
     { label: BL.COL_CREATED_BY, value: row.createdBy?.fullName ?? BL.UNASSIGNED },
-    { label: BL.COL_CREATED_ON, value: formatDate(row.createdOn) },
+    { label: BL.COL_CREATED_ON, value: formatDisplayDateTime(row.createdOn, row.createdOn || "—") },
   ];
 
   const defaultColumns = [

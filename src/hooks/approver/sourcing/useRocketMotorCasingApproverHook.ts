@@ -335,6 +335,7 @@ export const useRocketMotorCasingApproverHook = () => {
     selected,
     detailsLoading,
     dialogProps: {
+      subdepartment: subDepartmentId ?? 0,
       actionType,
       batchId: dialogItem?.motorCasingId ?? dialogItem?.batchId ?? null,
       idLabel: STRINGS.APPROVER.ACTION.MOTOR_CASING_ID_LABEL,

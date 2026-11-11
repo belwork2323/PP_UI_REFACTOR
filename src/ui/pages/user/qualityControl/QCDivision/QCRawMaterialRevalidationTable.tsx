@@ -268,7 +268,7 @@ const QCRawMaterialRevalidationTable = ({
           <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub, fontWeight: 600 }}>
             {readOnly
               ? "No raw material revalidation data is available for this batch."
-              : "Loading batch materials… If this persists, confirm the identification sheet has materials with lot numbers assigned."}
+              : "No materials with lot numbers are available for revalidation. Confirm the identification sheet has materials with lot numbers assigned."}
           </Typography>
         </Box>
       ) : null}

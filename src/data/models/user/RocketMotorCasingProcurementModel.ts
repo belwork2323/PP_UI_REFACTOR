@@ -101,13 +101,10 @@ export function normalizeRocketCasingListStatus(status: string): OperationStatus
   return OPERATION_STATUS.TO_BE_INITIATED;
 }
 
-/** Submitted / approved casing forms keep persisted master-data rows (no live append). */
+/** Live MDM sync only while the casing form is still TO_BE_INITIATED (no append after start). */
 export const isRocketMotorCasingMasterFrozen = (status?: string | null) => {
   const normalized = normalizeRocketCasingListStatus(String(status ?? ""));
-  return (
-    normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    normalized === OPERATION_STATUS.APPROVED
-  );
+  return normalized !== OPERATION_STATUS.TO_BE_INITIATED;
 };
 
 /** Column keys searched by the rocket motor casing list search bar */

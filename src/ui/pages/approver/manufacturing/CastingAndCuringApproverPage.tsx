@@ -38,7 +38,6 @@ const CastingAndCuringApproverPage = () => {
     handleCloseDetail,
     handleActiveMotorChange,
   } = useCastingAndCuringApproverHook();
-
   return (
     <ApproverSubdepartmentBatchListSection
       department="manufacturing"

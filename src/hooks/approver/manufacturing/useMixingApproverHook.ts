@@ -58,8 +58,7 @@ export const useMixingApproverHook = () => {
     const match =
       user?.allSubDepartments?.find(
         (item) => item.slugs?.dept === "manufacturing" && item.slugs?.subDept === SUB_DEPARTMENT,
-      ) ??
-      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+      ) ?? user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
     return match?.subDepartmentId ?? null;
   }, [user]);
 
@@ -191,6 +190,7 @@ export const useMixingApproverHook = () => {
         activeMixCard?.label && mixCardDialogBaseProps.batchId
           ? `${mixCardDialogBaseProps.batchId} · ${activeMixCard.label}`
           : mixCardDialogBaseProps.batchId,
+      subdepartment: 5,
     }),
     [activeMixCard?.label, mixCardDialogBaseProps],
   );
@@ -224,8 +224,7 @@ export const useMixingApproverHook = () => {
     setDetailsLoading(false);
 
     if (!response?.success || !response?.data) {
-      const fallback =
-        response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
+      const fallback = response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
       showAlert(response?.message || fallback, "error", { autoCloseMs: 3500 });
       setSelected(null);
       return;

@@ -35,16 +35,13 @@ export {
 const STF_FOCUS_PREFIX_ORDER = [
   "motorId",
   "stfTestNo",
-  "CONDITIONING_DETAILS.",
-  "GRAIN_DIMENSION.",
-  "BEM_HARDWARE_DETAILS.",
+  "TEST_HEADER.",
   "IGNITER_DETAILS.",
   "NOZZLE_DETAILS.",
-  "TESTING_DETAILS.",
-  "SENSOR_CONFIGURATION.",
-  "RESULT_DETAILS.",
-  "STATIC_TEST_RESULT.",
-  "UPLOAD_PT_CURVE.",
+  "MAIN_MOTOR_DATA.",
+  "BEM_DATA.",
+  "BALLISTIC_PARAMETERS.",
+  "BURN_RATE.",
 ] as const;
 
 export type StfValidationFocusTarget = {

@@ -23,6 +23,8 @@ import PremixStatusChip, {
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
 import CastingMotorPanel from "../../user/manufacturing/CastingAndCuring/CastingMotorPanel";
 import CuringMotorPanel from "../../user/manufacturing/CastingAndCuring/CuringMotorPanel";
+import CuringSetupHeaderCard from "../../user/manufacturing/CastingAndCuring/CuringSetupHeaderCard";
+import CastingCuringSetupHeaderCard from "../../user/manufacturing/CastingAndCuring/CastingCuringSetupHeaderCard";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -30,10 +32,8 @@ import {
 } from "../../../components/custom/UserWorkflowStepPager";
 
 const CC = STRINGS.MANUFACTURING.CASTING_CURING;
-const {
-  approved: ApproveIcon,
-  rejected: RejectIcon,
-} = icons.approver.manufacturing.castingAndCuring;
+const { approved: ApproveIcon, rejected: RejectIcon } =
+  icons.approver.manufacturing.castingAndCuring;
 
 type MotorProcessTab = "CASTING" | "CURING";
 
@@ -103,7 +103,10 @@ const CastingCuringApproverReviewContent = ({
   }, [detailView?.motorCounts?.totalMotorCount, motors]);
 
   const enabledMotors = useMemo(
-    () => motors.filter((motor) => !isCastingCuringMotorApproverTabDisabled(motor.motorSubmissionStatus)),
+    () =>
+      motors.filter(
+        (motor) => !isCastingCuringMotorApproverTabDisabled(motor.motorSubmissionStatus),
+      ),
     [motors],
   );
 
@@ -114,7 +117,9 @@ const CastingCuringApproverReviewContent = ({
 
   const activeMotorIndex = motors.findIndex((motor) => motor.motorId === activeMotorId);
   const enabledMotorIndex = enabledMotors.findIndex((motor) => motor.motorId === activeMotorId);
-  const canApproveOrReject = isCastingCuringMotorApproverActionable(activeMotor?.motorSubmissionStatus);
+  const canApproveOrReject = isCastingCuringMotorApproverActionable(
+    activeMotor?.motorSubmissionStatus,
+  );
 
   const navPalette = {
     primary: palette.primary,
@@ -149,10 +154,7 @@ const CastingCuringApproverReviewContent = ({
       0,
       enabledMotors.findIndex((motor) => motor.motorId === activeMotorId),
     );
-    const nextIndex = Math.min(
-      enabledMotors.length - 1,
-      Math.max(0, currentIndex + direction),
-    );
+    const nextIndex = Math.min(enabledMotors.length - 1, Math.max(0, currentIndex + direction));
     onActiveMotorChange(enabledMotors[nextIndex].motorId);
   };
 
@@ -209,9 +211,7 @@ const CastingCuringApproverReviewContent = ({
           onStepBack={() => goToEnabledMotor(-1)}
           onStepNext={() => goToEnabledMotor(1)}
           disableStepBack={enabledMotorIndex <= 0}
-          disableStepNext={
-            enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1
-          }
+          disableStepNext={enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1}
           isTabDisabled={(_, index) =>
             isCastingCuringMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
           }
@@ -223,7 +223,8 @@ const CastingCuringApproverReviewContent = ({
         />
       </UserWorkflowNavPanel>
 
-      {activeMotor && !isCastingCuringMotorApproverTabDisabled(activeMotor.motorSubmissionStatus) ? (
+      {activeMotor &&
+      !isCastingCuringMotorApproverTabDisabled(activeMotor.motorSubmissionStatus) ? (
         <Box
           sx={{
             borderRadius: 2.5,
@@ -257,7 +258,12 @@ const CastingCuringApproverReviewContent = ({
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={1.25} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1}
+              mb={1.25}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="contained"
                 size="small"
@@ -292,24 +298,39 @@ const CastingCuringApproverReviewContent = ({
             <ToggleButton value="CASTING">{CC.SECTION_TAB_CASTING}</ToggleButton>
             <ToggleButton value="CURING">{CC.SECTION_TAB_CURING}</ToggleButton>
           </ToggleButtonGroup>
-
           {activeProcessTab === "CASTING" ? (
-            <CastingMotorPanel
-              value={activeMotor.castingData}
-              onChange={() => undefined}
-              readOnly
-              theme={manufacturingTheme}
-              motorId={activeMotor.motorId}
-              batchId={detailView?.batchId}
-            />
+            <>
+              <CastingCuringSetupHeaderCard
+                castingStation={activeMotor.setup.castingStation}
+                motorId={activeMotor.motorId}
+                motorReceivedAt={activeMotor.motorReceivedAt}
+                theme={manufacturingTheme}
+              />
+              <CastingMotorPanel
+                value={activeMotor.castingData}
+                onChange={() => undefined}
+                readOnly
+                theme={manufacturingTheme}
+                motorId={activeMotor.motorId}
+                batchId={detailView?.batchId}
+              />
+            </>
           ) : (
-            <CuringMotorPanel
-              value={activeMotor.curingData}
-              onChange={() => undefined}
-              readOnly
-              theme={manufacturingTheme}
-              motorId={activeMotor.motorId}
-            />
+            <>
+              <CuringSetupHeaderCard
+                setup={activeMotor.curingSetup}
+                curingCycleConfig={null}
+                batch={null}
+                theme={manufacturingTheme}
+              />
+              <CuringMotorPanel
+                value={activeMotor.curingData}
+                onChange={() => undefined}
+                readOnly
+                theme={manufacturingTheme}
+                motorId={activeMotor.motorId}
+              />
+            </>
           )}
         </Box>
       ) : (

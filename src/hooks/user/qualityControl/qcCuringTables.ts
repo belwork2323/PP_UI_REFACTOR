@@ -12,6 +12,7 @@ import {
   QC_CURING_SECTION_IDS,
   QC_CURING_SUBSCALE_PARAMETER_PRESET_ROWS,
   formatQcSubscaleArticleTypeLabel,
+  normalizeQcCuringSubscaleParameter,
   normalizeQcCuringType,
   toQcSubscaleArticleTypeApi,
   type QcCuringSetupField,
@@ -184,7 +185,7 @@ const pickApiTemperatureValue = (row: Record<string, unknown>): string => {
   for (const key of TEMPERATURE_API_ALIASES) {
     const value = row[key];
     if (value === null || value === undefined) continue;
-    const raw = String(value).trim();
+    const raw = normalizeQcCuringSubscaleParameter(value);
     if (raw) return raw;
   }
   return "";
@@ -210,43 +211,89 @@ const pickApiOptionalString = (row: Record<string, unknown>, keys: readonly stri
   return "";
 };
 
-/** One row per article: Article Type, Parameter, mould no under BEM No. only.
- * Preserves API `subscaleDetails.curingTable` order (e.g. 40KG → … → Cartoons). */
-export const mapApiSubscaleCuringTableToParameterRows = (
-  curingTable: unknown[],
-): QcCuringSubscaleParameterRow[] => {
-  const presetRows = defaultSubscaleParameterRows();
-  const articles = curingTable
+const articleTypeMatchKey = (value: unknown): string =>
+  formatQcSubscaleArticleTypeLabel(value).trim().toUpperCase();
+
+const mapCuringArticleToParameterRow = (
+  article: Record<string, unknown>,
+  index: number,
+  articleTypeOverride?: string,
+): QcCuringSubscaleParameterRow => ({
+  SR_NO: index + 1,
+  OVEN_NO: "",
+  ARTICLE_TYPE:
+    articleTypeOverride ||
+    formatQcSubscaleArticleTypeLabel(article.articleType ?? article.ARTICLE_TYPE),
+  PARAMETER: pickApiTemperatureValue(article),
+  // Manufacturing sends bemNo (legacy bemMouldNo) — always show under BEM No.
+  BEM_NO: pickApiBemMouldNo(article),
+  WHEEL_PEEL_NO: pickApiOptionalString(article, ["wheelPeelNo", "WHEEL_PEEL_NO"]),
+  CARTON_NO: pickApiOptionalString(article, ["cartonNo", "CARTON_NO"]),
+  CONTROL_GRAIN_NO: pickApiOptionalString(article, ["controlGrainNo", "CONTROL_GRAIN_NO"]),
+  QA_REMARKS: pickApiOptionalString(article, ["qaRemarks", "QA_REMARKS"]),
+});
+
+/**
+ * Expand hardwarePreparationDetails.articles (all types, by noOfArticles) and merge
+ * curingTable values. Falls back to curingTable alone when hardware list is empty.
+ * Does not use STF bemMotors filtering.
+ */
+export const buildSubscaleCuringParameterRows = (params: {
+  curingTable?: unknown[];
+  hardwareArticles?: unknown[];
+}): QcCuringSubscaleParameterRow[] => {
+  const curingArticles = (params.curingTable ?? [])
     .map((row) => asRecord(row))
     .filter((row): row is Record<string, unknown> => Boolean(row));
 
-  if (!articles.length) return presetRows;
-
-  const mappedRows = articles.map((article, index) => {
-    const articleType = article.articleType ?? article.ARTICLE_TYPE;
-    return {
-      SR_NO: index + 1,
-      OVEN_NO: "",
-      ARTICLE_TYPE: formatQcSubscaleArticleTypeLabel(articleType),
-      PARAMETER: pickApiTemperatureValue(article),
-      // Manufacturing sends bemNo (legacy bemMouldNo) — always show under BEM No.
-      BEM_NO: pickApiBemMouldNo(article),
-      WHEEL_PEEL_NO: pickApiOptionalString(article, ["wheelPeelNo", "WHEEL_PEEL_NO"]),
-      CARTON_NO: pickApiOptionalString(article, ["cartonNo", "CARTON_NO"]),
-      CONTROL_GRAIN_NO: pickApiOptionalString(article, ["controlGrainNo", "CONTROL_GRAIN_NO"]),
-      QA_REMARKS: pickApiOptionalString(article, ["qaRemarks", "QA_REMARKS"]),
-    };
-  });
-
-  while (mappedRows.length < presetRows.length) {
-    mappedRows.push({
-      ...presetRows[mappedRows.length],
-      SR_NO: mappedRows.length + 1,
-    });
+  const expandedLabels: string[] = [];
+  for (const raw of params.hardwareArticles ?? []) {
+    const selection = asRecord(raw);
+    if (!selection) continue;
+    const name = String(
+      selection.subscaleArticleName ?? selection.subscaleArticleCode ?? "",
+    ).trim();
+    if (!name) continue;
+    const count = Math.max(0, Number(selection.noOfArticles ?? 0) || 0);
+    const label = formatQcSubscaleArticleTypeLabel(name);
+    for (let i = 0; i < count; i += 1) {
+      expandedLabels.push(label);
+    }
   }
 
-  return mappedRows.slice(0, Math.max(mappedRows.length, presetRows.length));
+  if (!expandedLabels.length) {
+    if (!curingArticles.length) return defaultSubscaleParameterRows();
+    return curingArticles.map((article, index) =>
+      mapCuringArticleToParameterRow(article, index),
+    );
+  }
+
+  const curingQueues = new Map<string, Record<string, unknown>[]>();
+  curingArticles.forEach((article) => {
+    const key = articleTypeMatchKey(article.articleType ?? article.ARTICLE_TYPE);
+    if (!key) return;
+    const queue = curingQueues.get(key) ?? [];
+    queue.push(article);
+    curingQueues.set(key, queue);
+  });
+
+  return expandedLabels.map((label, index) => {
+    const key = articleTypeMatchKey(label);
+    const queue = curingQueues.get(key);
+    const matched = queue?.shift();
+    if (matched) {
+      return mapCuringArticleToParameterRow(matched, index, label);
+    }
+    return emptySubscaleParameterRow(index + 1, { ARTICLE_TYPE: label });
+  });
 };
+
+/** @deprecated Prefer buildSubscaleCuringParameterRows — kept for call-site compatibility. */
+export const mapApiSubscaleCuringTableToParameterRows = (
+  curingTable: unknown[],
+  hardwareArticles?: unknown[],
+): QcCuringSubscaleParameterRow[] =>
+  buildSubscaleCuringParameterRows({ curingTable, hardwareArticles });
 
 export const createInitialCuringValues = (_subType?: QcCuringSubType | ""): SchemaFormValues => ({
   [formKey(QC_CURING_SECTION_IDS.MOTOR_SETUP, "MOTOR_STAGE")]: "",
@@ -440,7 +487,10 @@ export const getCuringSubscaleParameterRows = (
       values,
       formKey(QC_CURING_SECTION_IDS.SUBSCALE, "CURING_PARAMETER_TABLE"),
       defaultSubscaleParameterRows(),
-    ),
+    ).map((row) => ({
+      ...row,
+      PARAMETER: normalizeQcCuringSubscaleParameter(row.PARAMETER),
+    })),
   );
 
 export const setCuringSubscaleParameterRows = (
@@ -458,7 +508,11 @@ const pressureRowHasData = (row: QcCuringPressureRow) =>
   hasValue(row.PEAK_PRESSURE) || hasValue(row.TEMPERATURE) || hasValue(row.TIME);
 
 const subscaleRowHasData = (row: QcCuringSubscaleParameterRow) =>
-  Object.entries(row).some(([key, value]) => key !== "SR_NO" && hasValue(value));
+  Object.entries(row).some(([key, value]) => {
+    if (key === "SR_NO") return false;
+    if (key === "PARAMETER") return Boolean(normalizeQcCuringSubscaleParameter(value));
+    return hasValue(value);
+  });
 
 const sanitizeCycleRows = (rows: QcCuringCycleRow[]) =>
   normalizeRows(rows.filter(cycleRowHasData)).map((row, index) => ({
@@ -488,7 +542,7 @@ const sanitizeSubscaleRows = (rows: QcCuringSubscaleParameterRow[]) =>
     SR_NO: index + 1,
     OVEN_NO: String(row.OVEN_NO ?? "").trim(),
     ARTICLE_TYPE: String(row.ARTICLE_TYPE ?? "").trim(),
-    PARAMETER: String(row.PARAMETER ?? "").trim(),
+    PARAMETER: normalizeQcCuringSubscaleParameter(row.PARAMETER),
     BEM_NO: String(row.BEM_NO ?? "").trim(),
     WHEEL_PEEL_NO: String(row.WHEEL_PEEL_NO ?? "").trim(),
     CARTON_NO: String(row.CARTON_NO ?? "").trim(),
@@ -760,7 +814,10 @@ export const curingMotorDetailToSections = (
       asRecord(rec.subscaleDetails) ??
       asRecord(asRecord(rec.details)?.subscaleDetails) ??
       {};
-    const parameterRows = mapApiSubscaleCuringTableToParameterRows(asArray(subscale.curingTable));
+    const parameterRows = mapApiSubscaleCuringTableToParameterRows(
+      asArray(subscale.curingTable),
+      asArray(subscale.hardwareArticles),
+    );
     const subscaleQaRemarks = pickQaRemarks(subscale.qaRemarks, subscale.QA_REMARKS);
     const subscaleSection = omitEmpty({
       NUMBER_OF_OVENS: String(
@@ -773,7 +830,11 @@ export const curingMotorDetailToSections = (
       BEM_AVERAGE_SHORE_A_HARDNESS: String(subscale.bemAverageShoreAHardness ?? ""),
       CARTON_AVERAGE_SHORE_A_HARDNESS: String(subscale.cartonAverageShoreAHardness ?? ""),
       SUBSCALE_VISUAL_OBSERVATIONS: normalizeVisualObservations(subscale.visualObservations ?? ""),
-      ...(parameterRows.some((row) => String(row.BEM_NO ?? "").trim() || String(row.PARAMETER ?? "").trim())
+      ...(parameterRows.some(
+        (row) =>
+          String(row.BEM_NO ?? "").trim() ||
+          Boolean(normalizeQcCuringSubscaleParameter(row.PARAMETER)),
+      )
         ? { CURING_PARAMETER_TABLE: parameterRows }
         : {}),
       ...(subscaleQaRemarks ? { QA_REMARKS: subscaleQaRemarks } : {}),
@@ -879,9 +940,12 @@ export const curingMotorDetailToSections = (
             SUBSCALE_VISUAL_OBSERVATIONS: normalizeVisualObservations(
               subscale.visualObservations ?? subscale.SUBSCALE_VISUAL_OBSERVATIONS ?? "",
             ),
-            ...(table.length
+            ...(table.length || asArray(subscale.hardwareArticles).length
               ? {
-                  CURING_PARAMETER_TABLE: mapApiSubscaleCuringTableToParameterRows(table),
+                  CURING_PARAMETER_TABLE: mapApiSubscaleCuringTableToParameterRows(
+                    table,
+                    asArray(subscale.hardwareArticles),
+                  ),
                 }
               : {}),
           },

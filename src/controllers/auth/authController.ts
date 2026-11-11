@@ -1,9 +1,13 @@
-import { resetPasswordApi, logoutApi, refreshTokenApi } from "../../data/api/auth/authApi";
+import {
+  resetPasswordApi,
+  changePasswordApi,
+  logoutApi,
+  refreshTokenApi,
+} from "../../data/api/auth/authApi";
 import { useAuthStore } from "../../app/store/authStore";
 import { STRINGS } from "../../app/config/strings";
 import { UserModel } from "../../data/models/user/UserModel";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
-
 
 export const loginController = (credentials) => _login(credentials);
 
@@ -15,19 +19,14 @@ const _login = async (credentials) => {
     const requestBody = {
       userId: credentials.userId ?? credentials.username,
       password: credentials.password,
-      role:
-        credentials.role ??
-        ({
-          roleId: credentials.roleId ?? credentials.role?.roleId,
-          roleName: credentials.roleName ?? credentials.role?.roleName,
-        }),
-      captcha:
-        credentials.captcha ??
-        ({
-          captchaId: credentials.captchaId ?? credentials.captcha?.captchaId,
-          captchaValue:
-            credentials.captchaValue ?? credentials.captcha?.captchaValue,
-        }),
+      role: credentials.role ?? {
+        roleId: credentials.roleId ?? credentials.role?.roleId,
+        roleName: credentials.roleName ?? credentials.role?.roleName,
+      },
+      captcha: credentials.captcha ?? {
+        captchaId: credentials.captchaId ?? credentials.captcha?.captchaId,
+        captchaValue: credentials.captchaValue ?? credentials.captcha?.captchaValue,
+      },
     };
 
     const apiResponse = await loginApi(requestBody);
@@ -46,7 +45,7 @@ const _login = async (credentials) => {
 /**
  * Refresh the access token using the refresh token
  * This is called by the 401 response interceptor in httpClient.ts
- * 
+ *
  * @returns User object if refresh succeeds, null if it fails
  */
 export const refreshAuthToken = async () => {
@@ -93,13 +92,31 @@ export const refreshAuthToken = async () => {
       success: true,
       data: updatedUser,
     };
-
   } catch (error) {
     useAuthStore.getState().logout();
     return null;
   }
 };
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Change Password Controller
+═══════════════════════════════════════════════════════════════════ */
+export const changePasswordController = async (payload: {
+  user_uuid: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) => {
+  try {
+    const apiResponse = await changePasswordApi(payload);
+    return new ApiResponseModel(apiResponse, (data) => data);
+  } catch (error: any) {
+    return new ApiResponseModel<null>({
+      ...error,
+      message: error?.message || STRINGS.AUTH.CHANGE_PASSWORD_FAILED,
+    });
+  }
+};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Reset Password Controller
@@ -110,7 +127,7 @@ export const resetPasswordController = async (payload) => {
     return new ApiResponseModel<string>(apiResponse, () => STRINGS.AUTH.RESET_REQUEST_SUCCESS);
   } catch (error: any) {
     let message = error.message || STRINGS.AUTH.RESET_FAILED;
-    
+
     if (error.details) {
       switch (error.details) {
         case "INVALID_REQUEST":
@@ -130,7 +147,7 @@ export const resetPasswordController = async (payload) => {
           break;
       }
     }
-    
+
     // Pass the overridden message to ApiResponseModel via the modified error object
     return new ApiResponseModel<null>({ ...error, message });
   }
@@ -143,7 +160,10 @@ export const resetPasswordController = async (payload) => {
 export const logoutController = async () => {
   const refreshToken = useAuthStore.getState().getRefreshToken();
   if (!refreshToken) {
-    return new ApiResponseModel<null>({ status: 400, message: "Logout failed: refresh token missing." });
+    return new ApiResponseModel<null>({
+      status: 400,
+      message: "Logout failed: refresh token missing.",
+    });
   }
 
   try {

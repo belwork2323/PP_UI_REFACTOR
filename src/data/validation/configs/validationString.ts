@@ -5,6 +5,8 @@ export const VALIDATIONSTRING = {
   OBSERVED_VALUE_RANGE: "Value must be between {min} and {max}",
   OBSERVED_VALUE_MIN: "Value must be ≥ {min}",
   OBSERVED_VALUE_MAX: "Value must be ≤ {max}",
+  OBSERVED_VALUE_GT: "Value must be > {min}",
+  OBSERVED_VALUE_LT: "Value must be < {max}",
 
   PATTERNS: {
     ONLY_DIGITS: /^\d+$/, // Positive integers only (e.g., 123)
@@ -25,7 +27,8 @@ export const VALIDATIONSTRING = {
      * QC Mixing read-only mixer + building display, e.g. "MX-1 & BLD-1"
      * (also accepts bare mixer/building codes).
      */
-    MIXER_AND_BLDG_NO: /^[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*(?:\s*&\s*[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*)*$/,
+    MIXER_AND_BLDG_NO:
+      /^[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*(?:\s*&\s*[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*)*$/,
     /** Remarks/observations + science symbols; # & + @ not allowed */
     ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,\-_()/:%°±≤≥µμ²³⁻]+$/,
     SPECIFICATION_WITH_TOLERANCE: /^[A-Za-z0-9\s.,_()#/:+±%\-@°≤≥µμ²³⁻]+$/, // e.g. 28 - 34%, ≤0.5%, @25°C

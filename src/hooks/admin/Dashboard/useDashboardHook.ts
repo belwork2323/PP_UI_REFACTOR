@@ -13,7 +13,13 @@ import {
 import { toOperationStatusApiValue } from "@/hooks/operationStatus";
 import { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
+
 export type BatchTab = "IN_PROGRESS" | "COMPLETED";
+
+export const batchTabOptions: ToggleTabOption[] = [
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+];
 
 type DashboardDateBounds = {
   filterType: string;
@@ -22,10 +28,6 @@ type DashboardDateBounds = {
   endDate: string;
 };
 
-export const batchTabOptions: ToggleTabOption[] = [
-  { value: "IN_PROGRESS", label: "In Progress" },
-  { value: "COMPLETED", label: "Completed" },
-];
 function useDashboardGlobalFilterSection(mode: string) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -37,7 +39,6 @@ function useDashboardGlobalFilterSection(mode: string) {
   const [chartUpdatedAt, setChartUpdatedAt] = useState<Date | null>(null);
 
   const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
-  /** Draft custom dates (pickers) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDateState] = useState("");
   const [customEndDate, setCustomEndDateState] = useState("");
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
@@ -55,10 +56,7 @@ function useDashboardGlobalFilterSection(mode: string) {
     clearTableFiltersRef.current?.();
   }, []);
 
-  const resolveApiFilterType = useCallback(
-    (value: string) => toDashboardApiFilterType(value),
-    [],
-  );
+  const resolveApiFilterType = useCallback((value: string) => toDashboardApiFilterType(value), []);
 
   const setFilterType = useCallback(
     (val: string) => {
@@ -164,18 +162,13 @@ function useDashboardGlobalFilterSection(mode: string) {
     void fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const kpis = stats?.kpis ?? [];
-  const weeklyActivity = chartData?.weeklyActivity ?? [];
-  const motorsProcessed = chartData?.motorsProcessed ?? [];
-  const qcPassRate = chartData?.qcPassRate ?? [];
-
   return {
     loading,
     statsLoading,
-    kpis,
-    weeklyActivity,
-    motorsProcessed,
-    qcPassRate,
+    kpis: stats?.kpis ?? [],
+    weeklyActivity: chartData?.weeklyActivity ?? [],
+    motorsProcessed: chartData?.motorsProcessed ?? [],
+    qcPassRate: chartData?.qcPassRate ?? [],
     chartUpdatedAt,
     filterType,
     setFilterType,
@@ -206,11 +199,16 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
   const [activeBatchesLoading, setActiveBatchesLoading] = useState(false);
   const [activeBatches, setActiveBatches] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_PANEL_FILTERS);
   const [draftFilters, setDraftFilters] = useState(DEFAULT_PANEL_FILTERS);
   const [activeTab, setActiveTab] = useState<BatchTab>("IN_PROGRESS");
+
   const setDraftFilter = <K extends keyof typeof DEFAULT_PANEL_FILTERS>(
     field: K,
     value: (typeof DEFAULT_PANEL_FILTERS)[K],
@@ -227,6 +225,7 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
 
   const applyFilters = () => {
     setAppliedFilters({ ...draftFilters });
+    setPage(0);
     setFilterOpen(false);
   };
 
@@ -234,7 +233,22 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
     setSearchQuery("");
     setDraftFilters(DEFAULT_PANEL_FILTERS);
     setAppliedFilters(DEFAULT_PANEL_FILTERS);
+    setPage(0);
   }, []);
+
+  const handleTabChange = (newTab: BatchTab) => {
+    setActiveTab(newTab);
+    setPage(0);
+  };
+
+  const handlePageChange = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const toggleCurrentMonth = useCallback(() => {
     setDraftFilters((prev) => {
@@ -267,6 +281,8 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
         dateTo: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonthOnly: appliedFilters.currentMonthOnly,
         status: activeTab,
+        page: page + 1,
+        pageSize: rowsPerPage,
       });
       const batchesResponse = await dashboardController.getActiveBatches(payload);
       setActiveBatches(batchesResponse?.data?.activeBatches ?? []);
@@ -274,7 +290,7 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
     } finally {
       setActiveBatchesLoading(false);
     }
-  }, [searchQuery, appliedFilters, activeTab, globalDateBounds]);
+  }, [searchQuery, appliedFilters, activeTab, globalDateBounds, page, rowsPerPage]);
 
   useEffect(() => {
     void fetchBatches();
@@ -295,6 +311,10 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
     activeBatches,
     filteredBatches: activeBatches,
     pagination,
+    page,
+    rowsPerPage,
+    onPageChange: handlePageChange,
+    onRowsPerPageChange: handleRowsPerPageChange,
     filterOpen,
     setFilterOpen,
     toggleFilterOpen,
@@ -307,104 +327,7 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
     clearBatchesFilters,
     toggleCurrentMonth,
     batchStatusTab: activeTab,
-    setBatchStatusTab: setActiveTab,
-  };
-}
-
-function useDashboardEventsSection(globalDateBounds: { startDate: string; endDate: string }) {
-  const DEFAULT_PANEL_FILTERS = {
-    type: "All",
-    department: "All",
-    subDepartment: "All",
-    dateFrom: "",
-    dateTo: "",
-    currentMonthOnly: false,
-  };
-
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [recentEvents, setRecentEvents] = useState<any[]>([]);
-  const [eventsPagination, setEventsPagination] = useState<any>(null);
-  const [eventsFilterOpen, setEventsFilterOpen] = useState(false);
-  const [eventsSearchQuery, setEventsSearchQuery] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_PANEL_FILTERS);
-  const [draftFilters, setDraftFilters] = useState(DEFAULT_PANEL_FILTERS);
-
-  const setDraftFilter = <K extends keyof typeof DEFAULT_PANEL_FILTERS>(
-    field: K,
-    value: (typeof DEFAULT_PANEL_FILTERS)[K],
-  ) => {
-    setDraftFilters((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const toggleEventsFilterOpen = () => {
-    setEventsFilterOpen((prev) => {
-      if (!prev) setDraftFilters({ ...appliedFilters });
-      return !prev;
-    });
-  };
-
-  const applyEventsFilters = () => {
-    setAppliedFilters({ ...draftFilters });
-    setEventsFilterOpen(false);
-  };
-
-  const clearEventsFilters = useCallback(() => {
-    setEventsSearchQuery("");
-    setDraftFilters(DEFAULT_PANEL_FILTERS);
-    setAppliedFilters(DEFAULT_PANEL_FILTERS);
-  }, []);
-
-  const fetchEvents = useCallback(async () => {
-    setEventsLoading(true);
-    try {
-      const payload = {
-        search: eventsSearchQuery.trim() || undefined,
-        eventType: appliedFilters.type !== "All" ? appliedFilters.type : undefined,
-        department: appliedFilters.department !== "All" ? appliedFilters.department : undefined,
-        subDepartment:
-          appliedFilters.subDepartment !== "All" ? appliedFilters.subDepartment : undefined,
-        startDate: appliedFilters.dateFrom || globalDateBounds.startDate,
-        endDate: appliedFilters.dateTo || globalDateBounds.endDate,
-        currentMonth: appliedFilters.currentMonthOnly,
-        page: 1,
-        pageSize: 10,
-      };
-      const eventsResponse = await dashboardController.getBlockchainEvents(payload);
-      setRecentEvents(eventsResponse?.data?.events ?? []);
-      setEventsPagination(eventsResponse?.data?.pagination ?? null);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, [eventsSearchQuery, appliedFilters, globalDateBounds]);
-
-  useEffect(() => {
-    void fetchEvents();
-  }, [fetchEvents]);
-
-  const eventsActiveFilterCount = [
-    eventsSearchQuery.trim(),
-    appliedFilters.type !== "All",
-    appliedFilters.department !== "All",
-    appliedFilters.subDepartment !== "All",
-    appliedFilters.dateFrom,
-    appliedFilters.dateTo,
-    appliedFilters.currentMonthOnly,
-  ].filter(Boolean).length;
-
-  return {
-    eventsLoading,
-    recentEvents,
-    eventsPagination,
-    eventsFilterOpen,
-    setEventsFilterOpen,
-    toggleEventsFilterOpen,
-    eventsSearchQuery,
-    setEventsSearchQuery,
-    draftFilters,
-    setDraftFilter,
-    applyEventsFilters,
-    eventsActiveFilterCount,
-    clearEventsFilters,
+    setBatchStatusTab: handleTabChange,
   };
 }
 
@@ -427,29 +350,30 @@ function useDashboardLookupsSection() {
 export default function useDashboardHook(mode: string) {
   const global = useDashboardGlobalFilterSection(mode);
   const batches = useDashboardActiveBatchesSection(global.globalDateBounds);
-  const events = useDashboardEventsSection(global.globalDateBounds);
   const lookups = useDashboardLookupsSection();
 
   global.registerTableFilterClear(() => {
     batches.clearBatchesFilters();
-    events.clearEventsFilters();
   });
 
   return {
     loading: global.loading,
     statsLoading: global.statsLoading,
     activeBatchesLoading: batches.activeBatchesLoading,
-    eventsLoading: events.eventsLoading,
     kpis: global.kpis,
     weeklyActivity: global.weeklyActivity,
     motorsProcessed: global.motorsProcessed,
     qcPassRate: global.qcPassRate,
     chartUpdatedAt: global.chartUpdatedAt,
+
     activeBatches: batches.activeBatches,
     filteredBatches: batches.filteredBatches,
     pagination: batches.pagination,
-    recentEvents: events.recentEvents,
-    eventsPagination: events.eventsPagination,
+    batchPage: batches.page,
+    batchRowsPerPage: batches.rowsPerPage,
+    onBatchPageChange: batches.onPageChange,
+    onBatchRowsPerPageChange: batches.onRowsPerPageChange,
+
     filterType: global.filterType,
     setFilterType: global.setFilterType,
     customStartDate: global.customStartDate,
@@ -467,22 +391,13 @@ export default function useDashboardHook(mode: string) {
     setBatchDraftFilter: batches.setDraftFilter,
     applyBatchFilters: batches.applyFilters,
     activeFilterCount: batches.activeFilterCount,
-    eventsFilterOpen: events.eventsFilterOpen,
-    setEventsFilterOpen: events.setEventsFilterOpen,
-    toggleEventsFilterOpen: events.toggleEventsFilterOpen,
-    eventsSearchQuery: events.eventsSearchQuery,
-    setEventsSearchQuery: events.setEventsSearchQuery,
-    eventsDraftFilters: events.draftFilters,
-    setEventsDraftFilter: events.setDraftFilter,
-    applyEventsFilters: events.applyEventsFilters,
-    eventsActiveFilterCount: events.eventsActiveFilterCount,
     clearFilters: global.clearFilters,
-    clearEventsFilters: events.clearEventsFilters,
     clearBatchesFilters: batches.clearBatchesFilters,
     subDepartments: lookups.subDepartments,
     toggleCurrentMonth: batches.toggleCurrentMonth,
     batchStatusTab: batches.batchStatusTab,
     setBatchStatusTab: batches.setBatchStatusTab,
-    batchTabOptions: batchTabOptions,
+    batchTabOptions,
+    globalDateBounds: global.globalDateBounds,
   };
 }

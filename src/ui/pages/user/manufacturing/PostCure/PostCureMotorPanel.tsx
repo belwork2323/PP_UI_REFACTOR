@@ -26,11 +26,16 @@ import {
   buildPostCureIngredientRowsFromApi,
   POST_CURE_RECIPE_TYPES,
 } from "../../../../../data/models/user/postCureIngredientRecipes";
+import {
+  postCureIngredientRowsHaveUserInput,
+  postCureMotorDataHasUserInput,
+  type PostCureMotorData,
+} from "../../../../../data/models/user/PostCureMotorDataModel";
 import { useCasePrepLinerMaterials } from "../../../../../hooks/user/manufacturing/useCasePrepLinerMaterials";
 import { postCureTableInputSx } from "./postCureFormPrimitivesShared";
 
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
-import { DateField } from "../../../../components/common/DateField";
+import { DateTimeField } from "../../../../components/common/DateField";
 import PostCureFileField from "./PostCureFileField";
 import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
 import {
@@ -84,8 +89,8 @@ export const LocationDateTable = ({
   const rows = value || [];
   const headers = [
     "Location",
-    "From Date",
-    "To Date",
+    "From Date & Time",
+    "To Date & Time",
     "Observations",
     ...(qaRemarksMode ? ["QA Remarks"] : []),
   ];
@@ -133,7 +138,7 @@ export const LocationDateTable = ({
                       <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
                       <Box data-qc-field={fromDateErrKey}>
-                        <DateField
+                        <DateTimeField
                           value={row.fromDate ?? ""}
                           onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
                           error={Boolean(validationErrors[fromDateErrKey])}
@@ -150,8 +155,9 @@ export const LocationDateTable = ({
                       <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
                       <Box data-qc-field={toDateErrKey}>
-                        <DateField
+                        <DateTimeField
                           value={row.toDate ?? ""}
+                          minDate={row.fromDate ?? ""}
                           onChange={(val: any) => handleFieldChange(index, "toDate", val)}
                           error={Boolean(validationErrors[toDateErrKey])}
                           helperText={validationErrors[toDateErrKey]}
@@ -246,8 +252,8 @@ export const LocationQtyTable = ({
   const rows = value || [];
   const headers = [
     "Location",
-    "From Date",
-    "To Date",
+    "From Date & Time",
+    "To Date & Time",
     qtyLabel,
     "Observations",
     ...(qaRemarksMode ? ["QA Remarks"] : []),
@@ -299,7 +305,7 @@ export const LocationQtyTable = ({
                       <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
                       <Box data-qc-field={fromDateErrKey}>
-                        <DateField
+                        <DateTimeField
                           value={row.fromDate ?? ""}
                           onChange={(val: any) => handleFieldChange(index, "fromDate", val)}
                           error={Boolean(validationErrors[fromDateErrKey])}
@@ -316,8 +322,9 @@ export const LocationQtyTable = ({
                       <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
                       <Box data-qc-field={toDateErrKey}>
-                        <DateField
+                        <DateTimeField
                           value={row.toDate ?? ""}
+                          minDate={row.fromDate ?? ""}
                           onChange={(val: any) => handleFieldChange(index, "toDate", val)}
                           error={Boolean(validationErrors[toDateErrKey])}
                           helperText={validationErrors[toDateErrKey]}
@@ -858,7 +865,11 @@ export const FlexibleOthersIngredientTable = ({
     commitRows(updated);
   };
 
-  const handleIngredientInput = (index: number, typed: string, selected?: MaterialsListItem | null) => {
+  const handleIngredientInput = (
+    index: number,
+    typed: string,
+    selected?: MaterialsListItem | null,
+  ) => {
     const updated = [...rows];
     if (selected) {
       updated[index] = {
@@ -880,9 +891,7 @@ export const FlexibleOthersIngredientTable = ({
   };
 
   const handleAddRow = () => {
-    const withoutTotal = rows.filter(
-      (row) => String(row?.srNo ?? "").toUpperCase() !== "TOTAL",
-    );
+    const withoutTotal = rows.filter((row) => String(row?.srNo ?? "").toUpperCase() !== "TOTAL");
     commitRows([
       ...withoutTotal,
       {
@@ -910,26 +919,30 @@ export const FlexibleOthersIngredientTable = ({
     const row = rows[index];
     if (!row || String(row.srNo ?? "").toUpperCase() === "TOTAL") return;
     const next = rows.filter((_, i) => i !== index);
-    commitRows(next.length ? next : [
-      {
-        srNo: 1,
-        ingredient: "",
-        materialId: null,
-        materialCode: null,
-        mfgLot: "",
-        partsByWeight: "",
-        [qtyKey]: "",
-      },
-      {
-        srNo: "TOTAL",
-        ingredient: "Total Quantity",
-        materialId: null,
-        materialCode: null,
-        mfgLot: "",
-        partsByWeight: "",
-        [qtyKey]: "",
-      },
-    ]);
+    commitRows(
+      next.length
+        ? next
+        : [
+            {
+              srNo: 1,
+              ingredient: "",
+              materialId: null,
+              materialCode: null,
+              mfgLot: "",
+              partsByWeight: "",
+              [qtyKey]: "",
+            },
+            {
+              srNo: "TOTAL",
+              ingredient: "Total Quantity",
+              materialId: null,
+              materialCode: null,
+              mfgLot: "",
+              partsByWeight: "",
+              [qtyKey]: "",
+            },
+          ],
+    );
   };
 
   const flexibleHeaders = [
@@ -1066,9 +1079,7 @@ export const FlexibleOthersIngredientTable = ({
                       ) : (
                         <TableTextInput
                           value={String(row.partsByWeight ?? "")}
-                          onChange={(next: any) =>
-                            handleFieldChange(index, "partsByWeight", next)
-                          }
+                          onChange={(next: any) => handleFieldChange(index, "partsByWeight", next)}
                           error={Boolean(validationErrors[partsErr])}
                           helperText={validationErrors[partsErr]}
                           disabled={disabled}
@@ -1250,9 +1261,9 @@ export const QualificationSection = ({
           />
         </Box>
         <Box>
-          <FieldLabelWithAsterisk label="Date of Preparation" required />
+          <FieldLabelWithAsterisk label="Date & Time of Preparation" required />
           <Box data-qc-field={prepDateErrKey}>
-            <DateField
+            <DateTimeField
               value={value?.qualificationPreparationDate ?? ""}
               onChange={(val: any) => handleSectionFieldChange("qualificationPreparationDate", val)}
               error={Boolean(validationErrors[prepDateErrKey])}
@@ -1288,6 +1299,26 @@ export const QualificationSection = ({
               const specificationErrKey = `${basePath}.qualificationTable.${index}.specification`;
               const qaErrKey = `${basePath}.qualificationTable.${index}.qaRemarks`;
               const canEditSpec = editableSpecification && !readOnly;
+              console.log(row.specification);
+
+              // Helper to format the specification object into a single display string
+              const formatSpecification = (spec: any) => {
+                if (!spec) return "-";
+                if (typeof spec === "string") return spec; // Fallback if string
+
+                const { min, max, unit } = spec;
+                let label = "";
+
+                if (min !== null && min !== undefined && max !== null && max !== undefined) {
+                  label = `${min} - ${max}`;
+                } else if (min !== null && min !== undefined) {
+                  label = `>= ${min}`;
+                } else if (max !== null && max !== undefined) {
+                  label = `<= ${max}`;
+                }
+
+                return `${label}${unit ? ` ${unit}` : ""}`.trim() || "-";
+              };
 
               return (
                 <TableRow key={`qual-${index}`} sx={postCureTableRowSx(index)}>
@@ -1297,7 +1328,7 @@ export const QualificationSection = ({
                   <TableCell sx={{ ...postCureTableCellSx, fontWeight: 500 }}>
                     {canEditSpec ? (
                       <TableTextInput
-                        value={specification ?? ""}
+                        value={formatSpecification(specification)}
                         onChange={(e: any) => handleTableSpecificationChange(index, e)}
                         error={Boolean(validationErrors[specificationErrKey])}
                         helperText={validationErrors[specificationErrKey]}
@@ -1307,7 +1338,7 @@ export const QualificationSection = ({
                         fieldPath={specificationErrKey}
                       />
                     ) : (
-                      specification
+                      formatSpecification(specification)
                     )}
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
@@ -1514,9 +1545,9 @@ export const InhibitionSharedSections = ({
       <SectionCard title="Dispatch Details" theme={theme}>
         <FieldGrid columns={2}>
           <Box>
-            <FieldLabelWithAsterisk label="Date Of Dispatch" required />
+            <FieldLabelWithAsterisk label="Date & Time Of Dispatch" required />
             <Box data-qc-field={"dispatchDetails.dispatchDate"}>
-              <DateField
+              <DateTimeField
                 value={value?.dispatchDetails?.dispatchDate ?? ""}
                 onChange={(val: any) => handleDispatchChange("dispatchDate", val)}
                 error={Boolean(validationErrors["dispatchDetails.dispatchDate"])}
@@ -1625,9 +1656,16 @@ export const PostCureMotorPanel: React.FC<any> = ({
     .replace(/_/g, "-");
 
   // Case Prep–style: seed mix tables from POST /post-cure/ingredients (parent owns fetch).
+  // Skip when the session already has user/hydrated input so a late recipe response cannot
+  // race and wipe reopen data; still merge material codes when tables are empty shells.
   useEffect(() => {
     const hydrateKey = `${str(motorId).trim()}::${variant}`;
     if (ingredientsHydratedKeyRef.current === hydrateKey) return;
+
+    if (postCureMotorDataHasUserInput(valueRef.current as PostCureMotorData | null)) {
+      ingredientsHydratedKeyRef.current = hydrateKey;
+      return;
+    }
 
     const recipePairs: Array<{
       recipeType: string;
@@ -1710,27 +1748,30 @@ export const PostCureMotorPanel: React.FC<any> = ({
 
     const gen = ++ingredientsFetchGenRef.current;
     void (async () => {
-      const current = valueRef.current || {};
-      const existingByRecipe: Record<string, any[]> = {
-        [POST_CURE_RECIPE_TYPES.LOOSE_FLAP_EPOXY]:
-          current.looseFlapEpoxyPreparation?.preparationDetails ?? [],
-        [POST_CURE_RECIPE_TYPES.IR1_PREMIX]: current.ir1Premix?.ir1PremixTable ?? [],
-        [POST_CURE_RECIPE_TYPES.IR1_FINAL_MIX]: current.ir1FinalMix?.ir1FinalMixTable ?? [],
-        [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_PREMIX]:
-          current.hemcoat3kPreparation?.premixPreparationTable ?? [],
-        [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_FINAL_MIX]:
-          current.hemcoat3kFinalMix?.finalMixTable ?? [],
-      };
-
       for (const pair of recipePairs) {
         const result = await postCureController.fetchIngredients(pair.recipeType);
         if (gen !== ingredientsFetchGenRef.current) return;
         if (!result.success || !result.data) continue;
-        const next = buildPostCureIngredientRowsFromApi(
-          result.data,
-          pair.qtyKey,
-          existingByRecipe[pair.recipeType],
-        );
+
+        // Re-read latest session before apply. Skip only this recipe when its mix
+        // table already has qty/lot/remarks — do not abort sibling recipes (IR1 /
+        // Hemcoat premix + final mix must both hydrate in one pass).
+        const current = valueRef.current || {};
+        const existingByRecipe: Record<string, any[]> = {
+          [POST_CURE_RECIPE_TYPES.LOOSE_FLAP_EPOXY]:
+            current.looseFlapEpoxyPreparation?.preparationDetails ?? [],
+          [POST_CURE_RECIPE_TYPES.IR1_PREMIX]: current.ir1Premix?.ir1PremixTable ?? [],
+          [POST_CURE_RECIPE_TYPES.IR1_FINAL_MIX]: current.ir1FinalMix?.ir1FinalMixTable ?? [],
+          [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_PREMIX]:
+            current.hemcoat3kPreparation?.premixPreparationTable ?? [],
+          [POST_CURE_RECIPE_TYPES.HEMCOAT_3K_FINAL_MIX]:
+            current.hemcoat3kFinalMix?.finalMixTable ?? [],
+        };
+        const existing = existingByRecipe[pair.recipeType] ?? [];
+        if (postCureIngredientRowsHaveUserInput(existing, pair.qtyKey)) {
+          continue;
+        }
+        const next = buildPostCureIngredientRowsFromApi(result.data, pair.qtyKey, existing);
         if (next.length) pair.apply(next);
       }
       if (gen === ingredientsFetchGenRef.current) {
@@ -1785,9 +1826,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Date of Preparation" required />
+              <FieldLabelWithAsterisk label="Date & Time of Preparation" required />
               <Box data-qc-field={"looseFlapEpoxyPreparation.epoxyPreparationDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.looseFlapEpoxyPreparation?.epoxyPreparationDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("looseFlapEpoxyPreparation.epoxyPreparationDate");
@@ -1796,7 +1837,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
                       epoxyPreparationDate: val,
                     });
                   }}
-                  error={Boolean(validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"])}
+                  error={Boolean(
+                    validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"],
+                  )}
                   helperText={validationErrors["looseFlapEpoxyPreparation.epoxyPreparationDate"]}
                   disabled={disabled}
                   readOnly={readOnly}
@@ -1900,9 +1943,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Premix Date" required />
+              <FieldLabelWithAsterisk label="Premix Date & Time" required />
               <Box data-qc-field={"ir1Premix.ir1PremixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.ir1Premix?.ir1PremixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("ir1Premix.ir1PremixDate");
@@ -1954,13 +1997,16 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Final Mix Date" required />
+              <FieldLabelWithAsterisk label="Final Mix Date & Time" required />
               <Box data-qc-field={"ir1FinalMix.ir1FinalMixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.ir1FinalMix?.ir1FinalMixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("ir1FinalMix.ir1FinalMixDate");
-                    updateSubSection("ir1FinalMix", { ...value?.ir1FinalMix, ir1FinalMixDate: val });
+                    updateSubSection("ir1FinalMix", {
+                      ...value?.ir1FinalMix,
+                      ir1FinalMixDate: val,
+                    });
                   }}
                   error={Boolean(validationErrors["ir1FinalMix.ir1FinalMixDate"])}
                   helperText={validationErrors["ir1FinalMix.ir1FinalMixDate"]}
@@ -2040,9 +2086,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Premix Date" required />
+              <FieldLabelWithAsterisk label="Premix Date & Time" required />
               <Box data-qc-field={"hemcoat3kPreparation.hemcoatPremixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.hemcoat3kPreparation?.hemcoatPremixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("hemcoat3kPreparation.hemcoatPremixDate");
@@ -2100,9 +2146,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Final Mix Date" required />
+              <FieldLabelWithAsterisk label="Final Mix Date & Time" required />
               <Box data-qc-field={"hemcoat3kFinalMix.hemcoatFinalMixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.hemcoat3kFinalMix?.hemcoatFinalMixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("hemcoat3kFinalMix.hemcoatFinalMixDate");
@@ -2192,9 +2238,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Premix Date" required />
+              <FieldLabelWithAsterisk label="Premix Date & Time" required />
               <Box data-qc-field={"othersPremix.othersPremixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.othersPremix?.othersPremixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("othersPremix.othersPremixDate");
@@ -2251,9 +2297,9 @@ export const PostCureMotorPanel: React.FC<any> = ({
               />
             </Box>
             <Box>
-              <FieldLabelWithAsterisk label="Final Mix Date" required />
+              <FieldLabelWithAsterisk label="Final Mix Date & Time" required />
               <Box data-qc-field={"othersFinalMix.othersFinalMixDate"}>
-                <DateField
+                <DateTimeField
                   value={value?.othersFinalMix?.othersFinalMixDate ?? ""}
                   onChange={(val: any) => {
                     clearFieldError?.("othersFinalMix.othersFinalMixDate");

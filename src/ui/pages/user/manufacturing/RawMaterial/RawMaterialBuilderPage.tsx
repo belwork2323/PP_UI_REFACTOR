@@ -78,6 +78,8 @@ const RawMaterialBuilderForm = ({
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
   validationFocusRequest = null,
+  preferredPremixNo = null,
+  onPreferredPremixNoChange,
 }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
   const groups = Array.isArray(premixGroups) ? premixGroups : [];
@@ -92,8 +94,18 @@ const RawMaterialBuilderForm = ({
       setActiveMaterialIndex(0);
       return;
     }
+    const preferredNo = Number(preferredPremixNo);
+    if (Number.isFinite(preferredNo) && preferredNo > 0) {
+      const preferredIdx = groups.findIndex(
+        (group: { premix?: number }) => Number(group?.premix) === preferredNo,
+      );
+      if (preferredIdx >= 0) {
+        setActivePremixIndex(preferredIdx);
+        return;
+      }
+    }
     setActivePremixIndex((prev) => Math.min(prev, groups.length - 1));
-  }, [groups.length]);
+  }, [groups, preferredPremixNo]);
 
   /** Switch premix/material tabs to the first error; focus runs after tabs settle. */
   useEffect(() => {
@@ -108,6 +120,9 @@ const RawMaterialBuilderForm = ({
     );
     if (premixIdx >= 0) {
       setActivePremixIndex(premixIdx);
+      if (Number.isFinite(target.premixNo) && target.premixNo > 0) {
+        onPreferredPremixNoChange?.(target.premixNo);
+      }
     }
 
     const materials =
@@ -370,6 +385,10 @@ const RawMaterialBuilderForm = ({
               onActiveIndexChange={(index) => {
                 setActivePremixIndex(index);
                 setActiveMaterialIndex(0);
+                const premixNo = Number(groups[index]?.premix);
+                if (Number.isFinite(premixNo) && premixNo > 0) {
+                  onPreferredPremixNoChange?.(premixNo);
+                }
               }}
               palette={navPalette}
               showStepArrows

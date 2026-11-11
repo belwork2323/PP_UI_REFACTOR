@@ -1,3 +1,5 @@
+import type { StfBemStaticTestingDetailsApi } from "@/data/models/user/StfMotorDataModel";
+
 // ==========================================
 // PAYLOAD INTERFACES
 // ==========================================
@@ -35,47 +37,22 @@ export interface OtherBemApiListRecord {
   createdAt: string;
 }
 
-export interface ConditioningDetails {
-  fromDateTime: string;
-  toDateTime: string;
-  temperature: number;
-  rh: number;
-  observation: string;
-}
-
-export interface GrainDimensionItem {
-  side: string;
-  od: number;
-  a: number;
-  b: number;
-  c: number;
-  length: number;
-  weight: number;
-}
-
-export interface HardwareDetails {
-  headEndNo: string;
-  nozzleEndNo: string;
-  retainerRingNo: string;
-  casingNo: string;
-  casingOD: number;
-  casingID: number;
-  length: number;
-  firingNo: string;
-}
-
+/** Raw Other BEM details — nested staticTestingDetails (new BEM sheet shape). */
 export interface OtherBemDetailRawData {
+  formId?: string;
   motorId: string;
-  motorCode: string;
+  motorCode?: string;
+  bemNo?: string;
   status: string;
-  stfTestNo: string;
-  conditioningDetails: ConditioningDetails;
-  grainDimension: GrainDimensionItem[];
-  hardwareDetails: HardwareDetails;
-  createdBy: string;
-  createdOn: string;
-  updatedBy: string;
-  updatedOn: string;
+  subType?: string;
+  stfTestNo?: string;
+  staticTestingDetails?: StfBemStaticTestingDetailsApi;
+  createdBy?: string | { id?: string; fullName?: string };
+  createdOn?: string;
+  createdAt?: string;
+  updatedBy?: string | { id?: string; fullName?: string };
+  updatedOn?: string;
+  updatedAt?: string;
 }
 
 // ==========================================
@@ -116,8 +93,9 @@ export interface OtherBemApproverListRow {
   createdBy: {};
   createdOn: string;
   raw: OtherBemApiListRecord;
-  [key: string]: unknown; // <--- Add index signature here
+  [key: string]: unknown;
 }
+
 export interface OtherBemTestParameter {
   parameterId: string | number;
   parameterName: string;
@@ -127,6 +105,7 @@ export interface OtherBemTestParameter {
   result: string;
   remarks?: string;
 }
+
 export interface OtherBemDetailView {
   // Required fields expected by STFApproverDetailDialog / StfDetailView
   formId: string;
@@ -149,13 +128,12 @@ export interface OtherBemDetailView {
   // BEM Motor Specific Payload Data
   motorId: string;
   motorCode: string;
+  stfTestNo?: string;
   createdBy: string;
   createdOn: string;
   updatedBy: string;
   updatedOn: string;
-  conditioningDetails: ConditioningDetails | null;
-  grainDimension: GrainDimensionItem[];
-  hardwareDetails: HardwareDetails | null;
+  staticTestingDetails: StfBemStaticTestingDetailsApi | null;
 
   // Flexible Index Signature to satisfy any extra UI properties
   [key: string]: unknown;
@@ -164,6 +142,16 @@ export interface OtherBemDetailView {
 // ==========================================
 // MAPPERS
 // ==========================================
+
+const personLabel = (value: unknown): string => {
+  if (value == null) return "N/A";
+  if (typeof value === "string") return value || "N/A";
+  if (typeof value === "object") {
+    const record = value as { fullName?: string; id?: string };
+    return String(record.fullName ?? record.id ?? "N/A");
+  }
+  return "N/A";
+};
 
 export const mapOtherBemListRow = (row: OtherBemApiListRecord): OtherBemApproverListRow => ({
   formId: row.formId ?? "",
@@ -182,16 +170,17 @@ export const mapOtherBemListRow = (row: OtherBemApiListRecord): OtherBemApprover
 
 export const mapOtherBemDetailsForDisplay = (data: OtherBemDetailRawData): OtherBemDetailView => {
   const motorId = data?.motorId ?? "-";
-  const motorCode = data?.motorCode ?? "-";
+  const motorCode = data?.motorCode ?? data?.bemNo ?? "-";
   const stfTestNo = data?.stfTestNo ?? "-";
-  const createdBy = data?.createdBy ?? "N/A";
-  const createdOn = data?.createdOn ?? "-";
-  const updatedBy = data?.updatedBy ?? createdBy;
-  const updatedOn = data?.updatedOn ?? createdOn;
+  const createdBy = personLabel(data?.createdBy);
+  const createdOn = data?.createdOn ?? data?.createdAt ?? "-";
+  const updatedBy = personLabel(data?.updatedBy) !== "N/A" ? personLabel(data?.updatedBy) : createdBy;
+  const updatedOn = data?.updatedOn ?? data?.updatedAt ?? createdOn;
+  const staticTestingDetails = data?.staticTestingDetails ?? null;
 
   return {
     // 1. Mandatory StfDetailView properties
-    formId: motorId,
+    formId: data?.formId ?? motorId,
     batchId: motorCode,
     batchType: "BEM Motor",
     status: data?.status ?? "SUBMITTED",
@@ -206,7 +195,10 @@ export const mapOtherBemDetailsForDisplay = (data: OtherBemDetailRawData): Other
       {
         motorId,
         motorCode,
+        subType: data?.subType ?? "BEM",
+        stfTestNo,
         status: data?.status ?? "-",
+        staticTestingDetails: staticTestingDetails ?? {},
       },
     ],
     remarks: "",
@@ -216,13 +208,12 @@ export const mapOtherBemDetailsForDisplay = (data: OtherBemDetailRawData): Other
     // 2. Motor-Specific JSON Payload Fields
     motorId,
     motorCode,
+    stfTestNo,
     createdBy,
     createdOn,
     updatedBy,
     updatedOn,
-    conditioningDetails: data?.conditioningDetails ?? null,
-    grainDimension: Array.isArray(data?.grainDimension) ? data.grainDimension : [],
-    hardwareDetails: data?.hardwareDetails ?? null,
+    staticTestingDetails,
 
     // 3. Overview Section Key-Values
     overviewSections: [

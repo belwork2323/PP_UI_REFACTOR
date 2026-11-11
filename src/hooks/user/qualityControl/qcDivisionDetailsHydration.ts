@@ -46,6 +46,11 @@ import {
   createInitialDeCoringValues,
   hydrateDeCoringValuesFromSections,
 } from "./qcDeCoringTables";
+import {
+  hydrateTrimmingValuesFromMotorDetail,
+  isTrimmingNestedMotorDetail,
+  trimmingMotorDetailToSections,
+} from "./qcTrimmingTables";
 import { resolveQcSectionInhibitorType } from "./qcPostCureConfig";
 import {
   createInitialPostCureValues,
@@ -445,6 +450,30 @@ export async function hydrateQcDivisionFormFromDetails(
         entryValues[entryId] = {
           schemaValues: buildCastingValuesFromPayload(dataRec, motorId),
         };
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
+    if (division === "TRIMMING") {
+      const dataRec = asRecord(detailData) ?? {};
+      const motors = [...asArray(dataRec.trimmingDetails), ...asArray(dataRec.motors)];
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId || !isTrimmingNestedMotorDetail(rec)) continue;
+
+        const { entryId } = makeEntry(
+          "TRIMMING_MOTOR",
+          detailSubType,
+          trimmingMotorDetailToSections(rec, motorId),
+          undefined,
+          motorId,
+        );
+        entryValues[entryId] = { schemaValues: hydrateTrimmingValuesFromMotorDetail(rec) };
         createdFromNested = true;
       }
 

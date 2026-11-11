@@ -104,7 +104,7 @@ const DoaFormatSection = ({
       ) : null}
       <Box>
         <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-          Date/ Time of dispatch
+          Date & Time Of Dispatch
         </Typography>
         <DateTimeField
           value={dispatchDatetime}

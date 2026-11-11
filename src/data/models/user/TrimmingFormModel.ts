@@ -1,7 +1,16 @@
-import { mapTrimmingMotorStage, resolveTrimmingMotorStageNumber } from "@/data/models/user/trimmingMotorStage";
+import {
+  mapTrimmingMotorStage,
+  resolveTrimmingMotorStageNumber,
+} from "@/data/models/user/trimmingMotorStage";
 import { SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
-import { isFileReady, isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../common/FileUploadModel";
+import {
+  isFileReady,
+  isFileUploadIncomplete,
+  parseFileRefs,
+  toFileIdListPayload,
+  type FileRef,
+} from "../common/FileUploadModel";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
@@ -9,6 +18,7 @@ import {
 import { formatPrepSectionLabel } from "./RawMaterialPreparationModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
+import { toApiDateTime, toUiDateTime } from "./castingCuringFieldCodec";
 
 const TRIMMING_SECTION_LABELS: Record<string, string> = {
   TRIMMING_DETAILS: "Trimming Details",
@@ -24,15 +34,21 @@ const TRIMMING_DETAILS_COLUMN_ORDER = [
   "completionDate",
   "arborSize",
   "cutterSize",
+  "ingestSize",
+  "motorTruing",
+  "arborTuring",
   "remarks",
 ] as const;
 
 const TRIMMING_DETAILS_COLUMN_LABELS: Record<string, string> = {
   machineDetails: "Machine Details",
-  startDate: "Start Date",
-  completionDate: "Completion Date",
+  startDate: "Start Date & Time",
+  completionDate: "Completion Date & Time",
   arborSize: "Arbor Size",
   cutterSize: "Cutter Size",
+  ingestSize: "Ingest Size",
+  motorTruing: "Motor Truing",
+  arborTuring: "Arbor Turing",
   remarks: "Remarks",
 };
 
@@ -70,8 +86,7 @@ const isTrimmingFileRefList = (value: unknown): boolean =>
   value.some((entry) => isTrimmingFileRefLike(entry) || typeof entry === "string");
 
 const resolveReportDisplayValue = (row: Record<string, unknown>): unknown => {
-  const raw =
-    row.reportFiles ?? row.reportFile ?? row.reportLink ?? row.reportFiles ?? undefined;
+  const raw = row.reportFiles ?? row.reportFile ?? row.reportLink ?? row.reportFiles ?? undefined;
   if (isTrimmingFileRefList(raw) || isTrimmingFileRefLike(raw)) {
     return raw;
   }
@@ -107,7 +122,12 @@ export const parseTrimmingSectionData = (
       .map((row) => {
         const next: Record<string, unknown> = {};
         TRIMMING_DETAILS_COLUMN_ORDER.forEach((key) => {
-          if (row[key] != null) next[key] = row[key];
+          if (row[key] != null) {
+            next[key] =
+              key === "startDate" || key === "completionDate"
+                ? toUiDateTime(row[key])
+                : row[key];
+          }
         });
         return next;
       })
@@ -317,7 +337,7 @@ export const isTrimmingMotorApproverActionable = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+  return normalized === "WAITING_FOR_APPROVAL";
 };
 
 /** Entire form can be approved/rejected once ready for complete approval. */
@@ -340,10 +360,7 @@ export const canApproverActionEntireTrimmingForm = (params: {
     return false;
   }
 
-  if (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  ) {
+  if (statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL) {
     return true;
   }
 
@@ -465,6 +482,9 @@ export type TrimmingDetailsRow = {
   completionDate: string;
   arborSize: string;
   cutterSize: string;
+  ingestSize: string;
+  motorTruing: string;
+  arborTuring: string;
   remarks: string;
   /** QC Division QA Remarks column (API: qaRemarks). */
   qaRemarks?: string;
@@ -576,6 +596,9 @@ const createDefaultTrimmingDetailsRows = (): TrimmingDetailsRow[] => [
     completionDate: "",
     arborSize: "",
     cutterSize: "",
+    arborTuring: "",
+    ingestSize: "",
+    motorTruing: "",
     remarks: "",
     qaRemarks: "",
   },
@@ -655,17 +678,19 @@ export const mapTrimmingDetailsToFormState = (
         motorStage: resolveTrimmingMotorStageNumber({
           motorStage: motor?.motorStage ?? motorStage,
         }),
-        motorReceivedAt: String(motor?.motorReceivedAt ?? "").trim(),
+        motorReceivedAt: toUiDateTime(motor?.motorReceivedAt),
         savedSections: motorSections.length > 0 ? motorSections : undefined,
-        trimmingDetails:
-          (detailsSection?.sectionData as TrimmingDetailsRow[]) ??
-          createDefaultTrimmingDetailsRows(),
+        trimmingDetails: Array.isArray(detailsSection?.sectionData)
+          ? (detailsSection.sectionData as TrimmingDetailsRow[]).map((row) => ({
+              ...row,
+              startDate: toUiDateTime(row.startDate),
+              completionDate: toUiDateTime(row.completionDate),
+            }))
+          : createDefaultTrimmingDetailsRows(),
         commonFormatParameters:
           (commonSection?.sectionData as TrimmingCommonFormatParameter[]) ??
           createDefaultCommonFormatParameters(),
-        drawingDescription: String(
-          drawingData.description ?? drawingData.drawingDescription ?? "",
-        ),
+        drawingDescription: String(drawingData.description ?? drawingData.drawingDescription ?? ""),
         drawingFiles: parseFileRefs(
           drawingData.drawingFiles ?? drawingData.drawingFile ?? drawingData.drawingImage,
         ),
@@ -719,7 +744,14 @@ export const mapTrimmingFormStateToPayload = (
 
       // 1. Trimming Details
       if (motor.trimmingDetails?.length) {
-        sections.push({ sectionId: "TRIMMING_DETAILS", sectionData: motor.trimmingDetails });
+        sections.push({
+          sectionId: "TRIMMING_DETAILS",
+          sectionData: motor.trimmingDetails.map((row) => ({
+            ...row,
+            startDate: toApiDateTime(row.startDate) ?? "",
+            completionDate: toApiDateTime(row.completionDate) ?? "",
+          })),
+        });
       }
 
       // 2. Trimming Common Format
@@ -748,11 +780,7 @@ export const mapTrimmingFormStateToPayload = (
       // 4. Trimming Remarks & File Upload
       const readyReportFiles = toFileIdListPayload(motor.reportFiles ?? []);
       const legacyReportLink = String(motor.reportLink ?? "").trim();
-      if (
-        motor.motorRemarks?.trim() ||
-        readyReportFiles.length ||
-        legacyReportLink
-      ) {
+      if (motor.motorRemarks?.trim() || readyReportFiles.length || legacyReportLink) {
         const remarksPayload: Record<string, unknown> = {
           remarks: motor.motorRemarks ?? "",
         };
@@ -772,7 +800,7 @@ export const mapTrimmingFormStateToPayload = (
       return {
         motorId: motor.motorId,
         motorStage: motor.motorStage,
-        motorReceivedAt: motor.motorReceivedAt,
+        motorReceivedAt: toApiDateTime(motor.motorReceivedAt) ?? "",
         sections,
         ...(options?.motorSubmissionType
           ? { motorSubmissionType: options.motorSubmissionType }
@@ -851,22 +879,19 @@ export const collectTrimmingFileRefsFromForm = (form: {
   return refs;
 };
 
-export const hasIncompleteTrimmingUploads = (form: {
-  motors?: TrimmingMotorSession[];
-}): boolean =>
+export const hasIncompleteTrimmingUploads = (form: { motors?: TrimmingMotorSession[] }): boolean =>
   collectTrimmingFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromTrimmingForm = (form: {
   motors?: TrimmingMotorSession[];
-}): string[] =>
-  [
-    ...new Set(
-      collectTrimmingFileRefsFromForm(form)
-        .filter((ref) => ref.isTemp !== false)
-        .map((ref) => String(ref.fileId ?? "").trim())
-        .filter(Boolean),
-    ),
-  ];
+}): string[] => [
+  ...new Set(
+    collectTrimmingFileRefsFromForm(form)
+      .filter((ref) => ref.isTemp !== false)
+      .map((ref) => String(ref.fileId ?? "").trim())
+      .filter(Boolean),
+  ),
+];
 
 /** Build final-approval payload from latest saved form details (all motors). */
 export const mapTrimmingDetailsFromSavedForm = (
@@ -978,7 +1003,7 @@ export const mapTrimmingDetailsForDisplay = (
       return {
         motorId,
         motorStageLabel: mapTrimmingMotorStage(motorStage),
-        motorReceivedAt: String(src.motorReceivedAt ?? entry.motorReceivedAt ?? "").trim(),
+        motorReceivedAt: toUiDateTime(src.motorReceivedAt ?? entry.motorReceivedAt),
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
           normalizeTrimmingMotorSubmissionType(entry.motorSubmissionType),
@@ -1008,8 +1033,7 @@ export const mapTrimmingDetailsForDisplay = (
   });
 
   const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
-    | Partial<TrimmingMotorCounts>
-    | undefined;
+    Partial<TrimmingMotorCounts> | undefined;
 
   return {
     formId: String(details.formId ?? data.formId ?? ""),

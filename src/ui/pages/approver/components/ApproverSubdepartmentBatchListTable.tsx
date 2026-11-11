@@ -33,6 +33,7 @@ import {
   uniformTableBodyCellSx,
   uniformTableHeaderCellSx,
 } from "@app/theme/custom_themes/shared/data_table_theme";
+import { formatDisplayDateTime } from "@/utils/dateUtils";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -66,13 +67,6 @@ export type ApproverSubdepartmentBatchListTableProps = {
   primaryColor?: string;
   /** When true, approved batches also show an enabled View Details button. */
   allowViewDetailsWhenApproved?: boolean;
-};
-
-const formatCreatedOn = (value?: string) => {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
 const headerCellSx = (accentMain: string, accentLight: string) =>
@@ -209,7 +203,7 @@ const ApproverSubdepartmentBatchListTable = ({
                   <TableCell
                     sx={{ ...tdSx, color: textSubColor, fontSize: "0.76rem", whiteSpace: "nowrap" }}
                   >
-                    {formatCreatedOn(row.createdOn)}
+                    {formatDisplayDateTime(row.createdOn)}
                   </TableCell>
                   <TableCell sx={tdSx}>
                     <Chip

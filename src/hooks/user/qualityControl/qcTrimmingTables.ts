@@ -11,7 +11,7 @@ import {
   toFileIdListPayload,
   type FileRef,
 } from "../../../data/models/common/FileUploadModel";
-import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
+import { toApiDateTime, toUiDateTime } from "../../../data/models/user/castingCuringFieldCodec";
 import { QC_TRIMMING_SECTION_IDS } from "./qcTrimmingConfig";
 
 export type QcTrimmingMotorSubmissionType = "DRAFT" | "SUBMIT";
@@ -69,6 +69,9 @@ const createDefaultTrimmingDetailsRows = (): TrimmingDetailsRow[] => [
     completionDate: "",
     arborSize: "",
     cutterSize: "",
+    ingestSize: "",
+    motorTruing: "",
+    arborTuring: "",
     remarks: "",
     qaRemarks: "",
   },
@@ -209,10 +212,13 @@ export const hydrateTrimmingValuesFromSections = (
     .filter(Boolean)
     .map((row) => ({
       machineDetails: String(row!.machineDetails ?? "").trim(),
-      startDate: String(row!.startDate ?? "").trim(),
-      completionDate: String(row!.completionDate ?? "").trim(),
+      startDate: toTrimmingUiMotorReceivedAt(String(row!.startDate ?? "")),
+      completionDate: toTrimmingUiMotorReceivedAt(String(row!.completionDate ?? "")),
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
+      ingestSize: String(row!.ingestSize ?? "").trim(),
+      motorTruing: String(row!.motorTruing ?? "").trim(),
+      arborTuring: String(row!.arborTuring ?? "").trim(),
       remarks: String(row!.remarks ?? "").trim(),
       qaRemarks: String(row!.qaRemarks ?? "").trim(),
     }));
@@ -254,18 +260,18 @@ export const hydrateTrimmingValuesFromSections = (
   });
 };
 
-/** UI datetime/date → API `motorReceivedDate` (`YYYY-MM-DD`). */
+/** UI `DD-MM-YYYY HH:mm` → API local datetime (`YYYY-MM-DDTHH:mm:ss`), manufacturing Trimming parity. */
 export const toTrimmingApiMotorReceivedDate = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  return formatToIsoDateInput(raw);
+  return toApiDateTime(raw) ?? "";
 };
 
-/** API `motorReceivedDate` / datetime → UI date (`DD-MM-YYYY`, no time). */
+/** API datetime / date → UI `DD-MM-YYYY HH:mm` (the field is a date-time picker). */
 export const toTrimmingUiMotorReceivedAt = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  return formatToUiDate(raw) || raw;
+  return toUiDateTime(raw) || raw;
 };
 
 export const toTrimmingApiMotorStage = (value: unknown): number | undefined => {
@@ -284,6 +290,9 @@ const operationRowHasData = (row: TrimmingDetailsRow) =>
     row.completionDate,
     row.arborSize,
     row.cutterSize,
+    row.ingestSize,
+    row.motorTruing,
+    row.arborTuring,
     row.remarks,
     row.qaRemarks,
   ].some(hasValue);
@@ -301,6 +310,9 @@ export const buildTrimmingOperationDetailsPayload = (
         completionDate: toTrimmingApiMotorReceivedDate(row.completionDate) || undefined,
         arborSize: String(row.arborSize ?? "").trim() || undefined,
         cutterSize: String(row.cutterSize ?? "").trim() || undefined,
+        ingestSize: String(row.ingestSize ?? "").trim() || undefined,
+        motorTruing: String(row.motorTruing ?? "").trim() || undefined,
+        arborTuring: String(row.arborTuring ?? "").trim() || undefined,
         remarks: String(row.remarks ?? "").trim() || undefined,
         qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
       }),
@@ -315,12 +327,13 @@ export const hydrateTrimmingDetailsFromOperationDetails = (
     .filter(Boolean)
     .map((row) => ({
       machineDetails: String(row!.machineDetails ?? "").trim(),
-      startDate: formatToUiDate(String(row!.startDate ?? "").trim()) || String(row!.startDate ?? "").trim(),
-      completionDate:
-        formatToUiDate(String(row!.completionDate ?? "").trim()) ||
-        String(row!.completionDate ?? "").trim(),
+      startDate: toTrimmingUiMotorReceivedAt(String(row!.startDate ?? "")),
+      completionDate: toTrimmingUiMotorReceivedAt(String(row!.completionDate ?? "")),
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
+      ingestSize: String(row!.ingestSize ?? "").trim(),
+      motorTruing: String(row!.motorTruing ?? "").trim(),
+      arborTuring: String(row!.arborTuring ?? "").trim(),
       remarks: String(row!.remarks ?? "").trim(),
       qaRemarks: String(row!.qaRemarks ?? "").trim(),
     }))

@@ -25,7 +25,7 @@ import {
   type RmpMaterialUiKey,
   type RmpProcessSlot,
 } from "./rmp/rmpMaterialUiRegistry";
-import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import { formatDisplayDateOrDateTime, formatToIsoDateInput } from "../../../utils/dateUtils";
 import { OPERATION_STATUS, formatApiStatusForDisplay } from "../../../hooks/operationStatus";
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
 import { formatDateTimeForApi, toCamelCaseKey } from "./rawMaterialPreparationApiMapper";
@@ -322,11 +322,14 @@ export const resolveWeightmentPremixMeta = (
 const formatDateTimeLocal = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/.test(raw)) return raw;
+  const dmyDateTime = raw.match(/^(\d{2}-\d{2}-\d{4} \d{2}:\d{2})(?::(\d{2}))?$/);
+  if (dmyDateTime) {
+    return dmyDateTime[2] ? `${dmyDateTime[1]}:${dmyDateTime[2]}` : dmyDateTime[1];
+  }
 
   const pad = (part: number) => String(part).padStart(2, "0");
   const toUiFormat = (date: Date) =>
-    `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) {
     const date = new Date(raw.length === 16 ? `${raw}:00` : raw);
@@ -1752,7 +1755,9 @@ export const formatPrepSectionCellValue = (value: unknown): string => {
       )
       .join("; ");
   }
-  return String(unwrapped);
+  return typeof unwrapped === "string"
+    ? formatDisplayDateOrDateTime(unwrapped, unwrapped)
+    : String(unwrapped);
 };
 
 /** Expand nested repeat/table blocks (e.g. FEED_LOTS) into flat table rows for read-only views. */
@@ -1829,7 +1834,7 @@ export const collectPrepSectionNestedTableRows = (
     return isPrepSectionNestedTableValue(nested) ? nested : [];
   });
 
-const mapProcessSections = (
+export const mapProcessSections = (
   process: PreparationProcessEntry,
 ): RawMaterialPrepApproverProcessView => {
   const typedSections = typedProcessToDisplaySections(process).filter(

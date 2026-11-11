@@ -48,6 +48,7 @@ const TrimmingPage = () => {
     handleSaveMotorDraft,
     handleSubmitMotor,
     motorValidationErrors,
+    validationFocusRequest,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -98,6 +99,7 @@ const TrimmingPage = () => {
               setMotorSubmitConfirmOpen(true);
             }}
             motorValidationErrors={motorValidationErrors}
+            validationFocusRequest={validationFocusRequest}
             theme={theme}
           />
 

@@ -272,13 +272,15 @@ const ApGradeMaterialProcessPanel = ({
             >
               <Box>
                 <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-                  Start Date/ Time
+                  Start Date & Time
                 </Typography>
                 <DateTimeField
                   value={aligned.grindingStartDatetime}
                   onChange={(v) => patchFine({ grindingStartDatetime: v })}
                   disabled={disabled}
                   compact
+                  error={Boolean(validationErrors?.grindingStartDatetime)}
+                  helperText={validationErrors?.grindingStartDatetime}
                 />
               </Box>
               <Box>
@@ -288,8 +290,11 @@ const ApGradeMaterialProcessPanel = ({
                 <DateTimeField
                   value={aligned.grindingEndDatetime}
                   onChange={(v) => patchFine({ grindingEndDatetime: v })}
+                  minDate={aligned.grindingStartDatetime}
                   disabled={disabled}
                   compact
+                  error={Boolean(validationErrors?.grindingEndDatetime)}
+                  helperText={validationErrors?.grindingEndDatetime}
                 />
               </Box>
             </Box>
@@ -445,13 +450,15 @@ const ApGradeMaterialProcessPanel = ({
             >
               <Box>
                 <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-                  Start Date/ Time
+                  Start Date & Time
                 </Typography>
                 <DateTimeField
                   value={aligned.grindingStartDatetime}
                   onChange={(v) => patchUltra({ grindingStartDatetime: v })}
                   disabled={disabled}
                   compact
+                  error={Boolean(validationErrors?.grindingStartDatetime)}
+                  helperText={validationErrors?.grindingStartDatetime}
                 />
               </Box>
               <Box>
@@ -461,8 +468,11 @@ const ApGradeMaterialProcessPanel = ({
                 <DateTimeField
                   value={aligned.grindingEndDatetime}
                   onChange={(v) => patchUltra({ grindingEndDatetime: v })}
+                  minDate={aligned.grindingStartDatetime}
                   disabled={disabled}
                   compact
+                  error={Boolean(validationErrors?.grindingEndDatetime)}
+                  helperText={validationErrors?.grindingEndDatetime}
                 />
               </Box>
             </Box>
@@ -566,13 +576,15 @@ const ApGradeMaterialProcessPanel = ({
           >
             <Box>
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-                Start Date/ Time
+                Start Date & Time
               </Typography>
               <DateTimeField
                 value={aligned.startDatetime}
                 onChange={(v) => patchAluminum({ startDatetime: v })}
                 disabled={disabled}
                 compact
+                error={Boolean(validationErrors?.startDatetime)}
+                helperText={validationErrors?.startDatetime}
               />
             </Box>
             <Box>
@@ -582,8 +594,11 @@ const ApGradeMaterialProcessPanel = ({
               <DateTimeField
                 value={aligned.endDatetime}
                 onChange={(v) => patchAluminum({ endDatetime: v })}
+                minDate={aligned.startDatetime}
                 disabled={disabled}
                 compact
+                error={Boolean(validationErrors?.endDatetime)}
+                helperText={validationErrors?.endDatetime}
               />
             </Box>
           </Box>
@@ -616,7 +631,7 @@ const ApGradeMaterialProcessPanel = ({
           />
           <Box>
             <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-              Date/ Time of dispatch
+              Date & Time Of Dispatch
             </Typography>
             <DateTimeField
               value={aligned.dispatchDatetime}

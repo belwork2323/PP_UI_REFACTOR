@@ -2,10 +2,8 @@ import {
   compactRecord,
   isLegacySectionArray,
   pickField,
-  toApiDate,
   toApiDateTime,
   toApiNumber,
-  toApiTime,
   toUiDate,
   toUiDateTime,
   toUiTime,
@@ -37,7 +35,10 @@ export type CuringCycleRow = {
   START_TIME: string;
   END_DATE: string;
   END_TIME: string;
-  PROPELLANT_PRESSURE: string;
+  PROPELLANT_PRESSURE: {
+    READING1: string;
+    READING2: string;
+  };
   HOT_WATER_STATUS: HotWaterStatusValue | string;
   REMARKS: string;
 };
@@ -55,8 +56,10 @@ export type CuringMotorData = {
     DECORING_DATE: string;
     BUILDING_NO: string;
     DECORING_LOAD: string;
+    PROPELLANT_TEMPERATURE: string;
+    RH: string;
+    MANDREL_WEIGHT: string;
     DECORING_REMARKS: string;
-    /** Eager file-service refs (Case Prep / RMS / RMC parity). */
     DECORING_VISUAL_OBSERVATION: FileRef[];
   };
 };
@@ -102,7 +105,10 @@ export const createEmptyCuringCycleRow = (srNo: number | string = 1): CuringCycl
   START_TIME: "",
   END_DATE: "",
   END_TIME: "",
-  PROPELLANT_PRESSURE: "",
+  PROPELLANT_PRESSURE: {
+    READING1: "",
+    READING2: "",
+  },
   HOT_WATER_STATUS: "",
   REMARKS: "",
 });
@@ -127,6 +133,9 @@ export const createEmptyCuringMotorData = (): CuringMotorData => ({
     BUILDING_NO: "",
     DECORING_LOAD: "",
     DECORING_REMARKS: "",
+    MANDREL_WEIGHT: "",
+    PROPELLANT_TEMPERATURE: "",
+    RH: "",
     DECORING_VISUAL_OBSERVATION: [],
   },
 });
@@ -169,12 +178,19 @@ const curingCycleRowsForPayload = (rows: CuringCycleRow[]): Record<string, unkno
         srNo: Number(row.srNo) || index + 1,
         temperature: toApiNumber(row.TEMPERATURE),
         time: toApiNumber(row.TIME),
-        startDate: toApiDate(row.START_DATE),
-        startTime: toApiTime(row.START_TIME),
-        endDate: toApiDate(row.END_DATE),
-        endTime: toApiTime(row.END_TIME),
+        startDateTime:
+          row.START_DATE && row.START_TIME
+            ? toApiDateTime(`${row.START_DATE} ${row.START_TIME}`)
+            : undefined,
+        endDateTime:
+          row.END_DATE && row.END_TIME
+            ? toApiDateTime(`${row.END_DATE} ${row.END_TIME}`)
+            : undefined,
         hotWaterStatus: str(row.HOT_WATER_STATUS).trim() || undefined,
-        propellantPressure: toApiNumber(row.PROPELLANT_PRESSURE),
+        propellantPressure: compactRecord({
+          reading1: toApiNumber(row.PROPELLANT_PRESSURE?.READING1),
+          reading2: toApiNumber(row.PROPELLANT_PRESSURE?.READING2),
+        }),
         remarks: str(row.REMARKS).trim() || undefined,
       }),
     )
@@ -194,9 +210,12 @@ export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSection
     decoringDispatchDateTime: toApiDateTime(data.POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME),
   }),
   decoringDetails: compactRecord({
-    decoringDate: toApiDate(data.DECORING_DETAILS.DECORING_DATE),
+    decoringDate: toApiDateTime(data.DECORING_DETAILS.DECORING_DATE),
     buildingNo: str(data.DECORING_DETAILS.BUILDING_NO).trim() || undefined,
     decoringLoad: toApiNumber(data.DECORING_DETAILS.DECORING_LOAD),
+    rh: toApiNumber(data.DECORING_DETAILS.RH),
+    mandrelWeight: toApiNumber(data.DECORING_DETAILS.MANDREL_WEIGHT),
+    propellantTemperature: toApiNumber(data.DECORING_DETAILS.PROPELLANT_TEMPERATURE),
     decoringRemarks: str(data.DECORING_DETAILS.DECORING_REMARKS).trim() || undefined,
     decoringVisualObservation: (() => {
       const files = toFileIdListPayload(data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION);
@@ -231,17 +250,61 @@ const resolveCuringSection = (
   return asRecord(nested[camelKey]) ?? asRecord(nested[snakeKey]) ?? {};
 };
 
+const parsePropellantPressureValues = (value: unknown): { READING1: string; READING2: string } => {
+  const pressureObj = asRecord(value) ?? {};
+  const direct1 = str(pickField(pressureObj, "reading1", "READING1") ?? "");
+  const direct2 = str(pickField(pressureObj, "reading2", "READING2") ?? "");
+  if (direct1 || direct2) {
+    return { READING1: direct1, READING2: direct2 };
+  }
+
+  const text = str(value).trim();
+  if (!text) return { READING1: "", READING2: "" };
+
+  const label1 = text.match(/(?:reading1|READING1)[^0-9+-]*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)/i);
+  const label2 = text.match(/(?:reading2|READING2)[^0-9+-]*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)/i);
+  if (label1 || label2) {
+    return {
+      READING1: label1?.[1] ?? "",
+      READING2: label2?.[1] ?? "",
+    };
+  }
+
+  const numbers = Array.from(text.matchAll(/[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?/g)).map(
+    (match) => match[0],
+  );
+  return {
+    READING1: numbers[0] ?? "",
+    READING2: numbers[1] ?? "",
+  };
+};
+
 const parseCuringCycleRow = (item: unknown, index: number): CuringCycleRow => {
   const row = asRecord(item) ?? {};
+  const pressureValues = parsePropellantPressureValues(
+    pickField(row, "propellantPressure", "PROPELLANT_PRESSURE"),
+  );
+  const pressureObj = asRecord(pickField(row, "propellantPressure", "PROPELLANT_PRESSURE")) ?? {};
+  const startDateTime = toUiDateTime(pickField(row, "startDateTime", "START_DATE_TIME") ?? "");
+  const endDateTime = toUiDateTime(pickField(row, "endDateTime", "END_DATE_TIME") ?? "");
+  const splitDateTime = (value: string) => {
+    const [date = "", time = ""] = value.split(" ");
+    return { date, time };
+  };
+  const startParts = splitDateTime(startDateTime);
+  const endParts = splitDateTime(endDateTime);
   return {
     srNo: str(pickField(row, "srNo", "SR_NO") ?? index + 1),
     TEMPERATURE: str(pickField(row, "temperature", "TEMPERATURE") ?? ""),
     TIME: str(pickField(row, "time", "durationMinutes", "DURATION", "TIME") ?? ""),
-    START_DATE: toUiDate(pickField(row, "startDate", "START_DATE") ?? ""),
-    START_TIME: toUiTime(pickField(row, "startTime", "START_TIME") ?? ""),
-    END_DATE: toUiDate(pickField(row, "endDate", "END_DATE") ?? ""),
-    END_TIME: toUiTime(pickField(row, "endTime", "END_TIME") ?? ""),
-    PROPELLANT_PRESSURE: str(pickField(row, "propellantPressure", "PROPELLANT_PRESSURE") ?? ""),
+    START_DATE: startParts.date || toUiDate(pickField(row, "startDate", "START_DATE") ?? ""),
+    START_TIME: startParts.time || toUiTime(pickField(row, "startTime", "START_TIME") ?? ""),
+    END_DATE: endParts.date || toUiDate(pickField(row, "endDate", "END_DATE") ?? ""),
+    END_TIME: endParts.time || toUiTime(pickField(row, "endTime", "END_TIME") ?? ""),
+    PROPELLANT_PRESSURE: {
+      READING1: pressureValues.READING1,
+      READING2: pressureValues.READING2,
+    },
     HOT_WATER_STATUS: str(
       pickField(row, "hotWaterStatus", "HOT_WATER_STATUS", "hotWaterCirculation") ?? "",
     ),
@@ -266,7 +329,6 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
   const tableRows = asArray(pickField(cycles, "curingTable", "CURING_TABLE")).map(
     parseCuringCycleRow,
   );
-
   return {
     CURING_CYCLES: {
       CURING_TABLE: tableRows.length ? tableRows : empty.CURING_CYCLES.CURING_TABLE,
@@ -288,24 +350,26 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
       ),
     },
     DECORING_DETAILS: {
-      DECORING_DATE: toUiDate(pickField(decor, "decoringDate", "DECORING_DATE") ?? ""),
+      DECORING_DATE: toUiDateTime(pickField(decor, "decoringDate", "DECORING_DATE") ?? ""),
       BUILDING_NO: str(pickField(decor, "buildingNo", "BUILDING_NO") ?? ""),
       DECORING_LOAD: str(pickField(decor, "decoringLoad", "DECORING_LOAD") ?? ""),
       DECORING_REMARKS: str(pickField(decor, "decoringRemarks", "DECORING_REMARKS") ?? ""),
+      MANDREL_WEIGHT: str(pickField(decor, "mandrelWeight", "MANDREL_WEIGHT") ?? ""),
+      PROPELLANT_TEMPERATURE: str(
+        pickField(
+          decor,
+          "propellantTemperature",
+          "propellantTemparature",
+          "PROPELLANT_TEMPERATURE",
+        ) ?? "",
+      ),
+      RH: str(pickField(decor, "rh", "RH") ?? ""),
       DECORING_VISUAL_OBSERVATION: parseFileRefs(
         pickField(decor, "decoringVisualObservation", "DECORING_VISUAL_OBSERVATION"),
       ),
     },
   };
 };
-
-/** @deprecated Use parseCuringMotorDataFromApi */
-export const parseCuringMotorDataFromSections = parseCuringMotorDataFromApi;
-
-/**
- * Replace CURING_TABLE from curing-cycles API mapped rows (partials accepted).
- * Accepts either schema-shaped keys or CuringCycleConfig field names.
- */
 export const applyCuringCycleConfigRows = (
   data: CuringMotorData,
   rowsFromConfig: Array<Partial<CuringCycleRow> & Record<string, unknown>>,
@@ -319,6 +383,9 @@ export const applyCuringCycleConfigRows = (
 
   const CURING_TABLE = rowsFromConfig.map((row, index) => {
     const base = createEmptyCuringCycleRow(index + 1);
+    const pressureValues = parsePropellantPressureValues(
+      row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? {},
+    );
     return {
       ...base,
       srNo: str(row.srNo ?? row.SR_NO ?? row.sequenceNo ?? index + 1),
@@ -328,9 +395,10 @@ export const applyCuringCycleConfigRows = (
       START_TIME: toUiTime(row.START_TIME ?? row.startTime ?? base.START_TIME),
       END_DATE: toUiDate(row.END_DATE ?? row.endDate ?? base.END_DATE),
       END_TIME: toUiTime(row.END_TIME ?? row.endTime ?? base.END_TIME),
-      PROPELLANT_PRESSURE: str(
-        row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? base.PROPELLANT_PRESSURE,
-      ),
+      PROPELLANT_PRESSURE: {
+        READING1: pressureValues.READING1 || base.PROPELLANT_PRESSURE.READING1,
+        READING2: pressureValues.READING2 || base.PROPELLANT_PRESSURE.READING2,
+      },
       HOT_WATER_STATUS: str(
         row.HOT_WATER_STATUS ?? row.hotWaterCirculation ?? base.HOT_WATER_STATUS,
       ),
@@ -362,6 +430,9 @@ export const mergeCuringCycleConfigRows = (
   const CURING_TABLE = rowsFromConfig.map((row, index) => {
     const base = createEmptyCuringCycleRow(index + 1);
     const srNo = str(row.srNo ?? row.SR_NO ?? row.sequenceNo ?? index + 1);
+    const pressureValues = parsePropellantPressureValues(
+      row.propellantPressure ?? row.PROPELLANT_PRESSURE ?? {},
+    );
     const fromMaster: CuringCycleRow = {
       ...base,
       srNo,
@@ -371,9 +442,11 @@ export const mergeCuringCycleConfigRows = (
       START_TIME: toUiTime(row.START_TIME ?? row.startTime ?? base.START_TIME),
       END_DATE: toUiDate(row.END_DATE ?? row.endDate ?? base.END_DATE),
       END_TIME: toUiTime(row.END_TIME ?? row.endTime ?? base.END_TIME),
-      PROPELLANT_PRESSURE: str(
-        row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? base.PROPELLANT_PRESSURE,
-      ),
+      PROPELLANT_PRESSURE: {
+        READING1: pressureValues.READING1 || base.PROPELLANT_PRESSURE.READING1,
+        READING2: pressureValues.READING2 || base.PROPELLANT_PRESSURE.READING2,
+      },
+
       HOT_WATER_STATUS: str(
         row.HOT_WATER_STATUS ?? row.hotWaterCirculation ?? base.HOT_WATER_STATUS,
       ),
@@ -381,6 +454,7 @@ export const mergeCuringCycleConfigRows = (
     };
     const prior = existingBySr.get(String(srNo).trim()) ?? existing[index];
     if (!prior) return fromMaster;
+    const priorPressure = asRecord(prior.PROPELLANT_PRESSURE) ?? {};
     return {
       ...fromMaster,
       TEMPERATURE: prior.TEMPERATURE || fromMaster.TEMPERATURE,
@@ -389,7 +463,18 @@ export const mergeCuringCycleConfigRows = (
       START_TIME: prior.START_TIME || fromMaster.START_TIME,
       END_DATE: prior.END_DATE || fromMaster.END_DATE,
       END_TIME: prior.END_TIME || fromMaster.END_TIME,
-      PROPELLANT_PRESSURE: prior.PROPELLANT_PRESSURE || fromMaster.PROPELLANT_PRESSURE,
+      PROPELLANT_PRESSURE: {
+        READING1: str(
+          priorPressure.READING1 ??
+            priorPressure.reading1 ??
+            fromMaster.PROPELLANT_PRESSURE.READING1,
+        ),
+        READING2: str(
+          priorPressure.READING2 ??
+            priorPressure.reading2 ??
+            fromMaster.PROPELLANT_PRESSURE.READING2,
+        ),
+      },
       HOT_WATER_STATUS: prior.HOT_WATER_STATUS || fromMaster.HOT_WATER_STATUS,
       REMARKS: prior.REMARKS || fromMaster.REMARKS,
     };

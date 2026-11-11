@@ -504,7 +504,17 @@ const mergeCutRows = (
     return {
       SR_NO: index + 1,
       DATE: mergeHardwareField(current.DATE, incoming.DATE, onlyIfEmpty),
+      START_DATE: mergeHardwareField(
+        current.START_DATE || current.DATE,
+        incoming.START_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       START_TIME: mergeHardwareField(current.START_TIME, incoming.START_TIME, onlyIfEmpty),
+      END_DATE: mergeHardwareField(
+        current.END_DATE || current.DATE,
+        incoming.END_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       END_TIME: mergeHardwareField(current.END_TIME, incoming.END_TIME, onlyIfEmpty),
       DUST_QTY: mergeHardwareField(current.DUST_QTY, incoming.DUST_QTY, onlyIfEmpty),
       OBSERVATIONS: mergeHardwareField(current.OBSERVATIONS, incoming.OBSERVATIONS, onlyIfEmpty),
@@ -524,7 +534,17 @@ const mergePreheatingRows = (
     {
       SR_NO: 1,
       DATE: mergeHardwareField(current.DATE, incoming.DATE, onlyIfEmpty),
+      START_DATE: mergeHardwareField(
+        current.START_DATE || current.DATE,
+        incoming.START_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       START_TIME: mergeHardwareField(current.START_TIME, incoming.START_TIME, onlyIfEmpty),
+      END_DATE: mergeHardwareField(
+        current.END_DATE || current.DATE,
+        incoming.END_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       END_TIME: mergeHardwareField(current.END_TIME, incoming.END_TIME, onlyIfEmpty),
       OVEN_NUMBER: mergeHardwareField(current.OVEN_NUMBER, incoming.OVEN_NUMBER, onlyIfEmpty),
       BUILDING_NO: mergeHardwareField(current.BUILDING_NO, incoming.BUILDING_NO, onlyIfEmpty),
@@ -547,7 +567,17 @@ const mergeLinearCoatingRows = (
     {
       SR_NO: 1,
       DATE: mergeHardwareField(current.DATE, incoming.DATE, onlyIfEmpty),
+      START_DATE: mergeHardwareField(
+        current.START_DATE || current.DATE,
+        incoming.START_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       START_TIME: mergeHardwareField(current.START_TIME, incoming.START_TIME, onlyIfEmpty),
+      END_DATE: mergeHardwareField(
+        current.END_DATE || current.DATE,
+        incoming.END_DATE || incoming.DATE,
+        onlyIfEmpty,
+      ),
       END_TIME: mergeHardwareField(current.END_TIME, incoming.END_TIME, onlyIfEmpty),
       LINER_QTY: mergeHardwareField(current.LINER_QTY, incoming.LINER_QTY, onlyIfEmpty),
       INSULATION_TEMP: mergeHardwareField(current.INSULATION_TEMP, incoming.INSULATION_TEMP, onlyIfEmpty),

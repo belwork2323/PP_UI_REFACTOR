@@ -112,6 +112,7 @@ const STFFlowBar = ({
             width={260}
             theme={theme}
             disabled={bemOptions.length === 0}
+            required
             onChange={onDraftBemNoChange}
           />
         </Box>

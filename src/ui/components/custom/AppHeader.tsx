@@ -27,6 +27,7 @@ import { images } from "@app/assets/images";
 import { useAuthStore } from "../../../app/store/authStore";
 import AdminDrawer from "./AppDrawer";
 import ConfirmAlertDialog from "../common/ConfirmAlertDialog";
+import ProfileDialog from "../common/ProfileDialog";
 
 const S = STRINGS.APP_HEADER;
 const FOOTER = STRINGS.APP_FOOTER;
@@ -79,13 +80,14 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
   const showDeptDropdown = roleKey === "USER" || roleKey === "APPROVER";
   const showDrawer =
     roleKey === "ADMIN" || roleKey === "CENTRE_HEAD" || roleKey === "SYSTEM_MANAGER";
-  const showProfileMenu =
-    roleKey === "USER" || roleKey === "APPROVER" || roleKey === "SYSTEM_MANAGER";
+  // System Manager uses the drawer only — no header profile click menu.
+  const showProfileMenu = roleKey === "USER" || roleKey === "APPROVER";
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pendingOption, setPendingOption] = useState(null); // { value, label, dept }
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const RoleIcon = ROLE_ICON_MAP[roleKey] ?? icons.headerUser;
   const displayName = userName || "User";
@@ -139,6 +141,11 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
   const handleProfileLogout = () => {
     handleProfileMenuClose();
     onLogout?.();
+  };
+
+  const handleViewProfile = () => {
+    handleProfileMenuClose();
+    setProfileOpen(true);
   };
 
   const ThemeIcon = mode === "dark" ? icons.lightModeToggleIcon : icons.darkModeToggleIcon;
@@ -271,6 +278,16 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
 
         <Divider sx={t.profileMenu.divider} />
 
+        <MenuItem onClick={handleViewProfile} sx={t.profileMenu.menuItem}>
+          <ListItemIcon sx={t.profileMenu.menuIcon}>
+            <icons.person fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary={S.VIEW_PROFILE_LABEL}
+            primaryTypographyProps={t.profileMenu.menuLabelProps}
+          />
+        </MenuItem>
+
         <MenuItem onClick={handleProfileLogout} sx={t.profileMenu.logoutItem}>
           <ListItemIcon sx={t.profileMenu.logoutIcon}>
             <icons.headerLogout fontSize="small" />
@@ -290,6 +307,8 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
       {showDrawer && (
         <AdminDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onLogout={onLogout} />
       )}
+
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <ConfirmAlertDialog
         open={confirmOpen}

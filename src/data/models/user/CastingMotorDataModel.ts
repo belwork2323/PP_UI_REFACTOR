@@ -2,9 +2,9 @@ import {
   compactRecord,
   isLegacySectionArray,
   pickField,
+  toApiDateTime,
   toApiNumber,
-  toApiTime,
-  toUiTime,
+  toUiDateTime,
   unwrapMotorSectionPayload,
 } from "./castingCuringFieldCodec";
 
@@ -29,6 +29,7 @@ export type CastingMotorCasingInstance = {
   MANDREL_MEASUREMENTS: MandrelMeasurementRow[];
   FEED_PIPE_DISTANCE: FeedPipeDistanceRow[];
   EMPTY_MOTOR_WEIGHT: string;
+  VACUUM_APPLIED: string;
 };
 
 export type CastingBowlDetailRow = {
@@ -86,6 +87,7 @@ export type CastingMotorData = {
     INITIAL_VACUUM: string;
     VACUUM_PRESSURE_CASTING: string;
     VACUUM_PRESSURE_SOAKING: string;
+    TDI_CLEARANCE_AFTER_VACUUM: string;
   };
   SLURRY_CAST_DETAILS: {
     SLURRY_CAST_FROM_BOWLS: SlurryCastRow[];
@@ -126,12 +128,12 @@ const SLURRY_TOTAL_ROW_KEY = "TOTAL";
 const SLURRY_TOTAL_LABEL = "Total Slurry Cast";
 
 const POST_CAST_PRESETS: Array<{ ACTIVITY: string; detailsFieldType: string }> = [
-  { ACTIVITY: "Soaking Time", detailsFieldType: "time" },
-  { ACTIVITY: "Time of removal from pit", detailsFieldType: "time" },
+  { ACTIVITY: "Soaking Time", detailsFieldType: "datetime" },
+  { ACTIVITY: "Time of removal from pit", detailsFieldType: "datetime" },
   { ACTIVITY: "Fixtures assembled for curing", detailsFieldType: "text" },
   { ACTIVITY: "Pressure sensor details (If applicable)", detailsFieldType: "text" },
   { ACTIVITY: "Initial pressure reading (If applicable)", detailsFieldType: "text" },
-  { ACTIVITY: "Time of dispatch to curing station", detailsFieldType: "time" },
+  { ACTIVITY: "Time of dispatch to curing station", detailsFieldType: "datetime" },
 ];
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -215,6 +217,7 @@ export const createEmptyMotorCasingInstance = (): CastingMotorCasingInstance => 
   ],
   FEED_PIPE_DISTANCE: [createEmptyFeedPipeDistanceRow()],
   EMPTY_MOTOR_WEIGHT: "",
+  VACUUM_APPLIED: "",
 });
 
 export const createEmptyBowlDetailRow = (): CastingBowlDetailRow => ({
@@ -279,6 +282,7 @@ export const createEmptyCastingMotorData = (): CastingMotorData => ({
     INITIAL_VACUUM: "",
     VACUUM_PRESSURE_CASTING: "",
     VACUUM_PRESSURE_SOAKING: "",
+    TDI_CLEARANCE_AFTER_VACUUM: "",
   },
   SLURRY_CAST_DETAILS: {
     SLURRY_CAST_FROM_BOWLS: syncSlurryCastTotalRow([createEmptySlurryCastRow()]),
@@ -381,14 +385,14 @@ const bowlDetailRowsForPayload = (rows: CastingBowlDetailRow[]): Record<string, 
       compactRecord({
         srNo: index + 1,
         bowlId: str(row.BOWL_ID).trim() || undefined,
-        bowlReceiptTime: toApiTime(row.BOWL_RECEIPT_TIME),
+        bowlReceiptTime: toApiDateTime(row.BOWL_RECEIPT_TIME),
         initialWeight: toApiNumber(row.INITIAL_WEIGHT),
         finalWeight: toApiNumber(row.FINAL_WEIGHT),
         initialSlurryDepth: toApiNumber(row.INITIAL_SLURRY_DEPTH),
-        dcOpenTime: toApiTime(row.DC_OPEN_TIME),
-        dcCloseTime: toApiTime(row.DC_CLOSE_TIME),
+        dcOpenTime: toApiDateTime(row.DC_OPEN_TIME),
+        dcCloseTime: toApiDateTime(row.DC_CLOSE_TIME),
         slurryDepthAfterDc: toApiNumber(row.SLURRY_DEPTH_AFTER_DC),
-        ballValveOpenTime: toApiTime(row.BALL_VALVE_OPEN_TIME),
+        ballValveOpenTime: toApiDateTime(row.BALL_VALVE_OPEN_TIME),
       }),
     )
     .filter((row) => Boolean(row.bowlId) || rowHasPayloadValues(row));
@@ -399,7 +403,7 @@ const castingFromBowlRowsForPayload = (rows: CastingFromBowlRow[]): Record<strin
       compactRecord({
         srNo: index + 1,
         bowlId: str(row.BOWL_ID).trim() || undefined,
-        timeInterval: toApiNumber(row.TIME_INTERVAL),
+        timeInterval: str(row.TIME_INTERVAL),
         rh: toApiNumber(row.RH),
         viscosity: toApiNumber(row.VISCOSITY),
         motorId: str(row.MOTOR_ID).trim() || undefined,
@@ -430,7 +434,10 @@ const postCastRowsForPayload = (rows: PostCastRow[]): Record<string, unknown>[] 
     compactRecord({
       srNo: index + 1,
       activity: str(row.ACTIVITY).trim() || undefined,
-      details: str(row.DETAILS).trim() || undefined,
+      details:
+        row.detailsFieldType === "datetime"
+          ? toApiDateTime(row.DETAILS)
+          : str(row.DETAILS).trim() || undefined,
     }),
   );
 
@@ -449,6 +456,7 @@ export const buildCastingSectionsPayload = (data: CastingMotorData): CastingSect
           mandrelMeasurements: mandrelRowsForPayload(motorCasing.MANDREL_MEASUREMENTS ?? []),
           feedPipeDistance: feedPipeRowsForPayload(motorCasing.FEED_PIPE_DISTANCE ?? []),
           emptyMotorWeight: toApiNumber(motorCasing.EMPTY_MOTOR_WEIGHT),
+          vacuumApplied: motorCasing.VACUUM_APPLIED,
         }),
       ],
     },
@@ -462,6 +470,7 @@ export const buildCastingSectionsPayload = (data: CastingMotorData): CastingSect
       initialVacuum: str(data.CASTING_PROCESS.INITIAL_VACUUM),
       vacuumPressureCasting: str(data.CASTING_PROCESS.VACUUM_PRESSURE_CASTING),
       vacuumPressureSoaking: str(data.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING),
+      tdiClearanceAfterVacuum: str(data.CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM),
     }),
     slurryCastDetails: {
       slurryCastFromBowls: slurryRowsForPayload(slurryRows),
@@ -535,6 +544,7 @@ const parseMotorCasingInstance = (item: unknown): CastingMotorCasingInstance => 
       : createEmptyMotorCasingInstance().MANDREL_MEASUREMENTS,
     FEED_PIPE_DISTANCE: feedRows.length ? feedRows : [createEmptyFeedPipeDistanceRow()],
     EMPTY_MOTOR_WEIGHT: str(pickField(row, "emptyMotorWeight", "EMPTY_MOTOR_WEIGHT") ?? ""),
+    VACUUM_APPLIED: str(pickField(row, "vacuumApplied", "VACUUM_APPLIED")),
   };
 };
 
@@ -544,14 +554,14 @@ const parseBowlDetailRow = (item: unknown): CastingBowlDetailRow => {
     BOWL_ID: str(pickField(row, "bowlId", "BOWL_ID") ?? ""),
     PREMIX_NO: str(pickField(row, "premixNo", "PREMIX_NO") ?? ""),
     BOWL_NO: str(pickField(row, "bowlNo", "BOWL_NO") ?? ""),
-    BOWL_RECEIPT_TIME: toUiTime(pickField(row, "bowlReceiptTime", "BOWL_RECEIPT_TIME") ?? ""),
+    BOWL_RECEIPT_TIME: toUiDateTime(pickField(row, "bowlReceiptTime", "BOWL_RECEIPT_TIME") ?? ""),
     INITIAL_WEIGHT: str(pickField(row, "initialWeight", "INITIAL_WEIGHT") ?? ""),
     FINAL_WEIGHT: str(pickField(row, "finalWeight", "FINAL_WEIGHT") ?? ""),
     INITIAL_SLURRY_DEPTH: str(pickField(row, "initialSlurryDepth", "INITIAL_SLURRY_DEPTH") ?? ""),
-    DC_OPEN_TIME: toUiTime(pickField(row, "dcOpenTime", "DC_OPEN_TIME") ?? ""),
-    DC_CLOSE_TIME: toUiTime(pickField(row, "dcCloseTime", "DC_CLOSE_TIME") ?? ""),
+    DC_OPEN_TIME: toUiDateTime(pickField(row, "dcOpenTime", "DC_OPEN_TIME") ?? ""),
+    DC_CLOSE_TIME: toUiDateTime(pickField(row, "dcCloseTime", "DC_CLOSE_TIME") ?? ""),
     SLURRY_DEPTH_AFTER_DC: str(pickField(row, "slurryDepthAfterDc", "SLURRY_DEPTH_AFTER_DC") ?? ""),
-    BALL_VALVE_OPEN_TIME: toUiTime(
+    BALL_VALVE_OPEN_TIME: toUiDateTime(
       pickField(row, "ballValveOpenTime", "BALL_VALVE_OPEN_TIME") ?? "",
     ),
   };
@@ -619,12 +629,10 @@ const parsePostCastTable = (value: unknown): PostCastRow[] => {
     return {
       ...preset,
       DETAILS:
-        preset.detailsFieldType === "time"
-          ? toUiTime(saved.DETAILS ?? saved.details ?? saved.value ?? "")
+        preset.detailsFieldType === "datetime"
+          ? toUiDateTime(saved.DETAILS ?? saved.details ?? saved.value ?? "")
           : str(saved.DETAILS ?? saved.details ?? saved.value ?? ""),
-      detailsFieldType:
-        str(saved.detailsFieldType ?? saved.DETAILS__fieldType ?? saved.DETAILS_fieldType ?? "") ||
-        preset.detailsFieldType,
+      detailsFieldType: preset.detailsFieldType,
     };
   });
 
@@ -638,14 +646,21 @@ const parsePostCastTable = (value: unknown): PostCastRow[] => {
             .toLowerCase(),
         ),
     )
-    .map((row) => ({
-      ACTIVITY: str(row.ACTIVITY ?? row.activity ?? ""),
-      DETAILS: str(row.DETAILS ?? row.details ?? row.value ?? ""),
-      detailsFieldType:
-        str(row.detailsFieldType ?? row.DETAILS__fieldType ?? row.DETAILS_fieldType ?? "") ||
-        undefined,
-      readonly: row.readonly === true,
-    }));
+    .map((row) => {
+      const rawFieldType = str(
+        row.detailsFieldType ?? row.DETAILS__fieldType ?? row.DETAILS_fieldType ?? "",
+      ).toLowerCase();
+      const detailsFieldType =
+        rawFieldType === "time" || rawFieldType === "date" ? "datetime" : rawFieldType;
+      const rawDetails = row.DETAILS ?? row.details ?? row.value ?? "";
+      return {
+        ACTIVITY: str(row.ACTIVITY ?? row.activity ?? ""),
+        DETAILS:
+          detailsFieldType === "datetime" ? toUiDateTime(rawDetails) : str(rawDetails),
+        detailsFieldType: detailsFieldType || undefined,
+        readonly: row.readonly === true,
+      };
+    });
 
   return [...merged, ...extras];
 };
@@ -704,6 +719,9 @@ export const parseCastingMotorDataFromApi = (source: unknown): CastingMotorData 
       ),
       VACUUM_PRESSURE_SOAKING: str(
         pickField(castingProcess, "vacuumPressureSoaking", "VACUUM_PRESSURE_SOAKING") ?? "",
+      ),
+      TDI_CLEARANCE_AFTER_VACUUM: str(
+        pickField(castingProcess, "tdiClearanceAfterVacuum", "TDI_CLEARANCE_AFTER_VACUUM"),
       ),
     },
     SLURRY_CAST_DETAILS: {

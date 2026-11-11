@@ -19,7 +19,7 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
-import DateField from "@/ui/components/common/DateField";
+import { DateTimeField } from "@/ui/components/common/DateField";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 import {
@@ -213,9 +213,8 @@ export const TrimmingCommonTable = ({
   const dynamicLocations = activeMotorSession.commonFormatLocations ?? [];
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColInput, setNewColInput] = useState("");
-  const [equipmentOptions, setEquipmentOptions] = useState<MachineEquipmentOption[]>(
-    fallbackEquipmentOptions,
-  );
+  const [equipmentOptions, setEquipmentOptions] =
+    useState<MachineEquipmentOption[]>(fallbackEquipmentOptions);
   const [equipmentLoading, setEquipmentLoading] = useState(false);
   /** Row indexes where user chose "Other" (keeps select on Other even if text is empty). */
   const [machineOtherModeByRow, setMachineOtherModeByRow] = useState<Record<number, boolean>>({});
@@ -251,10 +250,7 @@ export const TrimmingCommonTable = ({
   }, [activeMotorEntry.motorId]);
 
   const machineSelectOptions = useMemo(
-    () => [
-      ...equipmentOptions,
-      { value: MACHINE_DETAILS_OTHER, label: "Other" },
-    ],
+    () => [...equipmentOptions, { value: MACHINE_DETAILS_OTHER, label: "Other" }],
     [equipmentOptions],
   );
 
@@ -392,10 +388,10 @@ export const TrimmingCommonTable = ({
         </Box>
         <Box sx={{ p: 1.5, maxWidth: 320 }}>
           {readOnly ? (
-            <ReadOnlyValue value={activeMotorSession.motorReceivedAt} />
+            <DateTimeField value={activeMotorSession.motorReceivedAt} readOnly />
           ) : (
             <Box data-qc-field="motorReceivedAt">
-              <DateField
+              <DateTimeField
                 value={activeMotorSession.motorReceivedAt ?? ""}
                 onChange={(value) =>
                   onMotorSessionChange(activeMotorEntry.motorId, {
@@ -421,14 +417,116 @@ export const TrimmingCommonTable = ({
 
         <Box sx={{ p: 1.5 }}>
           <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
-            <Table size="small" sx={{ borderCollapse: "collapse", minWidth: qaRemarksMode ? 900 : 720 }}>
+            <Table
+              size="small"
+              sx={{ borderCollapse: "collapse", minWidth: qaRemarksMode ? 900 : 720 }}
+            >
               <TableHead>
                 <TableRow>
-                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Machine Details" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Start Date" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Completion Date" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Arbor Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Cutter Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Machine Details"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Start Date & Time"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Completion Date & Time"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Arbor Size"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Cutter Size"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Ingest Size"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Motor Truing"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={thSx}>
+                    <FieldLabelWithAsterisk
+                      label="Arbor Turing"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
                   <TableCell sx={thSx}>Remarks</TableCell>
                   {qaRemarksMode ? <TableCell sx={thSx}>QA Remarks</TableCell> : null}
                   {showStructureActions ? (
@@ -465,7 +563,9 @@ export const TrimmingCommonTable = ({
                               const next = String(e.target.value ?? "");
                               if (next === MACHINE_DETAILS_OTHER) {
                                 const current = String(row.machineDetails ?? "").trim();
-                                const isKnown = equipmentOptions.some((opt) => opt.value === current);
+                                const isKnown = equipmentOptions.some(
+                                  (opt) => opt.value === current,
+                                );
                                 setMachineOtherModeByRow((prev) => ({ ...prev, [rowIndex]: true }));
                                 patchTrimmingDetailRow(rowIndex, {
                                   machineDetails: isKnown ? "" : current,
@@ -511,10 +611,10 @@ export const TrimmingCommonTable = ({
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
-                        <ReadOnlyValue value={row.startDate} />
+                        <DateTimeField value={row.startDate} readOnly />
                       ) : (
                         <Box data-qc-field={`trimmingDetails.${rowIndex}.startDate`}>
-                          <DateField
+                          <DateTimeField
                             value={row.startDate}
                             compact
                             error={Boolean(err(`trimmingDetails.${rowIndex}.startDate`))}
@@ -534,11 +634,12 @@ export const TrimmingCommonTable = ({
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
-                        <ReadOnlyValue value={row.completionDate} />
+                        <DateTimeField value={row.completionDate} readOnly />
                       ) : (
                         <Box data-qc-field={`trimmingDetails.${rowIndex}.completionDate`}>
-                          <DateField
+                          <DateTimeField
                             value={row.completionDate}
+                            minDate={row.startDate}
                             compact
                             error={Boolean(err(`trimmingDetails.${rowIndex}.completionDate`))}
                             onChange={(val) => {
@@ -609,6 +710,87 @@ export const TrimmingCommonTable = ({
                         </Box>
                       )}
                     </TableCell>
+
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.ingestSize} />
+                      ) : (
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.ingestSize`}>
+                          <FormInput
+                            value={row.ingestSize}
+                            inputMode="decimal"
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.ingestSize`))}
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                ingestSize: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText message={err(`trimmingDetails.${rowIndex}.ingestSize`)} />
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.motorTruing} />
+                      ) : (
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.motorTruing`}>
+                          <FormInput
+                            value={row.motorTruing}
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.motorTruing`))}
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                motorTruing: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText
+                            message={err(`trimmingDetails.${rowIndex}.motorTruing`)}
+                          />
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.arborTuring} />
+                      ) : (
+                        <Box data-qc-field={`trimmingDetails.${rowIndex}.arborTuring`}>
+                          <FormInput
+                            value={row.arborTuring}
+                            error={Boolean(err(`trimmingDetails.${rowIndex}.arborTuring`))}
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                arborTuring: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText
+                            message={err(`trimmingDetails.${rowIndex}.arborTuring`)}
+                          />
+                        </Box>
+                      )}
+                    </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly || qaRemarksMode ? (
                         <ReadOnlyValue value={row.remarks} />
@@ -620,7 +802,10 @@ export const TrimmingCommonTable = ({
                             error={Boolean(err(`trimmingDetails.${rowIndex}.remarks`))}
                             onChange={(e) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                              nextRows[rowIndex] = { ...nextRows[rowIndex], remarks: e.target.value };
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                remarks: e.target.value,
+                              };
                               onMotorSessionChange(activeMotorEntry.motorId, {
                                 ...activeMotorSession,
                                 trimmingDetails: nextRows,
@@ -655,7 +840,9 @@ export const TrimmingCommonTable = ({
                               }}
                               disabled={inputsLocked}
                             />
-                            <FieldErrorText message={err(`trimmingDetails.${rowIndex}.qaRemarks`)} />
+                            <FieldErrorText
+                              message={err(`trimmingDetails.${rowIndex}.qaRemarks`)}
+                            />
                           </Box>
                         )}
                       </TableCell>
@@ -744,10 +931,58 @@ export const TrimmingCommonTable = ({
                   <TableCell sx={{ ...thSx, minWidth: 160 }}>Parameter</TableCell>
                   <TableCell sx={{ ...thSx, minWidth: 110 }}>Stage</TableCell>
                   <TableCell sx={{ ...thSx, minWidth: 110 }}>Specification</TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R2T" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R2B" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R1R" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R1L" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>
+                    <FieldLabelWithAsterisk
+                      label="R2T"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>
+                    <FieldLabelWithAsterisk
+                      label="R2B"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>
+                    <FieldLabelWithAsterisk
+                      label="R1R"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>
+                    <FieldLabelWithAsterisk
+                      label="R1L"
+                      required
+                      sx={{
+                        display: "inline",
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        color: "inherit",
+                        mb: 0,
+                      }}
+                    />
+                  </TableCell>
                   {dynamicLocations.map((loc) => (
                     <TableCell key={`col-head-${loc}`} sx={{ ...thSx, minWidth: 100 }}>
                       <Stack
@@ -823,33 +1058,35 @@ export const TrimmingCommonTable = ({
                           }}
                         >
                           {readOnly ? (
-                        <ReadOnlyValue value={param.parameterName} />
-                      ) : (
-                        <FormInput
-                            value={param.parameterName}
-                            placeholder={param.parameterName}
-                            onChange={(e) => {
-                              const nextParams = [
-                                ...(activeMotorSession.commonFormatParameters ?? []),
-                              ];
-                              nextParams[paramIndex] = {
-                                ...nextParams[paramIndex],
-                                parameterName: e.target.value,
-                              };
-                              onMotorSessionChange(activeMotorEntry.motorId, {
-                                ...activeMotorSession,
-                                commonFormatParameters: nextParams,
-                              });
-                            }}
+                            <ReadOnlyValue value={param.parameterName} />
+                          ) : (
+                            <FormInput
+                              value={param.parameterName}
+                              placeholder={param.parameterName}
+                              onChange={(e) => {
+                                const nextParams = [
+                                  ...(activeMotorSession.commonFormatParameters ?? []),
+                                ];
+                                nextParams[paramIndex] = {
+                                  ...nextParams[paramIndex],
+                                  parameterName: e.target.value,
+                                };
+                                onMotorSessionChange(activeMotorEntry.motorId, {
+                                  ...activeMotorSession,
+                                  commonFormatParameters: nextParams,
+                                });
+                              }}
 
-                        disabled={inputsLocked}
-                      />
-                      )}
+                              disabled={inputsLocked}
+                            />
+                          )}
                         </TableCell>
                       ) : null}
 
                       <TableCell sx={tdSx}>
-                        <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: colors.text }}>
+                        <Typography
+                          sx={{ fontSize: "0.78rem", fontWeight: 600, color: colors.text }}
+                        >
                           {stage.stage === "BEFORE_TRIMMING" ||
                           stage.stageName === "Before Trimming"
                             ? "Before Trimming"
@@ -859,29 +1096,29 @@ export const TrimmingCommonTable = ({
 
                       <TableCell sx={tdSx}>
                         {readOnly ? (
-                        <ReadOnlyValue value={stage.specification ?? ""} />
-                      ) : (
-                        <FormInput
-                          value={stage.specification ?? ""}
-                          onChange={(e) => {
-                            const nextParams = [
-                              ...(activeMotorSession.commonFormatParameters ?? []),
-                            ];
-                            nextParams[paramIndex] = {
-                              ...nextParams[paramIndex],
-                              stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                idx === stageIndex ? { ...s, specification: e.target.value } : s,
-                              ),
-                            };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              commonFormatParameters: nextParams,
-                            });
-                          }}
+                          <ReadOnlyValue value={stage.specification ?? ""} />
+                        ) : (
+                          <FormInput
+                            value={stage.specification ?? ""}
+                            onChange={(e) => {
+                              const nextParams = [
+                                ...(activeMotorSession.commonFormatParameters ?? []),
+                              ];
+                              nextParams[paramIndex] = {
+                                ...nextParams[paramIndex],
+                                stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                  idx === stageIndex ? { ...s, specification: e.target.value } : s,
+                                ),
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                commonFormatParameters: nextParams,
+                              });
+                            }}
 
-                        disabled={inputsLocked}
-                      />
-                      )}
+                            disabled={inputsLocked}
+                          />
+                        )}
                       </TableCell>
 
                       {["R2T", "R2B", "R1R", "R1L"].map((location) => {
@@ -980,7 +1217,7 @@ export const TrimmingCommonTable = ({
                           rowSpan={param.stages.length}
                           sx={{ ...tdSx, verticalAlign: "middle" }}
                         >
-                          {paramIndex >= 3 && (
+                          {paramIndex >= 2 && (
                             <IconButton
                               size="small"
                               sx={{ color: colors.danger }}

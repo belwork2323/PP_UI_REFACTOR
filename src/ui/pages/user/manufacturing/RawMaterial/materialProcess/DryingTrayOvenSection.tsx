@@ -1,16 +1,14 @@
 import React from "react";
 import { Box, Typography } from "@mui/material";
 import CasePrepTextField from "../../CasePreparation/CasePrepTextField";
-import CasePrepSelect, {
-  type CasePrepSelectOption,
-} from "../../CasePreparation/CasePrepSelect";
+import CasePrepSelect, { type CasePrepSelectOption } from "../../CasePreparation/CasePrepSelect";
 import { DateTimeField } from "../../../../../components/common/DateField";
 import type { DryingTrayOvenForm } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
 import { sanitizeMasterDataDecimalInput } from "../../../../../../data/models/admin/MasterData/masterDataNumericInput";
 
 const OVEN_TYPE_OPTIONS: CasePrepSelectOption[] = [
-  { value: "WATER_HEATED", label: "Water Heated" },
-  { value: "AIR_HEATED", label: "Air Heated" },
+  { value: "Water Heated", label: "Water Heated" },
+  { value: "Air Heated", label: "Air Heated" },
 ];
 
 type Props = {
@@ -34,14 +32,11 @@ const DryingTrayOvenSection = ({
   title = "Drying in Tray Oven",
   showQaRemarks = false,
 }: Props) => {
-  const patch = (patchValue: Partial<DryingTrayOvenForm>) =>
-    onChange({ ...value, ...patchValue });
+  const patch = (patchValue: Partial<DryingTrayOvenForm>) => onChange({ ...value, ...patchValue });
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, mb: 1 }}>
-        {title}
-      </Typography>
+      <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, mb: 1 }}>{title}</Typography>
       <Box
         sx={{
           display: "grid",
@@ -88,24 +83,29 @@ const DryingTrayOvenSection = ({
         />
         <Box>
           <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-            Start Date/ Time
+            Start Date & Time
           </Typography>
           <DateTimeField
             value={value.startDatetime}
             onChange={(v) => patch({ startDatetime: v })}
             disabled={disabled}
             compact
+            error={Boolean(fieldErrors.startDatetime)}
+            helperText={fieldErrors.startDatetime ?? null}
           />
         </Box>
         <Box>
           <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.35 }}>
-            End Date / Time
+            End Date & Time
           </Typography>
           <DateTimeField
             value={value.endDatetime}
             onChange={(v) => patch({ endDatetime: v })}
+            minDate={value.startDatetime}
             disabled={disabled}
             compact
+            error={Boolean(fieldErrors.endDatetime)}
+            helperText={fieldErrors.endDatetime ?? null}
           />
         </Box>
         <CasePrepTextField

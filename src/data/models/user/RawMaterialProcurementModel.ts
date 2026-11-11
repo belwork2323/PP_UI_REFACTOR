@@ -9,6 +9,7 @@ import type {
   RawMaterialTypeValue,
   PreparationTypeValue,
 } from "../admin/MasterData/MaterialsMasterModel";
+import { formatToUiDate } from "../../../utils/dateUtils";
 
 export type AdductPreparationDetails = {
   adductBatchPrepDate: string;
@@ -1148,7 +1149,7 @@ export class RawMaterialLotDetailsModel {
     this.submissionType = payload?.submissionType ?? "";
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.supplyOrderNo = payload?.supplyOrderNo ?? "";
-    this.receiptDate = payload?.receiptDate ?? "";
+    this.receiptDate = formatToUiDate(String(payload?.receiptDate ?? ""));
     this.manufacturerName = payload?.manufacturerName ?? "";
     this.materialCode = payload?.materialCode ?? "";
     this.grade = resolveGradeCode(payload?.grade);
@@ -1268,7 +1269,7 @@ export function mapLotListApiRow(lot: any, index: number): RawMaterialLotListRow
     materialName: String(lot?.materialName ?? grade?.gradeName ?? "").trim(),
     grade,
     supplyOrderNo: String(lot?.supplyOrderNo ?? ""),
-    receiptDate: String(lot?.receiptDate ?? ""),
+    receiptDate: formatToUiDate(String(lot?.receiptDate ?? "")),
     manufacturerName: String(lot?.manufacturerName ?? ""),
     status: statusRaw,
     rmStatus,
@@ -1469,7 +1470,7 @@ export function mapMaterialGroupsToCreateMaterials(
       materialCode: group.material.trim(),
       grade: null,
       supplyOrderNo: (group.supplyOrderNo ?? "").trim(),
-      receiptDate: (group.receiptDate ?? "").trim(),
+      receiptDate: formatToUiDate(group.receiptDate),
       manufacturerName: (group.manufacturerName ?? "").trim(),
       lots: (group.lots ?? []).map(mapLotBlockToCreatePayload),
     }));
@@ -1492,7 +1493,7 @@ export function mapFirstBlockToLotUpdatePayload(
     submissionType,
     subDepartmentId,
     supplyOrderNo: (block.supplyOrderNo ?? "").trim(),
-    receiptDate: (block.receiptDate ?? "").trim(),
+    receiptDate: formatToUiDate(block.receiptDate),
     manufacturerName: (block.manufacturerName ?? "").trim(),
     materialCode: (block.material ?? "").trim(),
     grade: null,

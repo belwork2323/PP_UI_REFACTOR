@@ -327,6 +327,7 @@ export const useRawMaterialApproverHook = () => {
     selected,
     detailsLoading,
     dialogProps: {
+      subdepartment: subDepartmentId ?? 0,
       actionType,
       batchId: dialogItem?.lotId ?? dialogItem?.batchId ?? null,
       idLabel: A.LOT_ID_LABEL,

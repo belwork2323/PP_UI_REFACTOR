@@ -18,6 +18,9 @@ const QC_TRIMMING_FOCUS_PREFIX_ORDER = [
   "motorReceivedAt",
   "trimmingDetails.",
   "commonFormatParameters.",
+  "measurementQaRemarks",
+  "dimensionsQaRemarks",
+  "motorRemarks",
 ] as const;
 
 /** First error field path for Trimming focus/scroll (stable section order). */
@@ -48,7 +51,10 @@ export function looksLikeQcTrimmingValidationErrors(
     return (
       path === "motorReceivedAt" ||
       path.startsWith("trimmingDetails.") ||
-      path.startsWith("commonFormatParameters.")
+      path.startsWith("commonFormatParameters.") ||
+      path === "measurementQaRemarks" ||
+      path === "dimensionsQaRemarks" ||
+      path === "motorRemarks"
     );
   });
 }

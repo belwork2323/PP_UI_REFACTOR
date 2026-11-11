@@ -2,6 +2,7 @@ import { pickField } from "@/data/models/user/castingCuringFieldCodec";
 import type { CastingMotorData } from "@/data/models/user/CastingMotorDataModel";
 import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { assertFromToOrderInTree } from "../dateRangeValidation";
 import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
@@ -12,6 +13,11 @@ export const castingCuringFieldRules = {
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
+  },
+  postDetailsDateTime: {
+    valueType: "datetime" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   // Mandrel measurements (assembly details)
   mandrelAMock: {
@@ -44,6 +50,12 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
+  vacuumApplied: {
+    valueType: "text" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+  },
   bowlId: {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
@@ -53,11 +65,9 @@ export const castingCuringFieldRules = {
     maxLength: 100,
   },
   bowlReceiptTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    minLength: 4,
-    maxLength: 20,
   },
   initialWeight: {
     valueType: "number" as const,
@@ -72,14 +82,12 @@ export const castingCuringFieldRules = {
     pattern: S.PATTERNS.FLOAT,
   },
   ballValveOpenTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"],
     messages: {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
-    minLength: 4,
-    maxLength: 20,
   },
   slurryDepthAfterDc: {
     valueType: "number" as const,
@@ -91,27 +99,23 @@ export const castingCuringFieldRules = {
     pattern: S.PATTERNS.FLOAT,
   },
   dcCloseTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"],
     messages: {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
-    minLength: 4,
-    maxLength: 20,
   },
   dcOpenTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"],
     messages: {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
-    minLength: 4,
-    maxLength: 20,
   },
   timeInterval: {
-    valueType: "number" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
@@ -124,7 +128,7 @@ export const castingCuringFieldRules = {
   },
   viscosity: {
     valueType: "number" as const,
-    requiredIn: ["SUBMIT"],
+    requiredIn: [],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
@@ -175,6 +179,11 @@ export const castingCuringFieldRules = {
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
+  },
+  tdiClearanceAfterVacuum: {
+    valueType: "datetime" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   fmMotorLabel: {
     valueType: "text" as const,
@@ -269,7 +278,7 @@ export const castingCuringFieldRules = {
     maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   pressurePlateRemovalDateTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: [],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     maxLength: 30,
@@ -282,14 +291,14 @@ export const castingCuringFieldRules = {
     maxLength: S.LENGTH.MAX_STANDARD,
   },
   deCoringDispatchDateTime: {
-    valueType: "text" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     maxLength: 30,
   },
   // De-coring details
   deCoringDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -302,6 +311,18 @@ export const castingCuringFieldRules = {
     maxLength: 50,
   },
   deCoringLoad: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
+  propellantProperties: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
+  mandrelWeight: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
@@ -369,6 +390,11 @@ function resolveCastingFieldPaths(data: any): ResolvedFieldPath[] {
       path: `FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`,
       value: casing.EMPTY_MOTOR_WEIGHT,
       ruleKey: "emptyMotorWeight",
+    });
+    paths.push({
+      path: `FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`,
+      value: casing.VACUUM_APPLIED,
+      ruleKey: "vacuumApplied",
     });
     const feed = casing.FEED_PIPE_DISTANCE?.[0];
     if (feed) {
@@ -487,7 +513,7 @@ function resolveCastingFieldPaths(data: any): ResolvedFieldPath[] {
       ruleKey: "vacuumLevel",
     });
   });
-  // console.log("check error ", data);
+  console.log(castingProcess);
 
   paths.push({
     path: `CASTING_PROCESS.INITIAL_VACUUM`,
@@ -503,6 +529,11 @@ function resolveCastingFieldPaths(data: any): ResolvedFieldPath[] {
     path: `CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`,
     value: pickField(castingProcess, "vacuumPressureSoaking", "VACUUM_PRESSURE_SOAKING"),
     ruleKey: "vacuumPressureSoaking",
+  });
+  paths.push({
+    path: `CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM`,
+    value: pickField(castingProcess, "tdiClearanceAfterVacuum", "TDI_CLEARANCE_AFTER_VACUUM"),
+    ruleKey: "tdiClearanceAfterVacuum",
   });
 
   // slurry cast rows
@@ -530,7 +561,10 @@ function resolveCastingFieldPaths(data: any): ResolvedFieldPath[] {
     paths.push({
       path: `POST_CAST_OPERATIONS.POST_CAST_TABLE.${i}.DETAILS`,
       value: row.DETAILS,
-      ruleKey: "postDetails",
+      ruleKey:
+        String(row.detailsFieldType ?? "").toLowerCase() === "datetime"
+          ? "postDetailsDateTime"
+          : "postDetails",
     });
   });
 
@@ -573,8 +607,13 @@ function resolveCuringFieldPaths(data: any): ResolvedFieldPath[] {
       ruleKey: "curingEndTime",
     });
     paths.push({
-      path: `CURING_CYCLES.CURING_TABLE.${i}.PROPELLANT_PRESSURE`,
-      value: row.PROPELLANT_PRESSURE,
+      path: `CURING_CYCLES.CURING_TABLE.${i}.PROPELLANT_PRESSURE.READING1`,
+      value: row.PROPELLANT_PRESSURE.READING1,
+      ruleKey: "propellantPressure",
+    });
+    paths.push({
+      path: `CURING_CYCLES.CURING_TABLE.${i}.PROPELLANT_PRESSURE.READING2`,
+      value: row.PROPELLANT_PRESSURE.READING2,
       ruleKey: "propellantPressure",
     });
     paths.push({
@@ -633,6 +672,21 @@ function resolveCuringFieldPaths(data: any): ResolvedFieldPath[] {
       ruleKey: "deCoringLoad",
     });
     paths.push({
+      path: `DECORING_DETAILS.MANDREL_WEIGHT`,
+      value: decoring.MANDREL_WEIGHT,
+      ruleKey: "mandrelWeight",
+    });
+    paths.push({
+      path: `DECORING_DETAILS.RH`,
+      value: decoring.RH,
+      ruleKey: "rh",
+    });
+    paths.push({
+      path: `DECORING_DETAILS.PROPELLANT_TEMPERATURE`,
+      value: decoring.PROPELLANT_TEMPERATURE,
+      ruleKey: "propellantTemperature",
+    });
+    paths.push({
       path: `DECORING_DETAILS.DECORING_REMARKS`,
       value: decoring.DECORING_REMARKS,
       ruleKey: "deCoringRemarks",
@@ -650,14 +704,22 @@ export const castingMotorValidationConfig: SubDeptValidationConfig<CastingMotorD
   id: "castingMotor",
   fields: castingCuringFieldRules as any,
   resolveFieldPaths: resolveCastingFieldPaths,
-  customRules: [],
+  customRules: [
+    (data, _tier, errors) => {
+      assertFromToOrderInTree(data, errors);
+    },
+  ],
 };
 
 export const curingMotorValidationConfig: SubDeptValidationConfig<unknown> = {
   id: "curingMotor",
   fields: castingCuringFieldRules as any,
   resolveFieldPaths: resolveCuringFieldPaths,
-  customRules: [],
+  customRules: [
+    (data, _tier, errors) => {
+      assertFromToOrderInTree(data, errors);
+    },
+  ],
 };
 
 /** @deprecated Use castingMotorValidationConfig or curingMotorValidationConfig */

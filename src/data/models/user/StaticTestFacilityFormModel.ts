@@ -185,6 +185,40 @@ export const createEmptyStfMotorSession = (
   stfData: createEmptyStfMotorData(subType),
 });
 
+/** Ensure UI model matches current MAIN/BEM shape (guards HMR / stale in-memory payloads). */
+export const coerceStfMotorData = (
+  data: StfMotorData | null | undefined,
+  variant: StfSubType,
+): StfMotorData => {
+  const empty = createEmptyStfMotorData(variant);
+  if (!data || data.variant !== variant) return empty;
+  if (variant === "MAIN_MOTOR") {
+    const main = data as Extract<StfMotorData, { variant: "MAIN_MOTOR" }>;
+    if (
+      !main.TEST_HEADER ||
+      !main.NOZZLE_DETAILS ||
+      !main.MAIN_MOTOR_DATA ||
+      !Array.isArray(main.BALLISTIC_PARAMETERS) ||
+      !main.BURN_RATE
+    ) {
+      return empty;
+    }
+    return main;
+  }
+  const bem = data as Extract<StfMotorData, { variant: "BEM" }>;
+  if (
+    !bem.TEST_HEADER ||
+    !bem.IGNITER_DETAILS ||
+    !bem.NOZZLE_DETAILS ||
+    !bem.BEM_DATA ||
+    !Array.isArray(bem.BALLISTIC_PARAMETERS) ||
+    !bem.BURN_RATE
+  ) {
+    return empty;
+  }
+  return bem;
+};
+
 export const normalizeStfMotorSession = (
   motor: Partial<StfMotorSession> & { motorId: string; subType: StfSubType },
 ): StfMotorSession => {
@@ -194,7 +228,7 @@ export const normalizeStfMotorSession = (
     ...base,
     stfTestNo: String(motor.stfTestNo ?? "").trim(),
     formLoaded: motor.formLoaded ?? true,
-    stfData: motor.stfData ?? base.stfData,
+    stfData: coerceStfMotorData(motor.stfData, subType),
   };
 };
 

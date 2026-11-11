@@ -38,6 +38,14 @@ const BRAND = QC_DIVISION_BRAND;
 
 type MotorProcessTab = "LOOSE_FLAP" | "INHIBITION";
 
+/** Survives entry remount after silent QC form refresh (entryId / panel key changes). */
+const rememberedPostCureTabsByMotor = new Map<string, MotorProcessTab>();
+
+const postCureMotorTabKey = (motorId?: string | null) => {
+  const key = String(motorId ?? "").trim();
+  return key || "__unknown_motor__";
+};
+
 const isLooseFlapErrorKey = (key: string) => {
   const path = String(key ?? "").toLowerCase();
   return (
@@ -101,7 +109,17 @@ const QCPostCureMotorPanel = ({
   clearFieldError,
 }: QCPostCureMotorPanelProps) => {
   const inputsLocked = Boolean(disabled || readOnly);
-  const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
+  const motorTabKey = postCureMotorTabKey(motorId);
+  const [activeProcessTab, setActiveProcessTabState] = useState<MotorProcessTab>(
+    () => rememberedPostCureTabsByMotor.get(motorTabKey) ?? "LOOSE_FLAP",
+  );
+  const setActiveProcessTab = useCallback(
+    (tab: MotorProcessTab) => {
+      rememberedPostCureTabsByMotor.set(motorTabKey, tab);
+      setActiveProcessTabState(tab);
+    },
+    [motorTabKey],
+  );
   const [inhibitionTypeEditing, setInhibitionTypeEditing] = useState(false);
 
   const session = useMemo(
@@ -188,8 +206,11 @@ const QCPostCureMotorPanel = ({
   const canChangeInhibitionSetup = inhibitionTypeSelected && !inputsLocked;
   const showInhibitionEdit = canChangeInhibitionSetup;
   const showInhibitionDelete = canChangeInhibitionSetup;
+  // Keep Inhibition body visible when hydrated details exist even if type string is odd.
   const showInhibitionPanel =
-    inhibitionTypeSelected && isPostCureInhibitionPanelVisible(session.inhibitorType);
+    Boolean(session.inhibitionData) &&
+    (isPostCureInhibitionPanelVisible(session.inhibitorType) ||
+      Boolean(session.inhibitionData?.variant));
 
   const sectionToggleSx = {
     width: "100%",

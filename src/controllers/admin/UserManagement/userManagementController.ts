@@ -5,7 +5,9 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  resetUserPassword,
+  activateUser,
+  fetchPasswordResetRequests,
+  changePasswordResetStatus,
 } from "@data/api/admin/UserManagement/userManagementApi";
 import {
   UserListItemModel,
@@ -105,12 +107,37 @@ export const userManagementController = {
   },
 
   /* ─────────────────────────────
-     Reset user password
+     Activate inactive user
   ───────────────────────────── */
-  resetPassword: async (id: string) => {
+  activateUser: async (uuid: string) => {
     try {
-      const response = await resetUserPassword(id);
+      const response = await activateUser(uuid);
       return new ApiResponseModel(response);
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Password reset requests
+  ───────────────────────────── */
+  getPasswordResetRequests: async (payload: any) => {
+    try {
+      const response = await fetchPasswordResetRequests(payload);
+      return new ApiResponseModel(response, (res) => res?.data ?? null);
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  changePasswordResetStatus: async (payload: {
+    requestId: string;
+    action: "APPROVE" | "REJECT";
+    remarks?: string;
+  }) => {
+    try {
+      const response = await changePasswordResetStatus(payload);
+      return new ApiResponseModel(response, (res) => res?.data ?? null);
     } catch (error) {
       return new ApiResponseModel<null>(error);
     }

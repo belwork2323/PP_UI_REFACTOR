@@ -600,6 +600,43 @@ export const useMixingFormHook = (
     [],
   );
 
+  /**
+   * After user confirms changing a Mixing Cycle: clear cycle selection and
+   * process/QC tables on Premix N + Final Mix N. Keep building, bowl, trial,
+   * and sheet defaults (mixerType / date / quantity).
+   */
+  const resetMixPairAfterCycleChange = useCallback((premixNo: string | number) => {
+    const key = String(premixNo);
+    setPremixCards((prev) =>
+      prev.map((card) => {
+        if (String(card.premixNo) !== key) return card;
+        return {
+          ...card,
+          mixingCycle: "",
+          mixingCycleId: "",
+          mixingCycleCode: "",
+          mixingCycleName: "",
+          processParticulars: [],
+          qualityChecks: [],
+        };
+      }),
+    );
+    setFinalMixCards((prev) =>
+      prev.map((card) => {
+        if (String(card.mixNo) !== key) return card;
+        return {
+          ...card,
+          mixingCycle: "",
+          mixingCycleId: "",
+          mixingCycleCode: "",
+          mixingCycleName: "",
+          processParticulars: [],
+          qualityChecks: [],
+        };
+      }),
+    );
+  }, []);
+
   const formState = useMemo(() => ({ premixCards, finalMixCards }), [finalMixCards, premixCards]);
 
   return {
@@ -627,6 +664,7 @@ export const useMixingFormHook = (
     applyFinalMixQualityChecks,
     applyPremixOperationsAndQCs,
     applyFinalMixOperationsAndQCs,
+    resetMixPairAfterCycleChange,
     setFinalMixMixingCycle,
     setPremixMixingCycle,
   };

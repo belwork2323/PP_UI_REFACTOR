@@ -233,13 +233,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       const apiStatus =
         status !== allLabel ? toRawMaterialApproverListApiStatus(status, allLabel) : null;
       const materialCode = String(extraFilters.materialCode ?? "").trim();
-      let fromDate = String(extraFilters.fromDate ?? "").trim();
-      let toDate = String(extraFilters.toDate ?? "").trim();
-      if (fromDate && toDate && fromDate > toDate) {
-        const swap = fromDate;
-        fromDate = toDate;
-        toDate = swap;
-      }
+      const fromDate = String(extraFilters.fromDate ?? "").trim();
+      const toDate = String(extraFilters.toDate ?? "").trim();
 
       const payload = {
         subDepartmentId: selectedSubDepartment.subDepartmentId,
@@ -289,13 +284,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     if (subDepartment === ROCKET_MOTOR_CASING_SUBDEPT) {
       const apiStatus = status !== allLabel ? toOperationStatusApiValue(status, allLabel) : null;
 
-      let fromDate = String(extraFilters.fromDate ?? "").trim();
-      let toDate = String(extraFilters.toDate ?? "").trim();
-      if (fromDate && toDate && fromDate > toDate) {
-        const swap = fromDate;
-        fromDate = toDate;
-        toDate = swap;
-      }
+      const fromDate = String(extraFilters.fromDate ?? "").trim();
+      const toDate = String(extraFilters.toDate ?? "").trim();
 
       const motorStage = String(extraFilters.motorStage ?? "").trim();
       const casingType = String(extraFilters.casingType ?? "").trim();

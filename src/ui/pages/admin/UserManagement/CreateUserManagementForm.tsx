@@ -324,6 +324,53 @@ const CreateUserManagementForm = ({
                       />
                     </Box>
 
+                    {/* Select All Option */}
+                    {filteredDepts.length > 0 &&
+                      (() => {
+                        const allFilteredIds = filteredDepts.map((sd) => sd.subDepartmentId);
+                        const isAllSelected = allFilteredIds.every((id) =>
+                          pendingSubDeptIds.includes(id),
+                        );
+
+                        const handleToggleSelectAll = () => {
+                          if (isAllSelected) {
+                            // Remove all filtered items from pending
+                            const updated = pendingSubDepts.filter(
+                              (item) => !allFilteredIds.includes(item.subDepartmentId),
+                            );
+                            setPendingSubDepts(updated);
+                          } else {
+                            // Add missing filtered items to pending
+                            const newItems = filteredDepts.filter(
+                              (sd) => !pendingSubDeptIds.includes(sd.subDepartmentId),
+                            );
+                            setPendingSubDepts([...pendingSubDepts, ...newItems]);
+                          }
+                        };
+
+                        return (
+                          <Box
+                            onClick={handleToggleSelectAll}
+                            sx={(theme) => ({
+                              ...modal.selectorListItem(isAllSelected, theme),
+                              borderBottom: "1px solid",
+                              borderColor: "divider",
+                              fontWeight: 600,
+                            })}
+                          >
+                            <Checkbox
+                              checked={isAllSelected}
+                              size="small"
+                              disableRipple
+                              sx={modal.selectorCheckbox}
+                            />
+                            <Typography sx={modal.selectorItemText(isAllSelected)}>
+                              Select All
+                            </Typography>
+                          </Box>
+                        );
+                      })()}
+
                     <Divider sx={{ flexShrink: 0 }} />
 
                     {/* List */}

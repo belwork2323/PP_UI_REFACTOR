@@ -90,7 +90,9 @@ type CastingCuringBatch = {
 const CC_STATUS = MANUFACTURING_STATUS;
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 const normalizeCuringType = (value: unknown) => {
-  const normalized = String(value ?? "").trim().toUpperCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase();
   return normalized === "N2_PRESSURE_CURING" ? "NITROGEN_PRESSURE_CURING" : normalized;
 };
 
@@ -133,7 +135,9 @@ export const useCastingAndCuringHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
-  const [formData, setFormData] = useState<CastingCuringFormState>(createDefaultCastingCuringFormState());
+  const [formData, setFormData] = useState<CastingCuringFormState>(
+    createDefaultCastingCuringFormState(),
+  );
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
   const [castingMotorDraftsById, setCastingMotorDraftsById] = useState<
@@ -141,9 +145,15 @@ export const useCastingAndCuringHook = () => {
   >({});
   const [addedMotors, setAddedMotors] = useState<CastingCuringAddedMotor[]>([]);
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
-  const [curingSetupDrafts, setCuringSetupDrafts] = useState<Record<string, CuringProcessSetup>>({});
-  const [motorStatusById, setMotorStatusById] = useState<Record<string, CastingCuringMotorStatusMeta>>({});
-  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(null);
+  const [curingSetupDrafts, setCuringSetupDrafts] = useState<Record<string, CuringProcessSetup>>(
+    {},
+  );
+  const [motorStatusById, setMotorStatusById] = useState<
+    Record<string, CastingCuringMotorStatusMeta>
+  >({});
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
+  );
   const [curingCycleConfig, setCuringCycleConfig] = useState<CuringCycleConfig | null>(null);
   const [curingCyclesLoading, setCuringCyclesLoading] = useState(false);
   const [curingCyclesError, setCuringCyclesError] = useState<string | null>(null);
@@ -218,7 +228,7 @@ export const useCastingAndCuringHook = () => {
     async (
       batch: CastingCuringBatch,
       editMode: boolean,
-      options?: { silent?: boolean },
+      options?: { silent?: boolean; preserveMotorData?: CastingCuringMotorSession[] },
     ) => {
       const silent = Boolean(options?.silent);
       // Silent refresh after draft must always hit form/details (even if list status
@@ -268,7 +278,6 @@ export const useCastingAndCuringHook = () => {
             formId,
             subDepartmentId,
           });
-
           if (!detailsResponse?.success || !detailsResponse?.data) {
             const fallback =
               detailsResponse?.statusCode === 404
@@ -309,8 +318,7 @@ export const useCastingAndCuringHook = () => {
         const mergedMotors = await Promise.all(
           motors.map(async (motor) => {
             const motorId = normalizeCastingCuringMotorId(motor.motorId);
-            const status =
-              statuses[motorId]?.motorSubmissionStatus ?? motor.motorSubmissionStatus;
+            const status = statuses[motorId]?.motorSubmissionStatus ?? motor.motorSubmissionStatus;
             if (isCastingCuringMotorLocked(status) || !motor.curingFormLoaded) {
               return motor;
             }
@@ -339,6 +347,30 @@ export const useCastingAndCuringHook = () => {
         nextFormData = { ...nextFormData, motors: mergedMotors };
       }
 
+      if (silent && options?.preserveMotorData?.length) {
+        const preservedMotors = new Map(
+          options.preserveMotorData.map((motor) => [
+            normalizeCastingCuringMotorId(motor.motorId),
+            motor,
+          ]),
+        );
+        nextFormData = {
+          ...nextFormData,
+          motors: (nextFormData.motors ?? []).map((motor) => {
+            const preservedMotor = preservedMotors.get(
+              normalizeCastingCuringMotorId(motor.motorId),
+            );
+            return preservedMotor
+              ? {
+                  ...motor,
+                  castingData: preservedMotor.castingData,
+                  curingData: preservedMotor.curingData,
+                }
+              : motor;
+          }),
+        };
+      }
+
       const formMotors = buildAddedMotorsFromForm(nextFormData);
 
       setActiveBatch(nextBatch);
@@ -359,7 +391,10 @@ export const useCastingAndCuringHook = () => {
         Object.fromEntries(
           (nextFormData.motors ?? [])
             .filter((motor) => !motor.curingFormLoaded)
-            .map((motor) => [motor.motorId, motor.curingSetup ?? createDefaultCuringProcessSetup()]),
+            .map((motor) => [
+              motor.motorId,
+              motor.curingSetup ?? createDefaultCuringProcessSetup(),
+            ]),
         ),
       );
       setInitialSnapshot(
@@ -494,60 +529,66 @@ export const useCastingAndCuringHook = () => {
     [activeBatch, addedMotors, castingMotorDraftsById, formData, previousStageGate, showAlert],
   );
 
-  const fetchCuringCycleConfig = useCallback(async (curingType: string) => {
-    if (!activeBatch) return null;
+  const fetchCuringCycleConfig = useCallback(
+    async (curingType: string) => {
+      if (!activeBatch) return null;
 
-    const projectId = String(activeBatch.projectId ?? "").trim();
-    const motorStage = resolveMotorStage(activeBatch);
-    const selectedCuringType = String(curingType ?? "").trim();
-    if (!projectId) {
-      setCuringCyclesError("Project is required to load curing cycle configuration.");
-      return null;
-    }
-    if (!selectedCuringType) return null;
+      const projectId = String(activeBatch.projectId ?? "").trim();
+      const motorStage = resolveMotorStage(activeBatch);
+      const selectedCuringType = String(curingType ?? "").trim();
+      if (!projectId) {
+        setCuringCyclesError("Project is required to load curing cycle configuration.");
+        return null;
+      }
+      if (!selectedCuringType) return null;
 
-    const cached = curingCycleConfigRef.current;
-    if (
-      cached &&
-      cached.motorStage === motorStage &&
-      String(cached.projectId ?? "") === projectId &&
-      normalizeCuringType(cached.curingType) === normalizeCuringType(selectedCuringType)
-    ) {
-      return cached;
-    }
-
-    setCuringCyclesLoading(true);
-    setCuringCyclesError(null);
-    setCuringCycleConfig(null);
-
-    try {
-      const response = await castingCuringController.fetchCuringCycles({
-        projectId,
-        motorStage,
-        curingType: selectedCuringType,
-      });
-      if (response?.success && response.data) {
-        const next = { ...response.data, projectId };
-        if (normalizeCuringType(next.curingType) !== normalizeCuringType(selectedCuringType)) {
-          setCuringCyclesError("The returned curing cycle does not match the selected curing type.");
-          return null;
-        }
-        setCuringCycleConfig(next);
-        return next;
+      const cached = curingCycleConfigRef.current;
+      if (
+        cached &&
+        cached.motorStage === motorStage &&
+        String(cached.projectId ?? "") === projectId &&
+        normalizeCuringType(cached.curingType) === normalizeCuringType(selectedCuringType)
+      ) {
+        return cached;
       }
 
-      const message = response?.message ?? "Unable to load curing cycle configuration.";
-      setCuringCyclesError(message);
-      showAlert(message, "warning");
-      return null;
-    } finally {
-      setCuringCyclesLoading(false);
-    }
-  }, [activeBatch, showAlert]);
+      setCuringCyclesLoading(true);
+      setCuringCyclesError(null);
+      setCuringCycleConfig(null);
+
+      try {
+        const response = await castingCuringController.fetchCuringCycles({
+          projectId,
+          motorStage,
+          curingType: selectedCuringType,
+        });
+        if (response?.success && response.data) {
+          const next = { ...response.data, projectId };
+          if (normalizeCuringType(next.curingType) !== normalizeCuringType(selectedCuringType)) {
+            setCuringCyclesError(
+              "The returned curing cycle does not match the selected curing type.",
+            );
+            return null;
+          }
+          setCuringCycleConfig(next);
+          return next;
+        }
+
+        const message = response?.message ?? "Unable to load curing cycle configuration.";
+        setCuringCyclesError(message);
+        showAlert(message, "warning");
+        return null;
+      } finally {
+        setCuringCyclesLoading(false);
+      }
+    },
+    [activeBatch, showAlert],
+  );
 
   const getCuringSetupDraft = useCallback(
     (motorId: string): CuringProcessSetup =>
-      curingSetupDrafts[normalizeCastingCuringMotorId(motorId)] ?? createDefaultCuringProcessSetup(),
+      curingSetupDrafts[normalizeCastingCuringMotorId(motorId)] ??
+      createDefaultCuringProcessSetup(),
     [curingSetupDrafts],
   );
 
@@ -680,7 +721,6 @@ export const useCastingAndCuringHook = () => {
         return false;
       }
 
-
       if (hasIncompleteCastingCuringUploads({ motors: formData.motors ?? [] })) {
         showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FILE_UPLOAD_PENDING, "warning");
         return false;
@@ -767,7 +807,7 @@ export const useCastingAndCuringHook = () => {
                 status: response.data?.status ?? "IN_PROGRESS",
               },
               stillRejectedEdit,
-              { silent: true },
+              { silent: true, preserveMotorData: formData.motors ?? [] },
             );
           } else {
             setInitialSnapshot(formSnapshot);
@@ -811,7 +851,10 @@ export const useCastingAndCuringHook = () => {
 
       const upstreamMixingGate = getCastingUpstreamMixingGate(activeBatch);
       if (intent === "submit" && !upstreamMixingGate.submitEnabled) {
-        showAlert(upstreamMixingGate.disabledReason ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED, "warning");
+        showAlert(
+          upstreamMixingGate.disabledReason ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+          "warning",
+        );
         return false;
       }
 
@@ -884,10 +927,7 @@ export const useCastingAndCuringHook = () => {
         }
 
         if (!response?.success) {
-          showAlert(
-            getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`),
-            "error",
-          );
+          showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
           return false;
         }
 
@@ -956,17 +996,19 @@ export const useCastingAndCuringHook = () => {
                 status: response.data?.status ?? "IN_PROGRESS",
               },
               stillRejectedEdit,
-              { silent: true },
+              { silent: true, preserveMotorData: [motor] },
             );
           } else {
             setInitialSnapshot(formSnapshot);
           }
         } else {
+          let refreshedBatch = activeBatch;
           if (intent === "submit" && activeBatch.batchId) {
             await listParams.refreshUserBatches();
             const enrichedStageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
             if (enrichedStageFields) {
-              setActiveBatch((prev) => (prev ? { ...prev, ...enrichedStageFields } : prev));
+              refreshedBatch = { ...refreshedBatch, ...enrichedStageFields };
+              setActiveBatch(refreshedBatch);
               setPreviousStageGate(
                 resolvePreviousStageApprovedUnits({
                   stageProgress: enrichedStageFields.stageProgress,
@@ -979,7 +1021,16 @@ export const useCastingAndCuringHook = () => {
             }
             bumpBatchRefresh();
           }
-          setInitialSnapshot(formSnapshot);
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            await openFormWithResolvedData(
+              { ...refreshedBatch, formId: formIdForRefresh },
+              isEditMode,
+              { silent: true, preserveMotorData: formData.motors ?? [] },
+            );
+          } else {
+            setInitialSnapshot(formSnapshot);
+          }
         }
 
         return true;
@@ -998,8 +1049,7 @@ export const useCastingAndCuringHook = () => {
                 setActiveBatch(batchToReopen);
                 setPreviousStageGate(
                   resolvePreviousStageApprovedUnits({
-                    stageProgress:
-                      enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
+                    stageProgress: enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
                     currentStage: enrichedStageFields.currentStage ?? batchToReopen.currentStage,
                     currentSlug: "casting-and-curing",
                     currentSubDepartmentId: subDepartmentId,
@@ -1053,11 +1103,7 @@ export const useCastingAndCuringHook = () => {
     [motorStatusById],
   );
 
-  const getCrossMotorExcludedBowlSelections = useCallback(
-    (motorId: string) => collectCrossMotorExcludedBowlLabels(formData.motors ?? [], motorId),
-    [formData.motors],
-  );
-
+  const getCrossMotorExcludedBowlSelections = useCallback((motorId: string) => [], []);
   const orderedMotorIds = useMemo(
     () => getCastingCuringOrderedMotorIds(activeBatch, addedMotors),
     [activeBatch, addedMotors],
@@ -1151,7 +1197,9 @@ export const useCastingAndCuringHook = () => {
         return false;
       }
 
-      showAlert("Form submitted for final approval successfully.", "success", { autoCloseMs: 2200 });
+      showAlert("Form submitted for final approval successfully.", "success", {
+        autoCloseMs: 2200,
+      });
       await listParams.refreshUserBatches();
       resetFormContext();
       return true;
@@ -1175,6 +1223,7 @@ export const useCastingAndCuringHook = () => {
         formId: row.formId,
         subDepartmentId,
       });
+
       setDetailsLoading(false);
       if (!response?.success || !response?.data) {
         showAlert(

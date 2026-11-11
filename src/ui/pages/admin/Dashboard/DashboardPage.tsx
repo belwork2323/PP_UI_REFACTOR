@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Box, Typography, Stack, CircularProgress } from "@mui/material";
 import { STRINGS } from "@app/config/strings";
 import getDashboardTheme from "@app/theme/custom_themes/admin/Dashboard/dashboard_theme";
@@ -6,7 +6,7 @@ import useDashboardHook from "@hooks/admin/Dashboard/useDashboardHook";
 import { useThemeStore } from "@app/store/themeStore";
 import DashboardKpiSection from "./components/DashboardKpiSection";
 import DashboardChartsSection from "./components/DashboardChartsSection";
-import DashboardBlockchainSection from "./components/DashboardBlockchainSection";
+import DashboardBlockchainSection from "../BlockchainEvents/DashboardBlockchainSection";
 import DashboardActiveBatchesSection from "./components/DashboardActiveBatchesSection";
 
 /** Admin dashboard: hide Weekly Batch Activity, Motors Processed, QC Pass Rate charts (keep markup). */
@@ -27,8 +27,6 @@ export default function DashboardPage() {
     motorsProcessed,
     qcPassRate,
     chartUpdatedAt,
-    recentEvents,
-    activeBatches,
     filterType,
     setFilterType,
     customStartDate,
@@ -47,17 +45,6 @@ export default function DashboardPage() {
     applyBatchFilters,
     filteredBatches,
     activeFilterCount,
-    eventsLoading,
-    eventsFilterOpen,
-    setEventsFilterOpen,
-    toggleEventsFilterOpen,
-    eventsSearchQuery,
-    setEventsSearchQuery,
-    eventsDraftFilters,
-    setEventsDraftFilter,
-    applyEventsFilters,
-    eventsActiveFilterCount,
-    clearEventsFilters,
     clearBatchesFilters,
     subDepartments,
     toggleCurrentMonth,
@@ -65,6 +52,25 @@ export default function DashboardPage() {
     setBatchStatusTab,
     batchTabOptions,
   } = useDashboardHook(mode);
+
+  // 🟢 Local state for Active Batches Section Pagination
+  const [batchPage, setBatchPage] = useState(0);
+  const [batchRowsPerPage, setBatchRowsPerPage] = useState(10);
+
+  // Pagination handlers for Active Batches Section
+  const handleBatchPageChange = (_event: unknown, newPage: number) => {
+    setBatchPage(newPage);
+  };
+  const handleBatchRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setBatchRowsPerPage(parseInt(event.target.value, 10));
+    setBatchPage(0);
+  };
+
+  // Sliced data for Active Batches pagination
+  const paginatedBatches = filteredBatches.slice(
+    batchPage * batchRowsPerPage,
+    batchPage * batchRowsPerPage + batchRowsPerPage,
+  );
 
   if (loading) {
     return (
@@ -76,7 +82,7 @@ export default function DashboardPage() {
     );
   }
 
-  const isRefreshing = statsLoading || eventsLoading;
+  const isRefreshing = statsLoading;
 
   return (
     <Box sx={th.dashboard.adminWrapper}>
@@ -123,7 +129,7 @@ export default function DashboardPage() {
           filterMenuProps={filterMenuProps}
           filterMenuItemSx={filterMenuItemSx}
           activeBatchesLoading={activeBatchesLoading}
-          activeBatches={activeBatches}
+          activeBatches={paginatedBatches}
           filterOpen={filterOpen}
           setFilterOpen={setFilterOpen}
           toggleFilterOpen={toggleFilterOpen}
@@ -132,7 +138,7 @@ export default function DashboardPage() {
           batchDraftFilters={batchDraftFilters}
           setBatchDraftFilter={setBatchDraftFilter}
           applyBatchFilters={applyBatchFilters}
-          filteredBatches={filteredBatches}
+          filteredBatches={paginatedBatches}
           activeFilterCount={activeFilterCount}
           clearBatchesFilters={clearBatchesFilters}
           subDepartments={subDepartments}
@@ -140,25 +146,11 @@ export default function DashboardPage() {
           batchStatusTab={batchStatusTab}
           setBatchStatusTab={setBatchStatusTab}
           batchTabOptions={batchTabOptions}
-        />
-
-        <DashboardBlockchainSection
-          th={th}
-          t={t}
-          filterMenuProps={filterMenuProps}
-          filterMenuItemSx={filterMenuItemSx}
-          recentEvents={recentEvents}
-          eventsLoading={eventsLoading}
-          eventsFilterOpen={eventsFilterOpen}
-          setEventsFilterOpen={setEventsFilterOpen}
-          toggleEventsFilterOpen={toggleEventsFilterOpen}
-          eventsSearchQuery={eventsSearchQuery}
-          setEventsSearchQuery={setEventsSearchQuery}
-          eventsDraftFilters={eventsDraftFilters}
-          setEventsDraftFilter={setEventsDraftFilter}
-          applyEventsFilters={applyEventsFilters}
-          eventsActiveFilterCount={eventsActiveFilterCount}
-          clearEventsFilters={clearEventsFilters}
+          page={batchPage}
+          rowsPerPage={batchRowsPerPage}
+          totalCount={filteredBatches.length}
+          onPageChange={handleBatchPageChange}
+          onRowsPerPageChange={handleBatchRowsPerPageChange}
         />
       </Box>
     </Box>

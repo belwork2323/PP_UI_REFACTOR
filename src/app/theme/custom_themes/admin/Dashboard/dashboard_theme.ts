@@ -270,7 +270,7 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
       header: {
         ...fonts.typography.tableHeader,
         color: raw.tableHeaderText,
-        borderBottom: `2px solid ${raw.border}`,
+        // borderBottom: `2px solid ${raw.border}`,
         whiteSpace: "nowrap",
         bgcolor: "transparent",
         cursor: "pointer",

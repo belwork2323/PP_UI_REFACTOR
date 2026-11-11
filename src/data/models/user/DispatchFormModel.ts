@@ -7,6 +7,7 @@ import {
   type DispatchMotorData,
 } from "./DispatchMotorDataModel";
 import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
+import { toApiDateTime, toUiDateTime } from "./castingCuringFieldCodec";
 
 export type DispatchMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type DispatchMotorSubmissionStatus =
@@ -257,17 +258,26 @@ export const hydrateDispatchMotorSession = (
  * Casting date fills only when empty. NDT / FAC clearance stay as the user selected them
  * (seed must not flip NO → YES on Load Form).
  */
+const normalizeDispatchSetupDate = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return toUiDateTime(raw);
+};
+
 export const mergeDispatchSetupFromDetails = (
   setup: DispatchMotorSetup,
   details?: Record<string, unknown> | null,
 ): DispatchMotorSetup => {
   if (!details) return setup;
-  const seededCasting = String(details.castingDate ?? "").trim();
+  const seededCasting = normalizeDispatchSetupDate(details.castingDate);
+  const seededDispatch = normalizeDispatchSetupDate(details.dispatchDate);
   const currentCasting = String(setup.castingDate ?? "").trim();
+  const currentDispatch = String(setup.dispatchDate ?? "").trim();
 
   return {
     ...setup,
     castingDate: currentCasting || seededCasting,
+    dispatchDate: currentDispatch || seededDispatch,
   };
 };
 
@@ -391,8 +401,8 @@ export const mapDispatchDetailsToFormState = (details: DispatchDetails): Dispatc
   const motors = Array.isArray(details?.motors) ? details.motors : [];
   const fallbackSetup: DispatchMotorSetup = {
     motorStage: String(details?.motorStage ?? ""),
-    castingDate: String(details?.castingDate ?? ""),
-    dispatchDate: String(details?.dispatchDate ?? ""),
+    castingDate: normalizeDispatchSetupDate(details?.castingDate),
+    dispatchDate: normalizeDispatchSetupDate(details?.dispatchDate),
     dispatchLocation: String(details?.dispatchLocation ?? ""),
     ndtClearance: String(details?.ndtClearance ?? "NO"),
     ndtMomNo: String(details?.ndtMomNo ?? ""),
@@ -503,8 +513,8 @@ export const mapDispatchFormStateToPayload = (form: DispatchFormState): Dispatch
   return {
     motorStage: primarySetup.motorStage || undefined,
     motorId: primaryMotor?.motorId || undefined,
-    castingDate: primarySetup.castingDate || undefined,
-    dispatchDate: primarySetup.dispatchDate || undefined,
+    castingDate: toApiDateTime(primarySetup.castingDate) ?? undefined,
+    dispatchDate: toApiDateTime(primarySetup.dispatchDate) ?? undefined,
     dispatchLocation: primarySetup.dispatchLocation || undefined,
     ndtClearance: primarySetup.ndtClearance || undefined,
     ndtMomNo: primarySetup.ndtClearance === "YES" ? primarySetup.ndtMomNo || undefined : undefined,

@@ -45,8 +45,14 @@ const CasePrepTextField = ({
       {...(dataCpField ? { "data-cp-field": dataCpField } : {})}
       {...(dataCcField ? { "data-cc-field": dataCcField } : {})}
     >
-      <Typography component="label" sx={flowBar.selectLabel}>
-        {required ? <FieldLabelWithAsterisk label={label} required /> : label}
+      <Typography component="label" sx={{ ...flowBar.selectLabel, fontWeight: 500 }}>
+        {required ? (
+          <FieldLabelWithAsterisk label={label} required />
+        ) : (
+          <Typography variant="body2" component="span" sx={{ mb: 0.5, fontWeight: 500 }}>
+            {label}
+          </Typography>
+        )}
       </Typography>
       {readOnly ? (
         <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />

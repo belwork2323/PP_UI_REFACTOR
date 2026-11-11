@@ -141,7 +141,7 @@ export const SectionCard = ({ title, children, theme, mb = 3 }: SectionCardProps
 export const SubsectionHeading = ({ children }: { children: ReactNode }) => (
   <Typography
     sx={{
-      fontSize: "0.78rem",
+      fontSize: "0.85rem",
       fontWeight: 800,
       color: BRAND.text,
       mb: 1.25,

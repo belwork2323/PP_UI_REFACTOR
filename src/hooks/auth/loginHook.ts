@@ -4,11 +4,7 @@ import { useAuthStore } from "../../app/store/authStore";
 import { getRouteByRole } from "../../utils/roleMapper";
 import { STRINGS } from "../../app/config/strings";
 import { useAlertStore } from "../../app/store/alertStore";
-import {
-  fetchDepartments,
-  fetchRoles,
-  fetchSubDepartments,
-} from "../../data/api/common/generalAPI";
+import { fetchRoles, fetchSubDepartments } from "../../data/api/common/generalAPI";
 
 const DEPT_REQUIRED_ROLES = /User|Approver/i;
 
@@ -38,21 +34,10 @@ const rejectedMessage = (reason) =>
     ? String(reason.message)
     : STRINGS.SYSTEM.UNEXPECTED_ERROR;
 
-const isPasswordValid = (pw) => {
-  if (!pw) return false;
-  if (pw.length < 8) return false;
-  if (!/^[A-Z]/.test(pw)) return false; // first char uppercase
-  if (!/[0-9]/.test(pw)) return false; // at least one digit
-  if (!/[^A-Za-z0-9]/.test(pw)) return false; // at least one special char
-  const hasUpper = /[A-Z]/.test(pw);
-  const hasLower = /[a-z]/.test(pw);
-  if (!hasUpper || !hasLower) return false; // not all caps, not all small
-  return true;
-};
-
 /**
  * Login form state, lookups (roles / sub-departments), validation, and submit.
  * System lookups call the API layer directly so errors can be surfaced once (no duplicate controller toasts).
+ * Password format is NOT validated here — only non-blank; strength rules apply on change-password.
  */
 export function useLoginForm({ navigate }) {
   const login = useAuthStore((s) => s.login);
@@ -101,9 +86,9 @@ export function useLoginForm({ navigate }) {
       setSystemLookupsLoading(true);
 
       try {
-        const [rolesSettled, depsSettled] = await Promise.allSettled([
+        const [rolesSettled, subSettled] = await Promise.allSettled([
           fetchRoles(),
-          fetchDepartments(),
+          fetchSubDepartments(),
         ]);
 
         if (cancelled) return;
@@ -118,44 +103,11 @@ export function useLoginForm({ navigate }) {
         }
 
         let subData = [];
-
-        const depsData =
-          depsSettled.status === "fulfilled" && Array.isArray(depsSettled.value)
-            ? depsSettled.value
-            : [];
-
-        if (depsSettled.status === "rejected") {
-          showAlert(rejectedMessage(depsSettled.reason), "error", { autoCloseMs: 2000 });
-        }
-
-        // Preferred path: fetch sub-departments per departmentId, then flatten.
-        if (depsData.length > 0) {
-          const settledSubs = await Promise.allSettled(
-            depsData.map((d) => {
-              const departmentId = d.departmentId;
-              return fetchSubDepartments(departmentId);
-            }),
-          );
-
-          settledSubs.forEach((res, idx) => {
-            if (res.status === "fulfilled") {
-              const list = Array.isArray(res.value) ? res.value : [];
-
-              subData = subData.concat(list);
-            } else {
-            }
-          });
-        }
-
-        if (subData.length === 0) {
-          const subAllSettled = await Promise.allSettled([fetchSubDepartments()]);
-          const subAll = subAllSettled[0];
-
-          if (subAll.status === "fulfilled") {
-            subData = Array.isArray(subAll.value) ? subAll.value : [];
-          } else {
-            console.error(STRINGS.AUTH.ERRORS.FETCH_SUB_DEPTS_FAILED, subAll.reason);
-          }
+        if (subSettled.status === "fulfilled") {
+          subData = Array.isArray(subSettled.value) ? subSettled.value : [];
+        } else {
+          console.error(STRINGS.AUTH.ERRORS.FETCH_SUB_DEPTS_FAILED, subSettled.reason);
+          showAlert(rejectedMessage(subSettled.reason), "error", { autoCloseMs: 2000 });
         }
 
         if (subData.length === 0 && rolesData.length > 0) {
@@ -187,19 +139,7 @@ export function useLoginForm({ navigate }) {
 
   const handleChange = useCallback((field, value) => {
     setCredentials((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => {
-      if (field === "password") {
-        if (!value || String(value).trim().length === 0) {
-          return { ...prev, password: "" };
-        }
-        return {
-          ...prev,
-          password: isPasswordValid(String(value)) ? "" : STRINGS.AUTH.VALIDATION.PASSWORD_INVALID,
-        };
-      }
-
-      return prev[field] ? { ...prev, [field]: "" } : prev;
-    });
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: "" } : prev));
   }, []);
 
   const handleRoleChange = useCallback(
@@ -252,9 +192,6 @@ export function useLoginForm({ navigate }) {
     }
     if (!credentials.password) {
       next.password = V.PASSWORD_REQUIRED;
-      valid = false;
-    } else if (!isPasswordValid(credentials.password)) {
-      next.password = V.PASSWORD_INVALID;
       valid = false;
     }
     if (!captchaValue.trim()) {
@@ -330,9 +267,19 @@ export function useLoginForm({ navigate }) {
         setCaptchaReloadTrigger((prev) => prev + 1);
       } else {
         login(user);
-        const selectedSubDept = user.getSubDepartment(credentials.subDepartmentId);
-        const route = getRouteByRole(user.role, credentials.subDepartmentId, selectedSubDept);
-        navigate(route, { replace: true });
+        if (user.mustChangePassword) {
+          if (credentials.subDepartmentId !== "" && credentials.subDepartmentId != null) {
+            sessionStorage.setItem("pendingSubDeptId", String(credentials.subDepartmentId));
+          } else {
+            sessionStorage.removeItem("pendingSubDeptId");
+          }
+          navigate("/change-password", { replace: true });
+        } else {
+          sessionStorage.removeItem("pendingSubDeptId");
+          const selectedSubDept = user.getSubDepartment(credentials.subDepartmentId);
+          const route = getRouteByRole(user.role, credentials.subDepartmentId, selectedSubDept);
+          navigate(route, { replace: true });
+        }
       }
     }
 
@@ -350,7 +297,7 @@ export function useLoginForm({ navigate }) {
     submitting,
   ]);
 
-  const passwordValid = isPasswordValid(credentials.password);
+  const passwordFilled = credentials.password.length > 0;
   const usernameFilled = credentials.username.trim().length > 0;
   const roleSelected = credentials.roleId !== "" && credentials.roleId != null;
   const subDeptSelected =
@@ -364,7 +311,7 @@ export function useLoginForm({ navigate }) {
     rolesEmpty ||
     (showDeptDropdown && subDeptsEmpty) ||
     !usernameFilled ||
-    !passwordValid ||
+    !passwordFilled ||
     !roleSelected ||
     !subDeptSelected ||
     !captchaIdValid ||

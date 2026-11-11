@@ -18,6 +18,10 @@ import {
   QC_NDT_VISUAL_INSPECTION_PRESET,
   QC_NDT_VISUAL_TYPE_BY_API,
   emptyNdtRadiographyDetailRow,
+  emptyNdtVisualCustomRow,
+  isQcNdtObservationPresetLabel,
+  isQcNdtVisualPresetLabel,
+  renumberQcNdtRows,
   type QcNdtRadiographyDetailRow,
   type QcNdtRadiographyObservationRow,
   type QcNdtVisualInspectionRow,
@@ -92,6 +96,7 @@ const emptyObservationRows = (): QcNdtRadiographyObservationRow[] =>
     OBSERVATIONS: "",
     LOCATION: "",
     QA_REMARKS: "",
+    isPreset: true,
   }));
 
 const emptyVisualRows = (): QcNdtVisualInspectionRow[] =>
@@ -102,7 +107,57 @@ const emptyVisualRows = (): QcNdtVisualInspectionRow[] =>
     LOCATION: "",
     QA_REMARKS: "",
     UPLOAD_IMAGE: [],
+    isPreset: true,
   }));
+
+const parseObservationRow = (
+  row: Record<string, unknown> | null | undefined,
+  fallback?: QcNdtRadiographyObservationRow,
+): QcNdtRadiographyObservationRow => {
+  const split = splitObservationLocation(
+    row?.OBSERVATION_LOCATION ?? row?.observationLocation ?? row?.observationAndLocation,
+  );
+  const typeOfDefect =
+    pickString(row?.TYPE_OF_DEFECT, row?.typeOfDefect) || fallback?.TYPE_OF_DEFECT || "";
+  const explicitPreset = row?.isPreset;
+  const isPreset =
+    typeof explicitPreset === "boolean"
+      ? explicitPreset
+      : Boolean(fallback?.isPreset) || isQcNdtObservationPresetLabel(typeOfDefect);
+  return {
+    SR_NO: Number(row?.SR_NO ?? row?.srNo ?? fallback?.SR_NO ?? 0) || fallback?.SR_NO || 0,
+    TYPE_OF_DEFECT: typeOfDefect,
+    OBSERVATIONS:
+      pickEditableString(row?.OBSERVATIONS, row?.observations, row?.OBSERVATION, row?.observation) ||
+      split.observations,
+    LOCATION: pickEditableString(row?.LOCATION, row?.location) || split.location,
+    QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
+    isPreset,
+  };
+};
+
+const parseVisualRow = (
+  row: Record<string, unknown> | null | undefined,
+  fallback?: QcNdtVisualInspectionRow,
+): QcNdtVisualInspectionRow => {
+  const rawType = pickString(row?.OBSERVATION_TYPE, row?.observationType);
+  const presetType = resolveQcVisualPresetType(rawType);
+  const observationType = presetType || rawType || fallback?.OBSERVATION_TYPE || "";
+  const explicitPreset = row?.isPreset;
+  const isPreset =
+    typeof explicitPreset === "boolean"
+      ? explicitPreset
+      : Boolean(fallback?.isPreset) || isQcNdtVisualPresetLabel(observationType);
+  return {
+    SR_NO: Number(row?.SR_NO ?? row?.srNo ?? fallback?.SR_NO ?? 0) || fallback?.SR_NO || 0,
+    OBSERVATION_TYPE: observationType,
+    OBSERVATION: pickEditableString(row?.OBSERVATION, row?.observation, row?.OBSERVATIONS),
+    LOCATION: pickEditableString(row?.LOCATION, row?.location),
+    QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
+    UPLOAD_IMAGE: parseNdtUploadFiles(row?.UPLOAD_IMAGE, row?.uploadImage, row?.uploadedImages),
+    isPreset,
+  };
+};
 
 const normalizeRadiographyDetailRows = (value: unknown): QcNdtRadiographyDetailRow[] => {
   const rows = asArray(value)
@@ -125,28 +180,38 @@ const normalizeObservationRows = (value: unknown): QcNdtRadiographyObservationRo
   const defaults = emptyObservationRows();
   const rows = asArray(value);
   if (!rows.length) return defaults;
-  return defaults.map((fallback, index) => {
-    const row =
-      asRecord(rows[index]) ??
-      asRecord(
-        rows.find((item) => {
-          const rec = asRecord(item);
-          return rec ? defectsMatch(rec.TYPE_OF_DEFECT ?? rec.typeOfDefect, fallback.TYPE_OF_DEFECT) : false;
-        }),
-      );
-    const split = splitObservationLocation(
-      row?.OBSERVATION_LOCATION ?? row?.observationLocation ?? row?.observationAndLocation,
-    );
+
+  const consumed = new Set<number>();
+  const presets = defaults.map((fallback) => {
+    const matchedIndex = rows.findIndex((item, index) => {
+      if (consumed.has(index)) return false;
+      const rec = asRecord(item);
+      if (!rec) return false;
+      if (rec.isPreset === false) return false;
+      const defect = pickString(rec.TYPE_OF_DEFECT, rec.typeOfDefect);
+      if (!defect) return false;
+      return defectsMatch(defect, fallback.TYPE_OF_DEFECT);
+    });
+    if (matchedIndex < 0) {
+      return { ...fallback };
+    }
+    consumed.add(matchedIndex);
+    const parsed = parseObservationRow(asRecord(rows[matchedIndex]), fallback);
     return {
+      ...parsed,
       SR_NO: fallback.SR_NO,
       TYPE_OF_DEFECT: fallback.TYPE_OF_DEFECT,
-      OBSERVATIONS:
-        pickEditableString(row?.OBSERVATIONS, row?.observations, row?.OBSERVATION, row?.observation) ||
-        split.observations,
-      LOCATION: pickEditableString(row?.LOCATION, row?.location) || split.location,
-      QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
+      isPreset: true,
     };
   });
+
+  const custom = rows
+    .map((item, index) => ({ item, index }))
+    .filter(({ index }) => !consumed.has(index))
+    .map(({ item }) => parseObservationRow(asRecord(item), undefined))
+    .map((row) => ({ ...row, isPreset: false }));
+
+  return renumberQcNdtRows([...presets, ...custom]);
 };
 
 const parseNdtUploadFiles = (...candidates: unknown[]): FileRef[] => {
@@ -235,35 +300,42 @@ const normalizeVisualRows = (value: unknown): QcNdtVisualInspectionRow[] => {
   const defaults = emptyVisualRows();
   const rows = asArray(value);
   if (!rows.length) return defaults;
-  return defaults.map((fallback, index) => {
-    const row =
-      asRecord(
-        rows.find((item) => {
-          const rec = asRecord(item);
-          if (!rec) return false;
-          const presetType = resolveQcVisualPresetType(
-            rec.OBSERVATION_TYPE ?? rec.observationType,
-          );
-          return (
-            defectsMatch(rec.OBSERVATION_TYPE ?? rec.observationType, fallback.OBSERVATION_TYPE) ||
-            defectsMatch(presetType, fallback.OBSERVATION_TYPE)
-          );
-        }),
-      ) ?? asRecord(rows[index]);
+
+  const consumed = new Set<number>();
+  const presets = defaults.map((fallback) => {
+    const matchedIndex = rows.findIndex((item, rowIndex) => {
+      if (consumed.has(rowIndex)) return false;
+      const rec = asRecord(item);
+      if (!rec) return false;
+      if (rec.isPreset === false) return false;
+      const presetType = resolveQcVisualPresetType(
+        rec.OBSERVATION_TYPE ?? rec.observationType,
+      );
+      return (
+        defectsMatch(rec.OBSERVATION_TYPE ?? rec.observationType, fallback.OBSERVATION_TYPE) ||
+        defectsMatch(presetType, fallback.OBSERVATION_TYPE)
+      );
+    });
+    if (matchedIndex < 0) {
+      return { ...fallback };
+    }
+    consumed.add(matchedIndex);
+    const parsed = parseVisualRow(asRecord(rows[matchedIndex]), fallback);
     return {
+      ...parsed,
       SR_NO: fallback.SR_NO,
       OBSERVATION_TYPE: fallback.OBSERVATION_TYPE,
-      OBSERVATION: pickEditableString(row?.OBSERVATION, row?.observation, row?.OBSERVATIONS),
-      // Do not derive Location from sectionNumber/orientation on seed.
-      LOCATION: pickEditableString(row?.LOCATION, row?.location),
-      QA_REMARKS: pickEditableString(row?.QA_REMARKS, row?.qaRemarks),
-      UPLOAD_IMAGE: parseNdtUploadFiles(
-        row?.UPLOAD_IMAGE,
-        row?.uploadImage,
-        row?.uploadedImages,
-      ),
+      isPreset: true,
     };
   });
+
+  const custom = rows
+    .map((item, index) => ({ item, index }))
+    .filter(({ index }) => !consumed.has(index))
+    .map(({ item }) => parseVisualRow(asRecord(item), undefined))
+    .map((row) => ({ ...row, isPreset: false }));
+
+  return renumberQcNdtRows([...presets, ...custom]);
 };
 
 const applyManufacturingNdtDetails = (
@@ -310,22 +382,44 @@ const applyManufacturingNdtDetails = (
     formKey(QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS, QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS)
   ] = emptyObservationRows();
 
-  const visualRows = emptyVisualRows();
+  const visualPresets = emptyVisualRows();
+  const visualCustom: QcNdtVisualInspectionRow[] = [];
   asArray(data.visualInspectionDetails).forEach((item) => {
     const rec = asRecord(item);
     if (!rec) return;
-    const presetType = resolveQcVisualPresetType(rec.observationType ?? rec.OBSERVATION_TYPE);
-    const index = visualRows.findIndex((row) => defectsMatch(row.OBSERVATION_TYPE, presetType));
-    if (index < 0) return;
-    visualRows[index] = {
-      ...visualRows[index],
-      OBSERVATION: pickEditableString(rec.observation, rec.OBSERVATION, rec.observations),
-      LOCATION: pickEditableString(rec.LOCATION, rec.location),
-      UPLOAD_IMAGE: parseNdtUploadFiles(rec.uploadedImages, rec.UPLOAD_IMAGE, rec.uploadImage),
-    };
+    const rawType = pickString(rec.observationType, rec.OBSERVATION_TYPE);
+    const presetType = resolveQcVisualPresetType(rawType);
+    const index = visualPresets.findIndex((row) =>
+      defectsMatch(row.OBSERVATION_TYPE, presetType || rawType),
+    );
+    const observation = pickEditableString(rec.observation, rec.OBSERVATION, rec.observations);
+    const location = pickEditableString(rec.LOCATION, rec.location);
+    const uploadImage = parseNdtUploadFiles(
+      rec.uploadedImages,
+      rec.UPLOAD_IMAGE,
+      rec.uploadImage,
+    );
+    if (index >= 0) {
+      visualPresets[index] = {
+        ...visualPresets[index],
+        OBSERVATION: observation,
+        LOCATION: location,
+        UPLOAD_IMAGE: uploadImage,
+      };
+      return;
+    }
+    if (!rawType && !observation && !location && !uploadImage.length) return;
+    visualCustom.push({
+      ...emptyNdtVisualCustomRow(0),
+      OBSERVATION_TYPE: presetType || rawType,
+      OBSERVATION: observation,
+      LOCATION: location,
+      UPLOAD_IMAGE: uploadImage,
+      isPreset: false,
+    });
   });
   values[formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)] =
-    visualRows;
+    renumberQcNdtRows([...visualPresets, ...visualCustom]);
 
   const media = parseNdtUploadFiles(data.uploadedVideos, data.UPLOAD_VIDEO_PHOTO, data.uploadVideoPhoto);
   if (media.length) {
@@ -686,31 +780,34 @@ export const hydrateNdtValuesFromSections = (
   return values;
 };
 
-/** Map API/manufacturing-shaped radiographyObservations onto QC defect presets (QC form reload). */
+/** Map API/manufacturing-shaped radiographyObservations onto QC defect presets + custom extras. */
 const mapApiObservationsToQcRows = (value: unknown): QcNdtRadiographyObservationRow[] => {
   const defaults = emptyObservationRows();
   const rows = asArray(value);
   if (!rows.length) return defaults;
 
-  rows.forEach((item, index) => {
-    const rec = asRecord(item);
-    if (!rec) return;
-    let targetIndex = -1;
-    const defect = pickString(rec.TYPE_OF_DEFECT, rec.typeOfDefect);
-    if (defect) {
-      targetIndex = defaults.findIndex((row) => defectsMatch(row.TYPE_OF_DEFECT, defect));
-    }
-    if (targetIndex < 0) {
-      const sr = Number(rec.sectionNumber ?? rec.SR_NO ?? index + 1);
-      if (Number.isFinite(sr)) {
-        targetIndex = defaults.findIndex((row) => row.SR_NO === sr);
+  const consumed = new Set<number>();
+  const presets = defaults.map((fallback) => {
+    let matchedIndex = -1;
+    rows.forEach((item, index) => {
+      if (matchedIndex >= 0 || consumed.has(index)) return;
+      const rec = asRecord(item);
+      if (!rec) return;
+      const defect = pickString(rec.TYPE_OF_DEFECT, rec.typeOfDefect);
+      if (defect && defectsMatch(fallback.TYPE_OF_DEFECT, defect)) {
+        matchedIndex = index;
+        return;
       }
-    }
-    if (targetIndex < 0) targetIndex = index;
-    if (targetIndex < 0 || targetIndex >= defaults.length) return;
-
-    defaults[targetIndex] = {
-      ...defaults[targetIndex],
+      const sr = Number(rec.sectionNumber ?? rec.SR_NO ?? NaN);
+      if (Number.isFinite(sr) && sr === fallback.SR_NO && isQcNdtObservationPresetLabel(defect || fallback.TYPE_OF_DEFECT)) {
+        matchedIndex = index;
+      }
+    });
+    if (matchedIndex < 0) return { ...fallback };
+    consumed.add(matchedIndex);
+    const rec = asRecord(rows[matchedIndex]) ?? {};
+    return {
+      ...fallback,
       OBSERVATIONS: pickEditableString(
         rec.OBSERVATIONS,
         rec.observations,
@@ -719,9 +816,38 @@ const mapApiObservationsToQcRows = (value: unknown): QcNdtRadiographyObservation
       ),
       LOCATION: pickEditableString(rec.LOCATION, rec.location, rec.orientation),
       QA_REMARKS: pickEditableString(rec.QA_REMARKS, rec.qaRemarks),
+      isPreset: true,
     };
   });
-  return defaults;
+
+  const custom = rows
+    .map((item, index) => ({ item, index }))
+    .filter(({ index }) => !consumed.has(index))
+    .map(({ item }) => {
+      const rec = asRecord(item) ?? {};
+      return {
+        SR_NO: 0,
+        TYPE_OF_DEFECT: pickString(rec.TYPE_OF_DEFECT, rec.typeOfDefect),
+        OBSERVATIONS: pickEditableString(
+          rec.OBSERVATIONS,
+          rec.observations,
+          rec.observation,
+          rec.OBSERVATION,
+        ),
+        LOCATION: pickEditableString(rec.LOCATION, rec.location, rec.orientation),
+        QA_REMARKS: pickEditableString(rec.QA_REMARKS, rec.qaRemarks),
+        isPreset: false as const,
+      };
+    })
+    .filter(
+      (row) =>
+        row.TYPE_OF_DEFECT ||
+        row.OBSERVATIONS ||
+        row.LOCATION ||
+        row.QA_REMARKS,
+    );
+
+  return renumberQcNdtRows([...presets, ...custom]);
 };
 
 export type NdtHydrateOptions = {
@@ -882,20 +1008,22 @@ export const ndtMotorDetailToSections = (
         sectionId: QC_NDT_SECTION_IDS.VISUAL_INSPECTION,
         sectionData: [
           {
-            [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: visualRows.map((row) => {
-              const recRow = asRecord(row) ?? {};
-              return {
-                OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
-                OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
-                LOCATION: pickEditableString(recRow.LOCATION, recRow.location),
-                QA_REMARKS: pickEditableString(recRow.qaRemarks, recRow.QA_REMARKS),
-                UPLOAD_IMAGE: parseNdtUploadFiles(
-                  recRow.uploadedImages,
-                  recRow.uploadImage,
-                  recRow.UPLOAD_IMAGE,
-                ),
-              };
-            }),
+            [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: normalizeVisualRows(
+              visualRows.map((row) => {
+                const recRow = asRecord(row) ?? {};
+                return {
+                  OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
+                  OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
+                  LOCATION: pickEditableString(recRow.LOCATION, recRow.location),
+                  QA_REMARKS: pickEditableString(recRow.qaRemarks, recRow.QA_REMARKS),
+                  UPLOAD_IMAGE: parseNdtUploadFiles(
+                    recRow.uploadedImages,
+                    recRow.uploadImage,
+                    recRow.UPLOAD_IMAGE,
+                  ),
+                };
+              }),
+            ),
           },
         ],
         motorId,

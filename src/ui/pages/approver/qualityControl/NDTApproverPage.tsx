@@ -6,9 +6,7 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useNDTApproverHook from "../../../../hooks/approver/qualityControl/useNDTApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import NDTApproverDetailDialog, {
-  type NDTApproverDetailItem,
-} from "./NDTApproverDetailDialog";
+import NDTApproverDetailDialog, { type NDTApproverDetailItem } from "./NDTApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",

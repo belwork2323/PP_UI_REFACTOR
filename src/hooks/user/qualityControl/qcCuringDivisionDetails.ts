@@ -412,7 +412,10 @@ const mapSubscaleCuringFromManufacturing = (
 
   return {
     numberOfOvens,
-    parameterRows: mapApiSubscaleCuringTableToParameterRows(curingTable),
+    parameterRows: mapApiSubscaleCuringTableToParameterRows(
+      curingTable,
+      asArray(subscale.hardwareArticles),
+    ),
     curingStartDate: startDates[0] ?? "",
     curingCompleteDate: endDates[endDates.length - 1] ?? "",
     bemAverageHardness: avg(bemHardness),

@@ -218,6 +218,7 @@ export const useOtherBemApproverHook = () => {
   // Formatted exact props expected by ApproverActionDialogProps
   const dialogProps = useMemo(
     () => ({
+      subdepartment: 12,
       open: actionDialog.open,
       actionType: actionDialog.type === "REJECTED" ? ("REJECTED" as const) : ("APPROVED" as const),
       submitting: actionLoading,

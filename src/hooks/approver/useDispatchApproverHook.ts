@@ -12,9 +12,7 @@ import {
   mapDispatchDetailsForDisplay,
   type DispatchDetailView,
 } from "../../data/models/user/DispatchApiModel";
-import {
-  isDispatchMotorApproverTabDisabled,
-} from "../../data/models/user/DispatchFormModel";
+import { isDispatchMotorApproverTabDisabled } from "../../data/models/user/DispatchFormModel";
 import useApproverFormAction from "./useApproverFormAction";
 
 const DEPARTMENT = "dispatch" as const;
@@ -55,8 +53,7 @@ export const useDispatchApproverHook = () => {
     const match =
       user?.allSubDepartments?.find(
         (item) => item.slugs?.dept === DEPARTMENT && item.slugs?.subDept === SUB_DEPARTMENT,
-      ) ??
-      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+      ) ?? user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
     return match?.subDepartmentId ?? null;
   }, [user]);
 
@@ -131,6 +128,7 @@ export const useDispatchApproverHook = () => {
         activeMotorId && motorDialogBaseProps.batchId
           ? `${motorDialogBaseProps.batchId} · ${activeMotorId}`
           : motorDialogBaseProps.batchId,
+      subdepartment: 13,
     }),
     [activeMotorId, motorDialogBaseProps],
   );
@@ -161,8 +159,7 @@ export const useDispatchApproverHook = () => {
     setDetailsLoading(false);
 
     if (!response?.success || !response?.data) {
-      const fallback =
-        response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
+      const fallback = response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
       showAlert(response?.message || fallback, "error", { autoCloseMs: 3500 });
       setSelected(null);
       return;
@@ -178,7 +175,9 @@ export const useDispatchApproverHook = () => {
       detailView?.status ||
       getDispatchBatchStatusLabel((response.data as { formStatus?: unknown })?.formStatus) ||
       getDispatchBatchStatusLabel((response.data as { status?: unknown })?.status) ||
-      getDispatchBatchStatusLabel((response.data as { dispatchStatus?: unknown })?.dispatchStatus) ||
+      getDispatchBatchStatusLabel(
+        (response.data as { dispatchStatus?: unknown })?.dispatchStatus,
+      ) ||
       row.dispatchStatus ||
       row.status ||
       "";
@@ -225,9 +224,7 @@ export const useDispatchApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;
@@ -244,9 +241,7 @@ export const useDispatchApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;

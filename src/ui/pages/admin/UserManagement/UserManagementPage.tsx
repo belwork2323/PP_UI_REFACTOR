@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Button, Stack } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { icons } from "@app/theme/icons";
 import getUserManagementTheme from "@app/theme/custom_themes/admin/UserManagement/userManagement_theme";
 import { STRINGS } from "@app/config/strings";
@@ -32,11 +33,21 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
 };
 
 const UserManagementPage = () => {
+  const navigate = useNavigate();
   const mode = useThemeStore((s) => s.mode);
   const t = getUserManagementTheme(mode);
-  const { list, stats, lookups, form, delete: deleteSection, refresh } = useUserManagementHook();
+  const {
+    list,
+    stats,
+    lookups,
+    form,
+    delete: deleteSection,
+    activate: activateSection,
+    refresh,
+  } = useUserManagementHook();
   const th = getDashboardTheme(mode);
   const S1 = STRINGS.DASHBOARD_PAGE;
+  const goToPasswordRequests = () => navigate("/admin/users/password-requests");
   const statRows = S.STATS.map((s) => ({
     ...s,
     value: stats.loading
@@ -51,9 +62,11 @@ const UserManagementPage = () => {
                 : "pendingResetRequests"
         ],
     icon: STAT_ICONS[s.variant],
+    onClick: s.variant === "reset" ? goToPasswordRequests : undefined,
   }));
 
   const deleteTarget = deleteSection.deleteTarget;
+  const activateTarget = activateSection.activateTarget;
   const { draftFilters } = list;
   const total = list.paginationData.totalRecords;
   const shown = list.users.length;
@@ -63,16 +76,27 @@ const UserManagementPage = () => {
       <AdminManagementPageHeader
         title={S.PAGE.TITLE}
         subtitle={S.PAGE.SUBTITLE}
-        primaryAction={
-          <Button
-            variant="contained"
-            startIcon={<icons.userMgmt.add />}
-            onClick={form.openCreate}
-            disabled={list.loading}
-            sx={t.pageHeader.newUserButton}
-          >
-            {S.PAGE.NEW_USER_BUTTON}
-          </Button>
+        headerActions={
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Button
+              variant="outlined"
+              startIcon={<icons.userMgmt.lockIcon />}
+              onClick={goToPasswordRequests}
+              disabled={list.loading}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.PAGE.PASSWORD_REQUEST_BUTTON}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<icons.userMgmt.add />}
+              onClick={form.openCreate}
+              disabled={list.loading}
+              sx={t.pageHeader.newUserButton}
+            >
+              {S.PAGE.NEW_USER_BUTTON}
+            </Button>
+          </Stack>
         }
         theme={t}
       />
@@ -197,6 +221,7 @@ const UserManagementPage = () => {
           t={t}
           onEdit={form.openEdit}
           onDelete={deleteSection.openDelete}
+          onActivate={activateSection.openActivate}
           onPageChange={(_, p) => list.setPage(p)}
           onRowsPerPageChange={(e) => {
             list.setRowsPerPage(+e.target.value);
@@ -234,6 +259,24 @@ const UserManagementPage = () => {
         onCancel={() => deleteSection.setDeleteOpen(false)}
         onConfirm={deleteSection.handleDelete}
         confirmDisabled={deleteSection.deleting}
+      />
+
+      <ConfirmAlertDialog
+        open={activateSection.activateOpen}
+        severity="success"
+        title={S.ACTIVATE_DIALOG.TITLE}
+        message={
+          activateTarget
+            ? S.ACTIVATE_DIALOG.BODY(getDisplayName(activateTarget), getUsername(activateTarget))
+            : S.ACTIVATE_DIALOG.FALLBACK_MESSAGE
+        }
+        cancelLabel={S.ACTIVATE_DIALOG.CANCEL}
+        confirmLabel={
+          activateSection.activating ? S.ACTIVATE_DIALOG.ACTIVATING : S.ACTIVATE_DIALOG.CONFIRM
+        }
+        onCancel={() => activateSection.setActivateOpen(false)}
+        onConfirm={activateSection.handleActivate}
+        confirmDisabled={activateSection.activating}
       />
     </Box>
   );

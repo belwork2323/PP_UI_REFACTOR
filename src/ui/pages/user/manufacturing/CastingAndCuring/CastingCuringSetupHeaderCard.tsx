@@ -13,7 +13,9 @@ const DetailItem = ({ label, value }: { label: string; value: string }) => (
     <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: "text.secondary", mb: 0.25 }}>
       {label}
     </Typography>
-    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary", wordBreak: "break-word" }}>
+    <Typography
+      sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary", wordBreak: "break-word" }}
+    >
       {value || "—"}
     </Typography>
   </Box>
@@ -38,7 +40,9 @@ const CastingCuringSetupHeaderCard = ({
         mb: 1.25,
       }}
     >
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1 }}>
+      <Typography
+        sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1 }}
+      >
         {L.castingProcessTitle}
       </Typography>
       <Stack
@@ -54,7 +58,7 @@ const CastingCuringSetupHeaderCard = ({
           },
         }}
       >
-        <DetailItem label={L.motorId} value={motorId} />
+        {/* <DetailItem label={L.motorId} value={motorId} /> */}
         <DetailItem label={L.castingStation} value={castingStation} />
         <DetailItem label={L.motorReceivedAt} value={motorReceivedAt} />
       </Stack>

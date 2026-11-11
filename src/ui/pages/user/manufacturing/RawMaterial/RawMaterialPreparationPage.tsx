@@ -52,6 +52,8 @@ const RawMaterialPreparationPage = () => {
     handleBack,
     handleDiscardAndBack,
     formHydrationKey,
+    preferredPremixNo,
+    setPreferredPremixNo,
     handleSavePremixDraft,
     handleSubmitPremix,
     premixFieldErrors,
@@ -120,11 +122,15 @@ const RawMaterialPreparationPage = () => {
             theme={theme}
             premixStatusByNo={premixStatusByNo}
             isPremixEditable={isPremixEditable}
+            preferredPremixNo={preferredPremixNo}
+            onPreferredPremixNoChange={setPreferredPremixNo}
             onSavePremixDraft={(premixNo: number) => {
+              setPreferredPremixNo(premixNo);
               setPendingPremixNo(premixNo);
               setDraftConfirmOpen(true);
             }}
             onSubmitPremix={(premixNo: number) => {
+              setPreferredPremixNo(premixNo);
               setPendingPremixNo(premixNo);
               setSubmitConfirmOpen(true);
             }}

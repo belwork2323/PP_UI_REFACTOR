@@ -1,6 +1,8 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import {
   Box,
+  Button,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -12,6 +14,8 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
@@ -20,7 +24,10 @@ import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_NDT_FIELD_LABELS,
   QC_NDT_SECTION_TITLES,
+  emptyNdtObservationCustomRow,
+  emptyNdtVisualCustomRow,
   getQcNdtMotorLabel,
+  renumberQcNdtRows,
   type QcNdtRadiographyDetailRow,
   type QcNdtRadiographyObservationRow,
   type QcNdtVisualInspectionRow,
@@ -279,122 +286,185 @@ const ObservationTable = ({
 
   const updateCell = (
     index: number,
-    field: "OBSERVATIONS" | "LOCATION" | "QA_REMARKS",
+    field: "TYPE_OF_DEFECT" | "OBSERVATIONS" | "LOCATION" | "QA_REMARKS",
     value: string,
   ) => {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
   };
 
+  const addRow = () => {
+    onChange(
+      renumberQcNdtRows([...rows, emptyNdtObservationCustomRow(rows.length + 1)]),
+    );
+  };
+
+  const removeRow = (index: number) => {
+    const row = rows[index];
+    if (!row || row.isPreset !== false) return;
+    onChange(renumberQcNdtRows(rows.filter((_, rowIndex) => rowIndex !== index)));
+  };
+
   return (
-    <TableContainer
-      sx={
-        readOnly
-          ? qcReadOnlyTableContainerSx
-          : { border: `1px solid ${TABLE_BORDER}`, borderRadius: 1, overflowX: "auto" }
-      }
-    >
-      <Table size="small" sx={{ minWidth: 780, borderCollapse: "collapse" }}>
-        <TableHead>
-          <TableRow>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.SR_NO}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.TYPE_OF_DEFECT}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATIONS}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.LOCATION}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.QA_REMARKS}</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row, index) => {
-            const observationsPath = `RADIOGRAPHY_OBSERVATIONS.${index}.OBSERVATIONS`;
-            const locationPath = `RADIOGRAPHY_OBSERVATIONS.${index}.LOCATION`;
-            const qaPath = `RADIOGRAPHY_OBSERVATIONS.${index}.QA_REMARKS`;
-            const observationsMsg = fieldError(validationErrors ?? undefined, observationsPath);
-            const locationMsg = fieldError(validationErrors ?? undefined, locationPath);
-            const qaMsg = fieldError(validationErrors ?? undefined, qaPath);
-            return (
-            <TableRow
-              key={`obs-${row.SR_NO}`}
-              sx={{
-                background: readOnly
-                  ? index % 2 === 0
-                    ? "#fff"
-                    : alpha(BRAND.primaryLight, 0.04)
-                  : undefined,
-              }}
-            >
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? <QCDivisionReadOnlyValue value={row.SR_NO} /> : row.SR_NO}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                <QCDivisionReadOnlyValue value={row.TYPE_OF_DEFECT} />
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.OBSERVATIONS} muted={!row.OBSERVATIONS.trim()} />
-                ) : (
-                  <Box data-qc-field={observationsPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      minRows={1}
-                      value={row.OBSERVATIONS}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateCell(index, "OBSERVATIONS", event.target.value)}
-                      inputProps={{ "data-qc-field": observationsPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(observationsMsg)}
-                    />
-                    <FieldErrorText message={observationsMsg} />
-                  </Box>
-                )}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.LOCATION} muted={!row.LOCATION.trim()} />
-                ) : (
-                  <Box data-qc-field={locationPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.LOCATION}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateCell(index, "LOCATION", event.target.value)}
-                      inputProps={{ "data-qc-field": locationPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(locationMsg)}
-                    />
-                    <FieldErrorText message={locationMsg} />
-                  </Box>
-                )}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.QA_REMARKS} muted={!row.QA_REMARKS?.trim()} />
-                ) : (
-                  <Box data-qc-field={qaPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      minRows={1}
-                      value={row.QA_REMARKS ?? ""}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateCell(index, "QA_REMARKS", event.target.value)}
-                      inputProps={{ "data-qc-field": qaPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(qaMsg)}
-                    />
-                    <FieldErrorText message={qaMsg} />
-                  </Box>
-                )}
-              </TableCell>
+    <Box>
+      <TableContainer
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : { border: `1px solid ${TABLE_BORDER}`, borderRadius: 1, overflowX: "auto" }
+        }
+      >
+        <Table size="small" sx={{ minWidth: 780, borderCollapse: "collapse" }}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.SR_NO}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.TYPE_OF_DEFECT}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATIONS}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.LOCATION}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.QA_REMARKS}</TableCell>
+              {!readOnly ? <TableCell sx={{ ...headerSx, width: 44 }} /> : null}
             </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => {
+              const isCustom = row.isPreset === false;
+              const defectPath = `RADIOGRAPHY_OBSERVATIONS.${index}.TYPE_OF_DEFECT`;
+              const observationsPath = `RADIOGRAPHY_OBSERVATIONS.${index}.OBSERVATIONS`;
+              const locationPath = `RADIOGRAPHY_OBSERVATIONS.${index}.LOCATION`;
+              const qaPath = `RADIOGRAPHY_OBSERVATIONS.${index}.QA_REMARKS`;
+              const defectMsg = fieldError(validationErrors ?? undefined, defectPath);
+              const observationsMsg = fieldError(validationErrors ?? undefined, observationsPath);
+              const locationMsg = fieldError(validationErrors ?? undefined, locationPath);
+              const qaMsg = fieldError(validationErrors ?? undefined, qaPath);
+              return (
+              <TableRow
+                key={`obs-${row.SR_NO}-${index}`}
+                sx={{
+                  background: readOnly
+                    ? index % 2 === 0
+                      ? "#fff"
+                      : alpha(BRAND.primaryLight, 0.04)
+                    : undefined,
+                }}
+              >
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? <QCDivisionReadOnlyValue value={row.SR_NO} /> : row.SR_NO}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly || !isCustom ? (
+                    <QCDivisionReadOnlyValue value={row.TYPE_OF_DEFECT} />
+                  ) : (
+                    <Box data-qc-field={defectPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.TYPE_OF_DEFECT}
+                        disabled={inputsDisabled}
+                        placeholder={QC_NDT_FIELD_LABELS.TYPE_OF_DEFECT}
+                        onChange={(event) => updateCell(index, "TYPE_OF_DEFECT", event.target.value)}
+                        inputProps={{ "data-qc-field": defectPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(defectMsg)}
+                      />
+                      <FieldErrorText message={defectMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.OBSERVATIONS} muted={!row.OBSERVATIONS.trim()} />
+                  ) : (
+                    <Box data-qc-field={observationsPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        value={row.OBSERVATIONS}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateCell(index, "OBSERVATIONS", event.target.value)}
+                        inputProps={{ "data-qc-field": observationsPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(observationsMsg)}
+                      />
+                      <FieldErrorText message={observationsMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.LOCATION} muted={!row.LOCATION.trim()} />
+                  ) : (
+                    <Box data-qc-field={locationPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.LOCATION}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateCell(index, "LOCATION", event.target.value)}
+                        inputProps={{ "data-qc-field": locationPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(locationMsg)}
+                      />
+                      <FieldErrorText message={locationMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.QA_REMARKS} muted={!row.QA_REMARKS?.trim()} />
+                  ) : (
+                    <Box data-qc-field={qaPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        value={row.QA_REMARKS ?? ""}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateCell(index, "QA_REMARKS", event.target.value)}
+                        inputProps={{ "data-qc-field": qaPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(qaMsg)}
+                      />
+                      <FieldErrorText message={qaMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                {!readOnly ? (
+                  <TableCell sx={bodyCellSx} align="center">
+                    {isCustom ? (
+                      <IconButton
+                        size="small"
+                        disabled={inputsDisabled}
+                        onClick={() => removeRow(index)}
+                        sx={{ color: BRAND.danger }}
+                      >
+                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    ) : null}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {!readOnly ? (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddRoundedIcon />}
+            disabled={inputsDisabled}
+            onClick={addRow}
+            sx={{ textTransform: "none" }}
+          >
+            Add row
+          </Button>
+        </Box>
+      ) : null}
+    </Box>
   );
 };
 
@@ -419,140 +489,203 @@ const VisualInspectionTable = ({
 
   const updateTextCell = (
     index: number,
-    field: "OBSERVATION" | "LOCATION" | "QA_REMARKS",
+    field: "OBSERVATION_TYPE" | "OBSERVATION" | "LOCATION" | "QA_REMARKS",
     value: string,
   ) => {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
   };
 
+  const addRow = () => {
+    onChange(renumberQcNdtRows([...rows, emptyNdtVisualCustomRow(rows.length + 1)]));
+  };
+
+  const removeRow = (index: number) => {
+    const row = rows[index];
+    if (!row || row.isPreset !== false) return;
+    onChange(renumberQcNdtRows(rows.filter((_, rowIndex) => rowIndex !== index)));
+  };
+
   return (
-    <TableContainer
-      sx={
-        readOnly
-          ? qcReadOnlyTableContainerSx
-          : { border: `1px solid ${TABLE_BORDER}`, borderRadius: 1, overflowX: "auto" }
-      }
-    >
-      <Table size="small" sx={{ minWidth: 900, borderCollapse: "collapse" }}>
-        <TableHead>
-          <TableRow>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.SR_NO}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATION_TYPE}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATION}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.LOCATION}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.QA_REMARKS}</TableCell>
-            <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.UPLOAD_IMAGE}</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((row, index) => {
-            const observationPath = `VISUAL_INSPECTION.${index}.OBSERVATION`;
-            const locationPath = `VISUAL_INSPECTION.${index}.LOCATION`;
-            const qaPath = `VISUAL_INSPECTION.${index}.QA_REMARKS`;
-            const uploadPath = `VISUAL_INSPECTION.${index}.UPLOAD_IMAGE`;
-            const observationMsg = fieldError(validationErrors ?? undefined, observationPath);
-            const locationMsg = fieldError(validationErrors ?? undefined, locationPath);
-            const qaMsg = fieldError(validationErrors ?? undefined, qaPath);
-            const uploadMsg = fieldError(validationErrors ?? undefined, uploadPath);
-            return (
-            <TableRow
-              key={`vi-${row.SR_NO}`}
-              sx={{
-                background: readOnly
-                  ? index % 2 === 0
-                    ? "#fff"
-                    : alpha(BRAND.primaryLight, 0.04)
-                  : undefined,
-              }}
-            >
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? <QCDivisionReadOnlyValue value={row.SR_NO} /> : row.SR_NO}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                <QCDivisionReadOnlyValue value={row.OBSERVATION_TYPE} />
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.OBSERVATION} muted={!row.OBSERVATION.trim()} />
-                ) : (
-                  <Box data-qc-field={observationPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      minRows={1}
-                      value={row.OBSERVATION}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateTextCell(index, "OBSERVATION", event.target.value)}
-                      inputProps={{ "data-qc-field": observationPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(observationMsg)}
-                    />
-                    <FieldErrorText message={observationMsg} />
-                  </Box>
-                )}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.LOCATION} muted={!row.LOCATION.trim()} />
-                ) : (
-                  <Box data-qc-field={locationPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.LOCATION}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateTextCell(index, "LOCATION", event.target.value)}
-                      inputProps={{ "data-qc-field": locationPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(locationMsg)}
-                    />
-                    <FieldErrorText message={locationMsg} />
-                  </Box>
-                )}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.QA_REMARKS} muted={!row.QA_REMARKS?.trim()} />
-                ) : (
-                  <Box data-qc-field={qaPath}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      multiline
-                      minRows={1}
-                      value={row.QA_REMARKS ?? ""}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateTextCell(index, "QA_REMARKS", event.target.value)}
-                      inputProps={{ "data-qc-field": qaPath }}
-                      sx={tableFieldSx}
-                      error={Boolean(qaMsg)}
-                    />
-                    <FieldErrorText message={qaMsg} />
-                  </Box>
-                )}
-              </TableCell>
-              <TableCell sx={bodyCellSx}>
-                <Box sx={{ minWidth: 160, maxWidth: 280 }} data-qc-field={uploadPath}>
-                  <QCDivisionFileField
-                    files={row.UPLOAD_IMAGE ?? []}
-                    onChange={(next) => onFilesChange(index, next)}
-                    multiple
-                    acceptMode="imageVideoPdf"
-                    compact
-                    readOnly={readOnly}
-                    disabled={inputsDisabled}
-                    emptyLabel={NDT_S.FILE_EMPTY_IMAGE}
-                  />
-                  {!readOnly ? <FieldErrorText message={uploadMsg} /> : null}
-                </Box>
-              </TableCell>
+    <Box>
+      <TableContainer
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : { border: `1px solid ${TABLE_BORDER}`, borderRadius: 1, overflowX: "auto" }
+        }
+      >
+        <Table size="small" sx={{ minWidth: 900, borderCollapse: "collapse" }}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.SR_NO}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATION_TYPE}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.OBSERVATION}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.LOCATION}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.QA_REMARKS}</TableCell>
+              <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.UPLOAD_IMAGE}</TableCell>
+              {!readOnly ? <TableCell sx={{ ...headerSx, width: 44 }} /> : null}
             </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, index) => {
+              const isCustom = row.isPreset === false;
+              const typePath = `VISUAL_INSPECTION.${index}.OBSERVATION_TYPE`;
+              const observationPath = `VISUAL_INSPECTION.${index}.OBSERVATION`;
+              const locationPath = `VISUAL_INSPECTION.${index}.LOCATION`;
+              const qaPath = `VISUAL_INSPECTION.${index}.QA_REMARKS`;
+              const uploadPath = `VISUAL_INSPECTION.${index}.UPLOAD_IMAGE`;
+              const typeMsg = fieldError(validationErrors ?? undefined, typePath);
+              const observationMsg = fieldError(validationErrors ?? undefined, observationPath);
+              const locationMsg = fieldError(validationErrors ?? undefined, locationPath);
+              const qaMsg = fieldError(validationErrors ?? undefined, qaPath);
+              const uploadMsg = fieldError(validationErrors ?? undefined, uploadPath);
+              return (
+              <TableRow
+                key={`vi-${row.SR_NO}-${index}`}
+                sx={{
+                  background: readOnly
+                    ? index % 2 === 0
+                      ? "#fff"
+                      : alpha(BRAND.primaryLight, 0.04)
+                    : undefined,
+                }}
+              >
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? <QCDivisionReadOnlyValue value={row.SR_NO} /> : row.SR_NO}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly || !isCustom ? (
+                    <QCDivisionReadOnlyValue value={row.OBSERVATION_TYPE} />
+                  ) : (
+                    <Box data-qc-field={typePath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.OBSERVATION_TYPE}
+                        disabled={inputsDisabled}
+                        placeholder={QC_NDT_FIELD_LABELS.OBSERVATION_TYPE}
+                        onChange={(event) =>
+                          updateTextCell(index, "OBSERVATION_TYPE", event.target.value)
+                        }
+                        inputProps={{ "data-qc-field": typePath }}
+                        sx={tableFieldSx}
+                        error={Boolean(typeMsg)}
+                      />
+                      <FieldErrorText message={typeMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.OBSERVATION} muted={!row.OBSERVATION.trim()} />
+                  ) : (
+                    <Box data-qc-field={observationPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        value={row.OBSERVATION}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateTextCell(index, "OBSERVATION", event.target.value)}
+                        inputProps={{ "data-qc-field": observationPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(observationMsg)}
+                      />
+                      <FieldErrorText message={observationMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.LOCATION} muted={!row.LOCATION.trim()} />
+                  ) : (
+                    <Box data-qc-field={locationPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.LOCATION}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateTextCell(index, "LOCATION", event.target.value)}
+                        inputProps={{ "data-qc-field": locationPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(locationMsg)}
+                      />
+                      <FieldErrorText message={locationMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.QA_REMARKS} muted={!row.QA_REMARKS?.trim()} />
+                  ) : (
+                    <Box data-qc-field={qaPath}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        value={row.QA_REMARKS ?? ""}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateTextCell(index, "QA_REMARKS", event.target.value)}
+                        inputProps={{ "data-qc-field": qaPath }}
+                        sx={tableFieldSx}
+                        error={Boolean(qaMsg)}
+                      />
+                      <FieldErrorText message={qaMsg} />
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell sx={bodyCellSx}>
+                  <Box sx={{ minWidth: 160, maxWidth: 280 }} data-qc-field={uploadPath}>
+                    <QCDivisionFileField
+                      files={row.UPLOAD_IMAGE ?? []}
+                      onChange={(next) => onFilesChange(index, next)}
+                      multiple
+                      acceptMode="imageVideoPdf"
+                      compact
+                      readOnly={readOnly}
+                      disabled={inputsDisabled}
+                      emptyLabel={NDT_S.FILE_EMPTY_IMAGE}
+                    />
+                    {!readOnly ? <FieldErrorText message={uploadMsg} /> : null}
+                  </Box>
+                </TableCell>
+                {!readOnly ? (
+                  <TableCell sx={bodyCellSx} align="center">
+                    {isCustom ? (
+                      <IconButton
+                        size="small"
+                        disabled={inputsDisabled}
+                        onClick={() => removeRow(index)}
+                        sx={{ color: BRAND.danger }}
+                      >
+                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    ) : null}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {!readOnly ? (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddRoundedIcon />}
+            disabled={inputsDisabled}
+            onClick={addRow}
+            sx={{ textTransform: "none" }}
+          >
+            Add row
+          </Button>
+        </Box>
+      ) : null}
+    </Box>
   );
 };
 

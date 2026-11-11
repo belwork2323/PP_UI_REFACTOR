@@ -7,6 +7,7 @@ import type {
   CasePrepParameterRow,
   CasePrepQualificationParameterRow,
 } from "./CasePrepMotorDataModel";
+import { assertFromToOrder } from "@/data/validation/dateRangeValidation";
 
 export type CasePrepSubmissionIntent = "DRAFT" | "SUBMIT";
 export type CasePrepValidationErrors = Record<string, string>;
@@ -123,39 +124,39 @@ const createAddHelpers = (errors: CasePrepValidationErrors, required: boolean): 
   ) => {
     const text = str(value);
     if (!text) {
-      if (required && mandatory) errors[path] = `${label} is required.`;
+      if (required && mandatory) errors[path] = "This field is required.";
       return;
     }
     if (alpha && !ALPHA_NUM.test(text) && !ALPHA_NUM_LOOSE.test(text)) {
-      errors[path] = `${label} must be alphanumeric.`;
+      errors[path] = "Invalid value.";
     }
   };
 
   const addNumber = (path: string, value: unknown, label: string, mandatory: boolean) => {
     const text = str(value);
     if (!text) {
-      if (required && mandatory) errors[path] = `${label} is required and must be numeric.`;
+      if (required && mandatory) errors[path] = "This field is required.";
       return;
     }
-    if (!isFiniteNumber(text)) errors[path] = `${label} must be numeric.`;
+    if (!isFiniteNumber(text)) errors[path] = "Invalid value.";
   };
 
   const addDate = (path: string, value: unknown, label: string, mandatory: boolean) => {
     const text = str(value);
     if (!text) {
-      if (required && mandatory) errors[path] = `${label} is required and must be valid.`;
+      if (required && mandatory) errors[path] = "This field is required.";
       return;
     }
-    if (!isValidUiDate(text)) errors[path] = `${label} must be a valid date.`;
+    if (!isValidUiDate(text)) errors[path] = "Invalid value.";
   };
 
   const addDateTime = (path: string, value: unknown, label: string, mandatory: boolean) => {
     const text = str(value);
     if (!text) {
-      if (required && mandatory) errors[path] = `${label} is required and must be valid.`;
+      if (required && mandatory) errors[path] = "This field is required.";
       return;
     }
-    if (!isValidUiDateTime(text)) errors[path] = `${label} must be a valid date/time.`;
+    if (!isValidUiDateTime(text)) errors[path] = "Invalid value.";
   };
 
   return { required, addText, addNumber, addDate, addDateTime };
@@ -249,8 +250,7 @@ const validateQualificationRows = (
     if (helpers.required && isFiniteNumber(row.result) && str(row.specification)) {
       const n = parseNum(row.result);
       if (n != null && !meetsSpecification(n, row.specification)) {
-        errors[`${base}.result`] =
-          `${label} result must satisfy specification (${row.specification}).`;
+        errors[`${base}.result`] = `Result must satisfy specification (${row.specification}).`;
       }
     }
   });
@@ -270,6 +270,106 @@ const validateAbradingDetails = (rows: CasePrepAbradingDetailsRow[], helpers: Ad
       helpers.addDateTime(path, row.value, operation || "Value", mandatory);
     else helpers.addText(path, row.value, operation || "Value", mandatory);
   });
+};
+
+const validateDateTimePair = (
+  from: unknown,
+  to: unknown,
+  fromPath: string,
+  toPath: string,
+  errors: CasePrepValidationErrors,
+) => {
+  assertFromToOrder({
+    from,
+    to,
+    fromPath,
+    toPath,
+    errors,
+    mode: "datetime",
+  });
+};
+
+const validateAbradingDateTimeOrder = (
+  rows: CasePrepAbradingDetailsRow[],
+  errors: CasePrepValidationErrors,
+) => {
+  let start: { value: string; index: number } | null = null;
+  let end: { value: string; index: number } | null = null;
+
+  const validateCut = () => {
+    if (!start || !end) return;
+    validateDateTimePair(
+      start.value,
+      end.value,
+      `abradingOperation.abradingDetails.${start.index}.value`,
+      `abradingOperation.abradingDetails.${end.index}.value`,
+      errors,
+    );
+  };
+
+  (rows ?? []).forEach((row, index) => {
+    if (isAbradingHeader(row)) {
+      validateCut();
+      start = null;
+      end = null;
+      return;
+    }
+
+    const operation = str(row.operation).toLowerCase();
+    if (operation === "start date & time") start = { value: row.value, index };
+    if (operation === "end date & time") end = { value: row.value, index };
+  });
+
+  validateCut();
+};
+
+const validateParameterDateTimeOrder = (
+  rows: CasePrepParameterRow[],
+  fromParameter: string,
+  toParameter: string,
+  pathPrefix: string,
+  errors: CasePrepValidationErrors,
+) => {
+  let from: { value: string; index: number } | null = null;
+  let to: { value: string; index: number } | null = null;
+  (rows ?? []).forEach((row, index) => {
+    const parameter = str(row.parameter).toLowerCase();
+    if (parameter === fromParameter.toLowerCase()) from = { value: row.value, index };
+    if (parameter === toParameter.toLowerCase()) to = { value: row.value, index };
+  });
+  if (!from || !to) return;
+  validateDateTimePair(
+    from.value,
+    to.value,
+    `${pathPrefix}.${from.index}.value`,
+    `${pathPrefix}.${to.index}.value`,
+    errors,
+  );
+};
+
+const validateCrossSectionDateTimeOrder = (
+  fromRows: CasePrepParameterRow[],
+  fromParameter: string,
+  fromPathPrefix: string,
+  toRows: CasePrepParameterRow[],
+  toParameter: string,
+  toPathPrefix: string,
+  errors: CasePrepValidationErrors,
+) => {
+  const fromIndex = (fromRows ?? []).findIndex(
+    (row) => str(row.parameter).toLowerCase() === fromParameter.toLowerCase(),
+  );
+  const toIndex = (toRows ?? []).findIndex(
+    (row) => str(row.parameter).toLowerCase() === toParameter.toLowerCase(),
+  );
+  if (fromIndex < 0 || toIndex < 0) return;
+  validateDateTimePair(
+    fromRows[fromIndex].value,
+    toRows[toIndex].value,
+    `${fromPathPrefix}.${fromIndex}.value`,
+    `${toPathPrefix}.${toIndex}.value`,
+    errors,
+  );
 };
 
 /** Validate one motor's typed Case Prep data. */
@@ -303,6 +403,7 @@ export function validateCasePrepMotorData(
     true,
   );
   validateAbradingDetails(abrading.abradingDetails ?? [], h);
+  validateAbradingDateTimeOrder(abrading.abradingDetails ?? [], errors);
 
   h.addText("bellowBonding.adhesiveDetails", bellow.adhesiveDetails, "Adhesive Details", false);
   h.addText(
@@ -351,6 +452,7 @@ export function validateCasePrepMotorData(
   if (str(preHeating.vacuumBaggingApplied).toUpperCase() === "YES") {
     h.addNumber("preHeating.vacuumApplied", preHeating.vacuumApplied, "Vacuum Applied", true);
   }
+
   h.addText("preHeating.preHeatingRecipe", preHeating.preHeatingRecipe, "Pre-heating Recipe", true);
   if (str(preHeating.preHeatingRecipe).toUpperCase() === "OTHERS") {
     h.addText(
@@ -361,7 +463,12 @@ export function validateCasePrepMotorData(
     );
     h.addNumber("preHeating.otherDuration", preHeating.otherDuration, "Other Duration (hrs)", true);
   }
-  h.addDate("preHeating.preHeatingDate", preHeating.preHeatingDate, "Pre-heating Date", false);
+  h.addDateTime(
+    "preHeating.preHeatingDateTime",
+    preHeating.preHeatingDateTime,
+    "Pre-heating Date & Time",
+    false,
+  );
   validateParameterRows(preHeating.temperatureDuration ?? [], "preHeating.temperatureDuration", h, {
     valueMandatory: true,
     useFieldType: true,
@@ -371,6 +478,13 @@ export function validateCasePrepMotorData(
     "preHeating.preHeatingMonitoring",
     h,
     { valueMandatory: true, useFieldType: true },
+  );
+  validateParameterDateTimeOrder(
+    preHeating.preHeatingMonitoring ?? [],
+    "Cycle Start Date & Time",
+    "Cycle End Date & Time",
+    "preHeating.preHeatingMonitoring",
+    errors,
   );
 
   h.addText("linerCoatingOperation.linerType", liner.linerType, "Liner Type", true);
@@ -392,10 +506,10 @@ export function validateCasePrepMotorData(
     true,
     true,
   );
-  h.addDate(
-    "linerCoatingOperation.linerCoatingDate",
-    liner.linerCoatingDate,
-    "Liner Coating Date",
+  h.addDateTime(
+    "linerCoatingOperation.linerCoatingDateTime",
+    liner.linerCoatingDateTime,
+    "Liner Coating Date & Time",
     false,
   );
 
@@ -422,6 +536,29 @@ export function validateCasePrepMotorData(
     "linerCoatingOperation.linerApplicationLog",
     h,
     { valueMandatory: true, useFieldType: true },
+  );
+  validateCrossSectionDateTimeOrder(
+    preHeating.preHeatingMonitoring ?? [],
+    "Oven Start Date & Time",
+    "preHeating.preHeatingMonitoring",
+    liner.linerApplicationLog ?? [],
+    "Oven Out Date & Time",
+    "linerCoatingOperation.linerApplicationLog",
+    errors,
+  );
+  validateParameterDateTimeOrder(
+    liner.linerApplicationLog ?? [],
+    "Start Date & Time",
+    "End Date & Time",
+    "linerCoatingOperation.linerApplicationLog",
+    errors,
+  );
+  validateParameterDateTimeOrder(
+    liner.linerApplicationLog ?? [],
+    "Rotation Start Date & Time",
+    "Rotation End Date & Time",
+    "linerCoatingOperation.linerApplicationLog",
+    errors,
   );
 
   validateObservationRows(
@@ -489,15 +626,15 @@ export function validateCasePrepMotorSession(
   const date = str(session.prrcClearanceDate);
 
   if (!date) {
-    if (required) errors.prrcClearanceDate = "PRRC clearance date is required.";
+    if (required) errors.prrcClearanceDate = "This field is required.";
   } else if (!isValidUiDate(date)) {
-    errors.prrcClearanceDate = "PRRC clearance date must be a valid date.";
+    errors.prrcClearanceDate = "Invalid value.";
   }
 
   if (session.data) {
     Object.assign(errors, validateCasePrepMotorData(session.data, intent));
   } else if (required) {
-    errors["data"] = "Case preparation data is required.";
+    errors["data"] = "This field is required.";
   }
 
   return errors;

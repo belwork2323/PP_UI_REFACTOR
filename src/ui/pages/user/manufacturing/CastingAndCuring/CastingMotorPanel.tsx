@@ -9,6 +9,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -32,7 +33,8 @@ import {
   type PostCastRow,
   type SlurryCastRow,
 } from "../../../../../data/models/user/CastingMotorDataModel";
-import { DateTimeField, TimeField } from "../../../../components/common/DateField";
+import { DateTimeField } from "../../../../components/common/DateField";
+import { toUiTime } from "../../../../../data/models/user/castingCuringFieldCodec";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import CasePrepTextField from "../CasePreparation/CasePrepTextField";
 import {
@@ -99,62 +101,60 @@ const isSlurryTotalRow = (row: SlurryCastRow): boolean =>
 
 const BOWL_ID_PLACEHOLDER = "Select bowl id";
 
-const CompactTime = ({
-  value,
-  onChange,
-  disabled,
-  readOnly,
-  error,
-  helperText,
-  fieldPath,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  readOnly?: boolean;
-  error?: boolean;
-  helperText?: string | null;
-  fieldPath?: string;
-}) => (
-  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
-    <TimeField
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      readOnly={readOnly}
-      compact
-      inputSx={castingCuringTableInputSx}
-      error={error}
-      helperText={helperText}
-    />
-  </Box>
-);
-
 const CompactDateTime = ({
   value,
   onChange,
   disabled,
   readOnly,
   fieldPath,
+  error,
+  helperText,
+  required,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
   fieldPath?: string;
-}) => (
-  <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
-    <DateTimeField
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      readOnly={readOnly}
-      compact
-      placeholder="DD-MM-YYYY HH:mm"
-      inputSx={castingCuringTableInputSx}
-    />
-  </Box>
-);
+  error?: boolean;
+  helperText?: string | null;
+  required?: boolean;
+}) => {
+  const isTimeOnly = /^\d{1,2}:\d{2}(?::\d{2})?$/.test(value.trim());
+
+  return (
+    <Box {...(fieldPath ? { "data-cc-field": fieldPath } : {})}>
+      {isTimeOnly && !readOnly ? (
+        <TextField
+          size="small"
+          fullWidth
+          value={toUiTime(value)}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+          required={required}
+          error={error}
+          helperText={helperText}
+          placeholder="HH:mm"
+          inputProps={{ readOnly }}
+          sx={castingCuringTableInputSx}
+        />
+      ) : (
+        <DateTimeField
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          readOnly={readOnly}
+          compact
+          placeholder="DD-MM-YYYY HH:mm"
+          inputSx={castingCuringTableInputSx}
+          error={error}
+          helperText={helperText}
+          required={required}
+        />
+      )}
+    </Box>
+  );
+};
 
 const ValueByFieldType = ({
   value,
@@ -176,19 +176,6 @@ const ValueByFieldType = ({
   helperText?: string | null;
 }) => {
   const type = String(fieldType ?? "text").toLowerCase();
-  if (type === "time") {
-    return (
-      <CompactTime
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        readOnly={readOnly}
-        fieldPath={fieldPath}
-        error={error}
-        helperText={helperText}
-      />
-    );
-  }
   if (type === "datetime") {
     return (
       <CompactDateTime
@@ -197,6 +184,8 @@ const ValueByFieldType = ({
         disabled={disabled}
         readOnly={readOnly}
         fieldPath={fieldPath}
+        error={error}
+        helperText={helperText}
       />
     );
   }
@@ -299,17 +288,19 @@ const CastingMotorPanel = ({
   }, [bowlSeedRows]);
 
   const bowlOptionsForRow = (selected: string, usedInTable: string[]) => {
+    // Exclude bowls used elsewhere if needed, but allow re-selection of the current row's value
     const used = new Set(
-      [...usedInTable, ...(excludedBowlLabels ?? [])]
-        .map((label) => str(label).trim().toLowerCase())
-        .filter(Boolean),
+      (usedInTable ?? []).map((label) => str(label).trim().toLowerCase()).filter(Boolean),
     );
     const selectedKey = str(selected).trim().toLowerCase();
+
+    // Filter out options already used in *this same table*, except the one currently selected in this row
     const options = bowlChoices.filter(
       (option) =>
         option.value.toLowerCase() === selectedKey || !used.has(option.value.toLowerCase()),
     );
-    if (selected && !options.some((option) => option.value === selected)) {
+
+    if (selected && !options.some((option) => option.value.toLowerCase() === selectedKey)) {
       return [{ value: selected, label: selected }, ...options];
     }
     return options;
@@ -348,6 +339,7 @@ const CastingMotorPanel = ({
     clearFieldError?.(
       `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.EMPTY_MOTOR_WEIGHT`,
     );
+    clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.VACUUM_APPLIED`);
 
     patchRoot({
       FINAL_ASSEMBLY_DETAILS: {
@@ -593,7 +585,8 @@ const CastingMotorPanel = ({
                 Mandrel rest on dome of motor (A)
               </TableCell>
               <TableCell colSpan={2} sx={groupHeaderSx}>
-                Mandrel rest on bottom cup (with Teflon sleeve) (B)
+                Mandrel rest on bottom cup with required no of gaskets (B)
+                {/* Mandrel rest on bottom cup (with Teflon sleeve) (B) */}
               </TableCell>
               <TableCell colSpan={2} sx={groupHeaderSx}>
                 Difference C=(A-B)
@@ -654,7 +647,9 @@ const CastingMotorPanel = ({
                     required
                     fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`}
                     error={Boolean(
-                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`],
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`
+                      ],
                     )}
                     helperText={
                       validationErrors?.[
@@ -678,7 +673,9 @@ const CastingMotorPanel = ({
                     required
                     fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`}
                     error={Boolean(
-                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`],
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`
+                      ],
                     )}
                     helperText={
                       validationErrors?.[
@@ -702,7 +699,9 @@ const CastingMotorPanel = ({
                     required
                     fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`}
                     error={Boolean(
-                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`],
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`
+                      ],
                     )}
                     helperText={
                       validationErrors?.[
@@ -736,7 +735,9 @@ const CastingMotorPanel = ({
                     required
                     fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`}
                     error={Boolean(
-                      validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`],
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`
+                      ],
                     )}
                     helperText={
                       validationErrors?.[
@@ -779,15 +780,12 @@ const CastingMotorPanel = ({
     <Box>
       {/* Section A */}
       <SectionCard title="Section A: Final Assembly Details" theme={theme}>
-        <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub, mb: 1.5 }}>
-          Fill Assembly Details
-        </Typography>
-
         {renderMandrelTable()}
 
         <Box sx={{ mb: 2 }}>
           <SubsectionHeading>
-            Measurement of distance between feed pipe & cone apex
+            Observations / remarks between feed pipe & cone apex
+            {/* Measurement of distance between feed pipe & cone apex */}
           </SubsectionHeading>
           <FieldGrid columns={2}>
             <Box>
@@ -801,7 +799,9 @@ const CastingMotorPanel = ({
                 placeholder="0"
                 fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`}
                 error={Boolean(
-                  validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`],
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`
+                  ],
                 )}
                 helperText={
                   validationErrors?.[
@@ -821,7 +821,9 @@ const CastingMotorPanel = ({
                 placeholder="0"
                 fieldPath={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`}
                 error={Boolean(
-                  validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`],
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`
+                  ],
                 )}
                 helperText={
                   validationErrors?.[
@@ -832,26 +834,47 @@ const CastingMotorPanel = ({
             </Box>
           </FieldGrid>
         </Box>
-
-        <CasePrepTextField
-          label="Weight of assembled empty motor casing (kg)"
-          value={casing.EMPTY_MOTOR_WEIGHT}
-          onChange={(v) => {
-            clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`);
-            updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v });
-          }}
-          disabled={disabled}
-          readOnly={readOnly}
-          theme={theme}
-          width="100%"
-          placeholder="0"
-          required
-          dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`}
-          error={Boolean(
-            validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
-          )}
-          helperText={validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`]}
-        />
+        <FieldGrid columns={2}>
+          <CasePrepTextField
+            label="Weight of assembled empty motor casing (kg)"
+            value={casing.EMPTY_MOTOR_WEIGHT}
+            onChange={(v) => {
+              clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`);
+              updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v });
+            }}
+            disabled={disabled}
+            readOnly={readOnly}
+            theme={theme}
+            width="100%"
+            placeholder="0"
+            required
+            dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`}
+            error={Boolean(
+              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
+            )}
+            helperText={
+              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`]
+            }
+          />
+          <CasePrepTextField
+            label="Vacuum Applied (overnight)"
+            value={casing.VACUUM_APPLIED}
+            onChange={(v) => {
+              clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`);
+              updateMotorCasing({ VACUUM_APPLIED: v });
+            }}
+            disabled={disabled}
+            readOnly={readOnly}
+            theme={theme}
+            width="100%"
+            required
+            dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`}
+            error={Boolean(
+              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`],
+            )}
+            helperText={validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`]}
+          />
+        </FieldGrid>
       </SectionCard>
 
       {/* Section B */}
@@ -867,14 +890,14 @@ const CastingMotorPanel = ({
                 <TableRow>
                   {[
                     { label: "Bowl Id", required: true },
-                    { label: "Bowl Receipt Time", required: true },
+                    { label: "Bowl Receipt Date & Time", required: true },
                     { label: "Initial Weight", required: true },
                     { label: "Final Weight", required: true },
                     { label: "Initial Slurry Depth", required: false },
-                    { label: "Bowl D/C Valve Opening Time", required: true },
-                    { label: "Bowl D/C Valve Closing Time", required: true },
+                    { label: "Bowl D/C Valve Opening Date & Time", required: true },
+                    { label: "Bowl D/C Valve Closing Date & Time", required: true },
                     { label: "Depth of Slurry after Opening of D/C Valve", required: true },
-                    { label: "Ball Valve Opening Time", required: true },
+                    { label: "Ball Valve Opening Date & Time", required: true },
                     { label: "", required: false },
                   ].map((col, idx) => (
                     <TableCell
@@ -916,7 +939,9 @@ const CastingMotorPanel = ({
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -926,7 +951,7 @@ const CastingMotorPanel = ({
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
-                        <CompactTime
+                        <CompactDateTime
                           value={row.BOWL_RECEIPT_TIME}
                           onChange={(v) => {
                             clearFieldError?.(
@@ -937,8 +962,11 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`}
+                          required
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -961,7 +989,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -984,7 +1014,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1018,7 +1050,7 @@ const CastingMotorPanel = ({
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
-                        <CompactTime
+                        <CompactDateTime
                           value={row.DC_OPEN_TIME}
                           onChange={(v) => {
                             clearFieldError?.(
@@ -1029,8 +1061,11 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`}
+                          required
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1040,7 +1075,7 @@ const CastingMotorPanel = ({
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
-                        <CompactTime
+                        <CompactDateTime
                           value={row.DC_CLOSE_TIME}
                           onChange={(v) => {
                             clearFieldError?.(
@@ -1051,8 +1086,11 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`}
+                          required
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1075,7 +1113,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1085,7 +1125,7 @@ const CastingMotorPanel = ({
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
-                        <CompactTime
+                        <CompactDateTime
                           value={row.BALL_VALVE_OPEN_TIME}
                           onChange={(v) => {
                             clearFieldError?.(
@@ -1096,8 +1136,11 @@ const CastingMotorPanel = ({
                           disabled={disabled}
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`}
+                          required
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1137,7 +1180,7 @@ const CastingMotorPanel = ({
                 <TableRow>
                   {[
                     { label: "Bowl Id", required: true },
-                    { label: "Time Interval (hrs)", required: true },
+                    { label: "Time", required: true },
                     { label: "RH (%)", required: true },
                     { label: "Viscosity (Poise)", required: false },
                     { label: "Motor Id No.", required: true },
@@ -1187,7 +1230,9 @@ const CastingMotorPanel = ({
                           readOnly={readOnly}
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1197,7 +1242,7 @@ const CastingMotorPanel = ({
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
-                        <TableTextInput
+                        <DateTimeField
                           value={row.TIME_INTERVAL}
                           onChange={(v) => {
                             clearFieldError?.(
@@ -1207,10 +1252,10 @@ const CastingMotorPanel = ({
                           }}
                           disabled={disabled}
                           readOnly={readOnly}
-                          type="number"
-                          fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1233,7 +1278,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1256,7 +1303,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1282,7 +1331,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1305,7 +1356,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1328,7 +1381,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1351,7 +1406,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1374,7 +1431,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`}
                           error={Boolean(
-                            validationErrors?.[`CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`],
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1403,7 +1462,7 @@ const CastingMotorPanel = ({
           </TableContainer>
         </Box>
 
-        <FieldGrid columns={3}>
+        <FieldGrid columns={4}>
           <CasePrepTextField
             label={(<FieldLabelWithAsterisk label="Initial Vacuum" required />) as any}
             value={value.CASTING_PROCESS.INITIAL_VACUUM}
@@ -1463,6 +1522,22 @@ const CastingMotorPanel = ({
             error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`])}
             helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`]}
           />
+          <Box>
+            <FieldLabelWithAsterisk label="TDI Clearance after Vacuum trial" required />
+
+            <DateTimeField
+              value={value.CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM}
+              onChange={(e: any) => {
+                const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+                patchCastingProcess({ TDI_CLEARANCE_AFTER_VACUUM: val });
+                clearFieldError?.(`CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM`);
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              error={Boolean(validationErrors?.[`CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM`])}
+              helperText={validationErrors?.[`CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM`]}
+            />
+          </Box>
         </FieldGrid>
       </SectionCard>
 
@@ -1528,7 +1603,9 @@ const CastingMotorPanel = ({
                           readOnly={readOnly}
                           fieldPath={`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`}
                           error={Boolean(
-                            validationErrors?.[`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`],
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1557,7 +1634,9 @@ const CastingMotorPanel = ({
                           type="number"
                           fieldPath={`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`}
                           error={Boolean(
-                            validationErrors?.[`SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`],
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`
+                            ],
                           )}
                           helperText={
                             validationErrors?.[
@@ -1617,7 +1696,9 @@ const CastingMotorPanel = ({
               ).map((row, index) => (
                 <TableRow key={`post-${index}`} sx={castingCuringTableRowSx(index)}>
                   <TableCell sx={{ ...castingCuringTableCellSx, fontWeight: 600, width: "40%" }}>
-                    {row.ACTIVITY}
+                    {row.detailsFieldType === "datetime"
+                      ? row.ACTIVITY.replace(/\bTime\b/i, "Date & Time")
+                      : row.ACTIVITY}
                   </TableCell>
                   <TableCell sx={castingCuringTableCellSx}>
                     <ValueByFieldType
@@ -1633,9 +1714,9 @@ const CastingMotorPanel = ({
                       error={Boolean(
                         validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`],
                       )}
-                      helperText={
-                        validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`]
-                      }
+                      // helperText={
+                      //   validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`]
+                      // }
                     />
                     {validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`] ? (
                       <Typography sx={{ color: "#d32f2f", fontSize: "0.75rem", mt: 0.5 }}>

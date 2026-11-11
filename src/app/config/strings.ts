@@ -2,6 +2,8 @@
    Global Application Strings
 =========================== */
 
+import { BLOCKCHAIN } from "@/data/api/endPoints";
+
 export const STRINGS = {
   /* -------- AUTH -------- */
   AUTH: {
@@ -21,7 +23,7 @@ export const STRINGS = {
     USERNAME_LABEL: "Username",
     PASSWORD_LABEL: "Password",
     LOGIN_BUTTON: "Login",
-    FORGOT_PASSWORD: "Forgot password or first-time reset?",
+    FORGOT_PASSWORD: "Forgot password ?",
     /* Features - Left Panel Information */
     FEATURES: [
       {
@@ -55,6 +57,18 @@ export const STRINGS = {
     REQUEST_RESET_BUTTON: "Request Password Reset",
     DEPARTMENT_LABEL: "Department",
     NEW_PASSWORD_LABEL: "New Password",
+    CONFIRM_PASSWORD_LABEL: "Confirm New Password",
+    CURRENT_PASSWORD_LABEL: "Current Password",
+    CHANGE_PASSWORD_TITLE: "Change Password",
+    CHANGE_PASSWORD_SUBTITLE:
+      "Enter your current password and choose a new one that meets the rules below.",
+    CHANGE_PASSWORD_FORCED_SUBTITLE:
+      "You must set a new password before continuing. Use your temporary password as the current password.",
+    CHANGE_PASSWORD_BUTTON: "Change Password",
+    CHANGE_PASSWORD_SUCCESS: "Password changed successfully.",
+    CHANGE_PASSWORD_FAILED: "Failed to change password. Please try again.",
+    CHANGE_PASSWORD_LABEL: "Change Password",
+    PASSWORD_RULES_HEADING: "Password requirements",
     RESET_BUTTON: "Reset Password",
     BACK_TO_LOGIN: "Back to login",
     RESET_REQUEST_SUCCESS: "Your password reset request has been submitted.",
@@ -77,8 +91,15 @@ export const STRINGS = {
       PASSWORD_REQUIRED: "Password is required.",
       PASSWORD_INVALID:
         "Password must start with an uppercase letter, be at least 8 characters, include at least one number, include at least one special character, and contain both uppercase and lowercase letters.",
+      CURRENT_PASSWORD_REQUIRED: "Current password is required.",
+      NEW_PASSWORD_REQUIRED: "New password is required.",
+      CONFIRM_PASSWORD_REQUIRED: "Please confirm your new password.",
+      PASSWORDS_DO_NOT_MATCH: "New password and confirm password do not match.",
       USER_ID_REQUIRED: "User ID is required.",
+      USER_ID_INVALID: "User ID may only contain letters, numbers, hyphens, and underscores.",
       REASON_REQUIRED: "Please describe the reason for your request.",
+      REASON_TOO_SHORT: "Reason must be at least 10 characters.",
+      REASON_INVALID: "Reason may only contain letters, numbers, spaces, and . , ! ? ' - ( )",
       CAPTCHA_REQUIRED: "Please enter the captcha.",
       CAPTCHA_INVALID: "Captcha does not match. Please try again.",
     },
@@ -117,7 +138,7 @@ export const STRINGS = {
     ACCESS_DENIED: "Access denied.",
     RESOURCE_NOT_FOUND: "Requested resource not found.",
     INVALID_REQUEST: "Invalid request.",
-    SERVER_ERROR: "Server error. Try again later.",
+    SERVER_ERROR: "Something went wrong. Please try again later.",
     UNKNOWN_ERROR: "Unexpected error occurred.",
     CONFLICT: "Request conflicts with existing data. Please check and try again.",
     TOO_MANY_REQUESTS: "Too many requests. Please try again later.",
@@ -126,7 +147,7 @@ export const STRINGS = {
   /* -------- DASHBOARD HEADER -------- */
   DASHBOARD: {
     TITLE: "Propellant Processing System",
-    SUBTITLE: "Integrated Blockchain Traceability and Data Capture",
+    SUBTITLE: "Integrated Blockchain Traceability and Processing",
     SYSTEM_OVERVIEW: {
       HEADING: "System Overview : End-to-End Propellant Lifecycle Management",
       DESCRIPTION:
@@ -136,7 +157,7 @@ export const STRINGS = {
   /* -------- LOGIN DESCRIPTION -------- */
   LOGIN_DETAILS: {
     TITLE: "Blockchain Based Propellant Processing System",
-    SUBTITLE: "Integrated Blockchain Traceability and Data Capture",
+    SUBTITLE: "Integrated Blockchain Traceability and Processing",
     CLIENT_DETAILS: {
       DEPARTMENT_NAME: "Advanced Centre for Energetic Materials (ACEM)",
       RESEARCH_DETAILS: "DEFENCE RESEARCH & DEVELOPMENT ORGANISATION (DRDO)",
@@ -171,7 +192,14 @@ export const STRINGS = {
     ORG_COUNTRY: "Govt. of India",
     DRDO_ALT: "DRDO",
     LOGOUT_LABEL: "Logout",
+    VIEW_PROFILE_LABEL: "View Profile",
+    PROFILE_DETAILS_TITLE: "Profile Details",
+    CHANGE_PASSWORD_LABEL: "Change Password",
     ROLE_LABEL: "Role",
+    PROFILE_USER_ID_LABEL: "User ID",
+    PROFILE_ACCESS_SECTION: "Sub-department access",
+    PROFILE_NO_SUB_DEPTS: "Not Applicable",
+    PROFILE_UNKNOWN_DEPT: "Department",
 
     // Sub-department dropdown options
     DEPARTMENTS: [
@@ -185,8 +213,8 @@ export const STRINGS = {
     COPYRIGHT:
       "Copyright © 2026 Defence Research & Development Organisation (DRDO). All rights reserved.",
     CREDITS: "Content & Maintenance - DRDO  |  Design & Development - Bharat Electronics Ltd.",
-    VERSION: "v 1.0",
-    VERSION_DATE: "08 Oct 2026",
+    VERSION: "v 1.1",
+    VERSION_DATE: "02 Nov 2026",
     BEL_LABEL: "BEL",
     BEL_ALT: "Bharat Electronics Limited",
   },
@@ -620,7 +648,7 @@ export const STRINGS = {
         PROCESS_START_TIME: "Process start time",
         PROCESS_END_TIME: "Process end time",
         FINAL_ADDUCT_QTY: "Final quantity of adduct preparation",
-        DISPATCH_DATE_TIME: "Date time of dispatch",
+        DISPATCH_DATE_TIME: "Date & Time Of Dispatch",
         adductBatchPrepDate: {
           required: "Adduct batch preparation date is required",
           invalid: "Enter a valid date",
@@ -678,8 +706,8 @@ export const STRINGS = {
         AGITATOR_RPM: "Agitator RPM",
         PROCESS_TEMP: "Process temp",
         JACKET_TEMP: "Jacket temp",
-        PROCESS_START_TIME: "Start date / time",
-        PROCESS_END_TIME: "End date / time",
+        PROCESS_START_TIME: "Start date & time",
+        PROCESS_END_TIME: "End date & time",
         OTHER_OBSERVATIONS: "Any other observation",
         mfgBatchLotNo: {
           required: "Mfg / Batch lot no is required",
@@ -706,7 +734,7 @@ export const STRINGS = {
           invalid: "Enter a valid number",
         },
         processStartTime: {
-          required: "Start date / time is required",
+          required: "Start date & time is required",
           invalid: "Enter a valid date and time",
         },
         processEndTime: {
@@ -1866,7 +1894,7 @@ export const STRINGS = {
       LABEL_PREMIX_NO: "Select Premix No.",
       LABEL_MIXER_BLDG: "Select Mixer & Bldg No.",
       LABEL_BOWL_ID: "Select Bowl Id",
-      LABEL_BOWL_TRIAL_DATE: "Bowl Trial Date",
+      LABEL_BOWL_TRIAL_DATE: "Bowl Trial Date & Time",
       LABEL_BOWL_TRIAL_OBS: "Observations",
       LABEL_PREMIX_DATE: "Premix Date",
       LABEL_PREMIX_QTY: "Batch Size",
@@ -1972,6 +2000,11 @@ export const STRINGS = {
       MIX_CARD_EMPTY_ERROR: "Add at least one value on this card before submitting.",
       MIX_CARD_SAVE_DRAFT_SUCCESS: (label: string) => `${label} saved as draft successfully.`,
       MIX_CARD_SUBMIT_SUCCESS: (label: string) => `${label} submitted for approval successfully.`,
+      CYCLE_CHANGE_CONFIRM_TITLE: "Change Mixing Cycle?",
+      CYCLE_CHANGE_CONFIRM_MESSAGE:
+        "Changing the Mixing Cycle will clear Process Particulars and Quality Checks for this Premix and Final Mix pair. Building, bowl, and trial details will be kept. Do you wish to Continue?",
+      CYCLE_CHANGE_CONFIRM_YES: "Yes",
+      CYCLE_CHANGE_CONFIRM_NO: "No",
     },
     CASTING_CURING: {
       TITLE: "Casting and Curing",
@@ -2074,8 +2107,10 @@ export const STRINGS = {
       SECTION_TAB_CURING: "Curing",
       CURING_PROCESS_TITLE: "Curing Process",
       CURING_SELECT_OVEN: "Select Oven",
+      CURING_OVEN: "Oven",
       CURING_SELECT_OVEN_PLACEHOLDER: "Select oven",
       CURING_SELECT_OVEN_NO: "Select Oven Number",
+      CURING_OVEN_NO: "Oven Number",
       CURING_SELECT_OVEN_NO_PLACEHOLDER: "Select oven number",
       CURING_OVEN_NO_OPTION: (n: number) => `Oven no ${n}`,
       CURING_MOTOR_STAGE: "Motor Stage",
@@ -3102,8 +3137,7 @@ export const STRINGS = {
       DETAILS_NO_MOTOR_DATA: "No form data recorded for this motor.",
       MOTOR_NAV_TITLE: "Motor navigation",
       MOTOR_NAV_HINT: "Switch between motors to fill static testing details.",
-      PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
-        "This motor was not approved in all QC motor divisions.",
+      PREVIOUS_STAGE_MOTOR_TAB_DISABLED: "This motor was not approved in all QC motor divisions.",
       PREVIOUS_STAGE_UNIT_DISABLED:
         "This motor was not approved in all QC motor divisions and cannot be filled yet.",
       PREVIOUS_STAGE_SUBSCALE_DISABLED:
@@ -3149,7 +3183,7 @@ export const STRINGS = {
         "Loading schema and preparing the form. This will only take a moment…",
       OTHER_BEM_DETAILS_TITLE: "Other BEM Motor Details",
       OTHER_BEM_DETAILS_SUBTITLE:
-        "Enter static testing details for other BEM motor per conditioning, grain dimension, and hardware format",
+        "Enter static testing details for other BEM motor (test header, igniter, nozzle, BEM data, ballistic parameters, and burn rate)",
       OTHER_BEM_MOTOR_NO_LABEL: "Other BEM Motor No.",
       OTHER_BEM_MOTOR_NO_PLACEHOLDER: "Enter Other BEM motor No.",
       STF_TEST_NO_LABEL: "STF Test No.",
@@ -3265,7 +3299,7 @@ export const STRINGS = {
     SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
     MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
     MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
-      MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
+    MOTOR_LOCKED_DISCARDED: "This motor has been discarded and cannot be edited.",
     MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) => `Draft saved for motor ${motorId} successfully.`,
     MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
       `Motor ${motorId} submitted for approval successfully.`,
@@ -3481,6 +3515,10 @@ export const STRINGS = {
     HEADER: {
       TITLE: "Admin Dashboard",
     },
+    BLOCKCHAIN_HEADER: {
+      TITLE: "Blockchain Events",
+      SUB_TITLE: "Inspect raw payloads and verifiable transaction data recorded on the ledger",
+    },
 
     // ── KPI ──────────────────────────────────────────────────────
     KPI: {
@@ -3567,7 +3605,7 @@ export const STRINGS = {
       STAGE: "Stage",
       TYPE: "Type",
       STATUS: "Status",
-      DEPARTMENT: "Dept",
+      DEPARTMENT: "Sub Department",
       FROM: "From",
       TO: "To",
       THIS_MONTH_CHIP: "Current month",
@@ -3598,6 +3636,20 @@ export const STRINGS = {
     EVENT_FILTERS: {
       TYPES: ["All", "STAGE_UPDATED", "APPROVAL_COMPLETED", "QC_PASSED", "DISPATCHED"],
       DEPARTMENTS: ["All", "Manufacturing", "Quality Assurance", "Sourcing", "Dispatch"],
+      SUB_DEPTS: [
+        "All",
+        "Raw Material Preparation",
+        "Case Preparation",
+        "Mixing",
+        "Casting and Curing",
+        "Post Cure Operations",
+        "Subscale",
+        "Trimming",
+        "NDT",
+        "Quality Assurance",
+        "Static Testing Facility",
+        "Dispatch",
+      ],
     },
   },
 
@@ -3617,13 +3669,18 @@ export const STRINGS = {
       TITLE: "User Management",
       SUBTITLE: "Manage user accounts, roles and department access",
       NEW_USER_BUTTON: "New User",
+      PASSWORD_REQUEST_BUTTON: "Password Request",
       LOADING_PLACEHOLDER: "…",
     },
     STATS: [
       { label: "Total Users", subLabel: "Registered accounts", variant: "total" },
       { label: "Active", subLabel: "Currently enabled", variant: "active" },
       { label: "Inactive", subLabel: "Access suspended", variant: "inactive" },
-      { label: "Actions Required", subLabel: "Pending reset requests", variant: "reset" },
+      {
+        label: "Password Reset Request",
+        subLabel: "Pending reset requests",
+        variant: "reset",
+      },
     ],
     TOOLBAR: {
       SEARCH_PLACEHOLDER: "Search by name or username…",
@@ -3636,10 +3693,44 @@ export const STRINGS = {
       FILTER_STATUS_LABEL: "Status",
     },
     STATUS: ["Active", "Inactive"],
-    TABLE_COLS: ["User", "User ID", "Role", "Sub-Departments", "Status", "Actions"],
+    TABLE_COLS: [
+      "User",
+      "User ID",
+      "Role",
+      "Sub-Departments",
+      "Password Change Required",
+      "Status",
+      "Actions",
+    ],
     TABLE: {
       EMPTY: "No users found",
       NOT_APPLICABLE: "Not Applicable",
+      PASSWORD_NEED_TO_DO: "Yes",
+      PASSWORD_NO: "No",
+      TEMP_PASSWORD_LABEL: "Temporary Password",
+    },
+    PASSWORD_REQUESTS: {
+      TITLE: "Password Reset Requests",
+      SUBTITLE: "Review and approve user password reset requests",
+      BACK: "Back to User Management",
+      EMPTY: "No password reset requests found",
+      COL_REQUEST_ID: "Request ID",
+      COL_USER_ID: "User ID",
+      COL_REASON: "Reason",
+      COL_STATUS: "Status",
+      COL_TEMP_PASSWORD: "Temp Password",
+      COL_REQUESTED_AT: "Requested At",
+      COL_ACTIONS: "Actions",
+      APPROVE: "Approve",
+      REJECT: "Reject",
+      APPROVE_SUCCESS: "Password reset approved.",
+      REJECT_SUCCESS: "Password reset request rejected.",
+      TEMP_PASSWORD_TITLE: "Temporary Password",
+      TEMP_PASSWORD_BODY: (userId: string, password: string) =>
+        `Share this temporary password with ${userId}. They must change it on next login.\n\n${password}`,
+      TEMP_PASSWORD_CLOSE: "Close",
+      LOAD_FAILED: "Failed to load password reset requests",
+      ACTION_FAILED: "Failed to update password reset request",
     },
     DELETE_DIALOG: {
       TITLE: "Delete User?",
@@ -3649,6 +3740,19 @@ export const STRINGS = {
       CANCEL: "Cancel",
       CONFIRM: "Delete User",
       DELETING: "Deleting…",
+    },
+    ACTIVATE_DIALOG: {
+      TITLE: "Activate User?",
+      BODY: (name: string, username: string) =>
+        `This will restore access for ${name} (${username}).`,
+      FALLBACK_MESSAGE: "Activate this user?",
+      CANCEL: "Cancel",
+      CONFIRM: "Activate User",
+      ACTIVATING: "Activating…",
+    },
+    ACTIONS: {
+      ACTIVATE_USER: "Activate User",
+      ACTIVATE_USER_TOOLTIP: "Activate this user",
     },
     FORM: {
       EDIT_TITLE: "Edit User",
@@ -3662,8 +3766,11 @@ export const STRINGS = {
       OPERATION_FAILED: "Operation failed.",
       DELETE_SUCCESS: "User deleted successfully.",
       DELETE_FAILED: "Failed to delete user.",
+      ACTIVATE_SUCCESS: "User activated successfully.",
+      ACTIVATE_FAILED: "Failed to activate user.",
       SAVING_USER: "Saving user data...",
       DELETING_USER: "Deleting user...",
+      ACTIVATING_USER: "Activating user...",
       UUID_RESOLVE_FAILED: "Unable to resolve user UUID for update.",
       NO_CHANGES: "No changes to update.",
     },

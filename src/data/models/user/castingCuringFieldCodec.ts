@@ -86,9 +86,7 @@ export const toApiDateTime = (value: unknown): string | undefined => {
     return core.length === 16 ? `${core}:00` : core;
   }
 
-  const dmy = raw.match(
-    /^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/,
-  );
+  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (dmy) {
     const [, day, month, year, hour = "00", minute = "00", second = "00"] = dmy;
     const date = `${year}-${pad2(month)}-${pad2(day)}`;
@@ -109,8 +107,13 @@ export const toUiDateTime = (value: unknown): string => {
   if (dmy) {
     const [, day, month, year, hour, minute] = dmy;
     const date = `${pad2(day)}-${pad2(month)}-${year}`;
-    if (hour == null) return date;
+    if (hour == null) return `${date} 00:00`;
     return `${date} ${pad2(hour)}:${pad2(minute)}`;
+  }
+
+  const isoDateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateOnly) {
+    return `${isoDateOnly[3]}-${isoDateOnly[2]}-${isoDateOnly[1]} 00:00`;
   }
 
   const isoLocal = raw.match(
@@ -145,8 +148,7 @@ export const isLegacySectionArray = (
 ): value is Array<{ sectionId?: string; sectionData?: unknown[] }> =>
   Array.isArray(value) &&
   value.some(
-    (item) =>
-      Boolean(asRecord(item)?.sectionId) || Array.isArray(asRecord(item)?.sectionData),
+    (item) => Boolean(asRecord(item)?.sectionId) || Array.isArray(asRecord(item)?.sectionData),
   );
 
 /** Unwrap nested API payloads like `castingSections` / `curingSections` onto the root object. */

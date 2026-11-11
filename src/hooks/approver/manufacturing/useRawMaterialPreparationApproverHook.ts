@@ -34,7 +34,8 @@ type ApproverListRow = Record<string, unknown> & {
   weightmentSheet?: unknown;
 };
 
-export const applyRawMaterialPrepApproverClientFilters = applyApproverSubdepartmentBatchListClientFilters;
+export const applyRawMaterialPrepApproverClientFilters =
+  applyApproverSubdepartmentBatchListClientFilters;
 
 const resolveInitialApproverPremixNo = (
   premixes: RawMaterialPrepApproverDetailView["premixes"],
@@ -176,6 +177,7 @@ export const useRawMaterialPreparationApproverHook = () => {
         activePremixNo && premixDialogBaseProps.batchId
           ? `${premixDialogBaseProps.batchId} · Premix ${activePremixNo}`
           : premixDialogBaseProps.batchId,
+      subdepartment: 3,
     }),
     [activePremixNo, premixDialogBaseProps],
   );
@@ -199,8 +201,7 @@ export const useRawMaterialPreparationApproverHook = () => {
     setDetailsLoading(false);
 
     if (!response?.success || !response?.data) {
-      const fallback =
-        response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
+      const fallback = response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
       showAlert(response?.message || fallback, "error", { autoCloseMs: 3500 });
       setSelected(null);
       return;
@@ -216,7 +217,10 @@ export const useRawMaterialPreparationApproverHook = () => {
       ...row,
       formId: detailView?.formId || formId,
       batchId: detailView?.batchId || row.batchId,
-      status: detailView?.status ?? getRawMaterialPrepBatchStatusLabel(response.data.status) ?? row.status,
+      status:
+        detailView?.status ??
+        getRawMaterialPrepBatchStatusLabel(response.data.status) ??
+        row.status,
       // Premix rejection reasons live on detailView.premixes — don't carry batch-level stale text.
       rejectionReason: null,
       detailView,

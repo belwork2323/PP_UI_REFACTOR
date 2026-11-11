@@ -101,7 +101,8 @@ export function mapToAppError(error: unknown) {
     case HTTP_STATUS.INTERNAL_SERVER_ERROR:
       return new AppError({
         status,
-        message: backendMessage(data) ?? STRINGS.SYSTEM.SERVER_ERROR,
+        // Prefer a stable user-facing message for opaque 500s from the API.
+        message: STRINGS.SYSTEM.SERVER_ERROR,
         details: typeof data === "object" && data !== null && "error" in data ? (data as { error: unknown }).error : null,
       });
 

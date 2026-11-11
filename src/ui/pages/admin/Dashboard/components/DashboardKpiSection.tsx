@@ -10,7 +10,7 @@ import { STRINGS } from "@app/config/strings";
 type DashboardKpiSectionProps = {
   th: any;
   statsLoading: boolean;
-  kpis: any[];
+  kpis?: any[];
   filterType: string;
   setFilterType: (val: string) => void;
   customStartDate: string;
@@ -75,36 +75,39 @@ export default function DashboardKpiSection({
           />
         )}
       </Box>
-
-      <Box sx={th.dashboard.kpiGrid}>
-        {statsLoading
-          ? [1, 2, 3, 4, 5, 6].map((i) => (
-              <DashKPICardSkeleton
-                key={i}
-                cardSx={th.kpi.card}
-                labelProps={th.kpi.label}
-                valueProps={th.kpi.value}
-                skeleton={th.kpi.skeleton}
-                avatarSx={th.kpi.avatarSx}
-              />
-            ))
-          : kpis.map(({ label, value, Icon, bg }) => (
-              <DashKPICard
-                key={label}
-                label={label}
-                value={value ?? "-"}
-                Icon={Icon}
-                bg={bg}
-                cardSx={th.kpi.card}
-                labelProps={th.kpi.label}
-                valueProps={th.kpi.value}
-                subRowSx={th.kpi.subRow}
-                trendIconSx={th.kpi.trendIcon}
-                avatarSx={th.kpi.avatarSx}
-                iconSx={th.kpi.iconSx}
-              />
-            ))}
-      </Box>
+      {kpis?.length > 0 && (
+        <>
+          <Box sx={th.dashboard.kpiGrid}>
+            {statsLoading
+              ? [1, 2, 3, 4, 5, 6].map((i) => (
+                  <DashKPICardSkeleton
+                    key={i}
+                    cardSx={th.kpi.card}
+                    labelProps={th.kpi.label}
+                    valueProps={th.kpi.value}
+                    skeleton={th.kpi.skeleton}
+                    avatarSx={th.kpi.avatarSx}
+                  />
+                ))
+              : kpis.map(({ label, value, Icon, bg }) => (
+                  <DashKPICard
+                    key={label}
+                    label={label}
+                    value={value ?? "-"}
+                    Icon={Icon}
+                    bg={bg}
+                    cardSx={th.kpi.card}
+                    labelProps={th.kpi.label}
+                    valueProps={th.kpi.value}
+                    subRowSx={th.kpi.subRow}
+                    trendIconSx={th.kpi.trendIcon}
+                    avatarSx={th.kpi.avatarSx}
+                    iconSx={th.kpi.iconSx}
+                  />
+                ))}
+          </Box>
+        </>
+      )}
     </>
   );
 }

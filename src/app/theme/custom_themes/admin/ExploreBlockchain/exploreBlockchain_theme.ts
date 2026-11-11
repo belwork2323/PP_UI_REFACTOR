@@ -25,7 +25,7 @@ const getExploreBlockchainTheme = (mode: "light" | "dark" = "light") => {
       subtitle: { ...adminTheme.pageHeader.subtitle, ...fonts.typography.subtitle },
     },
 
-      statsGrid: {
+    statsGrid: {
       ...adminTheme.statsGrid,
       colors: {
         // reuse the same structure that AdminManagementStatsGrid expects
@@ -80,7 +80,7 @@ const getExploreBlockchainTheme = (mode: "light" | "dark" = "light") => {
       bgcolor: d.cardBg,
       borderRadius: layout.cardBorderRadius,
       border: `1px solid ${d.cardBorder}`,
-      boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.35)" : colors.shadow?.card,
+      boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.35)" : colors.shadow?.header,
     },
 
     sectionTitle: {
@@ -106,7 +106,7 @@ const getExploreBlockchainTheme = (mode: "light" | "dark" = "light") => {
         cursor: "pointer",
         pb: 1,
         fontWeight: active ? 700 : 500,
-        color: active ? "#3b82f6" : d.textSecondary ?? "text.secondary",
+        color: active ? "#3b82f6" : (d.textSecondary ?? "text.secondary"),
         borderBottom: active ? "2px solid #3b82f6" : "none",
       }),
     },

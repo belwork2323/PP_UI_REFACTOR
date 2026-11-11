@@ -133,7 +133,7 @@ export const validateQcProcessingEntryProcess = (
   identificationMaterials?: MaterialItem[] | null,
   slotOverride?: RawMaterialPrepMaterialProcessSlot | null,
 ): Record<string, string> => {
-  if (entry.kind !== "PROCESSING_MATERIAL" || !entry.schemaUnavailable) return {};
+  if (entry.kind !== "PROCESSING_MATERIAL") return {};
   const slotState = slotOverride ?? hydrateProcessSlotFromProcessingEntry(entry);
   if (!slotState) return {};
   const qty = quantityPerPremixForMaterial(identificationMaterials, entry.materialCode);
@@ -155,7 +155,7 @@ export const validateQcProcessingEntriesForSubmit = (
 ): Record<string, Record<string, string>> => {
   const errorsByEntryId: Record<string, Record<string, string>> = {};
   for (const entry of entries) {
-    if (entry.kind !== "PROCESSING_MATERIAL" || !entry.schemaUnavailable) continue;
+    if (entry.kind !== "PROCESSING_MATERIAL") continue;
     const errs = validateQcProcessingEntryProcess(
       entry,
       { submit: true, unit: false },

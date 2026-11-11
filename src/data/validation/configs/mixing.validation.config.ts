@@ -39,7 +39,7 @@ export const mixingFieldRules = {
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   bowlTrialDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     pattern: undefined,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },

@@ -21,6 +21,7 @@ import {
   formatSubdepartmentBatchTypeLabel,
   normalizeSubdepartmentBatchStatus,
 } from "./SubdepartmentBatchModel";
+import { formatDateTimeForApi } from "./rawMaterialPreparationApiMapper";
 
 export interface ProcessParticularRow {
   operationId: number;
@@ -177,6 +178,11 @@ export const isMixCardLocked = (status?: MixCardSubmissionStatus | string | null
   const normalized = String(status ?? "").toUpperCase();
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
 };
+
+/** Live Mixing Cycle MDM sync only while the card has never been started. */
+export const shouldSyncMixingCycleMaster = (
+  status?: MixCardSubmissionStatus | string | null,
+): boolean => normalizeMixCardStatus(status) === "TO_BE_INITIATED";
 
 export const isMixCardEditable = (status?: MixCardSubmissionStatus | string | null) =>
   !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
@@ -824,7 +830,8 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
           bldgNo: String(premix?.mixerConfiguration?.bldgNo ?? ""),
           bowlId: premix?.mixerConfiguration?.bowlId ?? "",
 
-          bowlTrialDate: premix?.trialDetails?.trialDate ?? "",
+          bowlTrialDate:
+            premix?.trialDetails?.trialDateTime ?? premix?.trialDetails?.trialDate ?? "",
 
           bowlTrialObservations: premix?.trialDetails?.observations ?? "",
 
@@ -951,8 +958,7 @@ const readObservationValues = (observations: unknown[]): string[] => {
     // Only read explicit value fields — never coerce the whole observation
     // (that could pick up unrelated nested fields / sampleNo).
     const rawValue = rec.value ?? rec.observedValue ?? rec.result;
-    const value =
-      rawValue === undefined || rawValue === null ? "" : coerceFieldValue(rawValue);
+    const value = rawValue === undefined || rawValue === null ? "" : coerceFieldValue(rawValue);
     const sampleNo = Number(rec.sampleNo);
     if (Number.isFinite(sampleNo) && sampleNo > 0) {
       byIndex[sampleNo - 1] = value;
@@ -995,7 +1001,8 @@ const mapApiQualityChecksToRows = (apiRows: any[] = []): QualityCheckRow[] =>
     const bySample = readObservationValues(rawObservations);
 
     const filledSlots = bySample.reduce(
-      (count, value, index) => (String(value ?? "").trim() !== "" ? Math.max(count, index + 1) : count),
+      (count, value, index) =>
+        String(value ?? "").trim() !== "" ? Math.max(count, index + 1) : count,
       0,
     );
 
@@ -1027,9 +1034,7 @@ const mergeQualityChecks = (
 
   return masterRows.map((master) => {
     const masterParam = String(master.parameterId ?? "").trim();
-    const api = apiRows.find(
-      (row) => String(row?.parameterId ?? "").trim() === masterParam,
-    );
+    const api = apiRows.find((row) => String(row?.parameterId ?? "").trim() === masterParam);
 
     const sampleCount = Math.max(
       1,
@@ -1109,7 +1114,7 @@ export const mapMixingFormStateToPayload = (
           },
 
           trialDetails: {
-            trialDate: premix.bowlTrialDate || null,
+            trialDateTime: formatDateTimeForApi(premix.bowlTrialDate),
             observations: premix.bowlTrialObservations,
           },
 
@@ -1162,6 +1167,14 @@ export const mapMixingFormStateToPayload = (
 
 const hasValue = (value: unknown) => String(value ?? "").trim().length > 0;
 
+const processParticularsHaveEnteredValues = (rows?: ProcessParticularRow[] | null) =>
+  (rows ?? []).some((row) => [row.rpm, row.time, row.temp, row.vacuum].some(hasValue));
+
+const qualityChecksHaveEnteredValues = (rows?: QualityCheckRow[] | null) =>
+  (rows ?? []).some(
+    (row) => Array.isArray(row.observedValues) && row.observedValues.some(hasValue),
+  );
+
 const premixHasValue = (premix: PremixEntry) => {
   const headerFilled =
     hasValue(premix.mixerType) ||
@@ -1173,15 +1186,11 @@ const premixHasValue = (premix: PremixEntry) => {
     hasValue(premix.premixQuantity) ||
     hasValue(premix.mixingCycle);
 
-  const processFilled = (premix.processParticulars ?? []).some((row) =>
-    [row.rpm, row.time, row.temp, row.vacuum].some(hasValue),
+  return (
+    headerFilled ||
+    processParticularsHaveEnteredValues(premix.processParticulars) ||
+    qualityChecksHaveEnteredValues(premix.qualityChecks)
   );
-
-  const qualityFilled = (premix.qualityChecks ?? []).some(
-    (row) => Array.isArray(row.observedValues) && row.observedValues.some(hasValue),
-  );
-
-  return headerFilled || processFilled || qualityFilled;
 };
 
 const finalMixHasValue = (entry: FinalMixEntry) => {
@@ -1192,15 +1201,33 @@ const finalMixHasValue = (entry: FinalMixEntry) => {
     hasValue(entry.bowlId) ||
     hasValue(entry.mixingCycle);
 
-  const processFilled = (entry.processParticulars ?? []).some((row) =>
-    [row.rpm, row.time, row.temp, row.vacuum].some(hasValue),
+  return (
+    headerFilled ||
+    processParticularsHaveEnteredValues(entry.processParticulars) ||
+    qualityChecksHaveEnteredValues(entry.qualityChecks)
   );
+};
 
-  const qualityFilled = (entry.qualityChecks ?? []).some(
-    (row) => Array.isArray(row.observedValues) && row.observedValues.some(hasValue),
-  );
+/**
+ * True when Premix N / Final Mix N have process/QC values that a Mixing Cycle
+ * change would wipe. Building, bowl, trial, sheet defaults, and cycle fields
+ * do not count — MDM-seeded empty tables alone do not count.
+ */
+export const mixPairHasEnteredDataForCycleChange = (
+  premix?: PremixEntry | null,
+  finalMix?: FinalMixEntry | null,
+): boolean => {
+  const premixEntered =
+    !!premix &&
+    (processParticularsHaveEnteredValues(premix.processParticulars) ||
+      qualityChecksHaveEnteredValues(premix.qualityChecks));
 
-  return headerFilled || processFilled || qualityFilled;
+  const finalEntered =
+    !!finalMix &&
+    (processParticularsHaveEnteredValues(finalMix.processParticulars) ||
+      qualityChecksHaveEnteredValues(finalMix.qualityChecks));
+
+  return premixEntered || finalEntered;
 };
 
 export const hasMixCardValue = (

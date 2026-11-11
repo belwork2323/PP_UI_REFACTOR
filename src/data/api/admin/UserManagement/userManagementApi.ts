@@ -66,9 +66,43 @@ export const deleteUser = async (uuid) => {
 };
 
 /**
- * Reset a user's password.
- * (Keeping existing mock routing format for now)
+ * Activate an inactive user by UUID.
+ * POST: /admin/user/activate
  */
-export const resetUserPassword = async (id) => {
-  return post(USER_MANAGEMENT.RESET_PASSWORD(id), {});
+export const activateUser = async (uuid) => {
+  return post(USER_MANAGEMENT.ACTIVATE_USER, { user_uuid: uuid });
+};
+
+/**
+ * List password reset requests.
+ * POST: /admin/reset-password/list
+ */
+export const fetchPasswordResetRequests = async (payload: {
+  search?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}) => {
+  return post(USER_MANAGEMENT.PASSWORD_RESET_LIST, {
+    search: payload.search ?? "",
+    status: payload.status ?? "ALL",
+    startDate: payload.startDate ?? "",
+    endDate: payload.endDate ?? "",
+    page: payload.page ?? 1,
+    pageSize: payload.pageSize ?? 10,
+  });
+};
+
+/**
+ * Approve or reject a password reset request.
+ * POST: /admin/reset-password/changeStatus
+ */
+export const changePasswordResetStatus = async (payload: {
+  requestId: string;
+  action: "APPROVE" | "REJECT";
+  remarks?: string;
+}) => {
+  return post(USER_MANAGEMENT.PASSWORD_RESET_CHANGE_STATUS, payload);
 };

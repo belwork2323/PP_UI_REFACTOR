@@ -206,7 +206,7 @@ export const mergeFileRefsPreferLive = (
   const seen = new Set<string>();
   for (const ref of next) {
     const key = keyOf(ref);
-    const merged = key ? byKey.get(key) ?? ref : ref;
+    const merged = key ? (byKey.get(key) ?? ref) : ref;
     ordered.push(merged);
     if (key) seen.add(key);
   }
@@ -272,9 +272,7 @@ export function extractUploadedFileId(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as Record<string, unknown>;
   const nested =
-    root.data && typeof root.data === "object"
-      ? (root.data as Record<string, unknown>)
-      : null;
+    root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
   const file =
     nested?.file && typeof nested.file === "object"
       ? (nested.file as Record<string, unknown>)
@@ -295,13 +293,22 @@ export function extractUploadedFileName(payload: unknown, fallback: string): str
   if (!payload || typeof payload !== "object") return fallback;
   const root = payload as Record<string, unknown>;
   const nested =
-    root.data && typeof root.data === "object"
-      ? (root.data as Record<string, unknown>)
-      : null;
+    root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
   const raw =
-    root.originalFileName ??
-    root.fileName ??
-    nested?.originalFileName ??
-    nested?.fileName;
+    root.originalFileName ?? root.fileName ?? nested?.originalFileName ?? nested?.fileName;
   return String(raw ?? "").trim() || fallback;
 }
+
+export const extractFileName = (fileInput: unknown): string | string[] => {
+  if (!fileInput) return "";
+  const getSingleName = (doc: unknown): string => {
+    if (!doc) return "";
+    if (typeof doc === "string") return doc;
+    const d = doc as Record<string, unknown>;
+    return String(d.fileName ?? d.name ?? d.fileId ?? "").trim();
+  };
+  if (Array.isArray(fileInput)) {
+    return fileInput.map(getSingleName);
+  }
+  return getSingleName(fileInput);
+};

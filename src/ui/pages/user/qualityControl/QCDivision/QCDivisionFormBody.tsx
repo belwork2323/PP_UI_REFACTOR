@@ -73,6 +73,8 @@ export type QCDivisionFormBodyProps = {
   readOnly?: boolean;
   /** Block field edits (Waiting / Approved) without forcing details theme. */
   fieldsDisabled?: boolean;
+  /** Details / approver view: render RMP processing as read-only tables (RMP approver parity). */
+  detailsView?: boolean;
   schemaLoading?: boolean;
   divisionAutoPopulateLoading?: boolean;
   schemaError?: string | null;
@@ -123,6 +125,7 @@ const QCDivisionFormBody = ({
   activeDivisionSubIndex,
   readOnly = false,
   fieldsDisabled = false,
+  detailsView = false,
   schemaLoading = false,
   divisionAutoPopulateLoading = false,
   schemaError = null,
@@ -516,6 +519,7 @@ const QCDivisionFormBody = ({
               divisionAutoPopulateData={divisionAutoPopulateData}
               readOnly={readOnly}
               fieldsDisabled={fieldsDisabled}
+              detailsView={detailsView}
               schemaLoading={schemaLoading}
               schemaError={schemaError}
               onEntryValuesChange={onDivisionEntryValuesChange}

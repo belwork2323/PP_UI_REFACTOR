@@ -54,12 +54,19 @@ export const DRAWER_NAV = [
     allowedRoles: ["ADMIN", "CENTRE_HEAD"],
   },
   {
-  key: "blockchain-explorer",
-  label: "Explore Blockchain",
-  route: "/blockchain-explorer",
-  Icon: icons.drawerBlockchainExplorer,
-  allowedRoles: ["ADMIN"],
-},
+    key: "blockchain-events",
+    label: "Blockchain Events",
+    route: "/blockchain-events",
+    Icon: icons.Hub,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
+  {
+    key: "blockchain-explorer",
+    label: "Explore Blockchain",
+    route: "/blockchain-explorer",
+    Icon: icons.drawerBlockchainExplorer,
+    allowedRoles: ["ADMIN"],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -285,6 +292,30 @@ const getDrawerTheme = (mode = "light") => {
     logout: {
       list: {
         pb: 0,
+      },
+
+      /** Neutral style for View Profile (and similar) */
+      menuItem: {
+        borderRadius: `${layout.cardBorderRadius ?? 10}px`,
+        mx: 1,
+        mb: 0.5,
+        color: d.textPrimary,
+        "&:hover": {
+          background: d.hoverBg,
+          color: d.textPrimary,
+        },
+        transition: layout.glass?.transition ?? "all 0.18s ease",
+      },
+
+      menuIcon: {
+        minWidth: 36,
+        color: "inherit",
+      },
+
+      menuLabelProps: {
+        fontSize: fonts.size?.sm ?? "0.875rem",
+        fontWeight: fonts.weight?.medium ?? 500,
+        color: "inherit",
       },
 
       item: {

@@ -11,6 +11,7 @@ import { getApproverBatchStatusDisplayLabel } from "../../../../data/models/appr
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import DateField from "../../../components/common/DateField";
+import { getFromToOrderMessages } from "../../../../data/validation/dateRangeValidation";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
@@ -142,14 +143,10 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     [theme.palette],
   );
 
+  const draftDateRangeErrors = getFromToOrderMessages(draftFrom, draftTo, "date");
+
   const handleApplyPanelFilters = () => {
-    let from = draftFrom;
-    let to = draftTo;
-    if (from && to && from > to) {
-      const swap = from;
-      from = to;
-      to = swap;
-    }
+    if (draftDateRangeErrors) return;
 
     const next: ApproverSubdepartmentBatchListAppliedFilters & { status: string } = {
       batchId: draftBatchId.trim(),
@@ -158,8 +155,8 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
       motorStage: draftMotorStage === filterAllLabel ? "" : draftMotorStage,
       projectId: draftProjectId === filterAllLabel ? "" : draftProjectId,
       submittedBy: draftSubmittedBy.trim(),
-      fromDate: from,
-      toDate: to,
+      fromDate: draftFrom,
+      toDate: draftTo,
       status: draftStatus,
     };
     applyPanelFilters(next);
@@ -373,13 +370,18 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
           value={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.from)}
+          helperText={draftDateRangeErrors?.from}
           sx={filterStyles.fieldDate}
         />
         <DateField
           label={BL.FILTERS_TO_DATE}
           value={formatToUiDate(draftTo)}
+          minDate={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.to)}
+          helperText={draftDateRangeErrors?.to}
           sx={filterStyles.fieldDate}
         />
       </Stack>

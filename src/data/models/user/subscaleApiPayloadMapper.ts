@@ -1,4 +1,10 @@
-import { scopedFormKey, syncRowGenerationTables, SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import {
+  scopedFormKey,
+  syncRowGenerationTables,
+  SchemaDocumentV2,
+  SchemaFormValues,
+  SchemaSectionSubmission,
+} from "@/data/models/shared/sectionFormTypes";
 import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
 import {
   ARTICLE_TYPE_TABLE_ID,
@@ -18,6 +24,7 @@ import {
   normalizeSubscaleMixingCycles,
 } from "../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { formatToUiDate } from "../../../utils/dateUtils";
+import { toApiDateTime } from "./castingCuringFieldCodec";
 import { parseFileRefs, type FileRef } from "../common/FileUploadModel";
 
 /** Mirrors backend `SubscaleDetailsDTO.MixParticular` */
@@ -81,7 +88,7 @@ export type HardwarePreparationTableDTO = {
   sleeveNo?: string;
   mouldNo?: string;
   lengthMm?: string;
-  thicknessMm?: number;
+  thicknessMm?: string;
   linerApplied?: boolean;
   observations?: string;
 };
@@ -94,7 +101,7 @@ export type CastingTableDTO = {
   castingPitNo?: string;
   castingStartTime?: string;
   castingEndTime?: string;
-  vacuumLevel?: number;
+  vacuumLevel?: string;
   remarks?: string;
 };
 
@@ -113,10 +120,10 @@ export type CuringTableDTO = {
   curingStartDate?: string;
   curingEndDate?: string;
   ovenNo?: string;
-  temperature?: number;
-  hardness?: number;
+  temperature?: string;
+  hardness?: string;
   decoringDate?: string;
-  decoringLoad?: number;
+  decoringLoad?: string;
   grainSurfaceObservations?: string;
 };
 
@@ -142,17 +149,17 @@ export type NdtDetailsDTO = {
 export type TrimmingTableDTO = {
   articleType?: string;
   bemNo?: string;
-  heOd?: number;
-  hePortInner?: number;
-  hePortOuter?: number;
-  heBeforeInhibitionInner?: number;
-  heBeforeInhibitionOuter?: number;
-  neOd?: number;
-  nePortInner?: number;
-  nePortOuter?: number;
-  neWebInner?: number;
-  neWebOuter?: number;
-  lengthBeforeInhibition?: number;
+  heOd?: string;
+  hePortInner?: string;
+  hePortOuter?: string;
+  heBeforeInhibitionInner?: string;
+  heBeforeInhibitionOuter?: string;
+  neOd?: string;
+  nePortInner?: string;
+  nePortOuter?: string;
+  neWebInner?: string;
+  neWebOuter?: string;
+  lengthBeforeInhibition?: string;
 };
 
 /** Mirrors backend `TrimmingDetailsDTO` */
@@ -164,10 +171,11 @@ export type TrimmingDetailsDTO = {
 export type InhibitionTableDTO = {
   articleType?: string;
   bemNo?: string;
-  linerCoatedSleeveWeight?: number;
-  weightBeforeInhibition?: number;
-  weightAfterInhibition?: number;
-  irAppliedWeight?: number;
+  linerCoatedSleeveWeight?: string;
+  weightBeforeInhibition?: string;
+  weightAfterInhibition?: string;
+  irAppliedWeight?: string;
+  dateOfApplication?: string;
   remarks?: string;
 };
 
@@ -321,10 +329,18 @@ const TABLE_FIELD_TO_API: Record<string, string> = {
   BEM_MOULD_NO: "bemMouldNo",
 };
 
+const DATETIME_TABLE_FIELDS = new Set([
+  "CASTING_START_TIME",
+  "CASTING_END_TIME",
+  "CURING_START_DATE",
+  "CURING_END_DATE",
+  "DECORING_DATE",
+  "DATE_OF_NDT",
+]);
+
 const mapGraphFileToApi = (value: unknown): SubscaleGraphFileDTO | undefined => {
   const refs = parseFileRefs(value);
-  const ref: FileRef | undefined =
-    refs.find((item) => String(item.fileId ?? "").trim()) ?? refs[0];
+  const ref: FileRef | undefined = refs.find((item) => String(item.fileId ?? "").trim()) ?? refs[0];
   if (!ref) {
     // Bare fileId string from legacy storage
     const bareId = String(value ?? "").trim();
@@ -337,8 +353,7 @@ const mapGraphFileToApi = (value: unknown): SubscaleGraphFileDTO | undefined => 
   const fileId = String(ref.fileId ?? "").trim();
   if (!fileId) return undefined;
 
-  const fileName =
-    String(ref.originalFileName ?? ref.fileName ?? "").trim() || fileId;
+  const fileName = String(ref.originalFileName ?? ref.fileName ?? "").trim() || fileId;
   const mimeType = String(ref.mimeType ?? "").trim();
   const status =
     ref.status === "uploaded" || ref.status === "uploading" || ref.status === "failed"
@@ -408,7 +423,43 @@ const resolveHardwareCountFieldFromArticleName = (articleName: string): string |
 const RUNTIME_ROW_KEYS = new Set(["SR_NO", "srNo"]);
 
 /** UI-only table columns not sent to the API */
-const TABLE_ROW_EXCLUDED_KEYS = new Set(["PROPELLANT_WEIGHT", "DATE_OF_APPLICATION"]);
+const TABLE_ROW_EXCLUDED_KEYS = new Set(["PROPELLANT_WEIGHT"]);
+
+/**
+ * Propellant Wt (C−B−A): C=Wt After Inhib, B=Wt Before Inhib, A=Liner Coated Sleeve Wt.
+ * Returns "" when any input is blank or non-numeric.
+ */
+export const recomputeInhibitionPropellantWeight = (
+  row: Record<string, unknown> | null | undefined,
+): string | number => {
+  if (!row) return "";
+  const parse = (value: unknown): number => {
+    const text = String(value ?? "").trim();
+    if (!text) return Number.NaN;
+    return Number(text);
+  };
+  const a = parse(row.LINER_COATED_SLEEVE_WEIGHT);
+  const b = parse(row.WEIGHT_BEFORE_INHIBITION);
+  const c = parse(row.WEIGHT_AFTER_INHIBITION);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
+  return c - b - a;
+};
+
+const enrichInhibitionUiRows = (
+  rows: Record<string, unknown>[],
+  sectionDateOfApplication?: string | null,
+): Record<string, unknown>[] => {
+  const sectionDate = String(sectionDateOfApplication ?? "").trim();
+  return rows.map((row) => {
+    const next = { ...row };
+    const rowDate = String(next.DATE_OF_APPLICATION ?? "").trim();
+    if (!rowDate && sectionDate) {
+      next.DATE_OF_APPLICATION = sectionDate;
+    }
+    next.PROPELLANT_WEIGHT = recomputeInhibitionPropellantWeight(next);
+    return next;
+  });
+};
 
 const bridgeHardwareArticleTableToSchemaScope = (values: SchemaFormValues) => {
   const rows = values[ARTICLE_TYPE_TABLE_ID];
@@ -435,6 +486,30 @@ const parseNumber = (value: unknown): number | undefined => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
+
+/** Subscale measure fields that accept alphanumeric / special text (not parseNumber). */
+const ALPHANUMERIC_MEASURE_KEYS = new Set([
+  "THICKNESS_MM",
+  "VACUUM_LEVEL",
+  "TEMPERATURE",
+  "HARDNESS",
+  "DECORING_LOAD",
+  "HE_OD",
+  "HE_PORT_INNER",
+  "HE_PORT_OUTER",
+  "HE_BEFORE_INHIBITION_INNER",
+  "HE_BEFORE_INHIBITION_OUTER",
+  "NE_OD",
+  "NE_PORT_INNER",
+  "NE_PORT_OUTER",
+  "NE_WEB_INNER",
+  "NE_WEB_OUTER",
+  "LENGTH_BEFORE_INHIBITION",
+  "LINER_COATED_SLEEVE_WEIGHT",
+  "WEIGHT_BEFORE_INHIBITION",
+  "WEIGHT_AFTER_INHIBITION",
+  "IR_APPLIED_WEIGHT",
+]);
 
 const parseBoolean = (value: unknown): boolean | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
@@ -474,8 +549,7 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
 
     if (key === "ARTICLE_TYPE") {
       const raw = String(value).trim();
-      mapped.articleType =
-        ARTICLE_TYPE_TO_API[raw] ?? raw.replace(/\s+/g, " ").trim();
+      mapped.articleType = ARTICLE_TYPE_TO_API[raw] ?? raw.replace(/\s+/g, " ").trim();
       return;
     }
 
@@ -493,30 +567,28 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
 
     const apiKey = TABLE_FIELD_TO_API[key] ?? toCamelCase(key);
 
-    // Date columns → DD-MM-YYYY for API
+    if (DATETIME_TABLE_FIELDS.has(key) && typeof value === "string") {
+      const formatted = toApiDateTime(value);
+      if (formatted) mapped[apiKey] = formatted;
+      return;
+    }
+
+    // Date-only columns → DD-MM-YYYY for API
     if (/DATE/i.test(key) && typeof value === "string") {
       const formatted = formatToUiDate(value);
       if (formatted) mapped[apiKey] = formatted;
       return;
     }
 
+    if (ALPHANUMERIC_MEASURE_KEYS.has(key)) {
+      const text = String(value).trim();
+      if (text) mapped[apiKey] = text;
+      return;
+    }
+
     const numeric =
       /_(MM|LEVEL|LOAD|MASS|OD|INNER|OUTER|WEIGHT|STRENGTH|RATE|VALUE|AVG|THK)$/i.test(key) ||
       [
-        "VACUUM_LEVEL",
-        "TEMPERATURE",
-        "HARDNESS",
-        "DECORING_LOAD",
-        "HE_OD",
-        "NE_OD",
-        "HE_PORT_INNER",
-        "HE_PORT_OUTER",
-        "HE_BEFORE_INHIBITION_INNER",
-        "HE_BEFORE_INHIBITION_OUTER",
-        "NE_PORT_INNER",
-        "NE_PORT_OUTER",
-        "NE_WEB_INNER",
-        "NE_WEB_OUTER",
         "DT",
         "N_VALUE",
         "DENSITY",
@@ -528,12 +600,7 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
         "PRESSURE_AVG",
         "THRUST_AVG",
         "BURN_RATE",
-        "LINER_COATED_SLEEVE_WEIGHT",
-        "WEIGHT_BEFORE_INHIBITION",
-        "WEIGHT_AFTER_INHIBITION",
-        "IR_APPLIED_WEIGHT",
         "PROPELLANT_WEIGHT",
-        "LENGTH_BEFORE_INHIBITION",
         "TS",
         "SBS",
         "TBS",
@@ -584,9 +651,7 @@ const mapHardwarePreparationDetails = (
   const linerBatchNo = String(values[LINER_BATCH_NO_FIELD.id] ?? "").trim();
   if (linerBatchNo) details.linerBatchNo = linerBatchNo;
 
-  const linerBatchDate = formatToUiDate(
-    String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim(),
-  );
+  const linerBatchDate = formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim());
   if (linerBatchDate) details.linerBatchDate = linerBatchDate;
 
   return Object.keys(details).length > 0 ? details : undefined;
@@ -629,8 +694,8 @@ const mapHardwarePreparationTable = (values: SchemaFormValues): HardwarePreparat
       const lengthMm = String(row.SIZE_MM ?? "").trim();
       if (lengthMm) mapped.lengthMm = lengthMm;
 
-      const thicknessMm = parseNumber(row.THICKNESS_MM);
-      if (thicknessMm !== undefined) mapped.thicknessMm = thicknessMm;
+      const thicknessMm = String(row.THICKNESS_MM ?? "").trim();
+      if (thicknessMm) mapped.thicknessMm = thicknessMm;
 
       const linerApplied = parseBoolean(row.LINER_APPLIED);
       if (linerApplied !== undefined) mapped.linerApplied = linerApplied;
@@ -726,12 +791,10 @@ export const mapSubscaleDetails = (values: SchemaFormValues): SubscaleDetailsDTO
   const mixerType = String(values.mixerType ?? values.MIXER_TYPE ?? "").trim();
   if (mixerType) payload.mixerType = mixerType;
 
-  const premixDate = formatToUiDate(
-    String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim(),
-  );
+  const premixDate = toApiDateTime(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim());
   if (premixDate) payload.premixDate = premixDate;
 
-  const finalMixDate = formatToUiDate(
+  const finalMixDate = toApiDateTime(
     String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim(),
   );
   if (finalMixDate) payload.finalMixDate = finalMixDate;
@@ -820,7 +883,7 @@ export const mapSubscaleFormValuesToApiPayload = (
   const hardwarePreparationDetails = mapHardwarePreparationDetails(values);
   const hardwarePreparationTable = mapHardwarePreparationTable(values);
 
-  const castingDate = formatToUiDate(
+  const castingDate = toApiDateTime(
     String(getFieldValue(values, "CASTING_DETAILS", "DATE_OF_CASTING") ?? "").trim(),
   );
   const castingDetails = buildSectionTablePayload(
@@ -846,13 +909,18 @@ export const mapSubscaleFormValuesToApiPayload = (
   );
 
   const inhibitionFields: Partial<InhibitionDetailsDTO> = {};
+  const dateOfApplicationFromRows = getTableRows(
+    values,
+    SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
+    "INHIBITION_TABLE",
+  ).find((row) => String(row.DATE_OF_APPLICATION ?? "").trim())?.DATE_OF_APPLICATION;
   const irBatchNo = String(
     getFieldValue(values, SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.IR_BATCH_NO) ??
       values.IR_BATCH_NO ??
       "",
   ).trim();
   if (irBatchNo) inhibitionFields.irBatchNo = irBatchNo;
-  const dateOfMfg = formatToUiDate(
+  const dateOfMfg = toApiDateTime(
     String(
       getFieldValue(
         values,
@@ -865,17 +933,33 @@ export const mapSubscaleFormValuesToApiPayload = (
     ).trim(),
   );
   if (dateOfMfg) inhibitionFields.dateOfManufacturing = dateOfMfg;
-  const dateOfApplication = formatToUiDate(
+  let dateOfApplication = toApiDateTime(
     String(
-      getFieldValue(
-        values,
-        SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
-        INHIBITION_FIELD_IDS.DATE_OF_APPLICATION,
-      ) ??
+      dateOfApplicationFromRows ??
+        getFieldValue(
+          values,
+          SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
+          INHIBITION_FIELD_IDS.DATE_OF_APPLICATION,
+        ) ??
         values.DATE_OF_APPLICATION ??
         "",
     ).trim(),
   );
+  // Prefer first non-empty per-row date when section scalar was never written by the UI.
+  if (!dateOfApplication) {
+    const inhibitionRows = getTableRows(
+      values,
+      SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
+      "INHIBITION_TABLE",
+    );
+    for (const row of inhibitionRows) {
+      const rowDate = formatToUiDate(String(row.DATE_OF_APPLICATION ?? "").trim());
+      if (rowDate) {
+        dateOfApplication = rowDate;
+        break;
+      }
+    }
+  }
   if (dateOfApplication) inhibitionFields.dateOfApplication = dateOfApplication;
 
   const inhibitionDetails = buildSectionTablePayload(
@@ -971,7 +1055,7 @@ const mapApiTableRowToUi = (row: Record<string, unknown>, index: number) => {
     const uiKey = API_TO_TABLE_FIELD[key] ?? toScreamingSnake(key);
     if (uiKey === "ARTICLE_TYPE") {
       const raw = value == null ? "" : String(value);
-      mapped[uiKey] = raw ? ARTICLE_TYPE_FROM_API[raw] ?? raw : "";
+      mapped[uiKey] = raw ? (ARTICLE_TYPE_FROM_API[raw] ?? raw) : "";
       return;
     }
     if (uiKey === "LINER_APPLIED") {
@@ -1019,6 +1103,17 @@ const mapApiTableRowsToUi = (rows: unknown) => {
   return rows.map((row, index) =>
     mapApiTableRowToUi((row ?? {}) as Record<string, unknown>, index),
   );
+};
+
+const mapInhibitionRowsToUi = (inhibition: Record<string, unknown>) => {
+  const rows = mapApiTableRowsToUi(inhibition.inhibitionTable);
+  const dateOfApplication = inhibition.dateOfApplication;
+  if (dateOfApplication == null || dateOfApplication === "") return rows;
+
+  return rows.map((row) => ({
+    ...row,
+    DATE_OF_APPLICATION: row.DATE_OF_APPLICATION || String(dateOfApplication),
+  }));
 };
 
 /** Normalize curing identity to BEM_NO (legacy curing used BEM_MOULD_NO / bemMouldNo). */
@@ -1187,9 +1282,7 @@ export const mapSubscaleApiDetailsToFormValues = (
           mixingCycleCode: String(mc.mixingCycleCode ?? ""),
           mixingCycleName: String(mc.mixingCycleName ?? ""),
           mixingCycleId:
-            mc.mixingCycleId == null || mc.mixingCycleId === ""
-              ? null
-              : Number(mc.mixingCycleId),
+            mc.mixingCycleId == null || mc.mixingCycleId === "" ? null : Number(mc.mixingCycleId),
           premixParticulars: mapParticulars(mc.premixParticulars),
           finalMixParticulars: mapParticulars(mc.finalMixParticulars),
         },
@@ -1226,12 +1319,7 @@ export const mapSubscaleApiDetailsToFormValues = (
   );
   setScopedTable(values, SUBSCALE_SCHEMA_SECTIONS.CASTING, "CASTING_TABLE", castingRowsUi);
 
-  setScopedTable(
-    values,
-    SUBSCALE_SCHEMA_SECTIONS.CURING,
-    "CURING_TABLE",
-    curingRowsUi,
-  );
+  setScopedTable(values, SUBSCALE_SCHEMA_SECTIONS.CURING, "CURING_TABLE", curingRowsUi);
 
   setScopedTable(
     values,
@@ -1263,18 +1351,19 @@ export const mapSubscaleApiDetailsToFormValues = (
     setUnscopedField(values, "DATE_OF_MFG", dateOfMfg);
     setUnscopedField(values, "DATE_OF_MANUFACTURING", dateOfMfg);
   }
-  if (inhibition.dateOfApplication != null) {
-    const dateOfApplication = String(inhibition.dateOfApplication);
+  const inhibitionSectionDate =
+    inhibition.dateOfApplication != null ? String(inhibition.dateOfApplication) : "";
+  if (inhibitionSectionDate) {
     values[
       scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_APPLICATION)
-    ] = dateOfApplication;
-    setUnscopedField(values, "DATE_OF_APPLICATION", dateOfApplication);
+    ] = inhibitionSectionDate;
+    setUnscopedField(values, "DATE_OF_APPLICATION", inhibitionSectionDate);
   }
   setScopedTable(
     values,
     SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
     "INHIBITION_TABLE",
-    mapApiTableRowsToUi(inhibition.inhibitionTable),
+    mapInhibitionRowsToUi(inhibition),
   );
 
   const staticTesting = (normalized.staticTestingDetails ?? {}) as Record<string, unknown>;
@@ -1436,9 +1525,10 @@ const mapProcessSectionApiToDisplayMerged = (
 };
 
 export const parseSubscaleDetailsApiResponse = (data: unknown): SubscaleDetailsResponse => {
-  const raw = ((data as { data?: Record<string, unknown> })?.data ??
-    data ??
-    {}) as Record<string, unknown>;
+  const raw = ((data as { data?: Record<string, unknown> })?.data ?? data ?? {}) as Record<
+    string,
+    unknown
+  >;
   const payload = normalizeSubscaleApiDetailsPayload(raw);
 
   return {
@@ -1453,17 +1543,14 @@ export const parseSubscaleDetailsApiResponse = (data: unknown): SubscaleDetailsR
     submittedAt: payload.submittedAt != null ? String(payload.submittedAt) : null,
     lastUpdatedBy: (payload.lastUpdatedBy as SubscaleDetailsResponse["lastUpdatedBy"]) ?? null,
     lastUpdatedAt: payload.lastUpdatedAt != null ? String(payload.lastUpdatedAt) : null,
-    subDepartmentId:
-      payload.subDepartmentId != null ? Number(payload.subDepartmentId) : undefined,
+    subDepartmentId: payload.subDepartmentId != null ? Number(payload.subDepartmentId) : undefined,
     formSubmissionType:
       payload.formSubmissionType != null ? String(payload.formSubmissionType) : undefined,
     subscaleDetails: payload.subscaleDetails as SubscaleDetailsDTO | undefined,
     hardwarePreparationDetails: payload.hardwarePreparationDetails as
-      | HardwarePreparationDetailsDTO
-      | undefined,
+      HardwarePreparationDetailsDTO | undefined,
     hardwarePreparationTable: payload.hardwarePreparationTable as
-      | HardwarePreparationTableDTO[]
-      | undefined,
+      HardwarePreparationTableDTO[] | undefined,
     castingDetails: payload.castingDetails as CastingDetailsDTO | undefined,
     curingDetails: payload.curingDetails as CuringDetailsDTO | undefined,
     ndtDetails: payload.ndtDetails as NdtDetailsDTO | undefined,
@@ -1471,8 +1558,7 @@ export const parseSubscaleDetailsApiResponse = (data: unknown): SubscaleDetailsR
     inhibitionDetails: payload.inhibitionDetails as InhibitionDetailsDTO | undefined,
     staticTestingDetails: payload.staticTestingDetails as StaticTestingDetailsDTO | undefined,
     mechanicalInterfaceProperties: payload.mechanicalInterfaceProperties as
-      | MechanicalInterfacePropertiesDTO
-      | undefined,
+      MechanicalInterfacePropertiesDTO | undefined,
     sections: resolveSubscaleApiSectionsForDisplay(raw.sections, raw),
   };
 };
@@ -1521,9 +1607,12 @@ const mergeSubscaleApiSectionRecord = (
     if (key === "castingDetails") {
       Object.assign(
         merged,
-        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "castingTable", "CASTING_TABLE", [
-          { apiKey: "dateOfCasting", uiKey: "DATE_OF_CASTING" },
-        ]),
+        mapProcessSectionApiToDisplayMerged(
+          value as Record<string, unknown>,
+          "castingTable",
+          "CASTING_TABLE",
+          [{ apiKey: "dateOfCasting", uiKey: "DATE_OF_CASTING" }],
+        ),
       );
       return;
     }
@@ -1546,7 +1635,11 @@ const mergeSubscaleApiSectionRecord = (
     if (key === "ndtDetails") {
       Object.assign(
         merged,
-        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "ndtTable", "NDT_TABLE"),
+        mapProcessSectionApiToDisplayMerged(
+          value as Record<string, unknown>,
+          "ndtTable",
+          "NDT_TABLE",
+        ),
       );
       return;
     }
@@ -1568,7 +1661,7 @@ const mergeSubscaleApiSectionRecord = (
       if (source.irBatchNo) merged.IR_BATCH_NO = source.irBatchNo;
       if (source.dateOfManufacturing) merged.DATE_OF_MANUFACTURING = source.dateOfManufacturing;
       if (source.dateOfApplication) merged.DATE_OF_APPLICATION = source.dateOfApplication;
-      const rows = mapApiTableRowsToUi(source.inhibitionTable);
+      const rows = mapInhibitionRowsToUi(source as Record<string, unknown>);
       if (rows.length > 0) merged.INHIBITION_TABLE = rows;
       return;
     }

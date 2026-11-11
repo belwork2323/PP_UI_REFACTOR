@@ -46,15 +46,13 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
   chaincodes: <Code sx={{ fontSize: 22 }} />,
 };
 
-const STAT_VALUE_KEYS: Record<
-  string,
-  "latestBlock" | "txCount" | "peerCount" | "chaincodeCount"
-> = {
-  blocks: "latestBlock",
-  transactions: "txCount",
-  nodes: "peerCount",
-  chaincodes: "chaincodeCount",
-};
+const STAT_VALUE_KEYS: Record<string, "latestBlock" | "txCount" | "peerCount" | "chaincodeCount"> =
+  {
+    blocks: "latestBlock",
+    transactions: "txCount",
+    nodes: "peerCount",
+    chaincodes: "chaincodeCount",
+  };
 
 const BlockchainExplorerPage = () => {
   const mode = useThemeStore((s) => s.mode);
@@ -109,7 +107,7 @@ const BlockchainExplorerPage = () => {
                 ))}
               </select>
             </FormControl>
-                       <RefreshIconButton
+            <RefreshIconButton
               onClick={ctrl.refresh}
               disabled={ctrl.loading}
               tooltip={S.PAGE.REFRESH_TOOLTIP || AC.REFRESH_TOOLTIP}
@@ -162,9 +160,7 @@ const BlockchainExplorerPage = () => {
         <Grid size={{ xs: 12, md: 6 }}>
           <Card sx={t.sectionCard}>
             <CardContent>
-              <Typography sx={t.sectionTitle}>
-                {S.TRANSACTIONS_BY_ORG.TITLE}
-              </Typography>
+              <Typography sx={t.sectionTitle}>{S.TRANSACTIONS_BY_ORG.TITLE}</Typography>
               <Box sx={t.pieContainer}>
                 {ctrl.pieData.length === 0 && !ctrl.loading ? (
                   <Typography variant="body2" color="text.secondary">
@@ -181,10 +177,7 @@ const BlockchainExplorerPage = () => {
                         label
                       >
                         {ctrl.pieData.map((_, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                          />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip />

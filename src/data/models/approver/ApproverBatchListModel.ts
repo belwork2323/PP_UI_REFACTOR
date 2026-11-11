@@ -202,14 +202,9 @@ export function buildApproverBatchListPayload({
   const motorStage = String(advanced.motorStage ?? "").trim();
   const submittedBy = String(advanced.submittedBy ?? "").trim();
   const projectId = String(advanced.projectId ?? "").trim();
-  let fromDate = String(advanced.fromDate ?? "").trim();
-  let toDate = String(advanced.toDate ?? "").trim();
-
-  if (fromDate && toDate && fromDate > toDate) {
-    const swap = fromDate;
-    fromDate = toDate;
-    toDate = swap;
-  }
+  const fromDate = String(advanced.fromDate ?? "").trim();
+  const toDate = String(advanced.toDate ?? "").trim();
+  // Invalid From>To ranges are blocked in the filter UI — do not silently swap.
 
   if (batchId) {
     payload.batchIds = [batchId];

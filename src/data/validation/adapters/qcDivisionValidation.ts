@@ -136,15 +136,13 @@ export function validateQcDivisionEntry(
       case "BOTH_PREMIX":
       case "SOLID_PREMIX":
       case "LIQUID_PREMIX":
-      case "PROCESSING_MATERIAL":
         // Schema-driven panels — enforce non-empty on SUBMIT only.
-        // Schema-unavailable materials show weighment fallback (no editable schema values).
-        if (kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable) {
-          break;
-        }
         if (tier === "SUBMIT" && !hasMeaningfulValue(values)) {
           errors = { form: REQUIRED };
         }
+        break;
+      case "PROCESSING_MATERIAL":
+        // RMP-parity UI (process + weighment) — validated separately; skip schema emptiness.
         break;
       default:
         if (tier === "SUBMIT" && !hasMeaningfulValue(values)) {
@@ -166,11 +164,7 @@ export function validateQcDivisionEntry(
         ? hasMeaningfulValue(options?.finalMixDetailsValues ?? values) ||
           hasMeaningfulValue(options?.viscosityValues ?? values)
         : hasMeaningfulValue(values);
-    if (
-      !meaningful &&
-      kind !== "SIMPLE" &&
-      !(kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable)
-    ) {
+    if (!meaningful && kind !== "SIMPLE" && kind !== "PROCESSING_MATERIAL") {
       errors = { form: REQUIRED };
     }
   }

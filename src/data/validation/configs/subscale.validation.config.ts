@@ -1,6 +1,7 @@
 import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { assertFromToOrderInTree } from "../dateRangeValidation";
 import { stateToMessage, validateFieldState } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
 
@@ -31,11 +32,9 @@ const dateRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-/** HH:mm or HH:mm:ss (API hydrate often includes seconds). */
-const timeRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
-  valueType: "text",
+const dateTimeRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "datetime",
   requiredIn,
-  pattern: /^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
@@ -52,11 +51,11 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
 
   // General Batch Info / Process Fields
   MIXER_BLDG_NO: textRule(["UNIT", "SUBMIT"], S.LENGTH.MAX_STANDARD, S.FIELD_REQUIRED),
-  PREMIX_DATE: dateRule(["UNIT", "SUBMIT"]),
-  FINAL_MIX_DATE: dateRule(["UNIT", "SUBMIT"]),
-  DATE_OF_CASTING: dateRule(["SUBMIT"]),
+  PREMIX_DATE: dateTimeRule(["UNIT", "SUBMIT"]),
+  FINAL_MIX_DATE: dateTimeRule(["UNIT", "SUBMIT"]),
+  DATE_OF_CASTING: dateTimeRule(["SUBMIT"]),
   IR_BATCH_NO: textRule(["SUBMIT"], 50, S.FIELD_REQUIRED),
-  DATE_OF_MFG: dateRule(["SUBMIT"]),
+  DATE_OF_MFG: dateTimeRule(["SUBMIT"]),
 
   // System-generated labels (MDM article names) — presence only, no pattern.
   ARTICLE_TYPE: {
@@ -71,45 +70,45 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   BEM_MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
   BEM_NO: textRule(["UNIT", "SUBMIT"], 50),
   SIZE_MM: textRule([], S.LENGTH.MAX_STANDARD),
-  THICKNESS_MM: numberRule(),
+  THICKNESS_MM: textRule([], S.LENGTH.MAX_STANDARD),
   LINER_APPLIED: textRule([], S.LENGTH.MAX_STANDARD),
   OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   CASTING_PIT_NO: textRule([], S.LENGTH.MAX_STANDARD),
-  CASTING_START_TIME: timeRule(),
-  CASTING_END_TIME: timeRule(),
+  CASTING_START_TIME: dateTimeRule(),
+  CASTING_END_TIME: dateTimeRule(),
   REMARKS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   OVEN_NO: textRule([], S.LENGTH.MAX_STANDARD),
   TEMPERATURE: numberRule(),
   HARDNESS: numberRule(),
-  DECORING_DATE: dateRule(),
+  DECORING_DATE: dateTimeRule(),
   DECORING_LOAD: numberRule(),
-  CURING_START_DATE: dateRule(),
-  CURING_END_DATE: dateRule(),
+  CURING_START_DATE: dateTimeRule(),
+  CURING_END_DATE: dateTimeRule(),
   GRAIN_SURFACE_OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   ACTOR: textRule([], S.LENGTH.MAX_STANDARD),
-  DATE_OF_NDT: dateRule(["UNIT", "SUBMIT"]),
-  DATE_OF_APPLICATION: dateRule(["UNIT", "SUBMIT"]),
+  DATE_OF_NDT: dateTimeRule(["UNIT", "SUBMIT"]),
+  DATE_OF_APPLICATION: dateTimeRule(["UNIT", "SUBMIT"]),
   VACUUM_LEVEL: numberRule(["SUBMIT"]),
   BATCH_SIZE: numberRule(["UNIT", "SUBMIT"]),
 
-  // Inhibition weights
-  LINER_COATED_SLEEVE_WEIGHT: numberRule(),
-  WEIGHT_BEFORE_INHIBITION: numberRule(),
-  WEIGHT_AFTER_INHIBITION: numberRule(),
-  IR_APPLIED_WEIGHT: numberRule(),
+  // Inhibition weights (alphanumeric / special text)
+  LINER_COATED_SLEEVE_WEIGHT: textRule([], S.LENGTH.MAX_STANDARD),
+  WEIGHT_BEFORE_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
+  WEIGHT_AFTER_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
+  IR_APPLIED_WEIGHT: textRule([], S.LENGTH.MAX_STANDARD),
 
-  // Trimming measurements
-  HE_OD: numberRule(),
-  HE_PORT_INNER: numberRule(),
-  HE_PORT_OUTER: numberRule(),
-  HE_BEFORE_INHIBITION_INNER: numberRule(),
-  HE_BEFORE_INHIBITION_OUTER: numberRule(),
-  NE_OD: numberRule(),
-  NE_PORT_INNER: numberRule(),
-  NE_PORT_OUTER: numberRule(),
-  NE_WEB_INNER: numberRule(),
-  NE_WEB_OUTER: numberRule(),
-  LENGTH_BEFORE_INHIBITION: numberRule(),
+  // Trimming measurements (alphanumeric / special text)
+  HE_OD: textRule([], S.LENGTH.MAX_STANDARD),
+  HE_PORT_INNER: textRule([], S.LENGTH.MAX_STANDARD),
+  HE_PORT_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
+  HE_BEFORE_INHIBITION_INNER: textRule([], S.LENGTH.MAX_STANDARD),
+  HE_BEFORE_INHIBITION_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
+  NE_OD: textRule([], S.LENGTH.MAX_STANDARD),
+  NE_PORT_INNER: textRule([], S.LENGTH.MAX_STANDARD),
+  NE_PORT_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
+  NE_WEB_INNER: textRule([], S.LENGTH.MAX_STANDARD),
+  NE_WEB_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
+  LENGTH_BEFORE_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
 
   // Static testing
   PROPELLANT_MASS: numberRule(),
@@ -139,10 +138,7 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
 };
 
 /** Live FORMAT message for a single field value (empty values are valid). */
-export function getSubscaleFieldFormatError(
-  fieldId: string,
-  value: unknown,
-): string | undefined {
+export function getSubscaleFieldFormatError(fieldId: string, value: unknown): string | undefined {
   const rule = subscaleHardwareFieldRules[fieldId];
   if (!rule) return undefined;
 
@@ -358,7 +354,11 @@ export const subscaleHardwareValidationConfig: SubDeptValidationConfig<any> = {
   id: "subscaleHardware",
   fields: subscaleHardwareFieldRules,
   resolveFieldPaths,
-  customRules: [],
+  customRules: [
+    (data, _tier, errors) => {
+      assertFromToOrderInTree(data, errors);
+    },
+  ],
 };
 
 export default subscaleHardwareValidationConfig;

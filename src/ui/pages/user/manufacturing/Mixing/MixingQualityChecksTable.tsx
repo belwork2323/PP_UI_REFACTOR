@@ -27,7 +27,7 @@ const observedGroupBorder = `1px solid ${alpha("#fff", 0.55)}`;
 type MixingQualityChecksTableProps = {
   rows: QualityCheckRow[];
   readOnly?: boolean;
-  errors: Record<string, string> | null;
+  errors?: Record<string, string> | null;
 
   /** Pass full path like `premixes.${cardIdx}.qualityChecks` or `finalMixes.${cardIdx}.qualityChecks` */
   arrayName?: string;

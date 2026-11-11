@@ -12,7 +12,6 @@ import { BatchTab } from "@/hooks/admin/Dashboard/useDashboardHook";
 import { OPERATION_STATUS } from "@/hooks/operationStatus";
 
 const AC = STRINGS.ADMIN_COMMON;
-
 type DashboardActiveBatchesSectionProps = {
   th: any;
   t: typeof import("@app/config/strings").STRINGS.DASHBOARD_PAGE;
@@ -46,6 +45,12 @@ type DashboardActiveBatchesSectionProps = {
   batchStatusTab: BatchTab;
   setBatchStatusTab: React.Dispatch<React.SetStateAction<BatchTab>>;
   batchTabOptions: ToggleTabOption[];
+  // 🟢 Pagination Props Added Here
+  page?: number;
+  rowsPerPage?: number;
+  totalCount?: number;
+  onPageChange?: (event: unknown, newPage: number) => void;
+  onRowsPerPageChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
 export default function DashboardActiveBatchesSection({
@@ -71,6 +76,11 @@ export default function DashboardActiveBatchesSection({
   batchStatusTab,
   setBatchStatusTab,
   batchTabOptions,
+  page,
+  rowsPerPage,
+  totalCount,
+  onPageChange,
+  onRowsPerPageChange,
 }: DashboardActiveBatchesSectionProps) {
   const shellTheme = {
     batchListShell: th.batchListShell,
@@ -89,6 +99,11 @@ export default function DashboardActiveBatchesSection({
             : t.BATCH_TABLE.SECTION_INPOROGRESS_TITLE
         }
         cardSx={th.card}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={onPageChange}
+        onRowsPerPageChange={onRowsPerPageChange}
         headerContent={
           <ToggleTabs
             value={batchStatusTab}
@@ -109,7 +124,6 @@ export default function DashboardActiveBatchesSection({
             loading={activeBatchesLoading}
             hasItems={filteredBatches.length > 0}
             emptyTitle={t.EMPTY_STATES.NO_BATCHES}
-            emptySubtitle={t.EMPTY_STATES.NO_BATCHES_SUBTITLE}
             filterExtension={
               <AdminListFilterPanel
                 title={t.FILTERS.BUTTON}

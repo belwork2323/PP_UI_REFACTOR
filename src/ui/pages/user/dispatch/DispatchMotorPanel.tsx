@@ -49,6 +49,14 @@ type Props = {
   validationErrors?: DispatchValidationErrors;
 };
 
+const dispatchTableRequiredHeaderLabelSx = {
+  display: "inline",
+  fontSize: "inherit",
+  fontWeight: "inherit",
+  color: "inherit",
+  mb: 0,
+} as const;
+
 const withFieldError = (node: ReactNode, message?: string, fieldPath?: string) => {
   const control =
     React.isValidElement(node) && message
@@ -149,11 +157,21 @@ const PropellantTable = ({
             <TableRow>
               <TableCell sx={dispatchTableHeaderCellSx(true)}>Sr. No.</TableCell>
               <TableCell sx={dispatchTableHeaderCellSx(false)}>Properties</TableCell>
-              <TableCell sx={dispatchTableHeaderCellSx(false)}>Specs</TableCell>
-              {value.fmColumns.map((col, idx) => (
+              <TableCell sx={dispatchTableHeaderCellSx(false)}>
+                <FieldLabelWithAsterisk
+                  label="Specs"
+                  required
+                  sx={dispatchTableRequiredHeaderLabelSx}
+                />
+              </TableCell>
+              {value.fmColumns.map((col) => (
                 <TableCell key={col} sx={dispatchTableHeaderCellSx(false)}>
                   <Stack direction="row" alignItems="center" justifyContent="space-between" gap={0.5}>
-                    <span>{col.replace("_", " ")}</span>
+                    <FieldLabelWithAsterisk
+                      label={col.replace("_", " ")}
+                      required
+                      sx={dispatchTableRequiredHeaderLabelSx}
+                    />
                     {!readOnly && value.fmColumns.length > 1 ? (
                       <IconButton size="small" onClick={() => deleteColumn(col)} disabled={disabled}>
                         <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
@@ -246,7 +264,13 @@ const ObservationTable = ({
           <TableRow>
             <TableCell sx={dispatchTableHeaderCellSx(true)}>Sr. No.</TableCell>
             <TableCell sx={dispatchTableHeaderCellSx(false)}>{labelHeader}</TableCell>
-            <TableCell sx={dispatchTableHeaderCellSx(false)}><FieldLabelWithAsterisk label="Observations" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit" }} /></TableCell>
+            <TableCell sx={dispatchTableHeaderCellSx(false)}>
+              <FieldLabelWithAsterisk
+                label="Observations"
+                required
+                sx={dispatchTableRequiredHeaderLabelSx}
+              />
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -481,6 +505,7 @@ const DispatchMotorPanel = ({
           {withFieldError(
             <DispatchFileField
               label="Upload Clearance Certificate"
+              required
               files={value.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE}
               onChange={(next) =>
                 onChange(patch(value, "SAFETY_CLEARANCE", { CLEARANCE_CERTIFICATE: next }))

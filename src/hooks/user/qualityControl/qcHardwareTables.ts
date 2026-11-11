@@ -16,8 +16,11 @@ import {
 
 export type QcHardwareCutRow = {
   SR_NO?: number | string;
+  /** Legacy shared date; hydrated as a fallback for both endpoints. */
   DATE?: string;
+  START_DATE?: string;
   START_TIME?: string;
+  END_DATE?: string;
   END_TIME?: string;
   DUST_QTY?: string;
   OBSERVATIONS?: string;
@@ -25,8 +28,11 @@ export type QcHardwareCutRow = {
 
 export type QcHardwarePreheatingRow = {
   SR_NO?: number | string;
+  /** Legacy shared date; hydrated as a fallback for both endpoints. */
   DATE?: string;
+  START_DATE?: string;
   START_TIME?: string;
+  END_DATE?: string;
   END_TIME?: string;
   OVEN_NUMBER?: string;
   BUILDING_NO?: string;
@@ -37,8 +43,11 @@ export type QcHardwarePreheatingRow = {
 
 export type QcHardwareLinearCoatingRow = {
   SR_NO?: number | string;
+  /** Legacy shared date; hydrated as a fallback for both endpoints. */
   DATE?: string;
+  START_DATE?: string;
   START_TIME?: string;
+  END_DATE?: string;
   END_TIME?: string;
   LINER_QTY?: string;
   INSULATION_TEMP?: string;
@@ -206,22 +215,37 @@ const LEGACY_HARDWARE_UPLOAD_SUB_TYPES: QcHardwareProcessSubType[] = [
 ];
 
 const normalizeCutRows = (rows: QcHardwareCutRow[]) =>
-  rows.map((row, index) => ({
-    ...row,
-    SR_NO: row.SR_NO ?? index + 1,
-  }));
+  rows.map((row, index) => {
+    const legacyDate = row.DATE ?? "";
+    return {
+      ...row,
+      SR_NO: row.SR_NO ?? index + 1,
+      START_DATE: row.START_DATE ?? legacyDate,
+      END_DATE: row.END_DATE ?? legacyDate,
+    };
+  });
 
 const normalizePreheatingRows = (rows: QcHardwarePreheatingRow[]) =>
-  rows.map((row, index) => ({
-    ...row,
-    SR_NO: row.SR_NO ?? index + 1,
-  }));
+  rows.map((row, index) => {
+    const legacyDate = row.DATE ?? "";
+    return {
+      ...row,
+      SR_NO: row.SR_NO ?? index + 1,
+      START_DATE: row.START_DATE ?? legacyDate,
+      END_DATE: row.END_DATE ?? legacyDate,
+    };
+  });
 
 const normalizeLinearCoatingRows = (rows: QcHardwareLinearCoatingRow[]) =>
-  rows.map((row, index) => ({
-    ...row,
-    SR_NO: row.SR_NO ?? index + 1,
-  }));
+  rows.map((row, index) => {
+    const legacyDate = row.DATE ?? "";
+    return {
+      ...row,
+      SR_NO: row.SR_NO ?? index + 1,
+      START_DATE: row.START_DATE ?? legacyDate,
+      END_DATE: row.END_DATE ?? legacyDate,
+    };
+  });
 
 const extractTableRows = <T extends Record<string, unknown>>(
   sectionData: unknown,
@@ -532,6 +556,8 @@ export const mergeHardwareUploadValuesIntoEntryValues = (
 ): SchemaFormValues => setHardwareUploadValues(values, uploads);
 
 const cutRowHasData = (row: QcHardwareCutRow) =>
+  hasValue(row.START_DATE) ||
+  hasValue(row.END_DATE) ||
   hasValue(row.DATE) ||
   hasValue(row.START_TIME) ||
   hasValue(row.END_TIME) ||
@@ -577,6 +603,8 @@ export const hardwareProcessValuesHaveUserData = (
 };
 
 const preheatingRowHasData = (row: QcHardwarePreheatingRow) =>
+  hasValue(row.START_DATE) ||
+  hasValue(row.END_DATE) ||
   hasValue(row.DATE) ||
   hasValue(row.START_TIME) ||
   hasValue(row.END_TIME) ||
@@ -587,6 +615,8 @@ const preheatingRowHasData = (row: QcHardwarePreheatingRow) =>
   hasValue(row.OBSERVATIONS);
 
 const linearCoatingRowHasData = (row: QcHardwareLinearCoatingRow) =>
+  hasValue(row.START_DATE) ||
+  hasValue(row.END_DATE) ||
   hasValue(row.DATE) ||
   hasValue(row.START_TIME) ||
   hasValue(row.END_TIME) ||
@@ -598,8 +628,9 @@ const linearCoatingRowHasData = (row: QcHardwareLinearCoatingRow) =>
 const sanitizeCutRows = (rows: QcHardwareCutRow[]) =>
   normalizeCutRows(rows.filter(cutRowHasData)).map((row, index) => ({
     SR_NO: index + 1,
-    DATE: String(row.DATE ?? "").trim(),
+    START_DATE: String(row.START_DATE ?? row.DATE ?? "").trim(),
     START_TIME: String(row.START_TIME ?? "").trim(),
+    END_DATE: String(row.END_DATE ?? row.DATE ?? "").trim(),
     END_TIME: String(row.END_TIME ?? "").trim(),
     DUST_QTY: String(row.DUST_QTY ?? "").trim(),
     OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim(),
@@ -608,8 +639,9 @@ const sanitizeCutRows = (rows: QcHardwareCutRow[]) =>
 const sanitizePreheatingRows = (rows: QcHardwarePreheatingRow[]) =>
   normalizePreheatingRows(rows.filter(preheatingRowHasData)).map((row, index) => ({
     SR_NO: index + 1,
-    DATE: String(row.DATE ?? "").trim(),
+    START_DATE: String(row.START_DATE ?? row.DATE ?? "").trim(),
     START_TIME: String(row.START_TIME ?? "").trim(),
+    END_DATE: String(row.END_DATE ?? row.DATE ?? "").trim(),
     END_TIME: String(row.END_TIME ?? "").trim(),
     OVEN_NUMBER: String(row.OVEN_NUMBER ?? "").trim(),
     BUILDING_NO: String(row.BUILDING_NO ?? "").trim(),
@@ -621,8 +653,9 @@ const sanitizePreheatingRows = (rows: QcHardwarePreheatingRow[]) =>
 const sanitizeLinearCoatingRows = (rows: QcHardwareLinearCoatingRow[]) =>
   normalizeLinearCoatingRows(rows.filter(linearCoatingRowHasData)).map((row, index) => ({
     SR_NO: index + 1,
-    DATE: String(row.DATE ?? "").trim(),
+    START_DATE: String(row.START_DATE ?? row.DATE ?? "").trim(),
     START_TIME: String(row.START_TIME ?? "").trim(),
+    END_DATE: String(row.END_DATE ?? row.DATE ?? "").trim(),
     END_TIME: String(row.END_TIME ?? "").trim(),
     LINER_QTY: String(row.LINER_QTY ?? "").trim(),
     INSULATION_TEMP: String(row.INSULATION_TEMP ?? "").trim(),
@@ -1103,8 +1136,11 @@ const pickApiField = (row: Record<string, unknown>, ...keys: string[]) => {
 const cutRowToApiRow = (row: QcHardwareCutRow, index: number) =>
   omitEmpty({
     srNo: index + 1,
-    date: row.DATE,
+    // Keep `date` for older consumers while persisting both endpoint dates.
+    date: row.START_DATE ?? row.DATE,
+    startDate: row.START_DATE ?? row.DATE,
     startTime: row.START_TIME,
+    endDate: row.END_DATE ?? row.DATE,
     endTime: row.END_TIME,
     dustQty: row.DUST_QTY,
     observations: row.OBSERVATIONS,
@@ -1113,8 +1149,10 @@ const cutRowToApiRow = (row: QcHardwareCutRow, index: number) =>
 const preheatingRowToApiRow = (row: QcHardwarePreheatingRow, index: number) =>
   omitEmpty({
     srNo: index + 1,
-    date: row.DATE,
+    date: row.START_DATE ?? row.DATE,
+    startDate: row.START_DATE ?? row.DATE,
     startTime: row.START_TIME,
+    endDate: row.END_DATE ?? row.DATE,
     endTime: row.END_TIME,
     ovenNumber: row.OVEN_NUMBER,
     buildingNo: row.BUILDING_NO,
@@ -1126,8 +1164,10 @@ const preheatingRowToApiRow = (row: QcHardwarePreheatingRow, index: number) =>
 const linerRowToApiRow = (row: QcHardwareLinearCoatingRow, index: number) =>
   omitEmpty({
     srNo: index + 1,
-    date: row.DATE,
+    date: row.START_DATE ?? row.DATE,
+    startDate: row.START_DATE ?? row.DATE,
     startTime: row.START_TIME,
+    endDate: row.END_DATE ?? row.DATE,
     endTime: row.END_TIME,
     linerQty: row.LINER_QTY,
     insulationTemp: row.INSULATION_TEMP,
@@ -1297,6 +1337,22 @@ const splitAbradingDateTimeValue = (value: unknown): { date: string; time: strin
   return { date: formatToUiDate(raw), time: "" };
 };
 
+const apiDateTimeParts = (
+  row: Record<string, unknown>,
+  endpoint: "start" | "end",
+  legacyDate = "",
+) => {
+  const upper = endpoint.toUpperCase();
+  const dateValue = pickApiField(row, `${endpoint}Date`, `${upper}_DATE`) || legacyDate;
+  const timeValue = pickApiField(row, `${endpoint}Time`, `${upper}_TIME`);
+  const dateTimeValue = pickApiField(row, `${endpoint}DateTime`, `${upper}_DATE_TIME`);
+  const parsed = splitAbradingDateTimeValue(dateTimeValue || dateValue);
+  return {
+    date: formatApiDateForUi(dateValue) || parsed.date,
+    time: timeValue || parsed.time,
+  };
+};
+
 const mapAbradingDetailItemsToCutRows = (abradingDetails: unknown[]): QcHardwareCutRow[] => {
   const rows: QcHardwareCutRow[] = [];
   let current: Partial<QcHardwareCutRow> = {};
@@ -1308,8 +1364,9 @@ const mapAbradingDetailItemsToCutRows = (abradingDetails: unknown[]): QcHardware
     }
     rows.push({
       SR_NO: rows.length + 1,
-      DATE: String(current.DATE ?? ""),
+      START_DATE: String(current.START_DATE ?? ""),
       START_TIME: String(current.START_TIME ?? ""),
+      END_DATE: String(current.END_DATE ?? ""),
       END_TIME: String(current.END_TIME ?? ""),
       DUST_QTY: String(current.DUST_QTY ?? ""),
       OBSERVATIONS: String(current.OBSERVATIONS ?? ""),
@@ -1327,7 +1384,7 @@ const mapAbradingDetailItemsToCutRows = (abradingDetails: unknown[]): QcHardware
     if (/^Start Date & Time$/i.test(operation)) {
       flush();
       const { date, time } = splitAbradingDateTimeValue(value);
-      current.DATE = date;
+      current.START_DATE = date;
       current.START_TIME = time;
       if (remarks) current.OBSERVATIONS = remarks;
       continue;
@@ -1335,7 +1392,7 @@ const mapAbradingDetailItemsToCutRows = (abradingDetails: unknown[]): QcHardware
 
     if (/^End Date & Time$/i.test(operation)) {
       const { date, time } = splitAbradingDateTimeValue(value);
-      if (!current.DATE && date) current.DATE = date;
+      current.END_DATE = date;
       current.END_TIME = time;
       if (remarks && !current.OBSERVATIONS) current.OBSERVATIONS = remarks;
       continue;
@@ -1419,11 +1476,15 @@ export const resolveAbradingCutsFromRecord = (
 
 const apiCutRowToFormRow = (row: unknown, index: number): QcHardwareCutRow => {
   const rec = asRecord(row) ?? {};
+  const legacyDate = pickApiField(rec, "date", "DATE");
+  const start = apiDateTimeParts(rec, "start", legacyDate);
+  const end = apiDateTimeParts(rec, "end", legacyDate);
   return {
     SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
-    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
-    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
-    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    START_DATE: start.date,
+    START_TIME: start.time,
+    END_DATE: end.date,
+    END_TIME: end.time,
     DUST_QTY: pickApiField(rec, "dustQty", "DUST_QTY"),
     OBSERVATIONS: pickApiField(rec, "observations", "OBSERVATIONS"),
   };
@@ -1431,11 +1492,15 @@ const apiCutRowToFormRow = (row: unknown, index: number): QcHardwareCutRow => {
 
 const apiPreheatingRowToFormRow = (row: unknown, index: number): QcHardwarePreheatingRow => {
   const rec = asRecord(row) ?? {};
+  const legacyDate = pickApiField(rec, "date", "DATE");
+  const start = apiDateTimeParts(rec, "start", legacyDate);
+  const end = apiDateTimeParts(rec, "end", legacyDate);
   return {
     SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
-    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
-    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
-    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    START_DATE: start.date,
+    START_TIME: start.time,
+    END_DATE: end.date,
+    END_TIME: end.time,
     OVEN_NUMBER: pickApiField(rec, "ovenNumber", "OVEN_NUMBER"),
     BUILDING_NO: pickApiField(rec, "buildingNo", "BUILDING_NO"),
     TEMPERATURE: pickApiField(rec, "temperature", "TEMPERATURE"),
@@ -1446,11 +1511,15 @@ const apiPreheatingRowToFormRow = (row: unknown, index: number): QcHardwarePrehe
 
 const apiLinerRowToFormRow = (row: unknown, index: number): QcHardwareLinearCoatingRow => {
   const rec = asRecord(row) ?? {};
+  const legacyDate = pickApiField(rec, "date", "DATE");
+  const start = apiDateTimeParts(rec, "start", legacyDate);
+  const end = apiDateTimeParts(rec, "end", legacyDate);
   return {
     SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
-    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
-    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
-    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    START_DATE: start.date,
+    START_TIME: start.time,
+    END_DATE: end.date,
+    END_TIME: end.time,
     LINER_QTY: pickApiField(rec, "linerQty", "LINER_QTY"),
     INSULATION_TEMP: pickApiField(rec, "insulationTemp", "INSULATION_TEMP"),
     RH: pickApiField(rec, "rh", "RH"),

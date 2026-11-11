@@ -1,6 +1,8 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import {
   Box,
+  Button,
+  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -11,6 +13,8 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
@@ -18,6 +22,7 @@ import DateField from "../../../../components/common/DateField";
 import {
   QC_MIXING_FINAL_MIX_MERGE_COLUMNS,
   QC_MIXING_PREMIX_MERGE_COLUMNS,
+  createBlankMixingDetailsRow,
   getMixingDetailsRows,
   getMixingValueFields,
   resolveMixingRowSampleCount,
@@ -103,6 +108,7 @@ const QCMixingDetailsTable = ({
     () => getMixingDetailsRows(values, variant, qualityCheckDefinitions),
     [qualityCheckDefinitions, values, variant],
   );
+  const manualMode = !readOnly && !(qualityCheckDefinitions?.length);
   const err = useCallback(
     (path: string) => fieldError(validationErrors ?? undefined, path),
     [validationErrors],
@@ -111,8 +117,10 @@ const QCMixingDetailsTable = ({
     () => getMixingValueFields(variant, qualityCheckDefinitions?.length ? qualityCheckDefinitions : rows),
     [qualityCheckDefinitions, rows, variant],
   );
-  const maxSampleCount = valueFields.length;
-  const showSampleSubHeaders = maxSampleCount > 1;
+  // Placeholder Value column while MDM defs / rows are still loading (avoid colSpan 0 / header-body mismatch).
+  const displayValueFields = valueFields.length > 0 ? valueFields : ["VALUE_1"];
+  const maxSampleCount = displayValueFields.length;
+  const showSampleSubHeaders = valueFields.length > 1;
   const mergeColumns: readonly string[] =
     variant === "premix" ? QC_MIXING_PREMIX_MERGE_COLUMNS : QC_MIXING_FINAL_MIX_MERGE_COLUMNS;
   const dateKey = (variant === "premix" ? "DATE_OF_PREMIX" : "DATE_OF_FINAL_MIX") as
@@ -150,6 +158,32 @@ const QCMixingDetailsTable = ({
   const updateRowField = useCallback(
     (rowIndex: number, field: keyof QcMixingDetailsRow, value: string) => {
       updateRows(rows.map((row, index) => (index === rowIndex ? { ...row, [field]: value } : row)));
+    },
+    [rows, updateRows],
+  );
+
+  const addRow = useCallback(() => {
+    const shared = rows[0] ?? null;
+    updateRows([...rows, createBlankMixingDetailsRow(variant, shared)]);
+  }, [rows, updateRows, variant]);
+
+  const removeRow = useCallback(
+    (index: number) => {
+      if (rows.length <= 1) return;
+      const next = rows.filter((_, rowIndex) => rowIndex !== index);
+      // Keep shared fields on remaining first row after delete.
+      if (index === 0 && next.length) {
+        const shared = rows[0];
+        next[0] = {
+          ...next[0],
+          BOWL_NO: shared.BOWL_NO,
+          DATE_OF_PREMIX: shared.DATE_OF_PREMIX,
+          DATE_OF_FINAL_MIX: shared.DATE_OF_FINAL_MIX,
+          MIXER_BLDG_NO: shared.MIXER_BLDG_NO,
+          PREMIX_QTY: shared.PREMIX_QTY,
+        };
+      }
+      updateRows(next);
     },
     [rows, updateRows],
   );
@@ -268,10 +302,15 @@ const QCMixingDetailsTable = ({
               <TableCell rowSpan={showSampleSubHeaders ? 2 : 1} sx={headerCellSx}>
                 QA Remarks
               </TableCell>
+              {manualMode ? (
+                <TableCell rowSpan={showSampleSubHeaders ? 2 : 1} sx={headerCellSx} align="center">
+                  Actions
+                </TableCell>
+              ) : null}
             </TableRow>
             {showSampleSubHeaders ? (
               <TableRow>
-                {valueFields.map((field, sampleIdx) => (
+                {displayValueFields.map((field, sampleIdx) => (
                   <TableCell
                     key={field}
                     align="center"
@@ -419,12 +458,25 @@ const QCMixingDetailsTable = ({
                       )
                     : null}
                   <TableCell sx={baseCellSx}>
-                    {readOnly ? (
+                    {readOnly || Boolean(qualityCheckDefinitions?.length) ? (
                       <QCDivisionReadOnlyValue value={row.PARAMETER} muted />
                     ) : (
-                      <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
-                        {row.PARAMETER}
-                      </Typography>
+                      <Box data-qc-field={`details.${rowIndex}.PARAMETER`}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          value={row.PARAMETER ?? ""}
+                          onChange={(event) =>
+                            updateRowField(rowIndex, "PARAMETER", event.target.value)
+                          }
+                          sx={tableFieldSx}
+                          error={Boolean(err(`details.${rowIndex}.PARAMETER`))}
+                          inputProps={{
+                            "data-qc-field": `details.${rowIndex}.PARAMETER`,
+                          }}
+                        />
+                        <FieldErrorText message={err(`details.${rowIndex}.PARAMETER`)} />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={baseCellSx}>
@@ -454,7 +506,7 @@ const QCMixingDetailsTable = ({
                       </Box>
                     )}
                   </TableCell>
-                  {valueFields.map((field, sampleIdx) => {
+                  {displayValueFields.map((field, sampleIdx) => {
                     const shouldRender = sampleIdx < rowSampleCount;
                     return (
                       <TableCell
@@ -510,12 +562,38 @@ const QCMixingDetailsTable = ({
                       />
                     )}
                   </TableCell>
+                  {manualMode ? (
+                    <TableCell sx={baseCellSx} align="center">
+                      <IconButton
+                        size="small"
+                        disabled={rows.length <= 1}
+                        onClick={() => removeRow(rowIndex)}
+                        sx={{ color: BRAND.danger }}
+                        aria-label="Remove row"
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </TableContainer>
+      {manualMode ? (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddRoundedIcon />}
+            onClick={addRow}
+            sx={{ textTransform: "none" }}
+          >
+            Add Row
+          </Button>
+        </Box>
+      ) : null}
     </Box>
   );
 };

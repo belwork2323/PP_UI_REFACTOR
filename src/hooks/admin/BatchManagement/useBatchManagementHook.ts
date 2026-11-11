@@ -715,7 +715,9 @@ function useBatchFormSection(onRefresh: () => void) {
       ? true
       : motorIds.length > 0 && motorIds.every((id: string) => id && id.trim());
 
-    if (!batchForm.batchType || !batchForm.systemManagerId) {
+    const isSubscale = batchForm.batchType === "SUBSCALE";
+
+    if (!batchForm.batchType || (!isSubscale && !batchForm.systemManagerId)) {
       useAlertStore.getState().showAlert(S.VALIDATION.REQUIRED_FIELDS, "warning");
       return;
     }

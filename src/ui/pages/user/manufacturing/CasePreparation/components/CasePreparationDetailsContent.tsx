@@ -37,6 +37,10 @@ import {
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
 import PremixStatusChip from "../../RawMaterial/components/PremixStatusChip";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
+import DetailsFixedColumnsTable, {
+  type DetailsFixedColumn,
+} from "../../../../../components/manufacturing/DetailsFixedColumnsTable";
 
 const ABRADING_OBS_COLUMNS = new Set(["remarksObservations", "observations", "remarks"]);
 const ABRADING_ATTACH_COLUMNS = new Set(["attachments"]);
@@ -158,13 +162,6 @@ const CP = STRINGS.MANUFACTURING.CASE_PREP;
 
 export type CasePrepDetailsTheme =
   ReturnType<typeof getManufacturingTheme>["manufacturing"]["casePreparation"]["details"];
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
 
 const looksLikeCasePrepFiles = (value: unknown): boolean => {
   if (value == null || value === "") return false;
@@ -299,6 +296,50 @@ const CasePrepFieldsTable = ({
   );
 };
 
+/** Create-form column structures for CP details tables (API data only). */
+const QUALIFICATION_PARAMETER_COLUMNS: DetailsFixedColumn[] = [
+  { key: "srNo", label: "Sr. No." },
+  { key: "parameter", label: "Parameter" },
+  { key: "specification", label: "Specification", emphasize: "spec" },
+  { key: "result", label: "Result", emphasize: "result" },
+];
+
+const DISPATCH_VISUAL_OBSERVATIONS_COLUMNS: DetailsFixedColumn[] = [
+  { key: "parameter", label: "Parameter" },
+  { key: "observations", label: "Observations" },
+  { key: "remarks", label: "Remarks", emphasize: "remarks" },
+];
+
+const DISPATCH_TO_CASTING_DETAILS_COLUMNS: DetailsFixedColumn[] = [
+  { key: "parameter", label: "Parameter" },
+  { key: "value", label: "Value" },
+  { key: "remarks", label: "Remarks", emphasize: "remarks" },
+];
+
+const resolveCasePrepFixedTable = (
+  table: CasePrepDetailTable,
+): { columns: DetailsFixedColumn[]; fallbackLabel: string } | null => {
+  switch (table.blockId) {
+    case "qualificationParameters":
+      return {
+        columns: QUALIFICATION_PARAMETER_COLUMNS,
+        fallbackLabel: "Qualification Parameters",
+      };
+    case "dispatchVisualObservations":
+      return {
+        columns: DISPATCH_VISUAL_OBSERVATIONS_COLUMNS,
+        fallbackLabel: "Dispatch Visual Observations",
+      };
+    case "dispatchToCastingDetails":
+      return {
+        columns: DISPATCH_TO_CASTING_DETAILS_COLUMNS,
+        fallbackLabel: "Dispatch To Casting",
+      };
+    default:
+      return null;
+  }
+};
+
 const CasePrepDataTable = ({
   table,
   dt,
@@ -310,6 +351,26 @@ const CasePrepDataTable = ({
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
 }) => {
+  // UI-owned structure matching create form; values from API-backed detail rows only.
+  const fixedTable = resolveCasePrepFixedTable(table);
+  if (fixedTable) {
+    return (
+      <DetailsFixedColumnsTable
+        title={table.label || fixedTable.fallbackLabel}
+        rows={table.rows}
+        columns={fixedTable.columns}
+        theme={dt}
+        renderCell={({ value }) => (
+          <CasePrepCellValue
+            value={value}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpen}
+          />
+        )}
+      />
+    );
+  }
+
   const displayRows = table.rows;
   const columns = orderCasePrepDisplayColumns(Object.keys(table.columnLabels));
   const useAbradingCutLayout = isAbradingDetailsTable(table);
@@ -683,10 +744,16 @@ const CasePreparationDetailsContent = ({
     },
     {
       label: BL.COL_CREATED_ON,
-      value: formatDate(detailView?.createdAt ?? (row?.createdOn as string | undefined)),
+      value: formatDisplayDateTime(
+        detailView?.createdAt ?? (row?.createdOn as string | undefined),
+        detailView?.createdAt ?? (row?.createdOn as string | undefined) ?? "—",
+      ),
     },
     { label: "Submitted By", value: detailView?.submittedBy || "—" },
-    { label: "Submitted On", value: formatDate(detailView?.submittedAt) },
+    {
+      label: "Submitted On",
+      value: formatDisplayDateTime(detailView?.submittedAt, detailView?.submittedAt || "—"),
+    },
   ];
 
   if (loading) {

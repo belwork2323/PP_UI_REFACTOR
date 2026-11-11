@@ -8,6 +8,7 @@ export type AdminManagementStatItem = {
   value: ReactNode;
   variant: string;
   icon: ReactNode;
+  onClick?: () => void;
 };
 
 type AdminManagementStatsGridProps = {
@@ -60,6 +61,7 @@ const AdminManagementStatsGrid = ({ stats, theme }: AdminManagementStatsGridProp
               iconBorder={sc?.iconBorder}
               iconColor={sc?.iconColor ?? ""}
               valueColor={sc?.value ?? ""}
+              onClick={stat.onClick}
               theme={statsGrid}
             />
           );

@@ -11,12 +11,9 @@ import {
   type CastingCuringBatchMotorSource,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+import type { OvenSelectOption } from "../../../../../hooks/user/manufacturing/ovenSelectOptions";
 
-export type OvenSelectOption = {
-  value: string;
-  label: string;
-  noOfOvenAvailable?: number;
-};
+export type { OvenSelectOption };
 
 type CuringProcessFlowBarProps = {
   setup: CuringProcessSetup;
@@ -88,12 +85,12 @@ const CuringProcessFlowBar = ({
       >
         {L.curingProcessTitle}
       </Typography>
-      <Stack direction="row" useFlexGap flexWrap="wrap" gap={2} sx={{ mb: 1.5 }}>
+      {/* <Stack direction="row" useFlexGap flexWrap="wrap" gap={2} sx={{ mb: 1.5 }}>
         <DetailItem
           label={L.curingMotorStage}
           value={curingCyclesLoading ? L.curingCyclesLoading : motorStageLabel}
         />
-      </Stack>
+      </Stack> */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={flowBar.topRow}>
           <CasePrepSelect

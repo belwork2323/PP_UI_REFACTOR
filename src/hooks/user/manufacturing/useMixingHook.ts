@@ -17,13 +17,13 @@ import {
   createEmptyPremixEntry,
   hasMixCardValue,
   isMixCardEditable,
-  isMixCardLocked,
   mapMixingDetailsToFormState,
   mapMixingFormStateToPayload,
   mapBackendQualityChecksToRows,
   mergeProcessParticularsWithOperations,
   resolveMixingCycleOperations,
   resolveMixingCycleQualityChecks,
+  shouldSyncMixingCycleMaster,
   type FinalMixEntry,
   type MixCardStageType,
   type MixCardStatusMeta,
@@ -144,11 +144,17 @@ export const useMixingHook = () => {
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formHydrationKey, setFormHydrationKey] = useState(0);
+  /** Survives MixingForm remount after silent draft/submit reload. */
+  const [preferredMixNav, setPreferredMixNav] = useState<{
+    kind: "PREMIX" | "FINAL_MIX";
+    cardNo: string;
+  } | null>(null);
   const resolvePremixCount = (batch?: MixingBatch | null) =>
     Number(batch?.numberOfPremix ?? batch?.identificationSheet?.numberOfPremix ?? 1) || 1;
   const resolveMotorStage = (batch?: MixingBatch | null) => Number(batch?.motorStage);
   const loadBatchIdentificationSheet = useCallback(async (batchId: string) => {
     const details = await batchManagementController.getBatchById(batchId);
+
     const identificationSheet = (details?.identificationSheet ??
       null) as IdentificationSheet | null;
     const numberOfPremix = Number(identificationSheet?.numberOfPremix) || 1;
@@ -196,6 +202,7 @@ export const useMixingHook = () => {
     setInitialSnapshot(JSON.stringify(defaults));
     setMixCardStatusById({});
     setPreviousStageGate(null);
+    setPreferredMixNav(null);
   }, []);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -260,7 +267,7 @@ export const useMixingHook = () => {
             { length: Math.max(1, Number(numberOfPremix) || 1) },
             (_, index) => ({
               ...createEmptyPremixEntry(index + 1),
-              mixerType: resolveMasterDataName(identificationSheet?.mixerType),
+              mixerType: resolveMasterDataName(identificationSheet?.mixerTypeName),
               bldgNo: "",
               premixDate: String(identificationSheet?.date ?? ""),
               premixQuantity: String(identificationSheet?.batchSize ?? ""),
@@ -276,7 +283,7 @@ export const useMixingHook = () => {
             (_, index) => ({
               ...createEmptyFinalMixEntry(index + 1),
               finalMixNo: String(index + 1),
-              mixerType: resolveMasterDataName(identificationSheet?.mixerType),
+              mixerType: resolveMasterDataName(identificationSheet?.mixerTypeName),
               bldgNo: "",
               mixingCycle: "",
               mixingCycleCode: "",
@@ -330,7 +337,8 @@ export const useMixingHook = () => {
             ...nextFormData,
             premixCards: (nextFormData.premixCards ?? []).map((card) => ({
               ...card,
-              mixerType: card.mixerType || resolveMasterDataName(identificationSheet?.mixerType),
+              mixerType:
+                card.mixerType || resolveMasterDataName(identificationSheet?.mixerTypeName),
               bldgNo: card.bldgNo || "",
               premixDate: card.premixDate || String(identificationSheet?.date ?? ""),
               premixQuantity: card.premixQuantity || String(identificationSheet?.batchSize ?? ""),
@@ -342,7 +350,8 @@ export const useMixingHook = () => {
             })),
             finalMixCards: (nextFormData.finalMixCards ?? []).map((card) => ({
               ...card,
-              mixerType: card.mixerType || resolveMasterDataName(identificationSheet?.mixerType),
+              mixerType:
+                card.mixerType || resolveMasterDataName(identificationSheet?.mixerTypeName),
               bldgNo: card.bldgNo || "",
               mixingCycle: card.mixingCycle || "",
               mixingCycleCode: card.mixingCycleCode || "",
@@ -366,8 +375,10 @@ export const useMixingHook = () => {
           : buildMixCardStatusMapFromForm(nextFormData);
         setMixCardStatusById(mixCardStatusMap);
         setView("form");
-        // Remount MixingForm so local card state hydrates from this load (not a stale echo).
-        setFormHydrationKey((value) => value + 1);
+        if (!silent) {
+          // Reset local form state on a new form load, but keep the active tab on save refreshes.
+          setFormHydrationKey((value) => value + 1);
+        }
 
         // Enrich process particulars per card from that card's mixing cycle (not Premix 1 only).
         try {
@@ -416,9 +427,7 @@ export const useMixingHook = () => {
                   Number(existing.noOfSamples) || 0,
                   Array.isArray(existing.observedValues) ? existing.observedValues.length : 0,
                 );
-                const prior = Array.isArray(existing.observedValues)
-                  ? existing.observedValues
-                  : [];
+                const prior = Array.isArray(existing.observedValues) ? existing.observedValues : [];
                 return {
                   ...row,
                   parameterId: paramKey,
@@ -438,7 +447,7 @@ export const useMixingHook = () => {
                   card.mixCardSubmissionStatus ??
                   mixCardStatusMap[buildMixCardId("PREMIX", card.premixNo)]
                     ?.mixCardSubmissionStatus;
-                if (isMixCardLocked(cardStatus)) return card;
+                if (!shouldSyncMixingCycleMaster(cardStatus)) return card;
                 const code = String(card.mixingCycleCode ?? "").trim();
                 const details = code ? cycleDetailsByCode.get(code) : undefined;
                 if (!details) return card;
@@ -461,7 +470,7 @@ export const useMixingHook = () => {
                   card.mixCardSubmissionStatus ??
                   mixCardStatusMap[buildMixCardId("FINAL_MIX", card.mixNo)]
                     ?.mixCardSubmissionStatus;
-                if (isMixCardLocked(cardStatus)) return card;
+                if (!shouldSyncMixingCycleMaster(cardStatus)) return card;
                 const code = String(card.mixingCycleCode ?? "").trim();
                 const details = code ? cycleDetailsByCode.get(code) : undefined;
                 if (!details) return card;
@@ -969,6 +978,8 @@ export const useMixingHook = () => {
     handleViewMixingDetails,
     handleBackFromDetails,
     formHydrationKey,
+    preferredMixNav,
+    setPreferredMixNav,
   };
 };
 

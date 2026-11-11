@@ -84,7 +84,7 @@ const BatchFormModal = ({
     !!form.batchType &&
     (isSubscale ? hasSubBatchTypeSelected : true) &&
     motorDetailsValid &&
-    !!form.systemManagerId &&
+    (isSubscale ? true : !!form.systemManagerId) &&
     (isMain || isSubscale ? !!form.projectId : true) &&
     (showsMotorStage ? !!form.motorStage : true) &&
     (isExperimental ? !!form.objective?.trim() && form.articles.length > 0 : true);
@@ -411,27 +411,27 @@ const BatchFormModal = ({
                       </AppDropdown>
                     </Box>
                   )}
-
-                  {/* System Manager Dropdown (Experimental / Non-Experimental) */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <AppDropdown
-                      label="System Manager"
-                      value={form.systemManagerId}
-                      onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
-                      placeholder={S.SELECT_SYSTEM_MANAGER}
-                      renderValue={renderSystemManagerValue}
-                      disabled={appendOnlyLocked}
-                      sx={{ mb: 0, width: "100%", ...input }}
-                      MenuProps={t.menuPaper}
-                    >
-                      {(userOptions || []).map((u: any) => (
-                        <MenuItem key={u.id} value={u.id}>
-                          {u.fullName || u.username}
-                          {u.id ? ` (${u.id})` : ""}
-                        </MenuItem>
-                      ))}
-                    </AppDropdown>
-                  </Box>
+                  {!isSubscale && (
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <AppDropdown
+                        label="System Manager"
+                        value={form.systemManagerId}
+                        onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
+                        placeholder={S.SELECT_SYSTEM_MANAGER}
+                        renderValue={renderSystemManagerValue}
+                        disabled={appendOnlyLocked}
+                        sx={{ mb: 0, width: "100%", ...input }}
+                        MenuProps={t.menuPaper}
+                      >
+                        {(userOptions || []).map((u: any) => (
+                          <MenuItem key={u.id} value={u.id}>
+                            {u.fullName || u.username}
+                            {u.id ? ` (${u.id})` : ""}
+                          </MenuItem>
+                        ))}
+                      </AppDropdown>
+                    </Box>
+                  )}
                 </Stack>
               </Box>
 

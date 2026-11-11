@@ -1,10 +1,74 @@
 import { STRINGS } from "@/app/config/strings";
 import type { SubDeptValidationConfig } from "../runValidation";
-import type { ValidationTier } from "../submissionIntent";
+import type { ValidationErrors, ValidationTier } from "../submissionIntent";
 import { PostCureMotorData } from "@/data/models/user/PostCureMotorDataModel";
+import { assertFromToOrderInTree } from "../dateRangeValidation";
+import { parseMixingSpecificationBounds } from "../specificationBounds";
 import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
+const M = VALIDATIONSTRING;
+
+const POST_CURE_QUALIFICATION_PATHS = [
+  "qualificationDetails",
+  "ir1Qualification",
+  "hemcoat3kQualification",
+  "othersQualification",
+] as const;
+
+/** Mixing parity — Result must fall within Specification bounds when parseable. */
+const applyPostCureQualificationRangeRules = (
+  data: PostCureMotorData,
+  _tier: ValidationTier,
+  errors: ValidationErrors,
+) => {
+  const root = (data ?? {}) as Record<string, unknown>;
+  for (const qualPath of POST_CURE_QUALIFICATION_PATHS) {
+    const qual = root[qualPath] as { qualificationTable?: unknown } | null | undefined;
+    const rows = Array.isArray(qual?.qualificationTable) ? qual.qualificationTable : [];
+    rows.forEach((item, i) => {
+      const row = (item ?? {}) as Record<string, unknown>;
+      const path = `${qualPath}.qualificationTable.${i}.result`;
+      if (errors[path]) return;
+
+      const raw = row.result;
+      if (raw === undefined || raw === null || String(raw).trim() === "") return;
+
+      const num = Number(raw);
+      if (Number.isNaN(num)) {
+        errors[path] = S.INVALID;
+        return;
+      }
+
+      const bounds = parseMixingSpecificationBounds(row.specification);
+      const { min, max, minExclusive, maxExclusive } = bounds;
+      if (min == null && max == null) return;
+
+      if (min != null && max != null) {
+        if (num < min || num > max) {
+          errors[path] = M.OBSERVED_VALUE_RANGE.replace("{min}", String(min)).replace(
+            "{max}",
+            String(max),
+          );
+        }
+      } else if (min != null) {
+        const belowMin = minExclusive ? num <= min : num < min;
+        if (belowMin) {
+          errors[path] = minExclusive
+            ? M.OBSERVED_VALUE_GT.replace("{min}", String(min))
+            : M.OBSERVED_VALUE_MIN.replace("{min}", String(min));
+        }
+      } else if (max != null) {
+        const aboveMax = maxExclusive ? num >= max : num > max;
+        if (aboveMax) {
+          errors[path] = maxExclusive
+            ? M.OBSERVED_VALUE_LT.replace("{max}", String(max))
+            : M.OBSERVED_VALUE_MAX.replace("{max}", String(max));
+        }
+      }
+    });
+  }
+};
 
 export const postCureFieldRules = {
   // Common / Shared fields
@@ -22,7 +86,7 @@ export const postCureFieldRules = {
     pattern: S.PATTERNS.FLOAT,
   },
   dispatchDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -43,12 +107,12 @@ export const postCureFieldRules = {
     maxLength: S.LENGTH.MAX_STANDARD,
   },
   fromDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   toDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -109,7 +173,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   qualificationPreparationDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -136,7 +200,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   epoxyPreparationDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -150,7 +214,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   ir1PremixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -162,7 +226,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   ir1FinalMixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -176,7 +240,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   hemcoatPremixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -188,7 +252,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   hemcoatFinalMixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -202,7 +266,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   othersPremixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -214,7 +278,7 @@ export const postCureFieldRules = {
     maxLength: 50,
   },
   othersFinalMixDate: {
-    valueType: "date" as const,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
@@ -314,7 +378,10 @@ function resolveFieldPaths(data: any) {
   };
 
   // 2. Uniform Qualification Paths Builder
-  const pushQualificationPaths = (qualPath: string, options?: { requireSpecification?: boolean }) => {
+  const pushQualificationPaths = (
+    qualPath: string,
+    options?: { requireSpecification?: boolean },
+  ) => {
     const qual = data[qualPath];
     if (qual) {
       paths.push({
@@ -611,7 +678,97 @@ export const postCureValidationConfig: SubDeptValidationConfig<PostCureMotorData
   id: "postCure",
   fields: postCureFieldRules as any,
   resolveFieldPaths,
-  customRules: [],
+  customRules: [
+    (data: PostCureMotorData, tier: string, errors: Record<string, string>) => {
+      const isSubmit = tier === "SUBMIT";
+
+      const checkQualificationTable = (prefix: string, qualTable: any[] | undefined) => {
+        if (!qualTable || !qualTable.length) return;
+
+        qualTable.forEach((row, qIdx) => {
+          const spec = row.specification;
+          let min: number | undefined;
+          let max: number | undefined;
+
+          // Extract min and max from the specification object
+          if (spec && typeof spec === "object") {
+            const minVal = Number((spec as any).min);
+            const maxVal = Number((spec as any).max);
+
+            if (
+              !Number.isNaN(minVal) &&
+              (spec as any).min !== null &&
+              (spec as any).min !== undefined
+            ) {
+              min = minVal;
+            }
+            if (
+              !Number.isNaN(maxVal) &&
+              (spec as any).max !== null &&
+              (spec as any).max !== undefined
+            ) {
+              max = maxVal;
+            }
+          }
+
+          const val = row.result;
+          const path = `${prefix}.${qIdx}.result`;
+
+          if (isSubmit) {
+            if (val === undefined || val === null || String(val).trim() === "") {
+              errors[path] = postCureFieldRules.result.messages.required;
+              return;
+            }
+          } else {
+            // FORMAT/UNIT: skip empty during draft checks
+            if (val === undefined || val === null || String(val).trim() === "") return;
+          }
+
+          // Validate as a valid number
+          const num = Number(val);
+          if (Number.isNaN(num)) {
+            errors[path] = postCureFieldRules.result.messages.invalid;
+            return;
+          }
+
+          // Range validation based on extracted min and max from specification object
+          if (min !== undefined && max !== undefined) {
+            if (num < min || num > max) {
+              errors[path] = M.OBSERVED_VALUE_RANGE.replace("{min}", String(min)).replace(
+                "{max}",
+                String(max),
+              );
+            }
+          } else if (min !== undefined && num < min) {
+            errors[path] = M.OBSERVED_VALUE_MIN.replace("{min}", String(min));
+          } else if (max !== undefined && num > max) {
+            errors[path] = M.OBSERVED_VALUE_MAX.replace("{max}", String(max));
+          }
+        });
+      };
+
+      // Check all possible qualification tables dynamically based on your data structure
+      // (Adjust `data.someParentKey` or call directly if they are top-level or nested)
+
+      // Example if they are under a specific object or root data structure:
+      checkQualificationTable(
+        "qualificationDetails.qualificationTable",
+        (data as any).qualificationDetails?.qualificationTable,
+      );
+      checkQualificationTable(
+        "ir1Qualification.qualificationTable",
+        (data as any).ir1Qualification?.qualificationTable,
+      );
+      checkQualificationTable(
+        "hemcoat3kQualification.qualificationTable",
+        (data as any).hemcoat3kQualification?.qualificationTable,
+      );
+      checkQualificationTable(
+        "othersQualification.qualificationTable",
+        (data as any).othersQualification?.qualificationTable,
+      );
+    },
+  ],
 };
 
 export default postCureValidationConfig;

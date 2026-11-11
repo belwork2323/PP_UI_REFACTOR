@@ -44,7 +44,12 @@ import {
   isReferenceRangeNotApplicable,
   sanitizeNumericAnalysedResultInput,
 } from "../../../../../../data/models/user/RawMaterialProcurementModel";
-import { isCasingIdentificationComplete, isCasingFieldRequired, focusRmcField, type RmcValidationFocusTarget } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
+import {
+  isCasingIdentificationComplete,
+  isCasingFieldRequired,
+  focusRmcField,
+  type RmcValidationFocusTarget,
+} from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
 import CasingFormStepNav from "./CasingFormStepNav";
 import RocketMotorCasingMockTrialPanel from "./RocketMotorCasingMockTrialPanel";
 import type { useRocketMotorCasingLookups } from "../../../../../../hooks/user/sourcing/useRocketMotorCasingLookups";
@@ -614,7 +619,9 @@ const MotorCasingCreateForm = ({
                                 });
                               }}
                               disabled={!identificationComplete}
-                              error={Boolean(validationErrors[`radiographyPlanRows.${index}.${field}`])}
+                              error={Boolean(
+                                validationErrors[`radiographyPlanRows.${index}.${field}`],
+                              )}
                               helperText={validationErrors[`radiographyPlanRows.${index}.${field}`]}
                               inputProps={{ inputMode: "decimal" }}
                               sx={casingWhiteInputSx({
@@ -653,7 +660,9 @@ const MotorCasingCreateForm = ({
                             })}
                           >
                             <MenuItem value="">
-                              <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", opacity: 0.45 }}>
+                              <Typography
+                                sx={{ fontSize: "0.8rem", color: "text.secondary", opacity: 0.45 }}
+                              >
                                 {S.RADIOGRAPHY_DETECTOR_PH}
                               </Typography>
                             </MenuItem>
@@ -925,11 +934,11 @@ const MotorCasingCreateForm = ({
                       const rangeNotApplicable = isReferenceRangeNotApplicable(item.referenceRange);
                       const inputType = rangeNotApplicable ? "text" : "number";
                       const reportedValue = thermal
-                        ? form.thermalProperties[item.specificationCode]?.reported ?? ""
-                        : form.mechanicalProperties[item.specificationCode]?.reported ?? "";
+                        ? (form.thermalProperties[item.specificationCode]?.reported ?? "")
+                        : (form.mechanicalProperties[item.specificationCode]?.reported ?? "");
                       const acemValue = thermal
-                        ? form.thermalProperties[item.specificationCode]?.acemSpec ?? ""
-                        : form.mechanicalProperties[item.specificationCode]?.acemSpec ?? "";
+                        ? (form.thermalProperties[item.specificationCode]?.acemSpec ?? "")
+                        : (form.mechanicalProperties[item.specificationCode]?.acemSpec ?? "");
                       const reportedOutOfRange = computeIsOutOfRange(
                         reportedValue,
                         item.referenceRange,
@@ -938,105 +947,111 @@ const MotorCasingCreateForm = ({
                       const rowFailed = reportedOutOfRange || acemOutOfRange;
                       const reportedPath = `${propertyPrefix}.${item.specificationCode}.reported`;
                       const acemPath = `${propertyPrefix}.${item.specificationCode}.acemSpec`;
-                      const reportedError = Boolean(validationErrors[reportedPath]) || reportedOutOfRange;
+                      const reportedError =
+                        Boolean(validationErrors[reportedPath]) || reportedOutOfRange;
                       const acemError = Boolean(validationErrors[acemPath]) || acemOutOfRange;
                       return (
-                      <Box
-                        component="tr"
-                        key={item.specificationCode}
-                        sx={cf.propertiesDataRow(rowFailed)}
-                      >
-                        <td>
-                          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-                            <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
-                              {`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}
-                            </Typography>
-                            {rowFailed ? (
-                              <Chip
-                                label={STRINGS.SOURCING.SPECIFICATION_FORM.SPEC_STATUS_OUT_OF_RANGE}
+                        <Box
+                          component="tr"
+                          key={item.specificationCode}
+                          sx={cf.propertiesDataRow(rowFailed)}
+                        >
+                          <td>
+                            <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                              <Typography
+                                component="span"
+                                sx={{ fontSize: "0.8rem", fontWeight: 600 }}
+                              >
+                                {`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}
+                              </Typography>
+                              {rowFailed ? (
+                                <Chip
+                                  label={
+                                    STRINGS.SOURCING.SPECIFICATION_FORM.SPEC_STATUS_OUT_OF_RANGE
+                                  }
+                                  size="small"
+                                  sx={cf.propertiesFailedChip}
+                                />
+                              ) : null}
+                            </Stack>
+                          </td>
+                          <td>
+                            <Chip
+                              size="small"
+                              label={
+                                rangeNotApplicable
+                                  ? "N/A"
+                                  : `${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`
+                              }
+                            />
+                          </td>
+
+                          <td>
+                            <Box data-rmc-field={reportedPath}>
+                              <CasingDeferredInput
                                 size="small"
-                                sx={cf.propertiesFailedChip}
+                                fullWidth
+                                type={inputType}
+                                inputMode={rangeNotApplicable ? "text" : "decimal"}
+                                placeholder="Enter value"
+                                value={reportedValue}
+                                onChange={(value) =>
+                                  thermal
+                                    ? updateThermal(
+                                        item.specificationCode,
+                                        "reported",
+                                        value,
+                                        item.referenceRange,
+                                      )
+                                    : updateMech(
+                                        item.specificationCode,
+                                        "reported",
+                                        value,
+                                        item.referenceRange,
+                                      )
+                                }
+                                error={reportedError}
+                                sx={[
+                                  casingWhiteInputSx(theme.workflow.formElements.cellField),
+                                  ...(reportedError ? [cf.propertiesFailedField] : []),
+                                ]}
                               />
-                            ) : null}
-                          </Stack>
-                        </td>
-                        <td>
-                          <Chip
-                            size="small"
-                            label={
-                              rangeNotApplicable
-                                ? "N/A"
-                                : `${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`
-                            }
-                          />
-                        </td>
+                            </Box>
+                          </td>
 
-                        <td>
-                          <Box data-rmc-field={reportedPath}>
-                            <CasingDeferredInput
-                              size="small"
-                              fullWidth
-                              type={inputType}
-                              inputMode={rangeNotApplicable ? "text" : "decimal"}
-                              placeholder="Enter value"
-                              value={reportedValue}
-                              onChange={(value) =>
-                                thermal
-                                  ? updateThermal(
-                                      item.specificationCode,
-                                      "reported",
-                                      value,
-                                      item.referenceRange,
-                                    )
-                                  : updateMech(
-                                      item.specificationCode,
-                                      "reported",
-                                      value,
-                                      item.referenceRange,
-                                    )
-                              }
-                              error={reportedError}
-                              sx={[
-                                casingWhiteInputSx(theme.workflow.formElements.cellField),
-                                ...(reportedError ? [cf.propertiesFailedField] : []),
-                              ]}
-                            />
-                          </Box>
-                        </td>
-
-                        <td>
-                          <Box data-rmc-field={acemPath}>
-                            <CasingDeferredInput
-                              size="small"
-                              fullWidth
-                              type={inputType}
-                              inputMode={rangeNotApplicable ? "text" : "decimal"}
-                              placeholder="Enter value"
-                              value={acemValue}
-                              onChange={(value) =>
-                                thermal
-                                  ? updateThermal(
-                                      item.specificationCode,
-                                      "acemSpec",
-                                      value,
-                                      item.referenceRange,
-                                    )
-                                  : updateMech(
-                                      item.specificationCode,
-                                      "acemSpec",
-                                      value,
-                                      item.referenceRange,
-                                    )
-                              }
-                              error={acemError}
-                              sx={[
-                                casingWhiteInputSx(theme.workflow.formElements.cellField),
-                                ...(acemError ? [cf.propertiesFailedField] : []),
-                              ]}
-                            />
-                          </Box>
-                        </td>
-                      </Box>
+                          <td>
+                            <Box data-rmc-field={acemPath}>
+                              <CasingDeferredInput
+                                size="small"
+                                fullWidth
+                                type={inputType}
+                                inputMode={rangeNotApplicable ? "text" : "decimal"}
+                                placeholder="Enter value"
+                                value={acemValue}
+                                onChange={(value) =>
+                                  thermal
+                                    ? updateThermal(
+                                        item.specificationCode,
+                                        "acemSpec",
+                                        value,
+                                        item.referenceRange,
+                                      )
+                                    : updateMech(
+                                        item.specificationCode,
+                                        "acemSpec",
+                                        value,
+                                        item.referenceRange,
+                                      )
+                                }
+                                error={acemError}
+                                sx={[
+                                  casingWhiteInputSx(theme.workflow.formElements.cellField),
+                                  ...(acemError ? [cf.propertiesFailedField] : []),
+                                ]}
+                              />
+                            </Box>
+                          </td>
+                        </Box>
                       );
                     })}
                   />
@@ -1192,7 +1207,9 @@ const MotorCasingCreateForm = ({
                           next[idx] = { ...next[idx], subItems: subs };
                           patch({ visualInspection: next });
                         }}
-                        error={validationErrors[`visualInspection.${idx}.subItems.${si}.observations`]}
+                        error={
+                          validationErrors[`visualInspection.${idx}.subItems.${si}.observations`]
+                        }
                         theme={theme}
                         fieldPath={`visualInspection.${idx}.subItems.${si}.observations`}
                       />
@@ -1246,9 +1263,7 @@ const MotorCasingCreateForm = ({
               label={S.WEIGHT_WITH}
               required={req("weightWithHarness")}
               value={form.weightWithHarness}
-              onChange={(v) =>
-                patch({ weightWithHarness: sanitizeNumericAnalysedResultInput(v) })
-              }
+              onChange={(v) => patch({ weightWithHarness: sanitizeNumericAnalysedResultInput(v) })}
               type="text"
               placeholder="Enter weight"
               theme={theme}
@@ -1287,7 +1302,12 @@ const MotorCasingCreateForm = ({
           cf={cf}
         >
           {validationErrors.dimensionalData ? (
-            <Typography data-rmc-field="dimensionalData" color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+            <Typography
+              data-rmc-field="dimensionalData"
+              color="error"
+              variant="caption"
+              sx={{ display: "block", mb: 1 }}
+            >
               {validationErrors.dimensionalData}
             </Typography>
           ) : null}
@@ -1386,7 +1406,9 @@ const MotorCasingCreateForm = ({
                                     };
                                     patch({ dimensionalData: next });
                                   }}
-                                  error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`])}
+                                  error={Boolean(
+                                    validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`],
+                                  )}
                                   sx={casingWhiteInputSx({
                                     ...theme.workflow.formElements.cellField,
                                     ...casingTheme.dimInput,
@@ -1413,7 +1435,11 @@ const MotorCasingCreateForm = ({
                                     };
                                     patch({ dimensionalData: next });
                                   }}
-                                  error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.axialLength`])}
+                                  error={Boolean(
+                                    validationErrors[
+                                      `dimensionalData.${idx}.looseFlap.axialLength`
+                                    ],
+                                  )}
                                   sx={casingWhiteInputSx({
                                     ...theme.workflow.formElements.cellField,
                                     ...casingTheme.dimInput,
@@ -1440,7 +1466,9 @@ const MotorCasingCreateForm = ({
                                     };
                                     patch({ dimensionalData: next });
                                   }}
-                                  error={Boolean(validationErrors[`dimensionalData.${idx}.readings.${col.key}`])}
+                                  error={Boolean(
+                                    validationErrors[`dimensionalData.${idx}.readings.${col.key}`],
+                                  )}
                                   sx={casingWhiteInputSx({
                                     ...theme.workflow.formElements.cellField,
                                     ...casingTheme.dimInput,
@@ -1490,7 +1518,12 @@ const MotorCasingCreateForm = ({
           theme={theme}
           cf={cf}
         >
-            <CasingReportUpload form={form} patch={patch} validationErrors={validationErrors} theme={theme} />
+          <CasingReportUpload
+            form={form}
+            patch={patch}
+            validationErrors={validationErrors}
+            theme={theme}
+          />
         </SectionCard>
       )}
     </Box>

@@ -942,6 +942,7 @@ export default function BatchImplementationForm({
                               <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
                                 <DateField
                                   value={formatToUiDate(material.revalidationToDate ?? "")}
+                                  minDate={formatToUiDate(material.revalidationFromDate ?? "")}
                                   onChange={(date) =>
                                     handleMaterialChange(idx, "revalidationToDate", date)
                                   }

@@ -82,6 +82,22 @@ export const isQcExperimentalAlwaysEnabledDivision = (
 
 export const QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON =
   "No motor linked to this subscale batch — this division is not applicable.";
+
+/**
+ * Subscale batches do not run manufacturing subdepartments — skip mfg auto-populate
+ * except STF (still seeded from manufacturing STF / BEM).
+ */
+export const shouldSkipQcManufacturingAutoPopulate = (
+  batchType?: string | null,
+  divisionFlowKey?: string | null,
+): boolean => {
+  if (!isQcSubscaleBatch(batchType)) return false;
+  const key = String(divisionFlowKey ?? "")
+    .trim()
+    .toUpperCase();
+  return key !== "STATIC_TEST_FACILITY";
+};
+
 /** Prefer explicit Subscale from list or details — details may default empty batchType to MAIN. */
 export const resolveQcWorkingBatchType = (
   listBatchType?: string | null,

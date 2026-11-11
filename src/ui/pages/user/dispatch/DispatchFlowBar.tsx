@@ -63,6 +63,8 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
             value={setup.castingDate ?? ""}
             onChange={(val) => onSetupChange("castingDate", val)}
             theme={selectTheme}
+            type="datetime"
+            required
           />
 
           <Box data-dispatch-field="setup.dispatchDate">
@@ -71,6 +73,7 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
               value={setup.dispatchDate ?? ""}
               onChange={(val) => onSetupChange("dispatchDate", val)}
               theme={selectTheme}
+              type="datetime"
               required
               error={Boolean(validationErrors["setup.dispatchDate"])}
               helperText={validationErrors["setup.dispatchDate"]}

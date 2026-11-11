@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Box,
   Button,
@@ -23,6 +23,12 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
+import { generalController } from "../../../../../controllers/admin/common/generalController";
+import {
+  mapOvensToOptions,
+  resolveOvenLabel,
+  type OvenSelectOption,
+} from "../../../../../hooks/user/manufacturing/ovenSelectOptions";
 import {
   QC_CURING_HOT_WATER_STATUS_OPTIONS,
   QC_CURING_SECTION_IDS,
@@ -31,9 +37,11 @@ import {
   formatQcCuringMotorStageLabel,
   getQcCuringMotorLabel,
   getQcCuringTypeLabel,
+  normalizeQcCuringSubscaleParameter,
   resolveCuringCycleColumnIds,
   type QcCuringCycleColumnId,
 } from "../../../../../hooks/user/qualityControl/qcCuringConfig";
+import { formatToUiDate } from "../../../../../utils/dateUtils";
 import {
   getCuringCycleRows,
   getCuringPostField,
@@ -199,9 +207,7 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
   ): ReactNode => {
     const rawValue = String(row[column.id] ?? "");
     const value =
-      column.id === "PARAMETER" && rawValue === QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER
-        ? ""
-        : rawValue;
+      column.id === "PARAMETER" ? normalizeQcCuringSubscaleParameter(rawValue) : rawValue;
     const placeholder =
       column.id === "PARAMETER" && !value.trim()
         ? QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER
@@ -223,11 +229,13 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
     }
 
     if (column.fieldType === "date") {
+      const startDate = formatToUiDate(String(row.START_DATE ?? ""));
       return (
         <Box data-qc-field={fieldPath}>
           <DateField
             compact
             value={value}
+            minDate={column.id === "END_DATE" ? startDate : undefined}
             onChange={(next) => updateRow(index, column.id, next)}
             placeholder="DD-MM-YYYY"
             inputSx={tableDateFieldSx}
@@ -238,11 +246,18 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
     }
 
     if (column.fieldType === "time") {
+      const startDate = formatToUiDate(String(row.START_DATE ?? ""));
+      const endDate = formatToUiDate(String(row.END_DATE ?? ""));
       return (
         <Box data-qc-field={fieldPath}>
           <TimeField
             compact
             value={normalizeTimeValue(value)}
+            minTime={
+              column.id === "END_TIME" && startDate && startDate === endDate
+                ? normalizeTimeValue(row.START_TIME)
+                : undefined
+            }
             onChange={(next) => updateRow(index, column.id, next)}
             placeholder="HH:mm"
             inputSx={tableTimeFieldSx}
@@ -652,6 +667,7 @@ const QCCuringMotorPanel = ({
   const mode = useThemeStore((state) => state.mode);
   const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const err = (path: string) => fieldError(validationErrors ?? undefined, path);
+  const [ovenOptions, setOvenOptions] = useState<OvenSelectOption[]>([]);
   const curingType = useMemo(
     () => getCuringTypeFromValues(values, curingSubType),
     [curingSubType, values],
@@ -659,12 +675,34 @@ const QCCuringMotorPanel = ({
   const cycleColumns = useMemo(() => buildCycleColumns(curingType), [curingType]);
   const motorStage = useMemo(() => getCuringSetupField(values, "MOTOR_STAGE"), [values]);
   const oven = useMemo(() => getCuringSetupField(values, "OVEN"), [values]);
+  const ovenLabel = useMemo(() => resolveOvenLabel(oven, ovenOptions), [oven, ovenOptions]);
   const ovenNumber = useMemo(() => getCuringSetupField(values, "OVEN_NUMBER"), [values]);
   const motorPositioningDateTime = useMemo(
     () => getCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME"),
     [values],
   );
   const curingTypeLabel = useMemo(() => getQcCuringTypeLabel(curingType), [curingType]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadOvens = async () => {
+      try {
+        const response = await generalController.getOvens();
+        if (cancelled) return;
+        if (!response?.success || !Array.isArray(response.data)) {
+          setOvenOptions([]);
+          return;
+        }
+        setOvenOptions(mapOvensToOptions(response.data));
+      } catch {
+        if (!cancelled) setOvenOptions([]);
+      }
+    };
+    void loadOvens();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const setupQaRemarks = useMemo(
     () => getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.MOTOR_SETUP),
     [values],
@@ -777,7 +815,7 @@ const QCCuringMotorPanel = ({
               <QCDivisionReadOnlyValue value={curingTypeLabel} muted={!curingTypeLabel.trim()} />
             </SetupFieldCell>
             <SetupFieldCell label="Oven" readOnly>
-              <QCDivisionReadOnlyValue value={oven} muted={!oven.trim()} />
+              <QCDivisionReadOnlyValue value={ovenLabel} muted={!ovenLabel.trim()} />
             </SetupFieldCell>
             <SetupFieldCell label="Oven Number" readOnly>
               <QCDivisionReadOnlyValue value={ovenNumber} muted={!ovenNumber.trim()} />
@@ -859,7 +897,7 @@ const QCCuringMotorPanel = ({
                 },
               )}
             </FieldRow>
-            <FieldRow label="Date/Time for removal of pressure plate" readOnly={readOnly}>
+            <FieldRow label="Date & Time Of Removal Of Pressure Plate" readOnly={readOnly}>
               {renderTextField(
                 pressurePlateRemovalDateTime,
                 (next) =>
@@ -880,7 +918,7 @@ const QCCuringMotorPanel = ({
                 },
               )}
             </FieldRow>
-            <FieldRow label="Date/Time of Dispatch of motor for De-coring" readOnly={readOnly} required error={err("DISPATCH_DATE_TIME")}>
+            <FieldRow label="Date & Time Of Dispatch Of Motor For De-coring" readOnly={readOnly} required error={err("DISPATCH_DATE_TIME")}>
               {renderTextField(
                 dispatchDateTime,
                 (next) => onChange(setCuringPostField(values, "DISPATCH_DATE_TIME", next)),
@@ -991,6 +1029,7 @@ const QCCuringMotorPanel = ({
                   <DateField
                     compact
                     value={curingCompleteDate}
+                    minDate={curingStartDate}
                     onChange={(next) =>
                       onChange(setCuringSubscaleField(values, "CURING_COMPLETE_DATE", next))
                     }
@@ -1012,6 +1051,12 @@ const QCCuringMotorPanel = ({
                   <TimeField
                     compact
                     value={normalizeTimeValue(cycleEndTime)}
+                    minTime={
+                      curingStartDate &&
+                      formatToUiDate(curingStartDate) === formatToUiDate(curingCompleteDate)
+                        ? normalizeTimeValue(cycleStartTime)
+                        : undefined
+                    }
                     onChange={(next) =>
                       onChange(setCuringSubscaleField(values, "CYCLE_END_TIME", next))
                     }

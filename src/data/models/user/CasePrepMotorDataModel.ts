@@ -11,6 +11,7 @@ import {
   UI_DATE_PARSE_FORMATS,
   UI_DATETIME_FORMAT,
 } from "../../../utils/dateUtils";
+import { toUiDateTime } from "./castingCuringFieldCodec";
 
 dayjs.extend(customParseFormat);
 
@@ -42,9 +43,7 @@ export const LINER_TYPE_OPTIONS: readonly CasePrepOption[] = [
   { value: "OTHERS", label: "Others" },
 ] as const;
 
-const LINER_TYPE_VALUE_SET = new Set(
-  LINER_TYPE_OPTIONS.map((option) => option.value),
-);
+const LINER_TYPE_VALUE_SET = new Set(LINER_TYPE_OPTIONS.map((option) => option.value));
 
 /** Map API linerType ↔ UI select (empty stays empty; free-text → OTHERS + otherLinerType). */
 export const resolveLinerTypeForUi = (
@@ -65,11 +64,7 @@ export const resolveLinerTypeForUi = (
   return { linerType: "OTHERS", otherLinerType: other || raw };
 };
 
-export type PreHeatingRecipeValue =
-  | "85_90C_6HR_10HR_VACUUM"
-  | "105C_8HR"
-  | "OTHERS"
-  | "";
+export type PreHeatingRecipeValue = "85_90C_6HR_10HR_VACUUM" | "105C_8HR" | "OTHERS" | "";
 
 export type AbradingWheelValue = "G60" | "G36" | "";
 export type VacuumBaggingValue = "YES" | "NO" | "";
@@ -164,7 +159,7 @@ export type CasePrepPreHeatingData = {
   otherDuration: string;
   temperatureDuration: CasePrepParameterRow[];
   preHeatingMonitoring: CasePrepParameterRow[];
-  preHeatingDate?: string;
+  preHeatingDateTime?: string;
 };
 
 export type CasePrepLinerCoatingOperationData = {
@@ -177,7 +172,7 @@ export type CasePrepLinerCoatingOperationData = {
   qualifyingSubscaleBatchNo: string;
   qualificationParameters: CasePrepQualificationParameterRow[];
   linerApplicationLog: CasePrepParameterRow[];
-  linerCoatingDate?: string;
+  linerCoatingDateTime?: string;
   rh?: string;
 };
 
@@ -210,26 +205,24 @@ const PRE_HEATING_RECIPE_ROW_COUNTS: Record<string, number> = {
 };
 
 const PRE_HEATING_MONITORING_PRESETS: Array<{ parameter: string; valueFieldType: string }> = [
-  { parameter: "Date", valueFieldType: "date" },
-  { parameter: "Oven Start Time", valueFieldType: "time" },
-  { parameter: "Cycle Start Time", valueFieldType: "time" },
-  { parameter: "Cycle End Time", valueFieldType: "time" },
+  { parameter: "Oven Start Date & Time", valueFieldType: "datetime" },
+  { parameter: "Cycle Start Date & Time", valueFieldType: "datetime" },
+  { parameter: "Cycle End Date & Time", valueFieldType: "datetime" },
   { parameter: "Visual Observation After Pre-heating", valueFieldType: "textarea" },
 ];
 
 const LINER_APPLICATION_LOG_PRESETS: Array<{ parameter: string; valueFieldType: string }> = [
-  { parameter: "Date", valueFieldType: "date" },
-  { parameter: "Oven Out Time", valueFieldType: "time" },
+  { parameter: "Oven Out Date & Time", valueFieldType: "datetime" },
   { parameter: "Rocket Motor Insulation Temp", valueFieldType: "number" },
   { parameter: "Rocket Motor RPM", valueFieldType: "number" },
   { parameter: "Boom Speed", valueFieldType: "number" },
   { parameter: "Start Temperature", valueFieldType: "number" },
-  { parameter: "Start Time", valueFieldType: "time" },
-  { parameter: "End Time", valueFieldType: "time" },
+  { parameter: "Start Date & Time", valueFieldType: "datetime" },
+  { parameter: "End Date & Time", valueFieldType: "datetime" },
   { parameter: "Number of Passes", valueFieldType: "number" },
   { parameter: "Liner Applied (w/o DCM)", valueFieldType: "text" },
-  { parameter: "Rotation Start Time", valueFieldType: "time" },
-  { parameter: "Rotation End Time", valueFieldType: "time" },
+  { parameter: "Rotation Start Date & Time", valueFieldType: "datetime" },
+  { parameter: "Rotation End Date & Time", valueFieldType: "datetime" },
   { parameter: "Storage Temperature", valueFieldType: "number" },
 ];
 
@@ -368,9 +361,7 @@ const createEmptyPreHeatingMonitoring = (): CasePrepParameterRow[] =>
   );
 
 const createEmptyLinerApplicationLog = (): CasePrepParameterRow[] =>
-  LINER_APPLICATION_LOG_PRESETS.map((row) =>
-    createParameterRow(row.parameter, row.valueFieldType),
-  );
+  LINER_APPLICATION_LOG_PRESETS.map((row) => createParameterRow(row.parameter, row.valueFieldType));
 
 const createEmptyQualificationParameters = (): CasePrepQualificationParameterRow[] =>
   QUALIFICATION_PARAMETER_PRESETS.map((row, index) =>
@@ -414,7 +405,7 @@ export const createEmptyCasePrepMotorData = (): CasePrepMotorData => ({
     otherDuration: "",
     temperatureDuration: [],
     preHeatingMonitoring: createEmptyPreHeatingMonitoring(),
-    preHeatingDate: "",
+    preHeatingDateTime: "",
   },
   linerCoatingOperation: {
     linerType: "",
@@ -426,7 +417,7 @@ export const createEmptyCasePrepMotorData = (): CasePrepMotorData => ({
     qualifyingSubscaleBatchNo: "",
     qualificationParameters: createEmptyQualificationParameters(),
     linerApplicationLog: createEmptyLinerApplicationLog(),
-    linerCoatingDate: "",
+    linerCoatingDateTime: "",
     rh: "",
   },
   dispatchToCasting: {
@@ -466,10 +457,7 @@ export const computeAbradingTotalDustWeight = (
   });
 };
 
-const resolveTemperatureDurationCount = (
-  recipe: string,
-  otherDuration: string,
-): number => {
+const resolveTemperatureDurationCount = (recipe: string, otherDuration: string): number => {
   const normalized = str(recipe).trim();
   if (normalized in PRE_HEATING_RECIPE_ROW_COUNTS) {
     return PRE_HEATING_RECIPE_ROW_COUNTS[normalized];
@@ -486,9 +474,7 @@ const buildTemperatureDurationRows = (
   count: number,
   previous: CasePrepParameterRow[],
 ): CasePrepParameterRow[] => {
-  const byParameter = new Map(
-    previous.map((row) => [str(row.parameter).trim(), row] as const),
-  );
+  const byParameter = new Map(previous.map((row) => [str(row.parameter).trim(), row] as const));
   return Array.from({ length: count }, (_, index) => {
     const parameter = `Temperature @ ${index + 1} Hour`;
     const existing = byParameter.get(parameter);
@@ -575,7 +561,7 @@ const toApiDateOnly = (value: unknown): string => {
   const raw = str(value).trim();
   if (!raw) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T].*)?$/);
   if (dmy) {
     const [, d, m, y] = dmy;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
@@ -585,11 +571,16 @@ const toApiDateOnly = (value: unknown): string => {
 };
 
 /** Prefer dedicated date field; else first monitoring/log row named "Date". */
-const resolveSectionDateForUi = (
-  dedicatedDate: unknown,
-  parameterRows: unknown,
-): string => {
-  const fromField = formatToUiDate(str(dedicatedDate));
+const resolveSectionDateForUi = (dedicatedDate: unknown, parameterRows: unknown): string => {
+  const toUiDateTimeWithSeconds = (value: unknown) => {
+    const raw = str(value).trim();
+    const uiDateTime = toUiDateTime(raw);
+    if (!uiDateTime) return "";
+    const seconds = raw.match(/[T ]\d{1,2}:\d{2}:(\d{2})/)?.[1] ?? "00";
+    return `${uiDateTime}:${seconds}`;
+  };
+
+  const fromField = toUiDateTimeWithSeconds(dedicatedDate);
   if (fromField) return fromField;
 
   if (!Array.isArray(parameterRows)) return "";
@@ -597,7 +588,7 @@ const resolveSectionDateForUi = (
     if (!entry || typeof entry !== "object") continue;
     const row = entry as Record<string, unknown>;
     if (str(row.parameter).trim().toLowerCase() !== "date") continue;
-    return formatToUiDate(str(row.value));
+    return toUiDateTimeWithSeconds(row.value);
   }
   return "";
 };
@@ -630,11 +621,31 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
   const raw = str(value).trim();
   if (!raw) return { date: "", time: "" };
 
+  const localIso = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (localIso) {
+    return {
+      date: `${localIso[3]}-${localIso[2]}-${localIso[1]}`,
+      time: `${localIso[4].padStart(2, "0")}:${localIso[5]}:${localIso[6] ?? "00"}`,
+    };
+  }
+
+  const uiDateTime = raw.match(
+    /^(\d{1,2})-(\d{1,2})-(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (uiDateTime) {
+    return {
+      date: `${uiDateTime[1].padStart(2, "0")}-${uiDateTime[2].padStart(2, "0")}-${uiDateTime[3]}`,
+      time: `${uiDateTime[4].padStart(2, "0")}:${uiDateTime[5]}:${uiDateTime[6] ?? "00"}`,
+    };
+  }
+
   const parsed = dayjs(raw, [...UI_DATE_PARSE_FORMATS, UI_DATETIME_FORMAT, "YYYY-MM-DDTHH:mm:ssZ"], true);
   if (parsed.isValid()) {
     return {
       date: parsed.format("DD-MM-YYYY"),
-      time: /[T\s]\d{1,2}:\d{2}/.test(raw) || raw.includes("T") ? parsed.format("HH:mm") : "",
+      time: /[T\s]\d{1,2}:\d{2}/.test(raw) || raw.includes("T") ? parsed.format("HH:mm:ss") : "",
     };
   }
 
@@ -642,15 +653,15 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
   if (loose.isValid() && (raw.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(raw))) {
     return {
       date: loose.format("DD-MM-YYYY"),
-      time: /[T\s]\d{1,2}:\d{2}/.test(raw) ? loose.format("HH:mm") : "",
+      time: /[T\s]\d{1,2}:\d{2}/.test(raw) ? loose.format("HH:mm:ss") : "",
     };
   }
 
-  const timeMatch = raw.match(/(\d{1,2}):(\d{2})/);
+  const timeMatch = raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (timeMatch && !/\d{4}/.test(raw)) {
     return {
       date: "",
-      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}:${timeMatch[3] ?? "00"}`,
     };
   }
 
@@ -658,7 +669,7 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
     const datePart = raw.replace(timeMatch[0], "").trim();
     return {
       date: formatToUiDate(datePart) || datePart,
-      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}:${timeMatch[3] ?? "00"}`,
     };
   }
 
@@ -668,9 +679,8 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
 const combineAbradingUiDateTime = (date: string, time: string): string => {
   const d = formatToUiDate(str(date).trim()) || str(date).trim();
   const t = str(time).trim();
-  if (d && t) return dayjs(`${d} ${t}`, UI_DATETIME_FORMAT, true).isValid()
-    ? `${d} ${t}`
-    : `${d} ${t}`;
+  if (d && t)
+    return dayjs(`${d} ${t}`, UI_DATETIME_FORMAT, true).isValid() ? `${d} ${t}` : `${d} ${t}`;
   if (d) return d;
   return t;
 };
@@ -678,10 +688,19 @@ const combineAbradingUiDateTime = (date: string, time: string): string => {
 const normalizeAbradingApiTime = (value: unknown): string => {
   const raw = str(value).trim();
   if (!raw) return "";
-  const match = raw.match(/^(\d{1,2}):(\d{2})/);
-  if (match) return `${match[1].padStart(2, "0")}:${match[2]}`;
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (match) {
+    return `${match[1].padStart(2, "0")}:${match[2]}:${match[3] ?? "00"}`;
+  }
   const parsed = dayjs(raw);
-  return parsed.isValid() ? parsed.format("HH:mm") : raw;
+  return parsed.isValid() ? parsed.format("HH:mm:ss") : raw;
+};
+
+const toApiLocalDateTime = (value: unknown): string => {
+  const { date, time } = splitAbradingUiDateTime(value);
+  const apiDate = toApiDateOnly(date);
+  const apiTime = normalizeAbradingApiTime(time);
+  return apiDate && apiTime ? `${apiDate}T${apiTime}` : "";
 };
 
 const splitAbradingDetailsByCut = (
@@ -708,12 +727,11 @@ const abradingSectionRowsToCutPayload = (
   sectionRows: CasePrepAbradingDataRow[],
   srNo: number,
 ): Record<string, unknown> | null => {
-  let date = "";
-  let startTime = "";
-  let endTime = "";
+  let startDateTime = "";
+  let endDateTime = "";
   let dustQty = "";
   let observations = "";
-  let attachments: FileRef[] = [];
+  const attachments: FileRef[] = [];
 
   const mergeAttachments = (incoming?: FileRef[]) => {
     if (!incoming?.length) return;
@@ -731,18 +749,14 @@ const abradingSectionRowsToCutPayload = (
   for (const row of sectionRows) {
     const operation = str(row.operation).trim();
     if (/^Start Date & Time$/i.test(operation)) {
-      const split = splitAbradingUiDateTime(row.value);
-      if (split.date) date = split.date;
-      if (split.time) startTime = split.time;
+      startDateTime = toApiLocalDateTime(row.value);
       // Single cut-level observation is stored on the Start row.
       observations = str(row.remarksObservations).trim();
       mergeAttachments(row.attachments);
       continue;
     }
     if (/^End Date & Time$/i.test(operation)) {
-      const split = splitAbradingUiDateTime(row.value);
-      if (!date && split.date) date = split.date;
-      if (split.time) endTime = split.time;
+      endDateTime = toApiLocalDateTime(row.value);
       // Legacy: if Start had no observation, fall back to End remarks.
       if (!observations) observations = str(row.remarksObservations).trim();
       mergeAttachments(row.attachments);
@@ -753,16 +767,14 @@ const abradingSectionRowsToCutPayload = (
     }
   }
 
-  if (!date && !startTime && !endTime && !dustQty && !observations && !attachments.length) {
+  if (!startDateTime && !endDateTime && !dustQty && !observations && !attachments.length) {
     return null;
   }
 
-  const apiDate = toApiDateOnly(date);
   return stripRowForPayload({
     srNo,
-    ...(apiDate ? { date: apiDate } : {}),
-    ...(startTime ? { startTime } : {}),
-    ...(endTime ? { endTime } : {}),
+    ...(startDateTime ? { startDateTime } : {}),
+    ...(endDateTime ? { endDateTime } : {}),
     ...(dustQty ? { dustQty } : {}),
     ...(observations ? { observations } : {}),
     attachments: fileIdsFromFormRefs(attachments),
@@ -788,14 +800,19 @@ const applyApiCutToAbradingPreset = (
 ): CasePrepAbradingDetailsRow[] => {
   if (!cut) return presetRows;
 
-  const date = formatToUiDate(str(cut.date ?? cut.DATE));
-  const startTime = normalizeAbradingApiTime(cut.startTime ?? cut.START_TIME);
-  const endTime = normalizeAbradingApiTime(cut.endTime ?? cut.END_TIME);
+  const legacyDate = formatToUiDate(str(cut.date ?? cut.DATE));
+  const startDateTime = splitAbradingUiDateTime(cut.startDateTime ?? cut.START_DATE_TIME);
+  const endDateTime = splitAbradingUiDateTime(cut.endDateTime ?? cut.END_DATE_TIME);
+  const date = startDateTime.date || endDateTime.date || legacyDate;
+  const startTime =
+    startDateTime.time || normalizeAbradingApiTime(cut.startTime ?? cut.START_TIME);
+  const endTime =
+    endDateTime.time || normalizeAbradingApiTime(cut.endTime ?? cut.END_TIME);
   const dustQty = str(cut.dustQty ?? cut.DUST_QTY);
   const observations = str(cut.observations ?? cut.OBSERVATIONS ?? cut.remarksObservations);
   const attachments = parseFileRefs(cut.attachments ?? cut.ATTACHMENTS);
-  const startValue = combineAbradingUiDateTime(date, startTime);
-  const endValue = combineAbradingUiDateTime(date, endTime);
+  const startValue = combineAbradingUiDateTime(startDateTime.date || date, startTime);
+  const endValue = combineAbradingUiDateTime(endDateTime.date || date, endTime);
 
   return presetRows.map((row) => {
     if (isAbradingHeaderRow(row)) return row;
@@ -842,11 +859,7 @@ export const parseAbradingOperationFromApi = (
       asRecord(secondCuts[0]),
       ABRADING_DUST_B,
     );
-    return computeAbradingTotalDustWeight([
-      ...firstApplied,
-      ...secondApplied,
-      ...totalRows,
-    ]);
+    return computeAbradingTotalDustWeight([...firstApplied, ...secondApplied, ...totalRows]);
   }
   return parseAbradingDetails(abrading.abradingDetails);
 };
@@ -962,7 +975,7 @@ const ingredientRowsForPayload = (rows: CasePrepIngredientRow[]): unknown[] =>
     const quantityTaken = toApiNumber(row.quantityTaken);
     // Always send totalQuantity as user input only (number, or null when blank — never copy quantityTaken).
     const totalQuantityRaw = str(row.totalQuantity).trim();
-    const totalQuantity = totalQuantityRaw ? toApiNumber(totalQuantityRaw) ?? null : null;
+    const totalQuantity = totalQuantityRaw ? (toApiNumber(totalQuantityRaw) ?? null) : null;
     const materialName = str(row.materialName).trim() || str(row.ingredient).trim();
     const materialCode = str(row.materialCode ?? "").trim();
     // Prefer master code in `ingredient` when known; otherwise keep display name.
@@ -1013,15 +1026,15 @@ export const buildCasePrepMotorDetailsPayload = (
   data: CasePrepMotorData,
 ): CasePrepMotorDetailsPayload => {
   const synced = syncPreHeatingTemperatureDurationRows(data);
-  const abradingDetails = computeAbradingTotalDustWeight(
-    synced.abradingOperation.abradingDetails,
-  );
+  const abradingDetails = computeAbradingTotalDustWeight(synced.abradingOperation.abradingDetails);
   const { firstCut, secondCut } = abradingDetailsToFirstSecondCutPayload(abradingDetails);
   const numberOfSpacers = toApiNumber(synced.bellowBonding.numberOfSpacers);
   const solventUsedQtyKg = toApiNumber(synced.tceCleaning.solventUsedQtyKg);
   const vacuumApplied = toApiNumber(synced.preHeating.vacuumApplied);
   const batchSize = toApiNumber(synced.linerCoatingOperation.batchSize);
   const recipe = str(synced.preHeating.preHeatingRecipe).trim();
+  const temperature = str(synced.preHeating.otherTemperature ?? "").trim();
+  const duration = str(synced.preHeating.otherDuration ?? "").trim();
   const linerTypeRaw = str(synced.linerCoatingOperation.linerType).trim();
   const otherLinerType = str(synced.linerCoatingOperation.otherLinerType).trim();
   // Backend LinerCoatingOperation has no `otherLinerType` — send the custom value as linerType.
@@ -1033,16 +1046,17 @@ export const buildCasePrepMotorDetailsPayload = (
   const tceCleaningDateTime = toApiInstant(synced.tceCleaning.tceCleaningDateTime);
 
   // Fold UI dates into monitoring/application-log "Date" rows when empty (display sync).
-  // preHeatingDate / linerCoatingDate are also sent as dedicated API fields.
-  const preHeatingDate = toApiDateOnly(synced.preHeating.preHeatingDate);
-  const linerCoatingDate = toApiDateOnly(synced.linerCoatingOperation.linerCoatingDate);
+  const preHeatingDateTime = toApiLocalDateTime(synced.preHeating.preHeatingDateTime);
+  const linerCoatingDateTime = toApiLocalDateTime(synced.linerCoatingOperation.linerCoatingDateTime);
+  const preHeatingDateOnly = toApiDateOnly(preHeatingDateTime);
+  const linerCoatingDateOnly = toApiDateOnly(linerCoatingDateTime);
   const preHeatingMonitoring = applyDateToParameterRows(
     synced.preHeating.preHeatingMonitoring,
-    preHeatingDate,
+    preHeatingDateOnly,
   );
   const linerApplicationLog = applyDateToParameterRows(
     synced.linerCoatingOperation.linerApplicationLog,
-    linerCoatingDate,
+    linerCoatingDateOnly,
   );
 
   return {
@@ -1067,15 +1081,18 @@ export const buildCasePrepMotorDetailsPayload = (
       ...(tceCleaningDateTime ? { tceCleaningDateTime } : {}),
       ...(solventUsedQtyKg !== undefined ? { solventUsedQtyKg } : {}),
       observation: str(synced.tceCleaning.observation).trim(),
-      testReport: fileIdsFromFormRefs(
-        synced.tceCleaning.testReport ? [synced.tceCleaning.testReport] : [],
-      )[0] ?? null,
+      testReport:
+        fileIdsFromFormRefs(
+          synced.tceCleaning.testReport ? [synced.tceCleaning.testReport] : [],
+        )[0] ?? null,
     },
     preHeating: {
       vacuumBaggingApplied,
       ...(vacuumBaggingApplied === "YES" && vacuumApplied !== undefined ? { vacuumApplied } : {}),
       preHeatingRecipe: recipe,
-      ...(preHeatingDate ? { preHeatingDate } : {}),
+      otherTemperature: temperature ?? "",
+      otherDuration: duration ?? "",
+      ...(preHeatingDateTime ? { preHeatingDateTime } : {}),
       // Do not send otherTemperature / otherDuration — not on API DTO.
       temperatureDuration: parameterRowsForPayload(synced.preHeating.temperatureDuration),
       preHeatingMonitoring: parameterRowsForPayload(preHeatingMonitoring),
@@ -1083,16 +1100,14 @@ export const buildCasePrepMotorDetailsPayload = (
     linerCoatingOperation: {
       linerType,
       // Do not send otherLinerType — not on API DTO (custom value sent as linerType).
-      ...(linerCoatingDate ? { linerCoatingDate } : {}),
+      ...(linerCoatingDateTime ? { linerCoatingDateTime } : {}),
       batchNo: str(synced.linerCoatingOperation.batchNo).trim(),
       ...(batchSize !== undefined ? { batchSize } : {}),
       premixIngredients: ingredientRowsForPayload(synced.linerCoatingOperation.premixIngredients),
       finalMixIngredients: ingredientRowsForPayload(
         synced.linerCoatingOperation.finalMixIngredients,
       ),
-      qualifyingSubscaleBatchNo: str(
-        synced.linerCoatingOperation.qualifyingSubscaleBatchNo,
-      ).trim(),
+      qualifyingSubscaleBatchNo: str(synced.linerCoatingOperation.qualifyingSubscaleBatchNo).trim(),
       qualificationParameters: qualificationRowsForPayload(
         synced.linerCoatingOperation.qualificationParameters,
       ),
@@ -1127,9 +1142,7 @@ const firstSectionRow = (
   sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
   sectionId: string,
 ): Record<string, unknown> => {
-  const match = (sections ?? []).find(
-    (section) => str(section.sectionId).trim() === sectionId,
-  );
+  const match = (sections ?? []).find((section) => str(section.sectionId).trim() === sectionId);
   const rows = asArray(match?.sectionData);
   return asRecord(rows[0]) ?? {};
 };
@@ -1225,18 +1238,21 @@ const parseObservationRows = (
 
 const parseIngredientRows = (value: unknown): CasePrepIngredientRow[] =>
   asArray(value)
-    .map((item, index) => {
+    .map((item, index): CasePrepIngredientRow | null => {
       const row = asRecord(item);
       if (!row) return null;
+
       const materialName = str(row.materialName ?? "").trim();
       const ingredientRaw = str(row.ingredient ?? "").trim();
       const materialCodeRaw = str(row.materialCode ?? "").trim();
-      // Payload stores master code in `ingredient` when known; keep display name for UI.
+
       const materialCode =
         materialCodeRaw ||
         (materialName && ingredientRaw && materialName !== ingredientRaw ? ingredientRaw : "") ||
         null;
+
       const displayName = materialName || ingredientRaw;
+
       return {
         srNo: Number(row.srNo ?? row.SR_NO ?? index + 1) || index + 1,
         materialId:
@@ -1252,7 +1268,7 @@ const parseIngredientRows = (value: unknown): CasePrepIngredientRow[] =>
         totalQuantity: str(row.totalQuantity ?? ""),
       };
     })
-    .filter((row): row is CasePrepIngredientRow => Boolean(row));
+    .filter((row): row is CasePrepIngredientRow => row !== null);
 
 const parseQualificationRows = (value: unknown): CasePrepQualificationParameterRow[] => {
   const rows = asArray(value)
@@ -1292,9 +1308,7 @@ const parseQualificationRows = (value: unknown): CasePrepQualificationParameterR
 
 export const parseCasePrepMotorDataFromApi = (
   motorOrSections?:
-    | Record<string, unknown>
-    | Array<{ sectionId?: string; sectionData?: unknown[] }>
-    | null,
+    Record<string, unknown> | Array<{ sectionId?: string; sectionData?: unknown[] }> | null,
 ): CasePrepMotorData => {
   const empty = createEmptyCasePrepMotorData();
   if (!motorOrSections) return empty;
@@ -1318,9 +1332,7 @@ export const parseCasePrepMotorDataFromApi = (
   const parsed: CasePrepMotorData = {
     abradingOperation: {
       typeOfCasing: str(abrading.typeOfCasing ?? empty.abradingOperation.typeOfCasing),
-      typeOfInsulation: str(
-        abrading.typeOfInsulation ?? empty.abradingOperation.typeOfInsulation,
-      ),
+      typeOfInsulation: str(abrading.typeOfInsulation ?? empty.abradingOperation.typeOfInsulation),
       abradingWheelType: str(
         abrading.abradingWheelType ?? empty.abradingOperation.abradingWheelType,
       ),
@@ -1353,8 +1365,8 @@ export const parseCasePrepMotorDataFromApi = (
         empty.preHeating.preHeatingMonitoring,
         preHeating.preHeatingMonitoring,
       ),
-      preHeatingDate: resolveSectionDateForUi(
-        preHeating.preHeatingDate,
+      preHeatingDateTime: resolveSectionDateForUi(
+        preHeating.preHeatingDateTime ?? preHeating.preHeatingDate,
         preHeating.preHeatingMonitoring,
       ),
     },
@@ -1376,8 +1388,8 @@ export const parseCasePrepMotorDataFromApi = (
         empty.linerCoatingOperation.linerApplicationLog,
         liner.linerApplicationLog,
       ),
-      linerCoatingDate: resolveSectionDateForUi(
-        liner.linerCoatingDate,
+      linerCoatingDateTime: resolveSectionDateForUi(
+        liner.linerCoatingDateTime ?? liner.linerCoatingDate,
         liner.linerApplicationLog,
       ),
       rh: str(liner.rh ?? ""),
@@ -1408,11 +1420,18 @@ export const parseCasePrepMotorDataFromSections = (
   sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
 ): CasePrepMotorData => parseCasePrepMotorDataFromApi(sections);
 
-export const collectCasePrepFileRefsFromMotorData = (data: CasePrepMotorData | null | undefined): FileRef[] => {
+export const collectCasePrepFileRefsFromMotorData = (
+  data: CasePrepMotorData | null | undefined,
+): FileRef[] => {
   if (!data) return [];
   const refs: FileRef[] = [];
   for (const row of data.abradingOperation?.abradingDetails ?? []) {
-    if (row && typeof row === "object" && "attachments" in row && Array.isArray((row as CasePrepAbradingDataRow).attachments)) {
+    if (
+      row &&
+      typeof row === "object" &&
+      "attachments" in row &&
+      Array.isArray((row as CasePrepAbradingDataRow).attachments)
+    ) {
       refs.push(...((row as CasePrepAbradingDataRow).attachments ?? []));
     }
   }
@@ -1440,13 +1459,11 @@ export const hasIncompleteCasePrepUploads = (form: {
 export const collectTempFileIdsFromCasePrepForm = (form: {
   motors?: Array<{ data?: CasePrepMotorData | null }>;
   subscaleData?: CasePrepMotorData | null;
-}): string[] =>
-  [
-    ...new Set(
-      collectCasePrepFileRefsFromForm(form)
-        .filter((ref) => ref.isTemp !== false)
-        .map((ref) => String(ref.fileId ?? "").trim())
-        .filter(Boolean),
-    ),
-  ];
-
+}): string[] => [
+  ...new Set(
+    collectCasePrepFileRefsFromForm(form)
+      .filter((ref) => ref.isTemp !== false)
+      .map((ref) => String(ref.fileId ?? "").trim())
+      .filter(Boolean),
+  ),
+];

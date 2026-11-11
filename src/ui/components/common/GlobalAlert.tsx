@@ -68,6 +68,8 @@ const GlobalAlertDialog = () => {
       fullWidth
       onClose={() => {}} // ignore backdrop click
       disableEscapeKeyDown // block ESC
+      // Sit above ApproverActionDialog / other modals so errors are never covered.
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 10 }}
       PaperProps={{
         sx: {
           borderRadius: "24px",
@@ -79,7 +81,14 @@ const GlobalAlertDialog = () => {
       }}
     >
       <DialogContent sx={{ overflow: "hidden" }}>
-        <Box display="flex" flexDirection="column" alignItems="center" textAlign="center" gap={3}>
+        <Box
+          key={`${severity}-${loading ? "loading" : "idle"}-${message}`}
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          textAlign="center"
+          gap={3}
+        >
           
           {/* Animated Icon Container */}
           <Box
@@ -87,7 +96,7 @@ const GlobalAlertDialog = () => {
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 80, height: 80, borderRadius: "50%",
               bgcolor: loading ? "transparent" : bg,
-              animation: open && !loading ? `${popIn} 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards` : "none",
+              animation: !loading ? `${popIn} 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards` : "none",
             }}
           >
             {loading ? (
@@ -109,7 +118,7 @@ const GlobalAlertDialog = () => {
               color: colors.grey[800],
               lineHeight: 1.45,
               px: 2,
-              animation: open ? `${slideUp} 0.4s ease-out forwards` : "none",
+              animation: `${slideUp} 0.4s ease-out forwards`,
               animationDelay: "0.1s",
               opacity: 0, // initially hide until animation starts
             }}

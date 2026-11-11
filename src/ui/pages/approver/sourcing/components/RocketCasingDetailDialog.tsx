@@ -18,7 +18,6 @@ import {
   Typography,
 } from "@mui/material";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import dayjs from "dayjs";
 
 import { useThemeStore } from "@app/store/themeStore";
 import { useAuthStore } from "@app/store/authStore";
@@ -33,6 +32,11 @@ import DimensionalInspectionDetailTable from "../../../user/sourcing/components/
 import MockTrialDetailTables from "../../../user/sourcing/components/MockTrialDetailTables";
 import FilePreviewDialog from "@ui/components/common/FilePreviewDialog";
 import { useFilePreview } from "@/hooks/useFilePreview";
+import {
+  formatDisplayDate,
+  formatDisplayDateOrDateTime,
+  formatDisplayDateTime,
+} from "@/utils/dateUtils";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 
@@ -56,9 +60,7 @@ export type RocketCasingDetailDialogProps = {
 };
 
 const formatDetailDate = (value?: string) => {
-  if (!value) return "—";
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("DD MMM YYYY") : value;
+  return formatDisplayDate(value);
 };
 
 const DEFAULT_DETAIL_COLUMNS = [
@@ -96,11 +98,13 @@ const RocketCasingDetailDialog = ({
   const renderResultCell = (row: any) => {
     const fileId = String(row?.fileId ?? "").trim();
     const canOpen = Boolean(fileId && subDepartmentId);
-    if (!canOpen) return row?.analysedResult || "—";
+    if (!canOpen) {
+      return formatDisplayDateOrDateTime(row?.analysedResult, row?.analysedResult || "—");
+    }
     return (
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
         <Typography component="span" sx={theme.dialog.innerResultText}>
-          {row?.analysedResult || "—"}
+          {formatDisplayDateOrDateTime(row?.analysedResult, row?.analysedResult || "—")}
         </Typography>
         <Link
           component="button"
@@ -171,7 +175,10 @@ const RocketCasingDetailDialog = ({
     { label: BL.COL_INSULATION_TYPE, value: item.insulationType || "—" },
     { label: BL.COL_RECEIVING_DATE, value: formatDetailDate(item.receivingDate) },
     { label: BL.COL_CREATED_BY, value: item.submittedBy || "—" },
-    { label: BL.COL_CREATED_ON, value: formatDetailDate(item.createdOn) },
+    {
+      label: BL.COL_CREATED_ON,
+      value: formatDisplayDateTime(item.createdOn, item.createdOn || "—"),
+    },
     { label: BL.COL_STAGE_STATUS, value: item.status || "—" },
   ];
 

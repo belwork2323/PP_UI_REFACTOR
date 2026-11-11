@@ -141,7 +141,7 @@ const normalizeTimeValue = (value: unknown) => {
 type ColumnDef<T> = {
   id: keyof T & string;
   label: string;
-  fieldType?: "text" | "number" | "date" | "time" | "textarea" | "select";
+  fieldType?: "text" | "number" | "date" | "time" | "dateTime" | "textarea" | "select";
   required?: boolean;
   options?: Array<{ value: string; label: string }>;
   loadingOptions?: boolean;
@@ -173,13 +173,31 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
 
   const updateRow = (index: number, field: keyof T & string, value: string) => {
+    updateRowFields(index, { [field]: value } as Partial<T>);
+  };
+
+  const updateRowFields = (index: number, patch: Partial<T>) => {
     onChange(
       rows.map((row, rowIndex) =>
         rowIndex === index
-          ? ({ ...row, [field]: value, SR_NO: rowIndex + 1 } as T)
+          ? ({ ...row, ...patch, SR_NO: rowIndex + 1 } as T)
           : ({ ...row, SR_NO: rowIndex + 1 } as T),
       ),
     );
+  };
+
+  const dateTimeParts = (row: T, column: ColumnDef<T>) => {
+    const dateField = column.id;
+    const timeField = dateField === "START_DATE" ? "START_TIME" : "END_TIME";
+    const rowValues = row as Record<string, unknown>;
+    const date = String(rowValues[dateField] ?? rowValues.DATE ?? "").trim();
+    const time = normalizeTimeValue(rowValues[timeField]);
+    return { date, time };
+  };
+
+  const dateTimeValue = (row: T, column: ColumnDef<T>) => {
+    const { date, time } = dateTimeParts(row, column);
+    return date ? `${date} ${time || "00:00"}` : "";
   };
 
   const addRow = () => {
@@ -204,6 +222,9 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   ): ReactNode => {
     const value = String(row[column.id] ?? "");
     if (readOnly) {
+      if (column.fieldType === "dateTime") {
+        return <DateTimeField value={dateTimeValue(row, column)} readOnly />;
+      }
       if (column.fieldType === "select") {
         const label =
           column.options?.find((option) => option.value === value)?.label ?? value;
@@ -228,6 +249,34 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
             onChange={(next) => updateRow(index, column.id, next)}
             placeholder="DD-MM-YYYY"
             inputSx={tableDateFieldSx}
+            error={hasError}
+          />
+        </Box>
+      );
+    }
+
+    if (column.fieldType === "dateTime") {
+      const dateField = column.id;
+      const timeField = dateField === "START_DATE" ? "START_TIME" : "END_TIME";
+      return (
+        <Box data-qc-field={fieldPath}>
+          <DateTimeField
+            compact
+            value={dateTimeValue(row, column)}
+            minDate={
+              column.id === "END_DATE"
+                ? dateTimeValue(row, { ...column, id: "START_DATE" })
+                : undefined
+            }
+            onChange={(next) => {
+              const [date = "", time = ""] = next.split(/\s+/, 2);
+              updateRowFields(index, {
+                [dateField]: date,
+                [timeField]: time,
+              } as Partial<T>);
+            }}
+            placeholder="DD-MM-YYYY HH:mm"
+            inputSx={tableDateTimeFieldSx}
             error={hasError}
           />
         </Box>
@@ -312,7 +361,7 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
               }
         }
       >
-        <Table size="small" sx={{ minWidth: 560, borderCollapse: "collapse" }}>
+        <Table size="small" sx={{ minWidth: 900, borderCollapse: "collapse" }}>
           <TableHead>
             <TableRow>
               <TableCell sx={headerSx}>S. No</TableCell>
@@ -353,7 +402,14 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
                   const path = errorPrefix
                     ? `${errorPrefix}.${index}.${column.id}`
                     : `${index}.${column.id}`;
-                  const message = fieldError(validationErrors ?? undefined, path);
+                  const dateTimeErrorPath = errorPrefix
+                    ? `${errorPrefix}.${index}.${column.id === "START_DATE" ? "START_TIME" : "END_TIME"}`
+                    : `${index}.${column.id === "START_DATE" ? "START_TIME" : "END_TIME"}`;
+                  const message =
+                    fieldError(validationErrors ?? undefined, path) ||
+                    (column.fieldType === "dateTime"
+                      ? fieldError(validationErrors ?? undefined, dateTimeErrorPath)
+                      : "");
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
                       {renderInput(row, index, column, path, Boolean(message))}
@@ -405,17 +461,15 @@ type QCHardwareProcessPanelProps = {
 };
 
 const ABRADING_COLUMNS: ColumnDef<QcHardwareCutRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date", required: true },
-  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
-  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "START_DATE", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  { id: "END_DATE", label: "End Date & Time", fieldType: "dateTime", required: true },
   { id: "DUST_QTY", label: "Qty of Dust (gms)", fieldType: "number", required: true },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
 ];
 
 const PREHEATING_COLUMNS_BASE: ColumnDef<QcHardwarePreheatingRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date", required: true },
-  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
-  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "START_DATE", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  { id: "END_DATE", label: "End Date & Time", fieldType: "dateTime", required: true },
   { id: "OVEN_NUMBER", label: "Oven Number", fieldType: "text", required: true },
   { id: "BUILDING_NO", label: "Building No", fieldType: "select", required: true },
   { id: "TEMPERATURE", label: "Temperature (°C)", fieldType: "number", required: true },
@@ -424,9 +478,8 @@ const PREHEATING_COLUMNS_BASE: ColumnDef<QcHardwarePreheatingRow>[] = [
 ];
 
 const LINEAR_COATING_COLUMNS: ColumnDef<QcHardwareLinearCoatingRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date", required: true },
-  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
-  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "START_DATE", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  { id: "END_DATE", label: "End Date & Time", fieldType: "dateTime", required: true },
   { id: "LINER_QTY", label: "Quantity of liner used (g)", fieldType: "number", required: true },
   { id: "INSULATION_TEMP", label: "Insulation Temp", fieldType: "number", required: true },
   { id: "RH", label: "RH", fieldType: "number", required: true },
@@ -548,8 +601,9 @@ const QCHardwareProcessPanel = ({
             onChange={setFirstCut}
             createEmptyRow={(srNo) => ({
               SR_NO: srNo,
-              DATE: "",
+              START_DATE: "",
               START_TIME: "",
+              END_DATE: "",
               END_TIME: "",
               DUST_QTY: "",
               OBSERVATIONS: "",
@@ -565,8 +619,9 @@ const QCHardwareProcessPanel = ({
             onChange={setSecondCut}
             createEmptyRow={(srNo) => ({
               SR_NO: srNo,
-              DATE: "",
+              START_DATE: "",
               START_TIME: "",
+              END_DATE: "",
               END_TIME: "",
               DUST_QTY: "",
               OBSERVATIONS: "",
@@ -586,8 +641,9 @@ const QCHardwareProcessPanel = ({
           onChange={setPreheating}
           createEmptyRow={(srNo) => ({
             SR_NO: srNo,
-            DATE: "",
+            START_DATE: "",
             START_TIME: "",
+            END_DATE: "",
             END_TIME: "",
             OVEN_NUMBER: "",
             BUILDING_NO: "",
@@ -707,11 +763,11 @@ const QCHardwareProcessPanel = ({
                     mb: 0.5,
                   }}
                 >
-                  Date and Time of dispatch of motor to casting division
+                  Date & Time Of Dispatch Of Motor To Casting Division
                 </Typography>
               ) : (
                 <FieldLabelWithAsterisk
-                  label="Date and Time of dispatch of motor to casting division"
+                  label="Date & Time Of Dispatch Of Motor To Casting Division"
                   required
                   sx={{
                     fontSize: "0.65rem",

@@ -5,6 +5,7 @@ import { icons } from "../../../app/theme/icons";
 import { motorStageLabel } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { formatSubdepartmentBatchTypeLabel } from "../../../data/models/user/SubdepartmentBatchModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { formatDisplayDateTime } from "../../../utils/dateUtils";
 import IconText from "../common/IconText";
 import UserWorkflowStatusCell from "./UserWorkflowStatusCell";
 
@@ -107,9 +108,6 @@ export const buildSubdepartmentBatchListColumns = ({
 }: BuildSubdepartmentBatchListColumnsArgs) => {
   const L = { ...defaultLabels(), ...labels, operationStatus: labels.operationStatus ?? statusLabel };
 
-  const formatDate = (v: string) =>
-    new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-
   return [
     {
       key: "batchId",
@@ -197,7 +195,7 @@ export const buildSubdepartmentBatchListColumns = ({
       render: (v: string) => (
         <IconText
           icon={<CalendarIcon sx={theme.batchList.icon} />}
-          text={formatDate(v)}
+          text={formatDisplayDateTime(v)}
           textSx={theme.batchList.subtleText}
         />
       ),

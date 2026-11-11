@@ -2,17 +2,34 @@
 
 import React, { useState } from "react";
 import {
-  Box, Stack, Typography, Chip, alpha, Card, Button, Dialog,
-  DialogContent, IconButton, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow,
+  Box,
+  Stack,
+  Typography,
+  Chip,
+  alpha,
+  Card,
+  Button,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import { styled, keyframes } from "@mui/material/styles";
 
-import { ReportPreviewDialog }    from "../components/ReportPdf";
+import { ReportPreviewDialog } from "../components/ReportPdf";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import { icons } from "../../../../app/theme/icons";
-import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
+import {
+  APPROVER_PRIORITY_META,
+  APPROVER_STATUS_META,
+  isApproverActionableStatus,
+} from "../../../../app/theme/approver";
 import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
 import {
   uniformTableBodyCellSx,
@@ -31,18 +48,18 @@ const {
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const BRAND = {
-  primary:      "#1B4F72",
+  primary: "#1B4F72",
   primaryLight: "#2E86C1",
-  accent:       "#148F77",
-  accentLight:  "#1ABC9C",
-  warn:         "#D4AC0D",
-  danger:       "#C0392B",
-  surface:      "#F4F6F8",
-  border:       "#D5D8DC",
-  text:         "#1C2833",
-  textSub:      "#5D6D7E",
-  qc:           "#1565C0",
-  qcLight:      "#1976D2",
+  accent: "#148F77",
+  accentLight: "#1ABC9C",
+  warn: "#D4AC0D",
+  danger: "#C0392B",
+  surface: "#F4F6F8",
+  border: "#D5D8DC",
+  text: "#1C2833",
+  textSub: "#5D6D7E",
+  qc: "#1565C0",
+  qcLight: "#1976D2",
 };
 
 const slideUp = keyframes`from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}`;
@@ -56,70 +73,78 @@ const PRIORITY_META = APPROVER_PRIORITY_META;
 const MOCK_RMR_SUBMISSIONS = [
   {
     id: 1,
-    batchId:     "RMR-2025-041",
+    batchId: "RMR-2025-041",
     submittedBy: "arjun.sharma",
-    createdOn:   "2025-03-10T09:30:00",
-    status:      "Pending",
-    priority:    "High",
+    createdOn: "2025-03-10T09:30:00",
+    status: "Pending",
+    priority: "High",
     blocks: [
       {
         ingredient: "HTPB",
         lotNo: "LOT-HTPB-2025-07",
         rows: [
-          { parameter: "OH value (mgKOH/g)",      result: "46.2",  validity: "Valid till Dec 2025" },
-          { parameter: "Moisture %",               result: "0.08",  validity: "Valid till Dec 2025" },
-          { parameter: "Acid value",               result: "0.22",  validity: "Valid till Dec 2025" },
-          { parameter: "Viscosity at 30°C (cP)",   result: "4250",  validity: "Valid till Dec 2025" },
+          { parameter: "OH value (mgKOH/g)", result: "46.2", validity: "Valid till Dec 2025" },
+          { parameter: "Moisture %", result: "0.08", validity: "Valid till Dec 2025" },
+          { parameter: "Acid value", result: "0.22", validity: "Valid till Dec 2025" },
+          { parameter: "Viscosity at 30°C (cP)", result: "4250", validity: "Valid till Dec 2025" },
         ],
       },
       {
         ingredient: "DOA",
         lotNo: "LOT-DOA-2025-03",
         rows: [
-          { parameter: "Saponification value (mgKOH/g)", result: "294.1", validity: "Valid till Nov 2025" },
-          { parameter: "Acid value",                     result: "0.14",  validity: "Valid till Nov 2025" },
-          { parameter: "Moisture %",                     result: "0.05",  validity: "Valid till Nov 2025" },
-          { parameter: "Refractive Index at 30°C",       result: "1.447", validity: "Valid till Nov 2025" },
+          {
+            parameter: "Saponification value (mgKOH/g)",
+            result: "294.1",
+            validity: "Valid till Nov 2025",
+          },
+          { parameter: "Acid value", result: "0.14", validity: "Valid till Nov 2025" },
+          { parameter: "Moisture %", result: "0.05", validity: "Valid till Nov 2025" },
+          {
+            parameter: "Refractive Index at 30°C",
+            result: "1.447",
+            validity: "Valid till Nov 2025",
+          },
         ],
       },
     ],
   },
   {
     id: 2,
-    batchId:     "RMR-2025-039",
+    batchId: "RMR-2025-039",
     submittedBy: "priya.nair",
-    createdOn:   "2025-03-08T14:10:00",
-    status:      "Approved",
-    priority:    "Medium",
+    createdOn: "2025-03-08T14:10:00",
+    status: "Approved",
+    priority: "Medium",
     blocks: [
       {
         ingredient: "AP",
         lotNo: "LOT-AP-2025-11",
         rows: [
-          { parameter: "Purity %",               result: "99.4",  validity: "Valid till Mar 2026" },
-          { parameter: "Moisture %",             result: "0.03",  validity: "Valid till Mar 2026" },
-          { parameter: "Particle Size D50 (µm)", result: "90",    validity: "Valid till Mar 2026" },
-          { parameter: "pH",                     result: "6.8",   validity: "Valid till Mar 2026" },
+          { parameter: "Purity %", result: "99.4", validity: "Valid till Mar 2026" },
+          { parameter: "Moisture %", result: "0.03", validity: "Valid till Mar 2026" },
+          { parameter: "Particle Size D50 (µm)", result: "90", validity: "Valid till Mar 2026" },
+          { parameter: "pH", result: "6.8", validity: "Valid till Mar 2026" },
         ],
       },
     ],
   },
   {
     id: 3,
-    batchId:     "RMR-2025-037",
+    batchId: "RMR-2025-037",
     submittedBy: "kiran.reddy",
-    createdOn:   "2025-03-05T11:00:00",
-    status:      "Rejected",
-    priority:    "Critical",
+    createdOn: "2025-03-05T11:00:00",
+    status: "Rejected",
+    priority: "Critical",
     blocks: [
       {
         ingredient: "Aluminium",
         lotNo: "LOT-AL-2025-02",
         rows: [
-          { parameter: "Purity %",               result: "97.1",  validity: "Expired" },
-          { parameter: "Moisture %",             result: "0.12",  validity: "Expired" },
-          { parameter: "Particle Size D50 (µm)", result: "32",    validity: "Expired" },
-          { parameter: "Bulk Density (g/cc)",    result: "0.98",  validity: "Expired" },
+          { parameter: "Purity %", result: "97.1", validity: "Expired" },
+          { parameter: "Moisture %", result: "0.12", validity: "Expired" },
+          { parameter: "Particle Size D50 (µm)", result: "32", validity: "Expired" },
+          { parameter: "Bulk Density (g/cc)", result: "0.98", validity: "Expired" },
         ],
       },
     ],
@@ -168,37 +193,58 @@ const DTD = styled(TableCell)(
 );
 
 const rowBg = (i) => (i % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.6));
-const hov   = { "&:hover": { background: alpha(BRAND.qc, 0.025) } };
+const hov = { "&:hover": { background: alpha(BRAND.qc, 0.025) } };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const StatusChip   = ({ status })   => (
-  <Chip label={status} size="small" sx={{
-    height: 20, fontSize: "0.62rem", fontWeight: 700,
-    background: QC_STATUS_META[status]?.bg,
-    color:      QC_STATUS_META[status]?.color,
-    border:    `1px solid ${QC_STATUS_META[status]?.border}`,
-  }} />
+const StatusChip = ({ status }) => (
+  <Chip
+    label={status}
+    size="small"
+    sx={{
+      height: 20,
+      fontSize: "0.62rem",
+      fontWeight: 700,
+      background: QC_STATUS_META[status]?.bg,
+      color: QC_STATUS_META[status]?.color,
+      border: `1px solid ${QC_STATUS_META[status]?.border}`,
+    }}
+  />
 );
 
 const PriorityChip = ({ priority }) => (
-  <Chip label={priority} size="small" sx={{
-    height: 20, fontSize: "0.62rem", fontWeight: 700,
-    background: PRIORITY_META[priority]?.bg,
-    color:      PRIORITY_META[priority]?.color,
-    border:    `1px solid ${PRIORITY_META[priority]?.border}`,
-  }} />
+  <Chip
+    label={priority}
+    size="small"
+    sx={{
+      height: 20,
+      fontSize: "0.62rem",
+      fontWeight: 700,
+      background: PRIORITY_META[priority]?.bg,
+      color: PRIORITY_META[priority]?.color,
+      border: `1px solid ${PRIORITY_META[priority]?.border}`,
+    }}
+  />
 );
 
 const SectionDivider = ({ icon: Icon, label }) => (
   <Stack direction="row" alignItems="center" gap={1} mb={1.5}>
-    <Box sx={{
-      width: 26, height: 26, borderRadius: "8px", flexShrink: 0,
-      background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
+    <Box
+      sx={{
+        width: 26,
+        height: 26,
+        borderRadius: "8px",
+        flexShrink: 0,
+        background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Icon sx={{ color: "#fff", fontSize: 14 }} />
     </Box>
-    <Typography sx={{ fontWeight: 800, fontSize: "0.78rem", color: BRAND.qc, letterSpacing: "0.04em" }}>
+    <Typography
+      sx={{ fontWeight: 800, fontSize: "0.78rem", color: BRAND.qc, letterSpacing: "0.04em" }}
+    >
       {label}
     </Typography>
     <Box sx={{ flex: 1, height: "1px", background: alpha(BRAND.qc, 0.18) }} />
@@ -210,11 +256,17 @@ const BlockDetailTable = ({ block, index }) => (
   <Box mb={index > 0 ? 2.5 : 0}>
     {/* Block sub-header */}
     <Stack direction="row" alignItems="center" gap={1.2} mb={1}>
-      <Box sx={{
-        width: 22, height: 22, borderRadius: "6px",
-        background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      <Box
+        sx={{
+          width: 22,
+          height: 22,
+          borderRadius: "6px",
+          background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Typography sx={{ color: "#fff", fontSize: "0.62rem", fontWeight: 800 }}>
           {index + 1}
         </Typography>
@@ -223,18 +275,29 @@ const BlockDetailTable = ({ block, index }) => (
         {block.ingredient}
       </Typography>
       {block.lotNo && (
-        <Chip label={`Lot: ${block.lotNo}`} size="small" sx={{
-          height: 20, fontSize: "0.62rem", fontWeight: 700,
-          background: alpha(BRAND.qc, 0.1), color: BRAND.qc,
-          border: `1px solid ${alpha(BRAND.qc, 0.2)}`,
-        }} />
+        <Chip
+          label={`Lot: ${block.lotNo}`}
+          size="small"
+          sx={{
+            height: 20,
+            fontSize: "0.62rem",
+            fontWeight: 700,
+            background: alpha(BRAND.qc, 0.1),
+            color: BRAND.qc,
+            border: `1px solid ${alpha(BRAND.qc, 0.2)}`,
+          }}
+        />
       )}
     </Stack>
 
-    <TableContainer sx={{
-      borderRadius: "8px", border: `1px solid ${BRAND.border}`,
-      boxShadow: `0 1px 8px ${alpha(BRAND.qc, 0.06)}`, overflowX: "auto",
-    }}>
+    <TableContainer
+      sx={{
+        borderRadius: "8px",
+        border: `1px solid ${BRAND.border}`,
+        boxShadow: `0 1px 8px ${alpha(BRAND.qc, 0.06)}`,
+        overflowX: "auto",
+      }}
+    >
       <Table size="small" sx={{ minWidth: 580 }}>
         <TableHead>
           <TableRow>
@@ -248,24 +311,32 @@ const BlockDetailTable = ({ block, index }) => (
             <TableRow
               key={ri}
               sx={{
-                background: rowBg(ri), ...hov,
+                background: rowBg(ri),
+                ...hov,
                 ...(ri === block.rows.length - 1 ? { "& td": { borderBottom: "none" } } : {}),
               }}
             >
               <DTD sx={{ fontWeight: 600 }}>{row.parameter}</DTD>
-              <DTD>{row.result  || "—"}</DTD>
+              <DTD>{row.result || "—"}</DTD>
               <DTD>
                 <Chip
                   label={row.validity || "—"}
                   size="small"
                   sx={{
-                    height: 20, fontSize: "0.62rem", fontWeight: 600,
+                    height: 20,
+                    fontSize: "0.62rem",
+                    fontWeight: 600,
                     background: row.validity?.toLowerCase().includes("expired")
-                      ? alpha(BRAND.danger, 0.1) : alpha(BRAND.accent, 0.1),
+                      ? alpha(BRAND.danger, 0.1)
+                      : alpha(BRAND.accent, 0.1),
                     color: row.validity?.toLowerCase().includes("expired")
-                      ? BRAND.danger : BRAND.accent,
-                    border: `1px solid ${row.validity?.toLowerCase().includes("expired")
-                      ? alpha(BRAND.danger, 0.25) : alpha(BRAND.accent, 0.25)}`,
+                      ? BRAND.danger
+                      : BRAND.accent,
+                    border: `1px solid ${
+                      row.validity?.toLowerCase().includes("expired")
+                        ? alpha(BRAND.danger, 0.25)
+                        : alpha(BRAND.accent, 0.25)
+                    }`,
                   }}
                 />
               </DTD>
@@ -283,11 +354,13 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
   if (!item) return null;
 
   const today = new Date().toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 
   const totalBlocks = item.blocks?.length ?? 0;
-  const totalRows   = item.blocks?.flatMap((b) => b.rows).length ?? 0;
+  const totalRows = item.blocks?.flatMap((b) => b.rows).length ?? 0;
 
   return (
     <>
@@ -298,19 +371,26 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3, maxHeight: "92vh",
-            overflow: "hidden", display: "flex",
-            flexDirection: "column", m: 2,
+            borderRadius: 3,
+            maxHeight: "92vh",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            m: 2,
           },
         }}
       >
         {/* Header */}
-        <Box sx={{
-          p: "14px 20px",
-          background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-          display: "flex", alignItems: "center",
-          justifyContent: "space-between", flexShrink: 0,
-        }}>
+        <Box
+          sx={{
+            p: "14px 20px",
+            background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexShrink: 0,
+          }}
+        >
           <Stack direction="row" alignItems="center" gap={1.5}>
             <VerifiedRoundedIcon sx={{ color: "#fff", fontSize: 19 }} />
             <Box>
@@ -318,20 +398,27 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
                 Raw Material Revalidation Record
               </Typography>
               <Typography sx={{ color: alpha("#fff", 0.7), fontSize: "0.72rem" }}>
-                {item.batchId} · {totalBlocks} ingredient{totalBlocks !== 1 ? "s" : ""} · {totalRows} parameters
+                {item.batchId} · {totalBlocks} ingredient{totalBlocks !== 1 ? "s" : ""} ·{" "}
+                {totalRows} parameters
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" gap={1} alignItems="center">
             <Button
-              size="small" variant="contained"
+              size="small"
+              variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
               sx={{
-                borderRadius: 2, fontWeight: 700, fontSize: "0.72rem",
-                textTransform: "none", px: 1.6, py: "5px",
-                background: alpha("#fff", 0.18), color: "#fff",
+                borderRadius: 2,
+                fontWeight: 700,
+                fontSize: "0.72rem",
+                textTransform: "none",
+                px: 1.6,
+                py: "5px",
+                background: alpha("#fff", 0.18),
+                color: "#fff",
                 border: `1px solid ${alpha("#fff", 0.3)}`,
                 backdropFilter: "blur(8px)",
                 "&:hover": { background: alpha("#fff", 0.28) },
@@ -346,20 +433,38 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
         </Box>
 
         {/* Submission meta strip */}
-        <Box sx={{
-          px: 2.8, py: 1.2,
-          background: "#fff",
-          borderBottom: `1px solid ${BRAND.border}`,
-          flexShrink: 0,
-        }}>
+        <Box
+          sx={{
+            px: 2.8,
+            py: 1.2,
+            background: "#fff",
+            borderBottom: `1px solid ${BRAND.border}`,
+            flexShrink: 0,
+          }}
+        >
           <Stack direction="row" gap={2} flexWrap="wrap" alignItems="center">
             {[
-              { label: "Batch ID",     value: item.batchId },
+              { label: "Batch ID", value: item.batchId },
               { label: "Submitted By", value: item.submittedBy },
-              { label: "Date",         value: new Date(item.createdOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
+              {
+                label: "Date",
+                value: new Date(item.createdOn).toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                }),
+              },
             ].map(({ label, value }) => (
               <Box key={label}>
-                <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <Typography
+                  sx={{
+                    fontSize: "0.62rem",
+                    fontWeight: 700,
+                    color: BRAND.textSub,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
                   {label}
                 </Typography>
                 <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.text }}>
@@ -381,13 +486,20 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
         </DialogContent>
 
         {/* Footer */}
-        <Box sx={{
-          p: "12px 20px", background: "#fff",
-          borderTop: `1px solid ${BRAND.border}`,
-          display: "flex", justifyContent: "flex-end",
-          gap: 1.5, flexShrink: 0,
-        }}>
-          <Button variant="outlined" onClick={onClose}>Close</Button>
+        <Box
+          sx={{
+            p: "12px 20px",
+            background: "#fff",
+            borderTop: `1px solid ${BRAND.border}`,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 1.5,
+            flexShrink: 0,
+          }}
+        >
+          <Button variant="outlined" onClick={onClose}>
+            Close
+          </Button>
           <Button
             variant="contained"
             startIcon={<CancelRoundedIcon />}
@@ -424,7 +536,7 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const RawMaterialRevalidationApproverPage = () => {
-  const [items,    setItems]    = useState(MOCK_RMR_SUBMISSIONS);
+  const [items, setItems] = useState(MOCK_RMR_SUBMISSIONS);
   const [selected, setSelected] = useState(null);
 
   const { dialogProps, requestApprove, requestReject } = useApproverFormAction({

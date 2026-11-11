@@ -55,8 +55,7 @@ export const useCasePreparationApproverHook = () => {
     const match =
       user?.allSubDepartments?.find(
         (item) => item.slugs?.dept === "manufacturing" && item.slugs?.subDept === SUB_DEPARTMENT,
-      ) ??
-      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+      ) ?? user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
     return match?.subDepartmentId ?? null;
   }, [user]);
 
@@ -191,6 +190,7 @@ export const useCasePreparationApproverHook = () => {
         activeMotorId && motorDialogBaseProps.batchId
           ? `${motorDialogBaseProps.batchId} · ${activeMotorId}`
           : motorDialogBaseProps.batchId,
+      subdepartment: 4,
     }),
     [activeMotorId, motorDialogBaseProps],
   );
@@ -224,8 +224,7 @@ export const useCasePreparationApproverHook = () => {
     setDetailsLoading(false);
 
     if (!response?.success || !response?.data) {
-      const fallback =
-        response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
+      const fallback = response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
       showAlert(response?.message || fallback, "error", { autoCloseMs: 3500 });
       setSelected(null);
       return;
@@ -270,9 +269,7 @@ export const useCasePreparationApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;
@@ -289,9 +286,7 @@ export const useCasePreparationApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;

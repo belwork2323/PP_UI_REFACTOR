@@ -148,7 +148,7 @@
             "type": "field",
             "id": "PRESSURE_PLATE_REMOVAL_DATE_TIME",
             "fieldType": "datetime",
-            "label": "Date/Time for removal of pressure plate"
+            "label": "Date & Time Of Removal Of Pressure Plate"
           },
           {
             "type": "field",
@@ -160,7 +160,7 @@
             "type": "field",
             "id": "DISPATCH_DATE_TIME",
             "fieldType": "datetime",
-            "label": "Date/Time of Dispatch of motor for De-coring"
+            "label": "Date & Time Of Dispatch Of Motor For De-coring"
           }
         ]
       },

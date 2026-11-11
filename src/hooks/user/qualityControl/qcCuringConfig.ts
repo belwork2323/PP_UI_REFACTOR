@@ -80,6 +80,14 @@ export const QC_CURING_CYCLE_PRESET_ROWS = [
 
 export const QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER = "Enter Oven Set Temperature (°C)";
 
+/** Treat oven-temp HTML placeholder text as empty (never a real PARAMETER value). */
+export const normalizeQcCuringSubscaleParameter = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw === QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER) return "";
+  return raw;
+};
+
 export const QC_CURING_SUBSCALE_PARAMETER_PRESET_ROWS = [
   { SR_NO: 1, PARAMETER: "" },
   { SR_NO: 2, PARAMETER: "" },
@@ -156,12 +164,44 @@ export type QcCuringSetupField =
   | "OVEN_NUMBER"
   | "MOTOR_POSITIONING_DATE_TIME";
 
+/** Display labels aligned with manufacturing subscale ARTICLE_TYPE_FROM_API. */
 const QC_SUBSCALE_ARTICLE_TYPE_LABELS: Record<string, string> = {
   "40_KG_BEM": "40 kg BEM",
   "10_KG_BEM": "10 kg BEM",
   "2_KG_BEM": "2 kg BEM",
+  "BEM 40KG": "40 kg BEM",
+  "BEM 10KG": "10 kg BEM",
+  "BEM 2KG": "2 kg BEM",
+  "40 kg BEM": "40 kg BEM",
+  "10 kg BEM": "10 kg BEM",
+  "2 kg BEM": "2 kg BEM",
   WHEEL_PEEL: "Wheel Peel",
+  "Wheel Peel": "Wheel Peel",
   SBS_TBS: "SBS/TBS",
+  "SBS/TBS": "SBS/TBS",
+  CARTOONS: "Cartoons",
+  CARTONS: "Cartoons",
+  Cartoons: "Cartoons",
+  Cartons: "Cartoons",
+};
+
+/** UI / manufacturing labels → manufacturing API articleType (BEM 10KG style). */
+const QC_SUBSCALE_ARTICLE_TYPE_TO_API: Record<string, string> = {
+  "40 kg BEM": "BEM 40KG",
+  "10 kg BEM": "BEM 10KG",
+  "2 kg BEM": "BEM 2KG",
+  "BEM 40KG": "BEM 40KG",
+  "BEM 10KG": "BEM 10KG",
+  "BEM 2KG": "BEM 2KG",
+  "40_KG_BEM": "BEM 40KG",
+  "10_KG_BEM": "BEM 10KG",
+  "2_KG_BEM": "BEM 2KG",
+  "Wheel Peel": "Wheel Peel",
+  WHEEL_PEEL: "Wheel Peel",
+  "SBS/TBS": "SBS/TBS",
+  SBS_TBS: "SBS/TBS",
+  Cartoons: "Cartoons",
+  Cartons: "Cartoons",
   CARTOONS: "Cartoons",
   CARTONS: "Cartoons",
 };
@@ -169,22 +209,25 @@ const QC_SUBSCALE_ARTICLE_TYPE_LABELS: Record<string, string> = {
 export const formatQcSubscaleArticleTypeLabel = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  return QC_SUBSCALE_ARTICLE_TYPE_LABELS[raw] ?? raw.replace(/_/g, " ");
+  if (QC_SUBSCALE_ARTICLE_TYPE_LABELS[raw]) return QC_SUBSCALE_ARTICLE_TYPE_LABELS[raw];
+  const underscored = raw.toUpperCase().replace(/\s+/g, "_").replace(/\//g, "_");
+  if (QC_SUBSCALE_ARTICLE_TYPE_LABELS[underscored]) {
+    return QC_SUBSCALE_ARTICLE_TYPE_LABELS[underscored];
+  }
+  const spaced = raw.toUpperCase().replace(/_/g, " ");
+  if (QC_SUBSCALE_ARTICLE_TYPE_LABELS[spaced]) return QC_SUBSCALE_ARTICLE_TYPE_LABELS[spaced];
+  // Pass through MDM / custom subscale article names.
+  return raw.replace(/_/g, " ");
 };
 
-/** UI label / loose value → API articleType enum for subscale curingTable. */
+/** UI label / loose value → manufacturing-aligned API articleType for curingTable. */
 export const toQcSubscaleArticleTypeApi = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  const upper = raw.toUpperCase().replace(/\s+/g, "_").replace(/\//g, "_");
-  if (QC_SUBSCALE_ARTICLE_TYPE_LABELS[upper] || upper === "CARTONS") {
-    return upper === "CARTONS" ? "CARTOONS" : upper;
-  }
-  const matched = Object.entries(QC_SUBSCALE_ARTICLE_TYPE_LABELS).find(
-    ([, label]) => label.toLowerCase() === raw.toLowerCase(),
-  );
-  if (matched) return matched[0] === "CARTONS" ? "CARTOONS" : matched[0];
-  return upper;
+  if (QC_SUBSCALE_ARTICLE_TYPE_TO_API[raw]) return QC_SUBSCALE_ARTICLE_TYPE_TO_API[raw];
+  const label = formatQcSubscaleArticleTypeLabel(raw);
+  if (QC_SUBSCALE_ARTICLE_TYPE_TO_API[label]) return QC_SUBSCALE_ARTICLE_TYPE_TO_API[label];
+  return label || raw;
 };
 
 export const formatQcCuringMotorStageLabel = (value: unknown): string => {

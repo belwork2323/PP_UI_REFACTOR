@@ -185,6 +185,7 @@ import WaterRoundedIcon from "@mui/icons-material/WaterRounded";
 import Project from "@mui/icons-material/AccountTreeRounded";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import { DeviceHub } from "@mui/icons-material";
 export const icons = {
   dashboard: DashboardIcon,
   users: PeopleIcon,
@@ -225,7 +226,7 @@ export const icons = {
   CleaningServices: CleaningServicesIcon,
   Blender: BlenderIcon,
   Inventory: InventoryIcon,
-
+  Hub: DeviceHub,
   // Material Log
   History: HistoryIcon,
   Link: LinkIcon,

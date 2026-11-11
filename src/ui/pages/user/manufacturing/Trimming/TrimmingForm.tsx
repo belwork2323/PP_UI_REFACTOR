@@ -29,6 +29,7 @@ import {
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
 import { TrimmingCommonTable } from "./TrimmingCommonTable";
+import { focusTrimField } from "../../../../../data/validation/adapters/trimming.validation";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 const { straighten: StraightenRoundedIcon } = icons.user.manufacturing.trimming.form;
@@ -54,6 +55,7 @@ type TrimmingFormProps = {
   onSubmitMotor?: (motorId: string) => void;
   theme: any;
   motorValidationErrors?: Record<string, Record<string, string>>;
+  validationFocusRequest?: { id: number; fieldPath: string | null } | null;
 };
 
 const TrimmingForm = ({
@@ -71,6 +73,7 @@ const TrimmingForm = ({
   onSubmitMotor,
   theme,
   motorValidationErrors = {},
+  validationFocusRequest = null,
 }: TrimmingFormProps) => {
   const BRAND = TRIMMING_BRAND;
   const primaryColor = theme.palette.primary;
@@ -103,6 +106,25 @@ const TrimmingForm = ({
     setActiveMotorIndex(0);
     prevMotorCountRef.current = 0;
   }, [formSessionKey]);
+
+  useEffect(() => {
+    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const fieldPath = validationFocusRequest.fieldPath;
+    const retryTimers: number[] = [];
+    let tries = 0;
+    const tryFocus = () => {
+      tries += 1;
+      if (focusTrimField(fieldPath)) return;
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const start = window.setTimeout(tryFocus, 80);
+    return () => {
+      window.clearTimeout(start);
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [validationFocusRequest?.id, validationFocusRequest?.fieldPath]);
 
   useEffect(() => {
     if (motorCards.length === 0) {

@@ -91,12 +91,12 @@ const UserListTable = ({
       },
       {
         id: "status",
-        label: S.TABLE_COLS[4],
+        label: S.TABLE_COLS[5],
         render: (user) => <StatusChip status={getStatus(user)} />,
       },
       // {
       //   id: "actions",
-      //   label: S.TABLE_COLS[5],
+      //   label: S.TABLE_COLS[6],
       //   isActions: true,
       //   render: (user) => (
       //     <UserActions onEdit={() => onEdit(user)} onDelete={() => onDelete(user)} />

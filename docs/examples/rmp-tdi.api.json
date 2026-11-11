@@ -85,7 +85,7 @@
                 "type": "field",
                 "id": "DISPATCH_DATETIME",
                 "fieldType": "datetime",
-                "label": "Date/Time of Dispatch",
+                "label": "Date & Time Of Dispatch",
                 "validation": {
                   "required": false
                 }

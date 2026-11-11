@@ -22,6 +22,8 @@ import {
   type TrimmingMotorSubmissionType,
 } from "../../../data/models/user/TrimmingFormModel";
 import {
+  focusTrimField,
+  resolveFirstTrimmingValidationFocus,
   validateTrimmingMotorSession,
   type ValidationErrors as TrimmingValidationErrors,
 } from "../../../data/validation/adapters/trimming.validation";
@@ -239,6 +241,10 @@ export const useTrimmingHook = () => {
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, TrimmingValidationErrors>
   >({});
+  const [validationFocusRequest, setValidationFocusRequest] = useState<{
+    id: number;
+    fieldPath: string | null;
+  } | null>(null);
   const [approvedMotorOptions] = useState<ReturnType<typeof resolveTrimmingMotorOptions>>([]);
 
   const projectId = useMemo(() => resolveBatchProjectId(activeBatch), [activeBatch]);
@@ -658,6 +664,16 @@ export const useTrimmingHook = () => {
         const fieldErrors = validateTrimmingMotorSession(motor, tier);
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          const fieldPath = resolveFirstTrimmingValidationFocus(fieldErrors);
+          setValidationFocusRequest((prev) => ({
+            id: (prev?.id ?? 0) + 1,
+            fieldPath,
+          }));
+          if (fieldPath) {
+            requestAnimationFrame(() => {
+              focusTrimField(fieldPath);
+            });
+          }
           return false;
         }
         setMotorValidationErrors((prev) => {
@@ -889,6 +905,7 @@ export const useTrimmingHook = () => {
     handleSaveMotorDraft,
     handleSubmitMotor,
     motorValidationErrors,
+    validationFocusRequest,
     detailsRow,
     detailsData,
     detailsLoading,

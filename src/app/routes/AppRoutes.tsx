@@ -5,33 +5,46 @@ import MainLayout from "../../ui/MainLayout";
 import { Suspense } from "react";
 
 const AppRoutes = () => {
+  const publicRoutes = routes.filter((r) => !r.isProtected);
+  const changePasswordRoutes = routes.filter(
+    (r) => r.isProtected && r.allowMustChangePassword,
+  );
+  const appRoutes = routes.filter(
+    (r) => r.isProtected && !r.allowMustChangePassword,
+  );
+
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <Routes>
-        {/* Default redirect */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* PUBLIC ROUTES (no header/footer) */}
-        {routes
-          .filter((r) => !r.isProtected)
-          .map(({ path, element }) => (
-            <Route key={path} path={path} element={element} />
-          ))}
+        {publicRoutes.map(({ path, element }) => (
+          <Route key={path} path={path} element={element} />
+        ))}
 
-        {/* PROTECTED ROUTES WITH LAYOUT */}
+        {/* Forced change-password: authenticated, no app chrome */}
+        {changePasswordRoutes.map(({ path, element, roles, allowMustChangePassword }) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <ProtectedRoute roles={roles} allowMustChangePassword={allowMustChangePassword}>
+                {element}
+              </ProtectedRoute>
+            }
+          />
+        ))}
+
         <Route element={<MainLayout />}>
-          {routes
-            .filter((r) => r.isProtected)
-            .map(({ path, element, roles }) => (
-              <Route
-                key={path}
-                path={path}
-                element={<ProtectedRoute roles={roles}>{element}</ProtectedRoute>}
-              />
-            ))}
+          {appRoutes.map(({ path, element, roles }) => (
+            <Route
+              key={path}
+              path={path}
+              element={<ProtectedRoute roles={roles}>{element}</ProtectedRoute>}
+            />
+          ))}
         </Route>
 
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Suspense>

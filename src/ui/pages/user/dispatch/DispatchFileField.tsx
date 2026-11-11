@@ -22,6 +22,7 @@ import {
   useFileUploadActions,
   type FileAcceptMode,
 } from "../../../../hooks/useFileUploadActions";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.DISPATCH;
 
@@ -31,6 +32,7 @@ type DispatchFileFieldProps = {
   multiple?: boolean;
   acceptMode?: FileAcceptMode;
   label?: string;
+  required?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
   emptyLabel?: string;
@@ -55,6 +57,7 @@ const DispatchFileField = ({
   multiple = true,
   acceptMode = "imageVideo",
   label,
+  required = false,
   disabled = false,
   readOnly = false,
   emptyLabel,
@@ -99,7 +102,15 @@ const DispatchFileField = ({
   return (
     <Box>
       {label ? (
-        <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>{label}</Typography>
+        required ? (
+          <FieldLabelWithAsterisk
+            label={label}
+            required
+            sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5, display: "block" }}
+          />
+        ) : (
+          <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>{label}</Typography>
+        )
       ) : null}
 
       <input

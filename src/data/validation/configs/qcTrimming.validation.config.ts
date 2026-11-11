@@ -25,8 +25,8 @@ const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
-  valueType: "date",
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
@@ -38,16 +38,19 @@ export type QcTrimmingValidationTarget = {
 
 export const qcTrimmingValidationFields: Record<string, FieldRuleConfig> = {
   // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
-  motorReceivedAt: date(["SUBMIT"]),
+  motorReceivedAt: dateTime(["SUBMIT"]),
   machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  startDate: date(["SUBMIT"]),
-  completionDate: date(["SUBMIT"]),
+  startDate: dateTime(["SUBMIT"]),
+  completionDate: dateTime(["SUBMIT"]),
   arborSize: number(["SUBMIT"]),
   cutterSize: number(["SUBMIT"]),
+  ingestSize: number(["SUBMIT"]),
+  motorTruing: number(["SUBMIT"]),
+  arborTuring: number(["SUBMIT"]),
   reading: number(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  dimensionsQaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  measurementQaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   motorRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
@@ -66,6 +69,9 @@ const detailRowHasData = (row: Record<string, unknown>) =>
       str(row.completionDate) ||
       str(row.arborSize) ||
       str(row.cutterSize) ||
+      str(row.ingestSize) ||
+      str(row.motorTruing) ||
+      str(row.arborTuring) ||
       str(row.remarks) ||
       str(row.qaRemarks),
   );
@@ -115,6 +121,21 @@ export const qcTrimmingValidationConfig: SubDeptValidationConfig<QcTrimmingValid
         ruleKey: "cutterSize",
       });
       fields.push({
+        path: `trimmingDetails.${i}.ingestSize`,
+        value: row.ingestSize ?? row.INGEST_SIZE,
+        ruleKey: "ingestSize",
+      });
+      fields.push({
+        path: `trimmingDetails.${i}.motorTruing`,
+        value: row.motorTruing ?? row.MOTOR_TRUING,
+        ruleKey: "motorTruing",
+      });
+      fields.push({
+        path: `trimmingDetails.${i}.arborTuring`,
+        value: row.arborTuring ?? row.ARBOR_TURING,
+        ruleKey: "arborTuring",
+      });
+      fields.push({
         path: `trimmingDetails.${i}.remarks`,
         value: row.remarks ?? row.REMARKS,
         ruleKey: "remarks",
@@ -127,9 +148,9 @@ export const qcTrimmingValidationConfig: SubDeptValidationConfig<QcTrimmingValid
     });
 
     fields.push({
-      path: "dimensionsQaRemarks",
-      value: values.dimensionsQaRemarks ?? values.measurementQaRemarks,
-      ruleKey: "dimensionsQaRemarks",
+      path: "measurementQaRemarks",
+      value: values.measurementQaRemarks ?? values.dimensionsQaRemarks,
+      ruleKey: "measurementQaRemarks",
     });
     fields.push({
       path: "motorRemarks",

@@ -22,7 +22,11 @@ import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRocketMotorCasingApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rocketMotorCasingApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
 import DateField from "../../../components/common/DateField";
-import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
+import {
+  formatDisplayDateTime,
+  formatToIsoDateInput,
+  formatToUiDate,
+} from "../../../../utils/dateUtils";
 import dayjs from "dayjs";
 import {
   canApproverViewBatchDetails,
@@ -39,6 +43,7 @@ import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import { STRINGS } from "../../../../app/config/strings";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
+import { getFromToOrderMessages } from "../../../../data/validation/dateRangeValidation";
 import { RefreshRounded } from "@mui/icons-material";
 import { useApproverListRefreshStore } from "@/app/store/approverListRefreshStore";
 import RocketCasingDetailDialog from "./components/RocketCasingDetailDialog";
@@ -147,21 +152,17 @@ const RocketMotorApproverPage = () => {
     [theme.palette],
   );
 
+  const draftDateRangeErrors = getFromToOrderMessages(draftFrom, draftTo, "date");
+
   const handleApplyPanelFilters = () => {
-    let from = draftFrom;
-    let to = draftTo;
-    if (from && to && from > to) {
-      const swap = from;
-      from = to;
-      to = swap;
-    }
+    if (draftDateRangeErrors) return;
 
     const next: RocketMotorCasingApproverAppliedFilters & { status: string } = {
       motorStage: draftMotorStage === filterAllLabel ? "" : draftMotorStage,
       casingType: draftCasingType === filterAllLabel ? "" : draftCasingType,
       insulationType: draftInsulationType === filterAllLabel ? "" : draftInsulationType,
-      fromDate: from,
-      toDate: to,
+      fromDate: draftFrom,
+      toDate: draftTo,
       status: draftStatus,
     };
     applyPanelFilters(next);
@@ -330,13 +331,18 @@ const RocketMotorApproverPage = () => {
           value={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.from)}
+          helperText={draftDateRangeErrors?.from}
           sx={filterStyles.fieldDate}
         />
         <DateField
           label={BL.FILTERS_TO_DATE}
           value={formatToUiDate(draftTo)}
+          minDate={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.to)}
+          helperText={draftDateRangeErrors?.to}
           sx={filterStyles.fieldDate}
         />
       </Stack>
@@ -473,7 +479,7 @@ const RocketMotorApproverPage = () => {
                         </TableCell>
                         <TableCell sx={theme.table.bodyCell}>{row.submittedBy ?? "—"}</TableCell>
                         <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                          {formatListDate(row.createdOn)}
+                          {formatDisplayDateTime(row.createdOn)}
                         </TableCell>
                         <TableCell sx={theme.table.bodyCell}>
                           <Chip

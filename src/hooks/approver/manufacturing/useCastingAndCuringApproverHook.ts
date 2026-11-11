@@ -56,8 +56,7 @@ export const useCastingAndCuringApproverHook = () => {
     const match =
       user?.allSubDepartments?.find(
         (item) => item.slugs?.dept === "manufacturing" && item.slugs?.subDept === SUB_DEPARTMENT,
-      ) ??
-      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+      ) ?? user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
     return match?.subDepartmentId ?? null;
   }, [user]);
 
@@ -83,7 +82,8 @@ export const useCastingAndCuringApproverHook = () => {
         formId: String(payload.formId ?? ""),
         motorId: String(payload.motorId ?? ""),
         subDepartmentId: Number(payload.subDepartmentId ?? 0),
-        actionType: payload.actionType as CastingCuringApproverMotorChangeStatusPayload["actionType"],
+        actionType:
+          payload.actionType as CastingCuringApproverMotorChangeStatusPayload["actionType"],
         remarks: (payload.remarks as string | null | undefined) ?? null,
         rejectionReason: (payload.rejectionReason as string | null | undefined) ?? null,
       }),
@@ -191,6 +191,7 @@ export const useCastingAndCuringApproverHook = () => {
         activeMotorId && motorDialogBaseProps.batchId
           ? `${motorDialogBaseProps.batchId} · ${activeMotorId}`
           : motorDialogBaseProps.batchId,
+      subdepartment: 6,
     }),
     [activeMotorId, motorDialogBaseProps],
   );
@@ -224,8 +225,7 @@ export const useCastingAndCuringApproverHook = () => {
     setDetailsLoading(false);
 
     if (!response?.success || !response?.data) {
-      const fallback =
-        response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
+      const fallback = response?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
       showAlert(response?.message || fallback, "error", { autoCloseMs: 3500 });
       setSelected(null);
       return;
@@ -269,9 +269,7 @@ export const useCastingAndCuringApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;
@@ -288,9 +286,7 @@ export const useCastingAndCuringApproverHook = () => {
         return;
       }
 
-      const activeMotor = item.detailView?.motors.find(
-        (motor) => motor.motorId === activeMotorId,
-      );
+      const activeMotor = item.detailView?.motors.find((motor) => motor.motorId === activeMotorId);
       if (!activeMotor || activeMotor.motorSubmissionStatus !== "WAITING_FOR_APPROVAL") {
         showAlert(S.MOTOR_LOCKED_WAITING, "warning", { autoCloseMs: 3000 });
         return;

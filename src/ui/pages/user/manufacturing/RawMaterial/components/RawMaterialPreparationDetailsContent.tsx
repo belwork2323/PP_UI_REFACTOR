@@ -35,7 +35,7 @@ import {
   type RawMaterialPrepWeightmentSheet,
 } from "../../../../../../data/models/user/RawMaterialPreparationModel";
 import PremixStatusChip, { PremixCountsSummary } from "./PremixStatusChip";
-import { formatToIsoDateInput } from "../../../../../../utils/dateUtils";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -51,26 +51,9 @@ export type RawMaterialPrepDetailsTheme = ReturnType<
   typeof getManufacturingTheme
 >["manufacturing"]["rawMaterialPrep"]["details"];
 
-const formatDate = (value?: unknown) => {
-  if (!value) return "—";
-  const raw = String(value).trim();
-  const iso = formatToIsoDateInput(raw) || raw;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
-
-const formatDateTime = (value?: string) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const formatDateTime = (value?: unknown) => {
+  const raw = String(value ?? "").trim();
+  return formatDisplayDateTime(raw, raw || "—");
 };
 
 export const SchemaSectionTable = ({
@@ -649,7 +632,10 @@ const RawMaterialPreparationDetailsContent = ({
         (typeof row?.submittedBy === "string" ? row.submittedBy : "") ||
         BL.UNASSIGNED,
     },
-    { label: BL.COL_CREATED_ON, value: formatDate(detailView?.createdAt ?? row?.createdOn) },
+    {
+      label: BL.COL_CREATED_ON,
+      value: formatDateTime(detailView?.createdAt ?? row?.createdOn),
+    },
   ];
 
   if (loading) {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -10,6 +10,10 @@ import {
   getTrimmingSessionFromValues,
   setTrimmingSessionValues,
 } from "../../../../../hooks/user/qualityControl/qcTrimmingTables";
+import {
+  focusQcTrimmingField,
+  resolveFirstQcTrimmingValidationFocus,
+} from "../../../../../data/validation/adapters/qcTrimming.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 
@@ -74,6 +78,26 @@ const QCTrimmingMotorPanel = ({
     },
     [inputsLocked, onChange, session.motorStage],
   );
+
+  useEffect(() => {
+    if (!validationErrors || !Object.keys(validationErrors).length) return;
+    const fieldPath = resolveFirstQcTrimmingValidationFocus(validationErrors);
+    if (!fieldPath) return;
+    const retryTimers: number[] = [];
+    let tries = 0;
+    const tryFocus = () => {
+      tries += 1;
+      if (focusQcTrimmingField(fieldPath)) return;
+      if (tries < 8) {
+        retryTimers.push(window.setTimeout(tryFocus, 50));
+      }
+    };
+    const start = window.setTimeout(tryFocus, 80);
+    return () => {
+      window.clearTimeout(start);
+      retryTimers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [validationErrors]);
 
   return (
     <Box

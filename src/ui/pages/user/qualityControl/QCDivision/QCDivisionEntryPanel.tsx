@@ -26,6 +26,7 @@ import {
   applyMixingDivisionEntryToValues,
   createInitialPremixDetailsValues,
   createInitialViscosityValues,
+  getMixingDetailsRows,
   hydrateMixingDetailsValuesFromSections,
   hydrateViscosityValuesFromSections,
   mergeFinalMixEntrySchemaValues,
@@ -248,7 +249,16 @@ const QCDivisionEntryPanel = ({
     if (entry.kind !== "MIXING_PREMIX") return;
     if (!premixAutoSeed && !(mixingQualityCheckDefinitions?.length)) return;
     const current = entryValues.schemaValues;
-    if (current && Object.keys(current).length > 0) {
+    const hasKeys = Boolean(current && Object.keys(current).length > 0);
+    // Subscale: early seed may write PREMIX_DETAILS: [] before MDM defs arrive — reseed.
+    const parameterRowsEmpty =
+      !hasKeys ||
+      getMixingDetailsRows(current, "premix").every(
+        (row) =>
+          !String(row.PARAMETER_ID ?? "").trim() && !String(row.PARAMETER ?? "").trim(),
+      );
+
+    if (hasKeys && !(parameterRowsEmpty && mixingQualityCheckDefinitions?.length)) {
       let next = mergeMixingQualityChecksIntoValues(
         current,
         "premix",
@@ -270,7 +280,8 @@ const QCDivisionEntryPanel = ({
       }
       return;
     }
-    if (readOnly) return;
+    if (readOnly && !parameterRowsEmpty) return;
+    if (readOnly && !mixingQualityCheckDefinitions?.length) return;
     const seeded = applyMixingDivisionEntryToValues(
       createInitialPremixDetailsValues(mixingQualityCheckDefinitions),
       {

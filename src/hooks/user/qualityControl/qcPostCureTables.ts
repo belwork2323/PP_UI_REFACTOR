@@ -6,6 +6,7 @@ import {
   buildDualPostCureMotorPayload,
   collectPostCureFileRefsFromMotorSession,
   createEmptyPostCureMotorData,
+  inferInhibitorTypeFromInhibitionDetails,
   parseInhibitionMotorDataFromApi,
   parseLooseFlapMotorDataFromApi,
   postCureMotorDataHasUserInput,
@@ -1836,36 +1837,40 @@ export const hydratePostCureValuesFromMotorDetail = (
     asRecord(rec.inhibitionDetails) ?? asRecord(details.inhibitionDetails);
   const hasLoose = Boolean(loose && Object.keys(loose).length > 0);
   const hasInhibition = Boolean(inhibition && Object.keys(inhibition).length > 0);
+  const inferredFromDetails = hasInhibition
+    ? inferInhibitorTypeFromInhibitionDetails(inhibition)
+    : "";
   const rawInhibitor = pickString(
     inhibitorType,
     inhibition?.inhibitorType,
     rec.inhibitorType,
     details.inhibitorType,
+    inferredFromDetails,
   );
   const uiInhibitor = toPostCureUiInhibitorType(rawInhibitor);
+  const hasInhibitorType = Boolean(uiInhibitor || rawInhibitor);
 
-  if (hasLoose || hasInhibition) {
+  // Prefer nested hydrate whenever inhibitionDetails or inhibitorType is present.
+  // Do not fall back to incomplete section rebuild (omits premix/finalMix) for QC PostCure.
+  if (hasLoose || hasInhibition || hasInhibitorType) {
+    const resolvedUi = uiInhibitor || toPostCureUiInhibitorType(inferredFromDetails) || "";
     const apiMotor = {
       ...rec,
-      inhibitorType: toApiInhibitorWire(uiInhibitor || rawInhibitor || "IR1"),
+      inhibitorType: toApiInhibitorWire(resolvedUi || rawInhibitor || "IR1"),
       looseFlapFillingDetails: loose ?? rec.looseFlapFillingDetails,
       inhibitionDetails: inhibition ?? rec.inhibitionDetails,
     } as Record<string, unknown>;
 
     return setPostCureSessionValues({
-      inhibitorType: uiInhibitor,
+      inhibitorType: resolvedUi,
       looseFlapData: parseLooseFlapMotorDataFromApi(apiMotor),
       inhibitionData:
-        parseInhibitionMotorDataFromApi(apiMotor, uiInhibitor || rawInhibitor) ??
-        createInhibitionDataForType(uiInhibitor || rawInhibitor),
+        parseInhibitionMotorDataFromApi(apiMotor, resolvedUi || rawInhibitor) ??
+        createInhibitionDataForType(resolvedUi || rawInhibitor),
     });
   }
 
-  return hydratePostCureValuesFromSections(
-    postCureMotorDetailToSections(rec, pickString(rec.motorIdNo, rec.motorId) || "MOTOR"),
-    null,
-    uiInhibitor || rawInhibitor || null,
-  );
+  return setPostCureSessionValues(createEmptyPostCureSession(null));
 };
 
 const buildLooseFlapSection = (values: SchemaFormValues | null | undefined): SchemaSectionSubmission => {

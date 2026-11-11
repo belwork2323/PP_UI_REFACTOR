@@ -2,6 +2,7 @@
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { assertFromToOrderInTree } from "../dateRangeValidation";
 import { str } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
 
@@ -157,6 +158,11 @@ export const qcPostCureValidationConfig: SubDeptValidationConfig<QcPostCureValid
     walk(values, "", fields);
     return fields;
   },
+  customRules: [
+    (target, _tier, errors) => {
+      assertFromToOrderInTree(target.values ?? {}, errors);
+    },
+  ],
   isUnitComplete: (target) => {
     const values = asRecord(target.values) ?? {};
     // Any batch no or from date filled

@@ -200,13 +200,8 @@ export const useRawMaterialLotList = () => {
       if (debouncedSearch.trim()) {
         payload.search = debouncedSearch.trim();
       }
-      let from = advancedFilters.fromDate;
-      let to = advancedFilters.toDate;
-      if (from && to && from > to) {
-        const swap = from;
-        from = to;
-        to = swap;
-      }
+      const from = advancedFilters.fromDate;
+      const to = advancedFilters.toDate;
       if (from) payload.fromDate = from;
       if (to) payload.toDate = to;
 

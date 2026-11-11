@@ -3,471 +3,374 @@ import {
   asRecord,
   pickField,
   str,
-  toApiDate,
   toApiDateTime,
   toApiNumber,
-  toUiDate,
   toUiDateTime,
 } from "./castingCuringFieldCodec";
 import {
   isFileUploadIncomplete,
-  parseFileRefs,
-  toFileIdPayloadOrNull,
-  type FileIdPayload,
   type FileRef,
 } from "../common/FileUploadModel";
 
 export type StfMotorDataVariant = "MAIN_MOTOR" | "BEM";
 
-type LegacySection = { sectionId: string; sectionData: Record<string, unknown>[] };
+/** Fixed MAIN ballistic parameter rows (Channel 1 only). */
+export const STF_MAIN_BALLISTIC_PARAMETERS = [
+  { key: "CHAMBER_PRESSURE_AVG", label: "Chamber Pressure (Avg)" },
+  { key: "CHAMBER_PRESSURE_MAX", label: "Chamber Pressure (Max)" },
+  { key: "AVERAGE_THRUST_KGF", label: "Average Thrust (kgf)" },
+  { key: "MAX_THRUST_KGF", label: "Max Thrust (kgf)" },
+  { key: "IGNITION_DELAY_MSEC", label: "Ignition delay (msec)" },
+  { key: "ACTION_TIME_SEC", label: "Action Time (sec)" },
+  { key: "TOTAL_IMPULSE_TON_SEC", label: "Total Impulse (Ton. Sec)" },
+  { key: "CSTAR_CORRECTED", label: "Cstar (corrected)" },
+  { key: "ISP_DELIVERED_SEC", label: "Isp Delivered (sec)" },
+  { key: "ISP_70_1_033", label: "Isp (70:1.033)" },
+] as const;
 
-const SENSOR_CHANNELS = ["PR1", "PR2", "TH1", "TH2", "FP"] as const;
-const GRAIN_SIDES = ["Side I", "Side II"] as const;
+export type StfMainBallisticParameterKey =
+  (typeof STF_MAIN_BALLISTIC_PARAMETERS)[number]["key"];
 
-export type StfMainIgniterRow = {
-  CONTAINER_TYPE: string;
-  COMPOSITION: string;
-  WEIGHT_OF_COMPOSITION: string;
-  SQUIB_RESISTANCE: string;
-  REMARKS: string;
-  /** QC Division QA Remarks (API: qaRemarks). */
-  QA_REMARKS: string;
-};
+/** Fixed BEM ballistic parameter rows (Channel 1 / Channel 2). */
+export const STF_BEM_BALLISTIC_PARAMETERS = [
+  { key: "PRESSURE_THRUST", label: "Pressure / Thrust" },
+  { key: "SENSOR_SENSITIVITY", label: "Sensor sensitivity" },
+  { key: "IGNITION_DELAY", label: "Ignition delay" },
+  { key: "ACTION_TIME", label: "Action time" },
+  { key: "BURN_TIME", label: "Burn time" },
+  { key: "AVERAGE_IN_BURN_TIME", label: "Average in Burn time" },
+  { key: "AVERAGE_IN_ACTION_TIME", label: "Average in Action time" },
+  { key: "AREA_IN_BURN_TIME", label: "Area in Burn Time" },
+  { key: "AREA_IN_ACTION_TIME", label: "Area in Action time" },
+  { key: "CSTAR_ISP", label: "Cstar/Isp" },
+] as const;
 
-export type StfMainNozzleRow = {
-  NOZZLE_CLOSURE_MATERIAL: string;
-  MOTHER_GRAPHITE: string;
-  NOZZLE_INSERT: string;
-  DT_BEFORE: string;
-  DE_BEFORE: string;
-  DT_AFTER: string;
-  DE_AFTER: string;
-  REMARKS: string;
-  /** QC Division QA Remarks (API: qaRemarks). */
-  QA_REMARKS: string;
-};
+export type StfBemBallisticParameterKey =
+  (typeof STF_BEM_BALLISTIC_PARAMETERS)[number]["key"];
 
-export type StfMainTestingDetails = {
-  THROAT_DIAMETER: string;
-  PROPELLANT_WEIGHT: string;
-  WEB_THICKNESS: string;
-  N_VALUE: string;
-  CONDITIONING_TEMPERATURE: string;
+export const STF_BEM_WT_OF_GRAIN_OPTIONS = ["40", "20", "2"] as const;
+export const STF_BEM_GRAIN_CONFIGURATION_OPTIONS = [
+  "6 STAR PETAL",
+  "10 POINT STAR",
+  "ID & OD",
+  "ID & BOTH END",
+] as const;
+
+export type StfMainTestHeader = {
+  FIRING_DATE: string;
   AMBIENT_TEMPERATURE: string;
-  RH_PERCENT: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfMainSensorRow = {
-  CHANNEL: string;
-  SENSOR: string;
-  SENSITIVITY: string;
-  MAX_EXPECTED: string;
-  SENSOR_RANGE: string;
-  FILTER_HZ: string;
-  IA_NO: string;
-  IA_GAIN: string;
-  EXT_VOLTAGE: string;
-  OFFSET_VALUE: string;
-  PRELOADING: string;
+export type StfMainNozzleDetails = {
+  BEFORE_DT: string;
+  BEFORE_DE: string;
+  AFTER_DT: string;
+  AFTER_DE: string;
+  NOZZLE_EROSION_RATE_MM_S: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfMainResultRow = {
-  AVERAGE_PRESSURE: string;
-  PEAK_PRESSURE: string;
-  TB: string;
-  BURN_RATE: string;
-  C_STAR: string;
-  ISP: string;
+export type StfMainMotorDataSection = {
+  PROPELLANT_WEIGHT_KG: string;
+  AVG_BEM_BURN_RATE_MM_S: string;
+  N_VALUE: string;
+  PROPELLANT_DENSITY: string;
+  GAMMA: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
+};
+
+export type StfMainBallisticRow = {
+  PARAMETER: StfMainBallisticParameterKey;
+  PARAMETER_LABEL: string;
+  CHANNEL_1: string;
+  /** QC Division QA Remarks (API: qaRemarks). */
+  QA_REMARKS: string;
+};
+
+export type StfMainBurnRate = {
+  BURN_RATE_MM_S: string;
+  PRESSURE_ABS_KSC: string;
+  N_VALUE: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
 export type StfMainMotorData = {
   variant: "MAIN_MOTOR";
-  IGNITER_DETAILS: StfMainIgniterRow;
-  NOZZLE_DETAILS: StfMainNozzleRow;
-  TESTING_DETAILS: StfMainTestingDetails;
-  SENSOR_CONFIGURATION: StfMainSensorRow[];
-  STATIC_TEST_RESULT: StfMainResultRow;
-  UPLOAD_PT_CURVE: { PT_CURVE_FILE: FileRef[] };
+  TEST_HEADER: StfMainTestHeader;
+  NOZZLE_DETAILS: StfMainNozzleDetails;
+  MAIN_MOTOR_DATA: StfMainMotorDataSection;
+  BALLISTIC_PARAMETERS: StfMainBallisticRow[];
+  BURN_RATE: StfMainBurnRate;
 };
 
-export type StfBemConditioningDetails = {
-  FROM_DATE_TIME: string;
-  TO_DATE_TIME: string;
+export type StfBemTestHeader = {
+  LOADING_NO: string;
+  FIRING_NO: string;
+  FIRING_DATE: string;
   TEMPERATURE: string;
   RH: string;
-  OBSERVATION: string;
+  WT_OF_GRAIN: string;
+  GRAIN_CONFIGURATION: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfBemGrainRow = {
-  SIDE: string;
-  OD: string;
-  A: string;
-  B: string;
-  C: string;
-  LENGTH: string;
-  WEIGHT: string;
+export type StfBemIgniterDetails = {
+  TYPE: string;
+  SR_NO_AND_LOT_NO: string;
+  CHARGE_MASS_GM: string;
+  COMPOSITION: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfBemHardwareDetails = {
-  HEAD_END_NO: string;
-  NOZZLE_END_NO: string;
-  RETAINER_RING_NO: string;
-  CASING_NO: string;
-  CASING_OD: string;
-  CASING_ID: string;
-  CASING_LENGTH: string;
-  FIRING_NO: string;
+export type StfBemNozzleDetails = {
+  BEFORE_DT: string;
+  BEFORE_DE: string;
+  AFTER_DT: string;
+  AFTER_DE: string;
+  NOZZLE_CLOSURE_THICKNESS_MM: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfBemIgniterDetails = StfMainIgniterRow;
-
-export type StfBemNozzleRow = {
-  NOZZLE_CLOSURE_MATERIAL: string;
-  THROAT_MATERIAL: string;
-  MOTHER_GRAPHITE: string;
-  NOZZLE_INSERT: string;
-  BEFORE_D1: string;
-  BEFORE_D2: string;
-  AFTER_D1: string;
-  AFTER_D2: string;
-  REMARKS: string;
-  /** QC Division QA Remarks (API: qaRemarks). */
-  QA_REMARKS: string;
-};
-
-export type StfBemTestingDetails = {
-  THROAT_DIAMETER: string;
-  WT_OF_PROPELLANT: string;
-  WEB_THICKNESS: string;
+export type StfBemDataSection = {
+  PROPELLANT_WEIGHT_KG: string;
+  CONDITIONING_TEMPERATURE: string;
   N_VALUE: string;
-  CONDITIONING_TEMP: string;
-  AMBIENT_TEMP: string;
-  RH: string;
+  WEB_THICKNESS_AVERAGE_MIN: string;
+  WEB_THICKNESS_STD_DEV: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfBemSensorRow = {
-  CHANNEL: string;
-  SENSOR: string;
-  SENSITIVITY: string;
-  MAX_RANGE: string;
-  SENSOR_RANGE: string;
-  FILTER_HZ: string;
-  IA_NO: string;
-  IA_GAIN: string;
-  EXT_V: string;
-  OFFSET_VALUE: string;
-  PRELOADING: string;
+export type StfBemBallisticRow = {
+  PARAMETER: StfBemBallisticParameterKey;
+  PARAMETER_LABEL: string;
+  CHANNEL_1: string;
+  CHANNEL_2: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
-export type StfBemResultRow = {
-  AVG_PRESSURE: string;
-  PEAK_PRESSURE: string;
-  TB: string;
-  BURN_RATE: string;
-  C_STAR: string;
-  ISP: string;
+export type StfBemBurnRate = {
+  BURN_RATE_MM_S: string;
+  PRESSURE_ABS_KSC: string;
   /** QC Division QA Remarks (API: qaRemarks). */
   QA_REMARKS: string;
 };
 
 export type StfBemMotorData = {
   variant: "BEM";
-  CONDITIONING_DETAILS: StfBemConditioningDetails;
-  GRAIN_DIMENSION: StfBemGrainRow[];
-  BEM_HARDWARE_DETAILS: StfBemHardwareDetails;
+  TEST_HEADER: StfBemTestHeader;
   IGNITER_DETAILS: StfBemIgniterDetails;
-  NOZZLE_DETAILS: StfBemNozzleRow;
-  TESTING_DETAILS: StfBemTestingDetails;
-  SENSOR_CONFIGURATION: StfBemSensorRow[];
-  RESULT_DETAILS: StfBemResultRow;
-  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: FileRef[] };
+  NOZZLE_DETAILS: StfBemNozzleDetails;
+  BEM_DATA: StfBemDataSection;
+  BALLISTIC_PARAMETERS: StfBemBallisticRow[];
+  BURN_RATE: StfBemBurnRate;
 };
 
 export type StfMotorData = StfMainMotorData | StfBemMotorData;
 
-export type StfIgniterDetailsApi = {
-  containerType?: string;
-  composition?: string;
-  weightOfComposition?: number;
-  squibResistance?: number;
-  remarks?: string;
+/** MAIN-only nested staticTestingDetails shape. */
+export type StfMainTestHeaderApi = {
+  firingDate?: string;
+  ambientTemperature?: number;
   qaRemarks?: string;
 };
 
 export type StfMainNozzleDetailsApi = {
-  nozzleClosureMaterial?: string;
-  motherGraphite?: string;
-  nozzleInsert?: string;
-  dtBefore?: number;
-  deBefore?: number;
-  dtAfter?: number;
-  deAfter?: number;
-  remarks?: string;
+  beforeDt?: number;
+  beforeDe?: number;
+  afterDt?: number;
+  afterDe?: number;
+  nozzleErosionRateMmS?: number;
+  qaRemarks?: string;
+};
+
+export type StfMainMotorDataApi = {
+  propellantWeightKg?: number;
+  avgBemBurnRateMmS?: number;
+  nValue?: number;
+  propellantDensity?: number;
+  gamma?: number;
+  qaRemarks?: string;
+};
+
+export type StfMainBallisticParameterApi = {
+  parameter?: string;
+  channel1?: string;
+  qaRemarks?: string;
+};
+
+export type StfMainBurnRateApi = {
+  burnRateMmS?: number;
+  pressureAbsKsc?: number;
+  nValue?: number;
+  qaRemarks?: string;
+};
+
+export type StfMainStaticTestingDetailsApi = {
+  testHeader?: StfMainTestHeaderApi;
+  nozzleDetails?: StfMainNozzleDetailsApi;
+  mainMotorData?: StfMainMotorDataApi;
+  ballisticParameters?: StfMainBallisticParameterApi[];
+  burnRate?: StfMainBurnRateApi;
+};
+
+/** BEM-only nested staticTestingDetails shape. */
+export type StfBemTestHeaderApi = {
+  loadingNo?: string;
+  firingNo?: string;
+  firingDate?: string;
+  temperature?: number;
+  rh?: number;
+  wtOfGrain?: string;
+  grainConfiguration?: string;
+  qaRemarks?: string;
+};
+
+export type StfBemIgniterDetailsApi = {
+  type?: string;
+  srNoAndLotNo?: string;
+  chargeMassGm?: number;
+  composition?: string;
   qaRemarks?: string;
 };
 
 export type StfBemNozzleDetailsApi = {
-  nozzleClosureMaterial?: string;
-  throatMaterial?: number;
-  motherGraphite?: string;
-  nozzleInsert?: string;
-  beforeD1?: number;
-  beforeD2?: number;
-  afterD1?: number;
-  afterD2?: number;
-  remarks?: string;
+  beforeDt?: number;
+  beforeDe?: number;
+  afterDt?: number;
+  afterDe?: number;
+  nozzleClosureThicknessMm?: number;
   qaRemarks?: string;
 };
 
-export type StfTestingDetailsApi = {
-  throatDiameter?: number;
-  propellantWeight?: number;
-  webThickness?: number;
-  nValue?: number;
+export type StfBemDataApi = {
+  propellantWeightKg?: number;
   conditioningTemperature?: number;
-  ambientTemperature?: number;
-  rhPercent?: number;
+  nValue?: number;
+  webThicknessAverageMin?: number;
+  webThicknessStdDev?: number;
   qaRemarks?: string;
 };
 
-export type StfSensorConfigurationApi = {
-  channel?: string;
-  sensor?: string;
-  sensitivity?: number;
-  maxExpected?: number;
-  sensorRange?: number;
-  filterHz?: number;
-  iaNo?: string;
-  iaGain?: number;
-  extVoltage?: number;
-  offsetValue?: number;
-  preloading?: number;
+export type StfBemBallisticParameterApi = {
+  parameter?: string;
+  channel1?: string;
+  channel2?: string;
   qaRemarks?: string;
 };
 
-export type StfResultDetailsApi = {
-  averagePressure?: number;
-  peakPressure?: number;
-  tb?: number;
-  burnRate?: number;
-  cStar?: number;
-  isp?: number;
+export type StfBemBurnRateApi = {
+  burnRateMmS?: number;
+  pressureAbsKsc?: number;
   qaRemarks?: string;
 };
 
-export type StfConditioningDetailsApi = {
-  fromDateTime?: string;
-  toDateTime?: string;
-  temperature?: number;
-  rh?: number;
-  observation?: string;
-  qaRemarks?: string;
+export type StfBemStaticTestingDetailsApi = {
+  testHeader?: StfBemTestHeaderApi;
+  igniterDetails?: StfBemIgniterDetailsApi;
+  nozzleDetails?: StfBemNozzleDetailsApi;
+  bemData?: StfBemDataApi;
+  ballisticParameters?: StfBemBallisticParameterApi[];
+  burnRate?: StfBemBurnRateApi;
 };
 
-export type StfGrainDimensionApi = {
-  side?: string;
-  od?: number;
-  a?: number;
-  b?: number;
-  c?: number;
-  length?: number;
-  weight?: number;
-  qaRemarks?: string;
-};
-
-export type StfBemHardwareDetailsApi = {
-  headEndNo?: string;
-  nozzleEndNo?: string;
-  retainerRingNo?: string;
-  casingNo?: string;
-  casingOd?: number;
-  casingId?: number;
-  casingLength?: number;
-  firingNo?: string;
-  qaRemarks?: string;
-};
-
-export type StfStaticTestingDetailsApi = {
-  igniterDetails?: StfIgniterDetailsApi;
-  nozzleDetails?: StfMainNozzleDetailsApi | StfBemNozzleDetailsApi;
-  testingDetails?: StfTestingDetailsApi;
-  sensorConfigurations?: StfSensorConfigurationApi[];
-  resultDetails?: StfResultDetailsApi;
-  ptCurveFile?: FileIdPayload;
-  conditioningDetails?: StfConditioningDetailsApi;
-  grainDimensions?: StfGrainDimensionApi[];
-  bemHardwareDetails?: StfBemHardwareDetailsApi;
-};
-
-const emptyStr = () => "";
-
-const createMainSensorRows = (): StfMainSensorRow[] =>
-  SENSOR_CHANNELS.map((channel) => ({
-    CHANNEL: channel,
-    SENSOR: "",
-    SENSITIVITY: "",
-    MAX_EXPECTED: "",
-    SENSOR_RANGE: "",
-    FILTER_HZ: "",
-    IA_NO: "",
-    IA_GAIN: "",
-    EXT_VOLTAGE: "",
-    OFFSET_VALUE: "",
-    PRELOADING: "",
-    QA_REMARKS: "",
-  }));
-
-const createBemSensorRows = (): StfBemSensorRow[] =>
-  SENSOR_CHANNELS.map((channel) => ({
-    CHANNEL: channel,
-    SENSOR: "",
-    SENSITIVITY: "",
-    MAX_RANGE: "",
-    SENSOR_RANGE: "",
-    FILTER_HZ: "",
-    IA_NO: "",
-    IA_GAIN: "",
-    EXT_V: "",
-    OFFSET_VALUE: "",
-    PRELOADING: "",
-    QA_REMARKS: "",
-  }));
-
-const createGrainRows = (): StfBemGrainRow[] =>
-  GRAIN_SIDES.map((side) => ({
-    SIDE: side,
-    OD: "",
-    A: "",
-    B: "",
-    C: "",
-    LENGTH: "",
-    WEIGHT: "",
-    QA_REMARKS: "",
-  }));
+export type StfStaticTestingDetailsApi =
+  | StfMainStaticTestingDetailsApi
+  | StfBemStaticTestingDetailsApi;
 
 export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
   variant: "MAIN_MOTOR",
-  IGNITER_DETAILS: {
-    CONTAINER_TYPE: "",
-    COMPOSITION: "",
-    WEIGHT_OF_COMPOSITION: "",
-    SQUIB_RESISTANCE: "",
-    REMARKS: "",
+  TEST_HEADER: {
+    FIRING_DATE: "",
+    AMBIENT_TEMPERATURE: "",
     QA_REMARKS: "",
   },
   NOZZLE_DETAILS: {
-    NOZZLE_CLOSURE_MATERIAL: "",
-    MOTHER_GRAPHITE: "",
-    NOZZLE_INSERT: "",
-    DT_BEFORE: "",
-    DE_BEFORE: "",
-    DT_AFTER: "",
-    DE_AFTER: "",
-    REMARKS: "",
+    BEFORE_DT: "",
+    BEFORE_DE: "",
+    AFTER_DT: "",
+    AFTER_DE: "",
+    NOZZLE_EROSION_RATE_MM_S: "",
     QA_REMARKS: "",
   },
-  TESTING_DETAILS: {
-    THROAT_DIAMETER: "",
-    PROPELLANT_WEIGHT: "",
-    WEB_THICKNESS: "",
+  MAIN_MOTOR_DATA: {
+    PROPELLANT_WEIGHT_KG: "",
+    AVG_BEM_BURN_RATE_MM_S: "",
     N_VALUE: "",
-    CONDITIONING_TEMPERATURE: "",
-    AMBIENT_TEMPERATURE: "",
-    RH_PERCENT: "",
+    PROPELLANT_DENSITY: "",
+    GAMMA: "",
     QA_REMARKS: "",
   },
-  SENSOR_CONFIGURATION: createMainSensorRows(),
-  STATIC_TEST_RESULT: {
-    AVERAGE_PRESSURE: "",
-    PEAK_PRESSURE: "",
-    TB: "",
-    BURN_RATE: "",
-    C_STAR: "",
-    ISP: "",
+  BALLISTIC_PARAMETERS: STF_MAIN_BALLISTIC_PARAMETERS.map((row) => ({
+    PARAMETER: row.key,
+    PARAMETER_LABEL: row.label,
+    CHANNEL_1: "",
+    QA_REMARKS: "",
+  })),
+  BURN_RATE: {
+    BURN_RATE_MM_S: "",
+    PRESSURE_ABS_KSC: "",
+    N_VALUE: "",
     QA_REMARKS: "",
   },
-  UPLOAD_PT_CURVE: { PT_CURVE_FILE: [] },
 });
 
 export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
   variant: "BEM",
-  CONDITIONING_DETAILS: {
-    FROM_DATE_TIME: "",
-    TO_DATE_TIME: "",
+  TEST_HEADER: {
+    LOADING_NO: "",
+    FIRING_NO: "",
+    FIRING_DATE: "",
     TEMPERATURE: "",
     RH: "",
-    OBSERVATION: "",
-    QA_REMARKS: "",
-  },
-  GRAIN_DIMENSION: createGrainRows(),
-  BEM_HARDWARE_DETAILS: {
-    HEAD_END_NO: "",
-    NOZZLE_END_NO: "",
-    RETAINER_RING_NO: "",
-    CASING_NO: "",
-    CASING_OD: "",
-    CASING_ID: "",
-    CASING_LENGTH: "",
-    FIRING_NO: "",
+    WT_OF_GRAIN: "",
+    GRAIN_CONFIGURATION: "",
     QA_REMARKS: "",
   },
   IGNITER_DETAILS: {
-    CONTAINER_TYPE: "",
+    TYPE: "",
+    SR_NO_AND_LOT_NO: "",
+    CHARGE_MASS_GM: "",
     COMPOSITION: "",
-    WEIGHT_OF_COMPOSITION: "",
-    SQUIB_RESISTANCE: "",
-    REMARKS: "",
     QA_REMARKS: "",
   },
   NOZZLE_DETAILS: {
-    NOZZLE_CLOSURE_MATERIAL: "",
-    THROAT_MATERIAL: "",
-    MOTHER_GRAPHITE: "",
-    NOZZLE_INSERT: "",
-    BEFORE_D1: "",
-    BEFORE_D2: "",
-    AFTER_D1: "",
-    AFTER_D2: "",
-    REMARKS: "",
+    BEFORE_DT: "",
+    BEFORE_DE: "",
+    AFTER_DT: "",
+    AFTER_DE: "",
+    NOZZLE_CLOSURE_THICKNESS_MM: "",
     QA_REMARKS: "",
   },
-  TESTING_DETAILS: {
-    THROAT_DIAMETER: "",
-    WT_OF_PROPELLANT: "",
-    WEB_THICKNESS: "",
+  BEM_DATA: {
+    PROPELLANT_WEIGHT_KG: "",
+    CONDITIONING_TEMPERATURE: "",
     N_VALUE: "",
-    CONDITIONING_TEMP: "",
-    AMBIENT_TEMP: "",
-    RH: "",
+    WEB_THICKNESS_AVERAGE_MIN: "",
+    WEB_THICKNESS_STD_DEV: "",
     QA_REMARKS: "",
   },
-  SENSOR_CONFIGURATION: createBemSensorRows(),
-  RESULT_DETAILS: {
-    AVG_PRESSURE: "",
-    PEAK_PRESSURE: "",
-    TB: "",
-    BURN_RATE: "",
-    C_STAR: "",
-    ISP: "",
+  BALLISTIC_PARAMETERS: STF_BEM_BALLISTIC_PARAMETERS.map((row) => ({
+    PARAMETER: row.key,
+    PARAMETER_LABEL: row.label,
+    CHANNEL_1: "",
+    CHANNEL_2: "",
+    QA_REMARKS: "",
+  })),
+  BURN_RATE: {
+    BURN_RATE_MM_S: "",
+    PRESSURE_ABS_KSC: "",
     QA_REMARKS: "",
   },
-  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: [] },
 });
 
 export const createEmptyStfMotorData = (variant: StfMotorDataVariant): StfMotorData =>
@@ -480,7 +383,14 @@ const hasUserContent = (value: unknown): boolean => {
   if (Array.isArray(value)) return value.some(hasUserContent);
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>).some(([key, entry]) => {
-      if (key === "CHANNEL" || key === "SIDE" || key === "variant") return false;
+      if (
+        key === "CHANNEL" ||
+        key === "PARAMETER" ||
+        key === "PARAMETER_LABEL" ||
+        key === "variant"
+      ) {
+        return false;
+      }
       return hasUserContent(entry);
     });
   }
@@ -489,17 +399,6 @@ const hasUserContent = (value: unknown): boolean => {
 
 export const stfMotorDataHasUserInput = (data: StfMotorData | null | undefined): boolean =>
   Boolean(data && hasUserContent(data));
-
-const sectionRow = (sections: LegacySection[] | undefined, sectionId: string) => {
-  const section = (sections ?? []).find((entry) => entry.sectionId === sectionId);
-  return asRecord(asArray(section?.sectionData)[0]) ?? {};
-};
-
-const nestedTableRows = (row: Record<string, unknown>, sectionId: string): unknown[] => {
-  const nested = row[sectionId];
-  if (Array.isArray(nested)) return nested;
-  return asArray(nested);
-};
 
 const mapRowFields = <T extends Record<string, string>>(
   preset: T,
@@ -520,35 +419,6 @@ const mapRowFields = <T extends Record<string, string>>(
   return next;
 };
 
-const mapTableRows = <T extends Record<string, string>>(
-  presetRows: T[],
-  savedRows: unknown,
-  readonlyKeys: Array<keyof T> = [],
-): T[] => {
-  const rows = asArray(savedRows);
-  if (!rows.length) return presetRows;
-  return presetRows.map((preset, index) => {
-    const saved = asRecord(rows[index]) ?? {};
-    const merged = mapRowFields(preset, saved);
-    readonlyKeys.forEach((key) => {
-      merged[key] = preset[key];
-    });
-    return merged;
-  });
-};
-
-const extractSections = (motor?: Record<string, unknown> | null): LegacySection[] => {
-  const staticDetails = asRecord(motor?.staticTestingDetails) ?? asRecord(motor);
-  const formSections = staticDetails?.formSections;
-  if (Array.isArray(formSections) && formSections.length) {
-    return formSections as LegacySection[];
-  }
-  if (Array.isArray(motor?.sections) && motor.sections.length) {
-    return motor.sections as LegacySection[];
-  }
-  return [];
-};
-
 const omitEmpty = <T extends Record<string, unknown>>(record: T): Partial<T> =>
   Object.fromEntries(
     Object.entries(record).filter(([, value]) => {
@@ -560,529 +430,414 @@ const omitEmpty = <T extends Record<string, unknown>>(record: T): Partial<T> =>
 
 const numOrOmit = (value: unknown): number | undefined => toApiNumber(value);
 
-const buildIgniterDetails = (row: StfMainIgniterRow): StfIgniterDetailsApi =>
+const buildMainTestHeader = (row: StfMainTestHeader): StfMainTestHeaderApi =>
   omitEmpty({
-    containerType: row.CONTAINER_TYPE.trim() || undefined,
-    composition: row.COMPOSITION.trim() || undefined,
-    weightOfComposition: numOrOmit(row.WEIGHT_OF_COMPOSITION),
-    squibResistance: numOrOmit(row.SQUIB_RESISTANCE),
-    remarks: row.REMARKS.trim() || undefined,
-    qaRemarks: row.QA_REMARKS.trim() || undefined,
-  });
-
-const buildMainNozzleDetails = (row: StfMainNozzleRow): StfMainNozzleDetailsApi =>
-  omitEmpty({
-    nozzleClosureMaterial: row.NOZZLE_CLOSURE_MATERIAL.trim() || undefined,
-    motherGraphite: row.MOTHER_GRAPHITE.trim() || undefined,
-    nozzleInsert: row.NOZZLE_INSERT.trim() || undefined,
-    dtBefore: numOrOmit(row.DT_BEFORE),
-    deBefore: numOrOmit(row.DE_BEFORE),
-    dtAfter: numOrOmit(row.DT_AFTER),
-    deAfter: numOrOmit(row.DE_AFTER),
-    remarks: row.REMARKS.trim() || undefined,
-    qaRemarks: row.QA_REMARKS.trim() || undefined,
-  });
-
-const buildBemNozzleDetails = (row: StfBemNozzleRow): StfBemNozzleDetailsApi =>
-  omitEmpty({
-    nozzleClosureMaterial: row.NOZZLE_CLOSURE_MATERIAL.trim() || undefined,
-    throatMaterial: numOrOmit(row.THROAT_MATERIAL),
-    motherGraphite: row.MOTHER_GRAPHITE.trim() || undefined,
-    nozzleInsert: row.NOZZLE_INSERT.trim() || undefined,
-    beforeD1: numOrOmit(row.BEFORE_D1),
-    beforeD2: numOrOmit(row.BEFORE_D2),
-    afterD1: numOrOmit(row.AFTER_D1),
-    afterD2: numOrOmit(row.AFTER_D2),
-    remarks: row.REMARKS.trim() || undefined,
-    qaRemarks: row.QA_REMARKS.trim() || undefined,
-  });
-
-const buildMainTestingDetails = (row: StfMainTestingDetails): StfTestingDetailsApi =>
-  omitEmpty({
-    throatDiameter: numOrOmit(row.THROAT_DIAMETER),
-    propellantWeight: numOrOmit(row.PROPELLANT_WEIGHT),
-    webThickness: numOrOmit(row.WEB_THICKNESS),
-    nValue: numOrOmit(row.N_VALUE),
-    conditioningTemperature: numOrOmit(row.CONDITIONING_TEMPERATURE),
+    firingDate: toApiDateTime(row.FIRING_DATE) || undefined,
     ambientTemperature: numOrOmit(row.AMBIENT_TEMPERATURE),
-    rhPercent: numOrOmit(row.RH_PERCENT),
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
-const buildBemTestingDetails = (row: StfBemTestingDetails): StfTestingDetailsApi =>
+const buildMainNozzleDetails = (row: StfMainNozzleDetails): StfMainNozzleDetailsApi =>
   omitEmpty({
-    throatDiameter: numOrOmit(row.THROAT_DIAMETER),
-    propellantWeight: numOrOmit(row.WT_OF_PROPELLANT),
-    webThickness: numOrOmit(row.WEB_THICKNESS),
+    beforeDt: numOrOmit(row.BEFORE_DT),
+    beforeDe: numOrOmit(row.BEFORE_DE),
+    afterDt: numOrOmit(row.AFTER_DT),
+    afterDe: numOrOmit(row.AFTER_DE),
+    nozzleErosionRateMmS: numOrOmit(row.NOZZLE_EROSION_RATE_MM_S),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
+  });
+
+const buildMainMotorData = (row: StfMainMotorDataSection): StfMainMotorDataApi =>
+  omitEmpty({
+    propellantWeightKg: numOrOmit(row.PROPELLANT_WEIGHT_KG),
+    avgBemBurnRateMmS: numOrOmit(row.AVG_BEM_BURN_RATE_MM_S),
     nValue: numOrOmit(row.N_VALUE),
-    conditioningTemperature: numOrOmit(row.CONDITIONING_TEMP),
-    ambientTemperature: numOrOmit(row.AMBIENT_TEMP),
-    rhPercent: numOrOmit(row.RH),
+    propellantDensity: numOrOmit(row.PROPELLANT_DENSITY),
+    gamma: numOrOmit(row.GAMMA),
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
-const buildMainSensorConfigurations = (
-  rows: StfMainSensorRow[],
-): StfSensorConfigurationApi[] =>
+const buildMainBallisticParameters = (
+  rows: StfMainBallisticRow[],
+): StfMainBallisticParameterApi[] =>
   rows
     .map((row) =>
       omitEmpty({
-        channel: row.CHANNEL.trim() || undefined,
-        sensor: row.SENSOR.trim() || undefined,
-        sensitivity: numOrOmit(row.SENSITIVITY),
-        maxExpected: numOrOmit(row.MAX_EXPECTED),
-        sensorRange: numOrOmit(row.SENSOR_RANGE),
-        filterHz: numOrOmit(row.FILTER_HZ),
-        iaNo: row.IA_NO.trim() || undefined,
-        iaGain: numOrOmit(row.IA_GAIN),
-        extVoltage: numOrOmit(row.EXT_VOLTAGE),
-        offsetValue: numOrOmit(row.OFFSET_VALUE),
-        preloading: numOrOmit(row.PRELOADING),
+        parameter: row.PARAMETER.trim() || undefined,
+        channel1: row.CHANNEL_1.trim() || undefined,
         qaRemarks: row.QA_REMARKS.trim() || undefined,
       }),
     )
     .filter((row) => Object.keys(row).length > 0);
 
-const buildBemSensorConfigurations = (rows: StfBemSensorRow[]): StfSensorConfigurationApi[] =>
-  rows
-    .map((row) =>
-      omitEmpty({
-        channel: row.CHANNEL.trim() || undefined,
-        sensor: row.SENSOR.trim() || undefined,
-        sensitivity: numOrOmit(row.SENSITIVITY),
-        maxExpected: numOrOmit(row.MAX_RANGE),
-        sensorRange: numOrOmit(row.SENSOR_RANGE),
-        filterHz: numOrOmit(row.FILTER_HZ),
-        iaNo: row.IA_NO.trim() || undefined,
-        iaGain: numOrOmit(row.IA_GAIN),
-        extVoltage: numOrOmit(row.EXT_V),
-        offsetValue: numOrOmit(row.OFFSET_VALUE),
-        preloading: numOrOmit(row.PRELOADING),
-        qaRemarks: row.QA_REMARKS.trim() || undefined,
-      }),
-    )
-    .filter((row) => Object.keys(row).length > 0);
-
-const buildMainResultDetails = (row: StfMainResultRow): StfResultDetailsApi =>
+const buildMainBurnRate = (row: StfMainBurnRate): StfMainBurnRateApi =>
   omitEmpty({
-    averagePressure: numOrOmit(row.AVERAGE_PRESSURE),
-    peakPressure: numOrOmit(row.PEAK_PRESSURE),
-    tb: numOrOmit(row.TB),
-    burnRate: numOrOmit(row.BURN_RATE),
-    cStar: numOrOmit(row.C_STAR),
-    isp: numOrOmit(row.ISP),
+    burnRateMmS: numOrOmit(row.BURN_RATE_MM_S),
+    pressureAbsKsc: numOrOmit(row.PRESSURE_ABS_KSC),
+    nValue: numOrOmit(row.N_VALUE),
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
-const buildBemResultDetails = (row: StfBemResultRow): StfResultDetailsApi =>
+const buildBemTestHeader = (row: StfBemTestHeader): StfBemTestHeaderApi =>
   omitEmpty({
-    averagePressure: numOrOmit(row.AVG_PRESSURE),
-    peakPressure: numOrOmit(row.PEAK_PRESSURE),
-    tb: numOrOmit(row.TB),
-    burnRate: numOrOmit(row.BURN_RATE),
-    cStar: numOrOmit(row.C_STAR),
-    isp: numOrOmit(row.ISP),
-    qaRemarks: row.QA_REMARKS.trim() || undefined,
-  });
-
-const buildConditioningDetails = (row: StfBemConditioningDetails): StfConditioningDetailsApi =>
-  omitEmpty({
-    fromDateTime: toApiDateTime(row.FROM_DATE_TIME),
-    toDateTime: toApiDateTime(row.TO_DATE_TIME),
+    loadingNo: row.LOADING_NO.trim() || undefined,
+    firingNo: row.FIRING_NO.trim() || undefined,
+    firingDate: toApiDateTime(row.FIRING_DATE) || undefined,
     temperature: numOrOmit(row.TEMPERATURE),
     rh: numOrOmit(row.RH),
-    observation: row.OBSERVATION.trim() || undefined,
+    wtOfGrain: row.WT_OF_GRAIN.trim() || undefined,
+    grainConfiguration: row.GRAIN_CONFIGURATION.trim() || undefined,
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
-const buildGrainDimensions = (rows: StfBemGrainRow[]): StfGrainDimensionApi[] =>
+const buildBemIgniterDetails = (row: StfBemIgniterDetails): StfBemIgniterDetailsApi =>
+  omitEmpty({
+    type: row.TYPE.trim() || undefined,
+    srNoAndLotNo: row.SR_NO_AND_LOT_NO.trim() || undefined,
+    chargeMassGm: numOrOmit(row.CHARGE_MASS_GM),
+    composition: row.COMPOSITION.trim() || undefined,
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
+  });
+
+const buildBemNozzleDetails = (row: StfBemNozzleDetails): StfBemNozzleDetailsApi =>
+  omitEmpty({
+    beforeDt: numOrOmit(row.BEFORE_DT),
+    beforeDe: numOrOmit(row.BEFORE_DE),
+    afterDt: numOrOmit(row.AFTER_DT),
+    afterDe: numOrOmit(row.AFTER_DE),
+    nozzleClosureThicknessMm: numOrOmit(row.NOZZLE_CLOSURE_THICKNESS_MM),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
+  });
+
+const buildBemData = (row: StfBemDataSection): StfBemDataApi =>
+  omitEmpty({
+    propellantWeightKg: numOrOmit(row.PROPELLANT_WEIGHT_KG),
+    conditioningTemperature: numOrOmit(row.CONDITIONING_TEMPERATURE),
+    nValue: numOrOmit(row.N_VALUE),
+    webThicknessAverageMin: numOrOmit(row.WEB_THICKNESS_AVERAGE_MIN),
+    webThicknessStdDev: numOrOmit(row.WEB_THICKNESS_STD_DEV),
+    qaRemarks: row.QA_REMARKS.trim() || undefined,
+  });
+
+const buildBemBallisticParameters = (
+  rows: StfBemBallisticRow[],
+): StfBemBallisticParameterApi[] =>
   rows
     .map((row) =>
       omitEmpty({
-        side: row.SIDE.trim() || undefined,
-        od: numOrOmit(row.OD),
-        a: numOrOmit(row.A),
-        b: numOrOmit(row.B),
-        c: numOrOmit(row.C),
-        length: numOrOmit(row.LENGTH),
-        weight: numOrOmit(row.WEIGHT),
+        parameter: row.PARAMETER.trim() || undefined,
+        channel1: row.CHANNEL_1.trim() || undefined,
+        channel2: row.CHANNEL_2.trim() || undefined,
         qaRemarks: row.QA_REMARKS.trim() || undefined,
       }),
     )
     .filter((row) => Object.keys(row).length > 0);
 
-const buildBemHardwareDetails = (row: StfBemHardwareDetails): StfBemHardwareDetailsApi =>
+const buildBemBurnRate = (row: StfBemBurnRate): StfBemBurnRateApi =>
   omitEmpty({
-    headEndNo: row.HEAD_END_NO.trim() || undefined,
-    nozzleEndNo: row.NOZZLE_END_NO.trim() || undefined,
-    retainerRingNo: row.RETAINER_RING_NO.trim() || undefined,
-    casingNo: row.CASING_NO.trim() || undefined,
-    casingOd: numOrOmit(row.CASING_OD),
-    casingId: numOrOmit(row.CASING_ID),
-    casingLength: numOrOmit(row.CASING_LENGTH),
-    firingNo: row.FIRING_NO.trim() || undefined,
+    burnRateMmS: numOrOmit(row.BURN_RATE_MM_S),
+    pressureAbsKsc: numOrOmit(row.PRESSURE_ABS_KSC),
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
 
-const hasNestedDtoShape = (details: Record<string, unknown>) =>
-  Boolean(
-    details.igniterDetails ||
+const hasNestedDtoShape = (details: Record<string, unknown>, variant: StfMotorDataVariant) => {
+  if (variant === "BEM") {
+    return Boolean(
+      details.testHeader ||
+        details.igniterDetails ||
+        details.nozzleDetails ||
+        details.bemData ||
+        details.ballisticParameters ||
+        details.burnRate,
+    );
+  }
+  return Boolean(
+    details.testHeader ||
       details.nozzleDetails ||
-      details.testingDetails ||
-      details.sensorConfigurations ||
-      details.resultDetails ||
-      details.conditioningDetails ||
-      details.grainDimensions ||
-      details.bemHardwareDetails ||
-      details.ptCurveFile,
+      details.mainMotorData ||
+      details.ballisticParameters ||
+      details.burnRate,
   );
+};
 
-const parseIgniterDetails = (
-  preset: StfMainIgniterRow,
+const parseMainTestHeader = (
+  preset: StfMainTestHeader,
   source?: Record<string, unknown>,
-): StfMainIgniterRow =>
+): StfMainTestHeader => ({
+  ...mapRowFields(preset, {
+    AMBIENT_TEMPERATURE: pickField(source ?? {}, "ambientTemperature", "AMBIENT_TEMPERATURE"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
+  }),
+  FIRING_DATE:
+    toUiDateTime(pickField(source ?? {}, "firingDate", "FIRING_DATE")) ||
+    str(pickField(source ?? {}, "firingDate", "FIRING_DATE")),
+});
+
+const parseMainNozzleDetails = (
+  preset: StfMainNozzleDetails,
+  source?: Record<string, unknown>,
+): StfMainNozzleDetails =>
   mapRowFields(preset, {
-    CONTAINER_TYPE: pickField(source ?? {}, "containerType", "CONTAINER_TYPE"),
-    COMPOSITION: pickField(source ?? {}, "composition", "COMPOSITION"),
-    WEIGHT_OF_COMPOSITION: pickField(source ?? {}, "weightOfComposition", "WEIGHT_OF_COMPOSITION"),
-    SQUIB_RESISTANCE: pickField(source ?? {}, "squibResistance", "SQUIB_RESISTANCE"),
-    REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    BEFORE_DT: pickField(source ?? {}, "beforeDt", "BEFORE_DT"),
+    BEFORE_DE: pickField(source ?? {}, "beforeDe", "BEFORE_DE"),
+    AFTER_DT: pickField(source ?? {}, "afterDt", "AFTER_DT"),
+    AFTER_DE: pickField(source ?? {}, "afterDe", "AFTER_DE"),
+    NOZZLE_EROSION_RATE_MM_S: pickField(
+      source ?? {},
+      "nozzleErosionRateMmS",
+      "NOZZLE_EROSION_RATE_MM_S",
+    ),
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
-const parseMainNozzleDetails = (
-  preset: StfMainNozzleRow,
+const parseMainMotorDataSection = (
+  preset: StfMainMotorDataSection,
   source?: Record<string, unknown>,
-): StfMainNozzleRow =>
+): StfMainMotorDataSection =>
   mapRowFields(preset, {
-    NOZZLE_CLOSURE_MATERIAL: pickField(source ?? {}, "nozzleClosureMaterial", "NOZZLE_CLOSURE_MATERIAL"),
-    MOTHER_GRAPHITE: pickField(source ?? {}, "motherGraphite", "MOTHER_GRAPHITE"),
-    NOZZLE_INSERT: pickField(source ?? {}, "nozzleInsert", "NOZZLE_INSERT"),
-    DT_BEFORE: pickField(source ?? {}, "dtBefore", "DT_BEFORE"),
-    DE_BEFORE: pickField(source ?? {}, "deBefore", "DE_BEFORE"),
-    DT_AFTER: pickField(source ?? {}, "dtAfter", "DT_AFTER"),
-    DE_AFTER: pickField(source ?? {}, "deAfter", "DE_AFTER"),
-    REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    PROPELLANT_WEIGHT_KG: pickField(source ?? {}, "propellantWeightKg", "PROPELLANT_WEIGHT_KG"),
+    AVG_BEM_BURN_RATE_MM_S: pickField(
+      source ?? {},
+      "avgBemBurnRateMmS",
+      "AVG_BEM_BURN_RATE_MM_S",
+    ),
+    N_VALUE: pickField(source ?? {}, "nValue", "N_VALUE"),
+    PROPELLANT_DENSITY: pickField(source ?? {}, "propellantDensity", "PROPELLANT_DENSITY"),
+    GAMMA: pickField(source ?? {}, "gamma", "GAMMA"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
+  });
+
+const parseMainBallisticParameters = (
+  presetRows: StfMainBallisticRow[],
+  savedRows: unknown,
+): StfMainBallisticRow[] => {
+  const rows = asArray(savedRows);
+  const byParameter = new Map<string, Record<string, unknown>>();
+  rows.forEach((row) => {
+    const saved = asRecord(row);
+    if (!saved) return;
+    const key = str(pickField(saved, "parameter", "PARAMETER"));
+    if (key) byParameter.set(key, saved);
+  });
+  return presetRows.map((preset, index) => {
+    const saved = byParameter.get(preset.PARAMETER) ?? asRecord(rows[index]) ?? {};
+    return {
+      PARAMETER: preset.PARAMETER,
+      PARAMETER_LABEL: preset.PARAMETER_LABEL,
+      CHANNEL_1: str(pickField(saved, "channel1", "CHANNEL_1")),
+      QA_REMARKS: str(pickField(saved, "qaRemarks", "QA_REMARKS")),
+    };
+  });
+};
+
+const parseMainBurnRate = (
+  preset: StfMainBurnRate,
+  source?: Record<string, unknown>,
+): StfMainBurnRate =>
+  mapRowFields(preset, {
+    BURN_RATE_MM_S: pickField(source ?? {}, "burnRateMmS", "BURN_RATE_MM_S"),
+    PRESSURE_ABS_KSC: pickField(source ?? {}, "pressureAbsKsc", "PRESSURE_ABS_KSC"),
+    N_VALUE: pickField(source ?? {}, "nValue", "N_VALUE"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
+  });
+
+const parseBemTestHeader = (
+  preset: StfBemTestHeader,
+  source?: Record<string, unknown>,
+): StfBemTestHeader => ({
+  ...mapRowFields(preset, {
+    LOADING_NO: pickField(source ?? {}, "loadingNo", "LOADING_NO"),
+    FIRING_NO: pickField(source ?? {}, "firingNo", "FIRING_NO"),
+    TEMPERATURE: pickField(source ?? {}, "temperature", "TEMPERATURE"),
+    RH: pickField(source ?? {}, "rh", "RH"),
+    WT_OF_GRAIN: pickField(source ?? {}, "wtOfGrain", "WT_OF_GRAIN"),
+    GRAIN_CONFIGURATION: pickField(source ?? {}, "grainConfiguration", "GRAIN_CONFIGURATION"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
+  }),
+  FIRING_DATE:
+    toUiDateTime(pickField(source ?? {}, "firingDate", "FIRING_DATE")) ||
+    str(pickField(source ?? {}, "firingDate", "FIRING_DATE")),
+});
+
+const parseBemIgniterDetails = (
+  preset: StfBemIgniterDetails,
+  source?: Record<string, unknown>,
+): StfBemIgniterDetails =>
+  mapRowFields(preset, {
+    TYPE: pickField(source ?? {}, "type", "TYPE"),
+    SR_NO_AND_LOT_NO: pickField(source ?? {}, "srNoAndLotNo", "SR_NO_AND_LOT_NO"),
+    CHARGE_MASS_GM: pickField(source ?? {}, "chargeMassGm", "CHARGE_MASS_GM"),
+    COMPOSITION: pickField(source ?? {}, "composition", "COMPOSITION"),
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
 const parseBemNozzleDetails = (
-  preset: StfBemNozzleRow,
+  preset: StfBemNozzleDetails,
   source?: Record<string, unknown>,
-): StfBemNozzleRow =>
+): StfBemNozzleDetails =>
   mapRowFields(preset, {
-    NOZZLE_CLOSURE_MATERIAL: pickField(source ?? {}, "nozzleClosureMaterial", "NOZZLE_CLOSURE_MATERIAL"),
-    THROAT_MATERIAL: pickField(source ?? {}, "throatMaterial", "THROAT_MATERIAL"),
-    MOTHER_GRAPHITE: pickField(source ?? {}, "motherGraphite", "MOTHER_GRAPHITE"),
-    NOZZLE_INSERT: pickField(source ?? {}, "nozzleInsert", "NOZZLE_INSERT"),
-    BEFORE_D1: pickField(source ?? {}, "beforeD1", "BEFORE_D1"),
-    BEFORE_D2: pickField(source ?? {}, "beforeD2", "BEFORE_D2"),
-    AFTER_D1: pickField(source ?? {}, "afterD1", "AFTER_D1"),
-    AFTER_D2: pickField(source ?? {}, "afterD2", "AFTER_D2"),
-    REMARKS: pickField(source ?? {}, "remarks", "REMARKS"),
+    BEFORE_DT: pickField(source ?? {}, "beforeDt", "BEFORE_DT"),
+    BEFORE_DE: pickField(source ?? {}, "beforeDe", "BEFORE_DE"),
+    AFTER_DT: pickField(source ?? {}, "afterDt", "AFTER_DT"),
+    AFTER_DE: pickField(source ?? {}, "afterDe", "AFTER_DE"),
+    NOZZLE_CLOSURE_THICKNESS_MM: pickField(
+      source ?? {},
+      "nozzleClosureThicknessMm",
+      "NOZZLE_CLOSURE_THICKNESS_MM",
+    ),
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
-const parseTestingDetailsMain = (
-  preset: StfMainTestingDetails,
+const parseBemData = (
+  preset: StfBemDataSection,
   source?: Record<string, unknown>,
-): StfMainTestingDetails =>
+): StfBemDataSection =>
   mapRowFields(preset, {
-    THROAT_DIAMETER: pickField(source ?? {}, "throatDiameter", "THROAT_DIAMETER"),
-    PROPELLANT_WEIGHT: pickField(source ?? {}, "propellantWeight", "PROPELLANT_WEIGHT"),
-    WEB_THICKNESS: pickField(source ?? {}, "webThickness", "WEB_THICKNESS"),
-    N_VALUE: pickField(source ?? {}, "nValue", "N_VALUE"),
+    PROPELLANT_WEIGHT_KG: pickField(source ?? {}, "propellantWeightKg", "PROPELLANT_WEIGHT_KG"),
     CONDITIONING_TEMPERATURE: pickField(
       source ?? {},
       "conditioningTemperature",
       "CONDITIONING_TEMPERATURE",
     ),
-    AMBIENT_TEMPERATURE: pickField(source ?? {}, "ambientTemperature", "AMBIENT_TEMPERATURE"),
-    RH_PERCENT: pickField(source ?? {}, "rhPercent", "RH_PERCENT"),
-    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
-  });
-
-const parseTestingDetailsBem = (
-  preset: StfBemTestingDetails,
-  source?: Record<string, unknown>,
-): StfBemTestingDetails =>
-  mapRowFields(preset, {
-    THROAT_DIAMETER: pickField(source ?? {}, "throatDiameter", "THROAT_DIAMETER"),
-    WT_OF_PROPELLANT: pickField(source ?? {}, "propellantWeight", "WT_OF_PROPELLANT", "PROPELLANT_WEIGHT"),
-    WEB_THICKNESS: pickField(source ?? {}, "webThickness", "WEB_THICKNESS"),
     N_VALUE: pickField(source ?? {}, "nValue", "N_VALUE"),
-    CONDITIONING_TEMP: pickField(source ?? {}, "conditioningTemperature", "CONDITIONING_TEMP", "CONDITIONING_TEMPERATURE"),
-    AMBIENT_TEMP: pickField(source ?? {}, "ambientTemperature", "AMBIENT_TEMP", "AMBIENT_TEMPERATURE"),
-    RH: pickField(source ?? {}, "rhPercent", "RH", "RH_PERCENT"),
+    WEB_THICKNESS_AVERAGE_MIN: pickField(
+      source ?? {},
+      "webThicknessAverageMin",
+      "WEB_THICKNESS_AVERAGE_MIN",
+    ),
+    WEB_THICKNESS_STD_DEV: pickField(
+      source ?? {},
+      "webThicknessStdDev",
+      "WEB_THICKNESS_STD_DEV",
+    ),
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
 
-const parseMainSensorConfigurations = (
-  presetRows: StfMainSensorRow[],
+const parseBemBallisticParameters = (
+  presetRows: StfBemBallisticRow[],
   savedRows: unknown,
-): StfMainSensorRow[] => {
+): StfBemBallisticRow[] => {
   const rows = asArray(savedRows);
+  const byParameter = new Map<string, Record<string, unknown>>();
+  rows.forEach((row) => {
+    const saved = asRecord(row);
+    if (!saved) return;
+    const key = str(pickField(saved, "parameter", "PARAMETER"));
+    if (key) byParameter.set(key, saved);
+  });
   return presetRows.map((preset, index) => {
-    const saved = asRecord(rows[index]) ?? {};
+    const saved = byParameter.get(preset.PARAMETER) ?? asRecord(rows[index]) ?? {};
     return {
-      CHANNEL: preset.CHANNEL,
-      SENSOR: str(pickField(saved, "sensor", "SENSOR")),
-      SENSITIVITY: str(pickField(saved, "sensitivity", "SENSITIVITY")),
-      MAX_EXPECTED: str(pickField(saved, "maxExpected", "MAX_EXPECTED", "MAX_RANGE")),
-      SENSOR_RANGE: str(pickField(saved, "sensorRange", "SENSOR_RANGE")),
-      FILTER_HZ: str(pickField(saved, "filterHz", "FILTER_HZ")),
-      IA_NO: str(pickField(saved, "iaNo", "IA_NO")),
-      IA_GAIN: str(pickField(saved, "iaGain", "IA_GAIN")),
-      EXT_VOLTAGE: str(pickField(saved, "extVoltage", "EXT_VOLTAGE", "EXT_V")),
-      OFFSET_VALUE: str(pickField(saved, "offsetValue", "OFFSET_VALUE")),
-      PRELOADING: str(pickField(saved, "preloading", "PRELOADING")),
+      PARAMETER: preset.PARAMETER,
+      PARAMETER_LABEL: preset.PARAMETER_LABEL,
+      CHANNEL_1: str(pickField(saved, "channel1", "CHANNEL_1")),
+      CHANNEL_2: str(pickField(saved, "channel2", "CHANNEL_2")),
       QA_REMARKS: str(pickField(saved, "qaRemarks", "QA_REMARKS")),
     };
   });
 };
 
-const parseBemSensorConfigurations = (
-  presetRows: StfBemSensorRow[],
-  savedRows: unknown,
-): StfBemSensorRow[] => {
-  const rows = asArray(savedRows);
-  return presetRows.map((preset, index) => {
-    const saved = asRecord(rows[index]) ?? {};
-    return {
-      CHANNEL: preset.CHANNEL,
-      SENSOR: str(pickField(saved, "sensor", "SENSOR")),
-      SENSITIVITY: str(pickField(saved, "sensitivity", "SENSITIVITY")),
-      MAX_RANGE: str(pickField(saved, "maxExpected", "MAX_RANGE", "MAX_EXPECTED")),
-      SENSOR_RANGE: str(pickField(saved, "sensorRange", "SENSOR_RANGE")),
-      FILTER_HZ: str(pickField(saved, "filterHz", "FILTER_HZ")),
-      IA_NO: str(pickField(saved, "iaNo", "IA_NO")),
-      IA_GAIN: str(pickField(saved, "iaGain", "IA_GAIN")),
-      EXT_V: str(pickField(saved, "extVoltage", "EXT_V", "EXT_VOLTAGE")),
-      OFFSET_VALUE: str(pickField(saved, "offsetValue", "OFFSET_VALUE")),
-      PRELOADING: str(pickField(saved, "preloading", "PRELOADING")),
-      QA_REMARKS: str(pickField(saved, "qaRemarks", "QA_REMARKS")),
-    };
+const parseBemBurnRate = (
+  preset: StfBemBurnRate,
+  source?: Record<string, unknown>,
+): StfBemBurnRate =>
+  mapRowFields(preset, {
+    BURN_RATE_MM_S: pickField(source ?? {}, "burnRateMmS", "BURN_RATE_MM_S"),
+    PRESSURE_ABS_KSC: pickField(source ?? {}, "pressureAbsKsc", "PRESSURE_ABS_KSC"),
+    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   });
+
+const parseBemFromNestedDto = (details: Record<string, unknown>): StfBemMotorData => {
+  const empty = createEmptyStfBemMotorData();
+  return {
+    variant: "BEM",
+    TEST_HEADER: parseBemTestHeader(empty.TEST_HEADER, asRecord(details.testHeader) ?? undefined),
+    IGNITER_DETAILS: parseBemIgniterDetails(
+      empty.IGNITER_DETAILS,
+      asRecord(details.igniterDetails) ?? undefined,
+    ),
+    NOZZLE_DETAILS: parseBemNozzleDetails(
+      empty.NOZZLE_DETAILS,
+      asRecord(details.nozzleDetails) ?? undefined,
+    ),
+    BEM_DATA: parseBemData(empty.BEM_DATA, asRecord(details.bemData) ?? undefined),
+    BALLISTIC_PARAMETERS: parseBemBallisticParameters(
+      empty.BALLISTIC_PARAMETERS,
+      details.ballisticParameters,
+    ),
+    BURN_RATE: parseBemBurnRate(empty.BURN_RATE, asRecord(details.burnRate) ?? undefined),
+  };
 };
 
-const parseMainResultDetails = (
-  preset: StfMainResultRow,
-  source?: Record<string, unknown>,
-): StfMainResultRow =>
-  mapRowFields(preset, {
-    AVERAGE_PRESSURE: pickField(source ?? {}, "averagePressure", "AVERAGE_PRESSURE", "AVG_PRESSURE"),
-    PEAK_PRESSURE: pickField(source ?? {}, "peakPressure", "PEAK_PRESSURE"),
-    TB: pickField(source ?? {}, "tb", "TB"),
-    BURN_RATE: pickField(source ?? {}, "burnRate", "BURN_RATE"),
-    C_STAR: pickField(source ?? {}, "cStar", "C_STAR"),
-    ISP: pickField(source ?? {}, "isp", "ISP"),
-    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
-  });
-
-const parseBemResultDetails = (
-  preset: StfBemResultRow,
-  source?: Record<string, unknown>,
-): StfBemResultRow =>
-  mapRowFields(preset, {
-    AVG_PRESSURE: pickField(source ?? {}, "averagePressure", "AVG_PRESSURE", "AVERAGE_PRESSURE"),
-    PEAK_PRESSURE: pickField(source ?? {}, "peakPressure", "PEAK_PRESSURE"),
-    TB: pickField(source ?? {}, "tb", "TB"),
-    BURN_RATE: pickField(source ?? {}, "burnRate", "BURN_RATE"),
-    C_STAR: pickField(source ?? {}, "cStar", "C_STAR"),
-    ISP: pickField(source ?? {}, "isp", "ISP"),
-    QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
-  });
+const parseMainFromNestedDto = (details: Record<string, unknown>): StfMainMotorData => {
+  const empty = createEmptyStfMainMotorData();
+  return {
+    variant: "MAIN_MOTOR",
+    TEST_HEADER: parseMainTestHeader(empty.TEST_HEADER, asRecord(details.testHeader) ?? undefined),
+    NOZZLE_DETAILS: parseMainNozzleDetails(
+      empty.NOZZLE_DETAILS,
+      asRecord(details.nozzleDetails) ?? undefined,
+    ),
+    MAIN_MOTOR_DATA: parseMainMotorDataSection(
+      empty.MAIN_MOTOR_DATA,
+      asRecord(details.mainMotorData) ?? undefined,
+    ),
+    BALLISTIC_PARAMETERS: parseMainBallisticParameters(
+      empty.BALLISTIC_PARAMETERS,
+      details.ballisticParameters,
+    ),
+    BURN_RATE: parseMainBurnRate(empty.BURN_RATE, asRecord(details.burnRate) ?? undefined),
+  };
+};
 
 const parseFromNestedDto = (
   details: Record<string, unknown>,
   variant: StfMotorDataVariant,
 ): StfMotorData => {
-  const igniter = asRecord(details.igniterDetails);
-  const nozzle = asRecord(details.nozzleDetails);
-  const testing = asRecord(details.testingDetails);
-  const sensors = details.sensorConfigurations;
-  const results = asRecord(details.resultDetails);
-  const ptCurveFile = parseFileRefs(
-    details.ptCurveFile ?? pickField(details, "ptCurveUpload", "PT_CURVE_FILE"),
-  );
-
-  if (variant === "MAIN_MOTOR") {
-    const empty = createEmptyStfMainMotorData();
-    return {
-      variant: "MAIN_MOTOR",
-      IGNITER_DETAILS: parseIgniterDetails(empty.IGNITER_DETAILS, igniter ?? undefined),
-      NOZZLE_DETAILS: parseMainNozzleDetails(empty.NOZZLE_DETAILS, nozzle ?? undefined),
-      TESTING_DETAILS: parseTestingDetailsMain(empty.TESTING_DETAILS, testing ?? undefined),
-      SENSOR_CONFIGURATION: parseMainSensorConfigurations(empty.SENSOR_CONFIGURATION, sensors),
-      STATIC_TEST_RESULT: parseMainResultDetails(empty.STATIC_TEST_RESULT, results ?? undefined),
-      UPLOAD_PT_CURVE: { PT_CURVE_FILE: ptCurveFile },
-    };
+  if (variant === "BEM") {
+    return parseBemFromNestedDto(details);
   }
-
-  const empty = createEmptyStfBemMotorData();
-  const conditioning = asRecord(details.conditioningDetails);
-  const hardware = asRecord(details.bemHardwareDetails);
-  const grainDimensions = details.grainDimensions ?? details.grainDimension;
-
-  return {
-    variant: "BEM",
-    CONDITIONING_DETAILS: {
-      ...mapRowFields(empty.CONDITIONING_DETAILS, {
-        TEMPERATURE: pickField(conditioning ?? {}, "temperature", "TEMPERATURE"),
-        RH: pickField(conditioning ?? {}, "rh", "RH"),
-        OBSERVATION: pickField(conditioning ?? {}, "observation", "OBSERVATION"),
-        QA_REMARKS: pickField(conditioning ?? {}, "qaRemarks", "QA_REMARKS"),
-      }),
-      FROM_DATE_TIME:
-        toUiDateTime(pickField(conditioning ?? {}, "fromDateTime", "FROM_DATE_TIME")) ||
-        str(pickField(conditioning ?? {}, "fromDateTime", "FROM_DATE_TIME")),
-      TO_DATE_TIME:
-        toUiDateTime(pickField(conditioning ?? {}, "toDateTime", "TO_DATE_TIME")) ||
-        str(pickField(conditioning ?? {}, "toDateTime", "TO_DATE_TIME")),
-    },
-    GRAIN_DIMENSION: mapTableRows(
-      empty.GRAIN_DIMENSION,
-      grainDimensions,
-      ["SIDE"],
-    ),
-    BEM_HARDWARE_DETAILS: mapRowFields(empty.BEM_HARDWARE_DETAILS, {
-      HEAD_END_NO: pickField(hardware ?? {}, "headEndNo", "HEAD_END_NO"),
-      NOZZLE_END_NO: pickField(hardware ?? {}, "nozzleEndNo", "NOZZLE_END_NO"),
-      RETAINER_RING_NO: pickField(hardware ?? {}, "retainerRingNo", "RETAINER_RING_NO"),
-      CASING_NO: pickField(hardware ?? {}, "casingNo", "CASING_NO"),
-      CASING_OD: pickField(hardware ?? {}, "casingOd", "CASING_OD"),
-      CASING_ID: pickField(hardware ?? {}, "casingId", "CASING_ID"),
-      CASING_LENGTH: pickField(hardware ?? {}, "casingLength", "CASING_LENGTH"),
-      FIRING_NO: pickField(hardware ?? {}, "firingNo", "FIRING_NO"),
-      QA_REMARKS: pickField(hardware ?? {}, "qaRemarks", "QA_REMARKS"),
-    }),
-    IGNITER_DETAILS: parseIgniterDetails(empty.IGNITER_DETAILS, igniter ?? undefined),
-    NOZZLE_DETAILS: parseBemNozzleDetails(empty.NOZZLE_DETAILS, nozzle ?? undefined),
-    TESTING_DETAILS: parseTestingDetailsBem(empty.TESTING_DETAILS, testing ?? undefined),
-    SENSOR_CONFIGURATION: parseBemSensorConfigurations(empty.SENSOR_CONFIGURATION, sensors),
-    RESULT_DETAILS: parseBemResultDetails(empty.RESULT_DETAILS, results ?? undefined),
-    UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: ptCurveFile },
-  };
+  return parseMainFromNestedDto(details);
 };
 
-const collectStfFileRefsFromMotorData = (data: StfMotorData | null | undefined): FileRef[] => {
-  if (!data) return [];
-  if (data.variant === "MAIN_MOTOR") return data.UPLOAD_PT_CURVE.PT_CURVE_FILE ?? [];
-  return data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD ?? [];
-};
+const collectStfFileRefsFromMotorData = (_data: StfMotorData | null | undefined): FileRef[] => [];
 
 export const parseStfMotorDataFromApi = (
   motor: Record<string, unknown> | null | undefined,
   variant: StfMotorDataVariant,
 ): StfMotorData => {
   const staticDetails = asRecord(motor?.staticTestingDetails) ?? asRecord(motor);
-  if (staticDetails && hasNestedDtoShape(staticDetails)) {
+  if (staticDetails && hasNestedDtoShape(staticDetails, variant)) {
     return parseFromNestedDto(staticDetails, variant);
   }
 
-  const sections = extractSections(motor);
-  if (variant === "MAIN_MOTOR") {
-    const empty = createEmptyStfMainMotorData();
-    const igniter = sectionRow(sections, "IGNITER_DETAILS");
-    const nozzle = sectionRow(sections, "NOZZLE_DETAILS");
-    const testing = sectionRow(sections, "TESTING_DETAILS");
-    const sensor = sectionRow(sections, "SENSOR_CONFIGURATION");
-    const resultRow = sectionRow(sections, "STATIC_TEST_RESULT");
-    const result =
-      Object.keys(resultRow).length > 0 ? resultRow : sectionRow(sections, "RESULT_DETAILS");
-    const upload = sectionRow(sections, "UPLOAD_PT_CURVE");
-    return {
-      variant: "MAIN_MOTOR",
-      IGNITER_DETAILS: mapRowFields(empty.IGNITER_DETAILS, igniter),
-      NOZZLE_DETAILS: mapRowFields(empty.NOZZLE_DETAILS, nozzle),
-      TESTING_DETAILS: mapRowFields(empty.TESTING_DETAILS, testing),
-      SENSOR_CONFIGURATION: mapTableRows(
-        empty.SENSOR_CONFIGURATION,
-        nestedTableRows(sensor, "SENSOR_CONFIGURATION").length
-          ? nestedTableRows(sensor, "SENSOR_CONFIGURATION")
-          : sensor.SENSOR_CONFIGURATION ?? sensor.rows,
-        ["CHANNEL"],
-      ),
-      STATIC_TEST_RESULT: parseMainResultDetails(empty.STATIC_TEST_RESULT, result),
-      UPLOAD_PT_CURVE: {
-        PT_CURVE_FILE: parseFileRefs(pickField(upload, "PT_CURVE_FILE", "ptCurveFile")),
-      },
-    };
-  }
-
-  const empty = createEmptyStfBemMotorData();
-  const conditioning = sectionRow(sections, "CONDITIONING_DETAILS");
-  const grain = sectionRow(sections, "GRAIN_DIMENSION");
-  const hardware = sectionRow(sections, "BEM_HARDWARE_DETAILS");
-  const igniter = sectionRow(sections, "IGNITER_DETAILS");
-  const nozzle = sectionRow(sections, "NOZZLE_DETAILS");
-  const testing = sectionRow(sections, "TESTING_DETAILS");
-  const sensor = sectionRow(sections, "SENSOR_CONFIGURATION");
-  const result = sectionRow(sections, "RESULT_DETAILS");
-  const upload = sectionRow(sections, "UPLOAD_PT_CURVE");
-
-  return {
-    variant: "BEM",
-    CONDITIONING_DETAILS: {
-      ...mapRowFields(empty.CONDITIONING_DETAILS, conditioning),
-      FROM_DATE_TIME: toUiDate(pickField(conditioning, "FROM_DATE_TIME", "fromDateTime")) || str(pickField(conditioning, "FROM_DATE_TIME")),
-      TO_DATE_TIME: toUiDate(pickField(conditioning, "TO_DATE_TIME", "toDateTime")) || str(pickField(conditioning, "TO_DATE_TIME")),
-    },
-    GRAIN_DIMENSION: mapTableRows(
-      empty.GRAIN_DIMENSION,
-      nestedTableRows(grain, "GRAIN_DIMENSION").length
-        ? nestedTableRows(grain, "GRAIN_DIMENSION")
-        : grain.GRAIN_DIMENSION ?? grain.rows,
-      ["SIDE"],
-    ),
-    BEM_HARDWARE_DETAILS: mapRowFields(empty.BEM_HARDWARE_DETAILS, hardware),
-    IGNITER_DETAILS: mapRowFields(empty.IGNITER_DETAILS, igniter),
-    NOZZLE_DETAILS: mapRowFields(empty.NOZZLE_DETAILS, nozzle),
-    TESTING_DETAILS: mapRowFields(empty.TESTING_DETAILS, testing),
-    SENSOR_CONFIGURATION: mapTableRows(
-      empty.SENSOR_CONFIGURATION,
-      nestedTableRows(sensor, "SENSOR_CONFIGURATION").length
-        ? nestedTableRows(sensor, "SENSOR_CONFIGURATION")
-        : sensor.SENSOR_CONFIGURATION ?? sensor.rows,
-      ["CHANNEL"],
-    ),
-    RESULT_DETAILS: mapRowFields(empty.RESULT_DETAILS, result),
-    UPLOAD_PT_CURVE: {
-      PT_CURVE_UPLOAD: parseFileRefs(
-        pickField(upload, "PT_CURVE_UPLOAD", "ptCurveUpload", "PT_CURVE_FILE", "ptCurveFile"),
-      ),
-    },
-  };
+  // No legacy section remapping — empty form when nested DTO is absent.
+  return createEmptyStfMotorData(variant);
 };
 
 export const buildStfMotorStaticTestingDetails = (
   data: StfMotorData,
 ): StfStaticTestingDetailsApi => {
   if (data.variant === "MAIN_MOTOR") {
-    const sensors = buildMainSensorConfigurations(data.SENSOR_CONFIGURATION);
+    const ballistic = buildMainBallisticParameters(data.BALLISTIC_PARAMETERS);
     return omitEmpty({
-      igniterDetails: buildIgniterDetails(data.IGNITER_DETAILS),
+      testHeader: buildMainTestHeader(data.TEST_HEADER),
       nozzleDetails: buildMainNozzleDetails(data.NOZZLE_DETAILS),
-      testingDetails: buildMainTestingDetails(data.TESTING_DETAILS),
-      sensorConfigurations: sensors.length ? sensors : undefined,
-      resultDetails: buildMainResultDetails(data.STATIC_TEST_RESULT),
-      ptCurveFile: toFileIdPayloadOrNull(data.UPLOAD_PT_CURVE.PT_CURVE_FILE) ?? undefined,
-    }) as StfStaticTestingDetailsApi;
+      mainMotorData: buildMainMotorData(data.MAIN_MOTOR_DATA),
+      ballisticParameters: ballistic.length ? ballistic : undefined,
+      burnRate: buildMainBurnRate(data.BURN_RATE),
+    }) as StfMainStaticTestingDetailsApi;
   }
 
-  const sensors = buildBemSensorConfigurations(data.SENSOR_CONFIGURATION);
-  const grains = buildGrainDimensions(data.GRAIN_DIMENSION);
+  const ballistic = buildBemBallisticParameters(data.BALLISTIC_PARAMETERS);
   return omitEmpty({
-    conditioningDetails: buildConditioningDetails(data.CONDITIONING_DETAILS),
-    grainDimensions: grains.length ? grains : undefined,
-    bemHardwareDetails: buildBemHardwareDetails(data.BEM_HARDWARE_DETAILS),
-    igniterDetails: buildIgniterDetails(data.IGNITER_DETAILS),
+    testHeader: buildBemTestHeader(data.TEST_HEADER),
+    igniterDetails: buildBemIgniterDetails(data.IGNITER_DETAILS),
     nozzleDetails: buildBemNozzleDetails(data.NOZZLE_DETAILS),
-    testingDetails: buildBemTestingDetails(data.TESTING_DETAILS),
-    sensorConfigurations: sensors.length ? sensors : undefined,
-    resultDetails: buildBemResultDetails(data.RESULT_DETAILS),
-    ptCurveFile: toFileIdPayloadOrNull(data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD) ?? undefined,
-  }) as StfStaticTestingDetailsApi;
+    bemData: buildBemData(data.BEM_DATA),
+    ballisticParameters: ballistic.length ? ballistic : undefined,
+    burnRate: buildBemBurnRate(data.BURN_RATE),
+  }) as StfBemStaticTestingDetailsApi;
 };
 
 export const collectStfFileRefsFromForm = (form: {

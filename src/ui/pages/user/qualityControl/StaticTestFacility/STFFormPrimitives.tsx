@@ -18,7 +18,7 @@ export {
 } from "../../manufacturing/PostCure/postCureFormPrimitivesShared";
 
 type SectionCardProps = {
-  title: string;
+  title?: string;
   children: ReactNode;
   theme?: any;
   mb?: number;
@@ -27,6 +27,7 @@ type SectionCardProps = {
 export const SectionCard = ({ title, children, theme, mb = 3 }: SectionCardProps) => {
   const details = theme?.qualityControl?.staticTestFacility?.details;
   const BRAND = STF_BRAND;
+  const showTitle = Boolean(title?.trim());
   return (
     <Box
       sx={{
@@ -39,23 +40,25 @@ export const SectionCard = ({ title, children, theme, mb = 3 }: SectionCardProps
         mb,
       }}
     >
-      <Typography
-        sx={
-          details?.sectionTitle ?? {
-            fontSize: "0.72rem",
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: BRAND.primaryLight,
-            mb: 1.5,
-            display: "flex",
-            alignItems: "center",
-            gap: 0.75,
+      {showTitle ? (
+        <Typography
+          sx={
+            details?.sectionTitle ?? {
+              fontSize: "0.72rem",
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: BRAND.primaryLight,
+              mb: 1.5,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+            }
           }
-        }
-      >
-        {title}
-      </Typography>
+        >
+          {title}
+        </Typography>
+      ) : null}
       {children}
     </Box>
   );

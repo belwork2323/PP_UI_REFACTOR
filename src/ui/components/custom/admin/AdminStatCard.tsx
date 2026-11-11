@@ -11,6 +11,7 @@ export type AdminStatCardProps = {
   iconBorder?: string;
   iconColor: string;
   valueColor: string;
+  onClick?: () => void;
   theme: {
     card: object;
     accentBar: object;
@@ -34,9 +35,34 @@ const AdminStatCard = ({
   iconBorder,
   iconColor,
   valueColor,
+  onClick,
   theme,
 }: AdminStatCardProps) => (
-  <Box sx={theme.card}>
+  <Box
+    sx={{
+      ...theme.card,
+      ...(onClick
+        ? {
+            cursor: "pointer",
+            transition: "transform 0.15s ease, box-shadow 0.15s ease",
+            "&:hover": { transform: "translateY(-2px)" },
+          }
+        : {}),
+    }}
+    onClick={onClick}
+    role={onClick ? "button" : undefined}
+    tabIndex={onClick ? 0 : undefined}
+    onKeyDown={
+      onClick
+        ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onClick();
+            }
+          }
+        : undefined
+    }
+  >
     <Box sx={{ ...theme.accentBar, background: accent }} />
     <Box
       sx={{

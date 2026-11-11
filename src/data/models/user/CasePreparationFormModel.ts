@@ -62,7 +62,10 @@ const CASE_PREP_DATETIME_KEYS = new Set([
   "heMotorPastingDateTime",
   "neMotorPastingDateTime",
   "tceCleaningDateTime",
-  "prrcClearanceDate",
+  "startDateTime",
+  "endDateTime",
+  "preHeatingDateTime",
+  "linerCoatingDateTime",
 ]);
 
 /** Match API sample Instant format: `2026-08-12T02:00:00Z` (no millis). */
@@ -162,8 +165,7 @@ export const isMotorEditable = (status?: MotorSubmissionStatus | string | null) 
 
 export const isMotorApproverTabDisabled = (
   status?: MotorSubmissionStatus | string | null,
-): boolean =>
-  isMotorWorkflowTabDisabled(status) || !status || status === "TO_BE_INITIATED";
+): boolean => isMotorWorkflowTabDisabled(status) || !status || status === "TO_BE_INITIATED";
 
 export const isMotorApproverActionable = (
   status?: MotorSubmissionStatus | string | null,
@@ -346,10 +348,7 @@ export const mapCasePreparationMotorStatusesFromApi = (
       motorSubmissionType:
         normalizeMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeMotorStatus(
-        preferMotorSubmissionStatus(
-          existing?.motorSubmissionStatus,
-          motor?.motorSubmissionStatus,
-        ),
+        preferMotorSubmissionStatus(existing?.motorSubmissionStatus, motor?.motorSubmissionStatus),
       ),
       submittedAt: motor?.submittedAt ?? existing?.submittedAt ?? null,
       reviewedBy: motor?.actionBy ?? motor?.reviewedBy ?? existing?.reviewedBy ?? null,
@@ -644,7 +643,7 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
     temperatureDurationHeading: "Temperature Duration",
     temperatureDuration: "Temperature Duration",
     preHeatingMonitoring: "Pre-heating Monitoring",
-    preHeatingDate: "Pre-heating Date",
+    preHeatingDateTime: "Pre-heating Date & Time",
     linerCoatingOperation: "Liner Coating Operation",
     linerType: "Select Liner Type",
     otherLinerType: "Other Liner Type",
@@ -657,7 +656,7 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
     qualifyingSubscaleBatchNo: "Qualifying Subscale Batch No.",
     qualificationParameters: "Qualification Parameters",
     linerApplicationLog: "Liner Application Process Log",
-    linerCoatingDate: "Liner Coating Date",
+    linerCoatingDateTime: "Liner Coating Date & Time",
     dispatchVisualObservations: "Dispatch Visual Observations",
     dispatchToCastingDetails: "Dispatch To Casting Details",
   },
@@ -669,17 +668,15 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
       attachments: "Photos / Videos",
     },
     firstCut: {
-      date: "Date",
-      startTime: "Start Time",
-      endTime: "End Time",
+      startDateTime: "Start Date & Time",
+      endDateTime: "End Date & Time",
       dustQty: "Qty of Dust (gms)",
       observations: "Observations",
       attachments: "Attachments",
     },
     secondCut: {
-      date: "Date",
-      startTime: "Start Time",
-      endTime: "End Time",
+      startDateTime: "Start Date & Time",
+      endDateTime: "End Date & Time",
       dustQty: "Qty of Dust (gms)",
       observations: "Observations",
       attachments: "Attachments",
@@ -724,11 +721,12 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
       remarks: "Remarks",
     },
     dispatchVisualObservations: {
-      parameter: "Operation",
+      parameter: "Parameter",
       observations: "Observations",
+      remarks: "Remarks",
     },
     dispatchToCastingDetails: {
-      parameter: "Operation",
+      parameter: "Parameter",
       value: "Value",
       remarks: "Remarks",
     },
@@ -737,9 +735,8 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
 });
 
 /** @deprecated Prefer getCasePrepStaticLabelIndex — schema walk no longer required. */
-export const buildCasePrepSchemaLabelIndex = (
-  _schema?: unknown,
-): CasePrepSchemaLabelIndex => getCasePrepStaticLabelIndex();
+export const buildCasePrepSchemaLabelIndex = (_schema?: unknown): CasePrepSchemaLabelIndex =>
+  getCasePrepStaticLabelIndex();
 
 const resolveCasePrepBlockLabel = (
   labelIndex: CasePrepSchemaLabelIndex | undefined,
@@ -821,13 +818,15 @@ const CASE_PREP_COLUMN_PRIORITY = [
   "INGREDIENT",
   "value",
   "VALUE",
-  "result",
-  "RESULT",
+  // Spec before Result — matches create form / PostCure details ordering.
   "specification",
   "SPECIFICATION",
-  "remarks",
-  "remarksObservations",
+  "result",
+  "RESULT",
+  // Observations before Remarks — matches Dispatch Visual Observations create form.
   "observations",
+  "remarksObservations",
+  "remarks",
   "REMARKS",
   "attachments",
   "mfgLot",
@@ -923,14 +922,12 @@ const buildTableColumnLabels = (
   );
 };
 
-const isWrappedTableValue = (
-  value: unknown,
-): value is { rows: Record<string, unknown>[] } =>
+const isWrappedTableValue = (value: unknown): value is { rows: Record<string, unknown>[] } =>
   Boolean(
     value &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      Array.isArray((value as { rows?: unknown }).rows),
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Array.isArray((value as { rows?: unknown }).rows),
   );
 
 const isTableRowArray = (value: unknown): value is Record<string, unknown>[] =>
@@ -1060,13 +1057,11 @@ export const resolveCasePrepMotorDetailSections = (
   labelIndex?: CasePrepSchemaLabelIndex,
 ): CasePrepDetailSection[] => {
   if (Array.isArray(motor.sections)) {
-    return (motor.sections as Array<{ sectionId?: string; sectionData?: Record<string, unknown>[] }>)
+    return (
+      motor.sections as Array<{ sectionId?: string; sectionData?: Record<string, unknown>[] }>
+    )
       .map((section) =>
-        parseCasePrepSectionData(
-          String(section.sectionId ?? ""),
-          section.sectionData,
-          labelIndex,
-        ),
+        parseCasePrepSectionData(String(section.sectionId ?? ""), section.sectionData, labelIndex),
       )
       .filter((section) => section.sectionId);
   }
@@ -1195,8 +1190,7 @@ export const mapCasePreparationDetailsForDisplay = (
   );
 
   const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
-    | Partial<MotorCounts>
-    | undefined;
+    Partial<MotorCounts> | undefined;
   const derivedCounts: MotorCounts = {
     pendingMotorCount: 0,
     approvedMotorCount: 0,

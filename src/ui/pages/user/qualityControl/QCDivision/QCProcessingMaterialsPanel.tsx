@@ -23,7 +23,16 @@ import type {
   RawMaterialPrepMaterialProcessSlot,
   RawMaterialPrepWeightmentSheet,
 } from "../../../../../data/models/user/RawMaterialPreparationModel";
-import { hydratePremixProcessSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import {
+  hydratePremixProcessSlot,
+  mapProcessSections,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
+import GrainRoundedIcon from "@mui/icons-material/GrainRounded";
+import OpacityRoundedIcon from "@mui/icons-material/OpacityRounded";
+import {
+  ProcessDetailBlock,
+  WeightmentSheetDetailBlock,
+} from "../../manufacturing/RawMaterial/components/RawMaterialPreparationDetailsContent";
 import type { IdentificationSheet } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
@@ -58,6 +67,7 @@ type QCProcessingMaterialsPanelProps = {
   divisionAutoPopulateData?: Record<string, unknown> | null;
   readOnly?: boolean;
   fieldsDisabled?: boolean;
+  detailsView?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   onEntryValuesChange: (
@@ -87,13 +97,14 @@ type QCProcessingMaterialsPanelProps = {
 const QCProcessingMaterialsPanel = ({
   formData,
   entries,
-  entryValuesById,
+  entryValuesById: _entryValuesById,
   subDepartmentId,
   batchId,
   batchPayload = null,
   divisionAutoPopulateData = null,
   readOnly = false,
   fieldsDisabled = false,
+  detailsView = false,
   schemaLoading = false,
   schemaError: _schemaError = null,
   onEntryValuesChange,
@@ -144,13 +155,10 @@ const QCProcessingMaterialsPanel = ({
   }, [processingValidationFocusRequest, materialEntries]);
 
   const activeEntry = materialEntries[activeMaterialIndex] ?? null;
-  const activeValues = activeEntry ? entryValuesById[activeEntry.entryId] : null;
   const activeSchema = activeEntry ? getSchemaForDivisionEntry(formData, activeEntry) : null;
-  const schemaUnavailable = Boolean(activeEntry?.schemaUnavailable);
 
-  const showWeightment = Boolean(
-    schemaUnavailable || materialEntries.some((entry) => entry.schemaUnavailable),
-  );
+  // RMP parity: always show weighment for Raw Material Processing (not schema-gated).
+  const showWeightment = materialEntries.length > 0;
 
   const activePremixNoForWeightment = useMemo(() => {
     const fromActive = Number(activeEntry?.premixNo);
@@ -510,8 +518,11 @@ const QCProcessingMaterialsPanel = ({
     [materialEntries],
   );
 
-  const showUnitActions = Boolean(unitActions?.show);
+  const showUnitActions = !detailsView && Boolean(unitActions?.show);
   const inputsLocked = readOnly || fieldsDisabled;
+  const manufacturingDetailsTheme = manufacturingTheme.manufacturing.rawMaterialPrep.details;
+  const activeProcessView =
+    detailsView && activeEntry?.savedProcess ? mapProcessSections(activeEntry.savedProcess) : null;
 
   if (!materialEntries.length) {
     return (
@@ -583,7 +594,7 @@ const QCProcessingMaterialsPanel = ({
         </Stack>
       ) : null}
 
-      {activeEntry && (activeValues || schemaUnavailable) ? (
+      {activeEntry ? (
         <Box
           key={activeEntry.entryId}
           sx={{
@@ -617,57 +628,34 @@ const QCProcessingMaterialsPanel = ({
             ) : null}
           </Typography>
 
-          {schemaUnavailable ? (
+          {detailsView ? (
             <Stack spacing={1.25}>
-              {activeProcessSlot && rmpUiKeyShowsProcessPanel(activeProcessSlot.uiKey) ? (
-                <Box data-rmp-slot={activeEntry.processSlot === "liquid" ? "liquid" : "solid"}>
-                  <RawMaterialMaterialProcessPanel
-                    slotState={activeProcessSlot}
-                    onSlotChange={(next) => {
-                      if (!activeEntry || inputsLocked) return;
-                      onProcessingProcessChange?.(activeEntry.entryId, next);
-                    }}
-                    materialCode={String(activeEntry.materialCode ?? "")}
-                    rmpFormTemplate={activeEntry.rmpFormTemplate}
-                    lotOptions={lotOptionsForMaterial(
-                      identificationSheet?.materials,
-                      activeEntry.materialCode,
-                      [
-                        ...(activeEntry.savedProcess?.lotDetails ?? [])
-                          .map((lot) => String(lot.lotId ?? "").trim())
-                          .filter(Boolean),
-                        ...approvedLotFallback,
-                      ],
-                    )}
-                    quantityPerPremix={quantityPerPremixForMaterial(
-                      identificationSheet?.materials,
-                      activeEntry.materialCode,
-                    )}
-                    readOnly={inputsLocked}
-                    theme={manufacturingTheme}
-                    validationErrors={processingFieldErrors[activeEntry.entryId]}
-                    showQaRemarks
-                  />
-                </Box>
+              {activeProcessView && activeProcessView.sections.length > 0 ? (
+                <ProcessDetailBlock
+                  process={activeProcessView}
+                  slotLabel={activeEntry.processSlot === "liquid" ? "Liquid" : "Solid"}
+                  slotIcon={activeEntry.processSlot === "liquid" ? OpacityRoundedIcon : GrainRoundedIcon}
+                  slotColor={
+                    activeEntry.processSlot === "liquid"
+                      ? manufacturingTheme.palette.primaryLight ?? "#2E86C1"
+                      : manufacturingTheme.palette.primary ?? "#1565C0"
+                  }
+                  dt={manufacturingDetailsTheme}
+                />
               ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (
                 <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
-              ) : null}
-              {weightmentSheet ? (
-                <RawMaterialWeightmentSheetPanel
-                  key={`weightment-premix-${activePremixNoForWeightment}`}
-                  value={weightmentSheet}
-                  onChange={handleWeightmentChange}
-                  onValidationChange={handleWeightmentValidationChange}
-                  theme={manufacturingTheme}
-                  batchId={batchId}
-                  identificationSheet={identificationSheet}
-                  premixNo={activePremixNoForWeightment}
-                  disabled={inputsLocked}
-                  allowAddRemoveRows
-                  compareHighlightOnly
-                  weightmentErrors={weightmentErrors}
-                  validationAttempt={validationAttempt}
-                  rowSourceIndices={weightmentRowSourceIndices}
+              ) : (
+                <Typography sx={manufacturingDetailsTheme.emptyText}>
+                  No process section data recorded.
+                </Typography>
+              )}
+              {weightmentSheet &&
+              (weightmentSheet.mixerBuildingNumber ||
+                (weightmentSheet.weightmentDetails?.length ?? 0) > 0) ? (
+                <WeightmentSheetDetailBlock
+                  weightmentSheet={weightmentSheet}
+                  dt={manufacturingDetailsTheme}
+                  palette={manufacturingTheme.palette}
                 />
               ) : (
                 <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
@@ -675,24 +663,65 @@ const QCProcessingMaterialsPanel = ({
                 </Typography>
               )}
             </Stack>
-          ) : readOnly && (activeEntry.savedSections?.length ?? 0) > 0 ? (
-            <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
-          ) : null}
-        </Box>
-      ) : activeEntry && readOnly && (activeEntry.savedSections?.length ?? 0) > 0 ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.surface,
-            px: 1.5,
-            py: 1.25,
-          }}
-        >
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
-            {activeEntry.label}
-          </Typography>
-          <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
+          ) : (
+          <Stack spacing={1.25}>
+            {activeProcessSlot && rmpUiKeyShowsProcessPanel(activeProcessSlot.uiKey) ? (
+              <Box data-rmp-slot={activeEntry.processSlot === "liquid" ? "liquid" : "solid"}>
+                <RawMaterialMaterialProcessPanel
+                  slotState={activeProcessSlot}
+                  onSlotChange={(next) => {
+                    if (!activeEntry || inputsLocked) return;
+                    onProcessingProcessChange?.(activeEntry.entryId, next);
+                  }}
+                  materialCode={String(activeEntry.materialCode ?? "")}
+                  rmpFormTemplate={activeEntry.rmpFormTemplate}
+                  lotOptions={lotOptionsForMaterial(
+                    identificationSheet?.materials,
+                    activeEntry.materialCode,
+                    [
+                      ...(activeEntry.savedProcess?.lotDetails ?? [])
+                        .map((lot) => String(lot.lotId ?? "").trim())
+                        .filter(Boolean),
+                      ...approvedLotFallback,
+                    ],
+                  )}
+                  quantityPerPremix={quantityPerPremixForMaterial(
+                    identificationSheet?.materials,
+                    activeEntry.materialCode,
+                  )}
+                  readOnly={inputsLocked}
+                  theme={manufacturingTheme}
+                  validationErrors={processingFieldErrors[activeEntry.entryId]}
+                  showQaRemarks
+                />
+              </Box>
+            ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (
+              <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
+            ) : null}
+            {weightmentSheet ? (
+              <RawMaterialWeightmentSheetPanel
+                key={`weightment-premix-${activePremixNoForWeightment}`}
+                value={weightmentSheet}
+                onChange={handleWeightmentChange}
+                onValidationChange={handleWeightmentValidationChange}
+                theme={manufacturingTheme}
+                batchId={batchId}
+                identificationSheet={identificationSheet}
+                premixNo={activePremixNoForWeightment}
+                disabled={inputsLocked}
+                allowAddRemoveRows
+                compareHighlightOnly
+                weightmentErrors={weightmentErrors}
+                validationAttempt={validationAttempt}
+                rowSourceIndices={weightmentRowSourceIndices}
+              />
+            ) : (
+              <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
+                {S.WEIGHTMENT_FALLBACK_EMPTY}
+              </Typography>
+            )}
+          </Stack>
+          )}
         </Box>
       ) : null}
     </Stack>

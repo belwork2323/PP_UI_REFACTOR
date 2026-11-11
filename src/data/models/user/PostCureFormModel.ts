@@ -30,6 +30,7 @@ import {
 } from "../../../hooks/user/manufacturing/postCureConfig";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
+import { formatDisplayDateTime } from "../../../utils/dateUtils";
 
 export type PostCureMotorSession = {
   motorId: string;
@@ -330,7 +331,7 @@ export const hydratePostCureMotorSession = (
     String(motor.operation ?? "").trim() ||
     mapApiOperationType(operationType) ||
     String(motor.fallback?.operation ?? "");
-  const inhibitorType =
+  let inhibitorType =
     mapApiInhibitorType(String(apiMotor.inhibitorType ?? motor.inhibitorType ?? "").trim()) ||
     mapApiInhibitorType(String(motor.fallback?.inhibitorType ?? "").trim());
 
@@ -345,8 +346,21 @@ export const hydratePostCureMotorSession = (
   }
 
   let inhibitionData: PostCureMotorData | null = null;
-  if (hasInhibition && inhibitorType) {
-    inhibitionData = parseInhibitionMotorDataFromApi(apiMotor, inhibitorType);
+  if (hasInhibition) {
+    // Infers type from payload when wire inhibitorType is missing after BE strip.
+    inhibitionData =
+      parseInhibitionMotorDataFromApi(apiMotor, inhibitorType) ??
+      (inhibitorType ? createInhibitionDataForType(inhibitorType) : null);
+    if (!inhibitorType && inhibitionData?.variant) {
+      inhibitorType =
+        inhibitionData.variant === "inhibition-hemcoat-3k"
+          ? "Hemcoat-3K"
+          : inhibitionData.variant === "inhibition-others"
+            ? "Others"
+            : inhibitionData.variant === "inhibition-not-applicable"
+              ? "not-applicable"
+              : "IR1";
+    }
   } else if (inhibitorType) {
     const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
     if (variant === "inhibition-not-applicable") {
@@ -547,11 +561,27 @@ export type PostCureDetailView = {
   motorCounts?: PostCureMotorCounts;
 };
 
+const normalizePostCureDisplayDateTimes = (value: unknown): unknown => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    return formatDisplayDateTime(value, value);
+  }
+  if (Array.isArray(value)) return value.map(normalizePostCureDisplayDateTimes);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, normalizePostCureDisplayDateTimes(entry)]),
+    );
+  }
+  return value;
+};
+
 const parsePostCureDisplaySections = (sections: unknown[] | undefined): CasePrepDetailSection[] =>
   (sections ?? [])
     .map((section) => {
       const block = section as { sectionId?: string; sectionData?: Record<string, unknown>[] };
-      return parseCastingCuringSectionData(String(block.sectionId ?? ""), block.sectionData);
+      return parseCastingCuringSectionData(
+        String(block.sectionId ?? ""),
+        normalizePostCureDisplayDateTimes(block.sectionData),
+      );
     })
     .filter((section) => section.fields.length > 0 || section.tables.length > 0);
 

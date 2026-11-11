@@ -14,6 +14,8 @@ export class UserListItemModel {
   department: unknown;
   subDepartments: unknown[];
   isActive: boolean;
+  mustChangePassword: boolean;
+  temporaryPassword: string | null;
   createdOn: unknown;
   createdBy: unknown;
 
@@ -28,6 +30,8 @@ export class UserListItemModel {
     department,
     subDepartments,
     isActive,
+    mustChangePassword,
+    temporaryPassword,
     createdOn,
     createdBy,
   }: Record<string, unknown>) {
@@ -41,6 +45,8 @@ export class UserListItemModel {
     this.department = department;
     this.subDepartments = Array.isArray(subDepartments) ? subDepartments : [];
     this.isActive = (isActive as boolean) ?? true;
+    this.mustChangePassword = Boolean(mustChangePassword);
+    this.temporaryPassword = (temporaryPassword as string) || null;
     this.createdOn = createdOn ?? null;
     this.createdBy = createdBy ?? null; // { userId, username, role }
   }
@@ -75,6 +81,7 @@ export class UserListItemModel {
       extractedDept = deptNames.join(", ");
     }
 
+    const mustChange = Boolean(data.mustChangePassword);
     return new UserListItemModel({
       id: data.userUUID || data.user_uuid || data.userId || data.id,
       userUUID: data.userUUID || data.user_uuid || data.id || "",
@@ -86,6 +93,8 @@ export class UserListItemModel {
       department: extractedDept,
       subDepartments: extractedSubDepts,
       isActive: data.status === "ACTIVE" || data.isActive === true,
+      mustChangePassword: mustChange,
+      temporaryPassword: mustChange ? (data.temporaryPassword ?? null) : null,
       createdOn: data.createdOn,
       createdBy: data.createdBy,
     });

@@ -6,10 +6,10 @@
   "functionality": "CREATE_STATIC_TESTING_FORM",
   "subType": "BEM",
   "subDepartmentId": 115,
-  "message": "BEM static testing schema fetched successfully",
+  "message": "BEM static testing schema / nested staticTestingDetails example",
   "meta": {
     "title": "Static Testing Facility - BEM",
-    "description": "BEM static testing facility process parameters"
+    "description": "BEM static testing facility process parameters (new sheet layout)"
   },
   "data": {
     "layout": {
@@ -19,476 +19,213 @@
       "title": "Static Testing Facility - BEM",
       "description": "BEM static testing facility process parameters"
     },
-    "ui": {
-      "layout": "flat",
-      "gap": "md",
-      "sectionVariant": "card",
-      "sectionBorderRadius": "sm",
-      "designSystem": {
-        "colors": {
-          "primary": "#1B4F72",
-          "primaryLight": "#2E86C1",
-          "surface": "#F4F6F8",
-          "border": "#D5D8DC",
-          "text": "#1C2833",
-          "textSub": "#5D6D7E"
-        },
-        "typography": {},
-        "spacing": {
-          "xs": 4,
-          "sm": 8,
-          "md": 12,
-          "lg": 16,
-          "xl": 24
-        },
-        "radius": {
-          "sm": 4,
-          "md": 6,
-          "lg": 8
-        },
-        "icons": {
-          "sectionDefault": "description",
-          "staticTestFacility": "rocket_launch"
-        }
-      }
-    },
     "context": {
       "subDepartmentId": 115,
       "subType": "BEM"
     },
-    "sections": [
-      {
-        "sectionId": "CONDITIONING_DETAILS",
-        "sectionName": "Conditioning Details",
-        "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
+    "exampleMotorPayload": {
+      "motorId": "BEM-001",
+      "subType": "BEM",
+      "stfTestNo": "STF-BEM-001",
+      "staticTestingDetails": {
+        "testHeader": {
+          "loadingNo": "L-100",
+          "firingNo": "F-200",
+          "firingDate": "2026-10-08T14:30:00",
+          "temperature": 25,
+          "rh": 55,
+          "wtOfGrain": "40",
+          "grainConfiguration": "6 STAR PETAL",
+          "qaRemarks": "Optional QA remarks"
         },
-        "fields": [
+        "igniterDetails": {
+          "type": "Pyrogen",
+          "srNoAndLotNo": "SR-12 / LOT-A",
+          "chargeMassGm": 120.5,
+          "composition": "BKNO3",
+          "qaRemarks": "Optional QA remarks"
+        },
+        "nozzleDetails": {
+          "beforeDt": 12.1,
+          "beforeDe": 45.2,
+          "afterDt": 12.3,
+          "afterDe": 45.4,
+          "nozzleClosureThicknessMm": 2.5,
+          "qaRemarks": "Optional QA remarks"
+        },
+        "bemData": {
+          "propellantWeightKg": 39.8,
+          "conditioningTemperature": 20,
+          "nValue": 0.35,
+          "webThicknessAverageMin": 10.2,
+          "webThicknessStdDev": 0.15,
+          "qaRemarks": "Optional QA remarks"
+        },
+        "ballisticParameters": [
           {
-            "fieldId": "FROM_DATE_TIME",
-            "label": "From (Date & Time)",
-            "type": "datetime"
+            "parameter": "PRESSURE_THRUST",
+            "channel1": "100",
+            "channel2": "98",
+            "qaRemarks": "Optional QA remarks"
           },
           {
-            "fieldId": "TO_DATE_TIME",
-            "label": "To (Date & Time)",
-            "type": "datetime"
+            "parameter": "SENSOR_SENSITIVITY",
+            "channel1": "1.2",
+            "channel2": "1.1"
           },
           {
-            "fieldId": "TEMPERATURE",
-            "label": "Temperature (°C)",
-            "type": "number"
+            "parameter": "IGNITION_DELAY",
+            "channel1": "0.05",
+            "channel2": "0.05"
           },
           {
-            "fieldId": "RH",
-            "label": "RH (%)",
-            "type": "number"
+            "parameter": "ACTION_TIME",
+            "channel1": "2.1",
+            "channel2": "2.0"
           },
           {
-            "fieldId": "OBSERVATION",
-            "label": "Observation",
-            "type": "textarea"
-          }
-        ]
-      },
-      {
-        "sectionId": "GRAIN_DIMENSION",
-        "sectionName": "Grain Dimension",
-        "type": "table",
-        "addRowAllowed": false,
-        "mergePresetColumns": ["LENGTH", "WEIGHT"],
-        "columns": [
-          {
-            "fieldId": "SIDE",
-            "label": "Side",
-            "type": "text",
-            "readonly": true
+            "parameter": "BURN_TIME",
+            "channel1": "1.8",
+            "channel2": "1.8"
           },
           {
-            "fieldId": "OD",
-            "label": "OD",
-            "type": "number"
+            "parameter": "AVERAGE_IN_BURN_TIME",
+            "channel1": "85",
+            "channel2": "84"
           },
           {
-            "fieldId": "A",
-            "label": "A",
-            "type": "number"
+            "parameter": "AVERAGE_IN_ACTION_TIME",
+            "channel1": "80",
+            "channel2": "79"
           },
           {
-            "fieldId": "B",
-            "label": "B",
-            "type": "number"
+            "parameter": "AREA_IN_BURN_TIME",
+            "channel1": "150",
+            "channel2": "148"
           },
           {
-            "fieldId": "C",
-            "label": "C",
-            "type": "number"
+            "parameter": "AREA_IN_ACTION_TIME",
+            "channel1": "160",
+            "channel2": "158"
           },
           {
-            "fieldId": "LENGTH",
-            "label": "Length",
-            "type": "number"
-          },
-          {
-            "fieldId": "WEIGHT",
-            "label": "Weight (Kg)",
-            "type": "number"
+            "parameter": "CSTAR_ISP",
+            "channel1": "1500 / 240",
+            "channel2": "1495 / 239"
           }
         ],
-        "predefinedRows": [
-          {
-            "side": "Side I"
-          },
-          {
-            "side": "Side II"
-          }
-        ]
-      },
+        "burnRate": {
+          "burnRateMmS": 8.5,
+          "pressureAbsKsc": 70,
+          "qaRemarks": "Optional QA remarks"
+        }
+      }
+    },
+    "sections": [
       {
-        "sectionId": "BEM_HARDWARE_DETAILS",
-        "sectionName": "BEM Hardware Details",
+        "sectionId": "TEST_HEADER",
+        "sectionName": "Test Header",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
+          { "fieldId": "LOADING_NO", "label": "Loading No.", "type": "text" },
+          { "fieldId": "FIRING_NO", "label": "Firing No.", "type": "text" },
+          { "fieldId": "FIRING_DATE", "label": "Firing Date & Time", "type": "datetime" },
+          { "fieldId": "TEMPERATURE", "label": "Temperature", "type": "number" },
+          { "fieldId": "RH", "label": "RH", "type": "number" },
           {
-            "fieldId": "HEAD_END_NO",
-            "label": "Head End No",
-            "type": "text"
+            "fieldId": "WT_OF_GRAIN",
+            "label": "Wt. of Grain (kg)",
+            "type": "select",
+            "options": ["40", "20", "2"]
           },
           {
-            "fieldId": "NOZZLE_END_NO",
-            "label": "Nozzle End No",
-            "type": "text"
-          },
-          {
-            "fieldId": "RETAINER_RING_NO",
-            "label": "Retainer Ring No",
-            "type": "text"
-          },
-          {
-            "fieldId": "CASING_NO",
-            "label": "Casing No",
-            "type": "text"
-          },
-          {
-            "fieldId": "CASING_OD",
-            "label": "OD",
-            "type": "number"
-          },
-          {
-            "fieldId": "CASING_ID",
-            "label": "ID",
-            "type": "number"
-          },
-          {
-            "fieldId": "CASING_LENGTH",
-            "label": "Length",
-            "type": "number"
-          },
-          {
-            "fieldId": "FIRING_NO",
-            "label": "Firing No",
-            "type": "text"
+            "fieldId": "GRAIN_CONFIGURATION",
+            "label": "Grain Configuration",
+            "type": "select",
+            "options": ["6 STAR PETAL", "10 POINT STAR", "ID & OD", "ID & BOTH END"]
           }
         ]
       },
       {
         "sectionId": "IGNITER_DETAILS",
-        "sectionName": "Igniter Details",
+        "sectionName": "Igniter",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
-          {
-            "fieldId": "CONTAINER_TYPE",
-            "label": "Container Type",
-            "type": "text"
-          },
-          {
-            "fieldId": "COMPOSITION",
-            "label": "Composition",
-            "type": "text"
-          },
-          {
-            "fieldId": "WEIGHT_OF_COMPOSITION",
-            "label": "Weight of Composition (g)",
-            "type": "number"
-          },
-          {
-            "fieldId": "SQUIB_RESISTANCE",
-            "label": "Squib Resistance (Ω)",
-            "type": "number"
-          },
-          {
-            "fieldId": "REMARKS",
-            "label": "Remarks",
-            "type": "textarea"
-          }
+          { "fieldId": "TYPE", "label": "Type", "type": "text" },
+          { "fieldId": "SR_NO_AND_LOT_NO", "label": "Sr No. & Lot No.", "type": "text" },
+          { "fieldId": "CHARGE_MASS_GM", "label": "Charge Mass (gm)", "type": "number" },
+          { "fieldId": "COMPOSITION", "label": "Composition", "type": "text" }
         ]
       },
       {
         "sectionId": "NOZZLE_DETAILS",
-        "sectionName": "Nozzle Details",
-        "type": "table",
-        "columns": [
-          {
-            "fieldId": "NOZZLE_CLOSURE_MATERIAL",
-            "label": "Nozzle Closure Material",
-            "type": "text"
-          },
-          {
-            "fieldId": "THROAT_MATERIAL",
-            "label": "T (mm)",
-            "type": "number"
-          },
-          {
-            "label": "Nozzle Material",
-            "columns": [
-              {
-                "fieldId": "MOTHER_GRAPHITE",
-                "label": "Mother Graphite",
-                "type": "text"
-              },
-              {
-                "fieldId": "NOZZLE_INSERT",
-                "label": "Nozzle Insert",
-                "type": "text"
-              }
-            ]
-          },
-          {
-            "label": "Before Firing",
-            "columns": [
-              {
-                "fieldId": "BEFORE_D1",
-                "label": "D₁ (mm)",
-                "type": "number"
-              },
-              {
-                "fieldId": "BEFORE_D2",
-                "label": "D₂ (mm)",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "label": "After Firing",
-            "columns": [
-              {
-                "fieldId": "AFTER_D1",
-                "label": "D₁ (mm)",
-                "type": "number"
-              },
-              {
-                "fieldId": "AFTER_D2",
-                "label": "D₂ (mm)",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "fieldId": "REMARKS",
-            "label": "Remarks",
-            "type": "textarea"
-          }
-        ]
-      },
-      {
-        "sectionId": "TESTING_DETAILS",
-        "sectionName": "Testing Details",
+        "sectionName": "Nozzle",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
+          { "fieldId": "BEFORE_DT", "label": "Before Dt", "type": "number" },
+          { "fieldId": "BEFORE_DE", "label": "Before De", "type": "number" },
+          { "fieldId": "AFTER_DT", "label": "After Dt", "type": "number" },
+          { "fieldId": "AFTER_DE", "label": "After De", "type": "number" },
           {
-            "fieldId": "THROAT_DIAMETER",
-            "label": "Throat Diameter",
-            "type": "number"
-          },
-          {
-            "fieldId": "WT_OF_PROPELLANT",
-            "label": "Wt of Propellant",
-            "type": "number"
-          },
-          {
-            "fieldId": "WEB_THICKNESS",
-            "label": "Web Thickness",
-            "type": "number"
-          },
-          {
-            "fieldId": "N_VALUE",
-            "label": "n Value",
-            "type": "number"
-          },
-          {
-            "fieldId": "CONDITIONING_TEMP",
-            "label": "Conditioning Temp",
-            "type": "number"
-          },
-          {
-            "fieldId": "AMBIENT_TEMP",
-            "label": "Ambient Temp",
-            "type": "number"
-          },
-          {
-            "fieldId": "RH",
-            "label": "RH",
+            "fieldId": "NOZZLE_CLOSURE_THICKNESS_MM",
+            "label": "Nozzle Closure Thickness (mm)",
             "type": "number"
           }
         ]
       },
       {
-        "sectionId": "SENSOR_CONFIGURATION",
-        "sectionName": "Sensor Configuration",
-        "type": "table",
-        "addRowAllowed": true,
-        "columns": [
+        "sectionId": "BEM_DATA",
+        "sectionName": "BEM Data",
+        "type": "form",
+        "fields": [
+          { "fieldId": "PROPELLANT_WEIGHT_KG", "label": "Wt of Propellant", "type": "number" },
           {
-            "fieldId": "CHANNEL",
-            "label": "Channel",
-            "type": "text"
+            "fieldId": "CONDITIONING_TEMPERATURE",
+            "label": "Conditioning Temperature",
+            "type": "number"
           },
+          { "fieldId": "N_VALUE", "label": "n value", "type": "number" },
           {
-            "fieldId": "SENSOR",
-            "label": "Sensor",
-            "type": "text"
-          },
-          {
-            "fieldId": "SENSITIVITY",
-            "label": "Sensitivity",
+            "fieldId": "WEB_THICKNESS_AVERAGE_MIN",
+            "label": "Web Thickness Average/Min",
             "type": "number"
           },
           {
-            "label": "Range",
-            "columns": [
-              {
-                "fieldId": "MAX_RANGE",
-                "label": "Max",
-                "type": "number"
-              },
-              {
-                "fieldId": "SENSOR_RANGE",
-                "label": "Sensor exp.",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "fieldId": "FILTER_HZ",
-            "label": "Filter (Hz)",
-            "type": "number"
-          },
-          {
-            "fieldId": "IA_NO",
-            "label": "IA No",
-            "type": "text"
-          },
-          {
-            "fieldId": "IA_GAIN",
-            "label": "IA Gain",
-            "type": "number"
-          },
-          {
-            "fieldId": "EXT_V",
-            "label": "Ext(V)",
-            "type": "number"
-          },
-          {
-            "fieldId": "OFFSET_VALUE",
-            "label": "Offset Value",
-            "type": "number"
-          },
-          {
-            "fieldId": "PRELOADING",
-            "label": "Preloading",
+            "fieldId": "WEB_THICKNESS_STD_DEV",
+            "label": "Web Thickness Std Dev",
             "type": "number"
           }
+        ]
+      },
+      {
+        "sectionId": "BALLISTIC_PARAMETERS",
+        "sectionName": "Ballistic Parameter",
+        "type": "table",
+        "columns": [
+          { "fieldId": "PARAMETER", "label": "Parameter", "readonly": true },
+          { "fieldId": "CHANNEL_1", "label": "Channel 1" },
+          { "fieldId": "CHANNEL_2", "label": "Channel 2" }
         ],
-        "predefinedRows": [
-          {
-            "channel": "PR1"
-          },
-          {
-            "channel": "PR2"
-          },
-          {
-            "channel": "TH1"
-          },
-          {
-            "channel": "TH2"
-          },
-          {
-            "channel": "FP"
-          }
+        "presetRows": [
+          "PRESSURE_THRUST",
+          "SENSOR_SENSITIVITY",
+          "IGNITION_DELAY",
+          "ACTION_TIME",
+          "BURN_TIME",
+          "AVERAGE_IN_BURN_TIME",
+          "AVERAGE_IN_ACTION_TIME",
+          "AREA_IN_BURN_TIME",
+          "AREA_IN_ACTION_TIME",
+          "CSTAR_ISP"
         ]
       },
       {
-        "sectionId": "RESULT_DETAILS",
-        "sectionName": "Result",
-        "type": "table",
-        "addRowAllowed": false,
-        "columns": [
-          {
-            "fieldId": "AVG_PRESSURE",
-            "label": "Avg. Pressure (ksc)",
-            "type": "number"
-          },
-          {
-            "fieldId": "PEAK_PRESSURE",
-            "label": "Peak Pressure (ksc)",
-            "type": "number"
-          },
-          {
-            "fieldId": "TB",
-            "label": "Tb (s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "BURN_RATE",
-            "label": "Burn Rate (mm/s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "C_STAR",
-            "label": "C star (m/s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "ISP",
-            "label": "Isp (s)",
-            "type": "number"
-          }
-        ]
-      },
-      {
-        "sectionId": "UPLOAD_PT_CURVE",
-        "sectionName": "Upload P-T Curve",
+        "sectionId": "BURN_RATE",
+        "sectionName": "Burn Rate",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
-          {
-            "fieldId": "PT_CURVE_UPLOAD",
-            "label": "Upload P-T Curve",
-            "type": "file",
-            "description": "Upload via /files/upload; submit as { fileId }"
-          }
+          { "fieldId": "BURN_RATE_MM_S", "label": "Burn Rate (mm/s)", "type": "number" },
+          { "fieldId": "PRESSURE_ABS_KSC", "label": "Pressure Abs (ksc)", "type": "number" }
         ]
       }
     ]

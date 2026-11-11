@@ -40,7 +40,9 @@ import {
   isMixCardLocked,
   mapBackendQualityChecksToRows,
   mapProcessRows,
+  mixPairHasEnteredDataForCycleChange,
   resolveMixingCycleQualityChecks,
+  shouldSyncMixingCycleMaster,
   type MixCardStageType,
   type MixCardStatusMeta,
   type MixCardSubmissionStatus,
@@ -87,6 +89,7 @@ import useValidationDisplay from "@/ui/components/validation/useValidationDispla
 import type { ValidationTier } from "@/data/validation/submissionIntent";
 
 import mixingController from "@/controllers/user/manufacturing/mixingController";
+import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 
 type CombinedStageKind = "PREMIX" | "FINAL_MIX";
 
@@ -395,8 +398,9 @@ const PremixStageCard = ({
               return (
                 <MixingDateField
                   label={S.LABEL_BOWL_TRIAL_DATE}
+                  type="datetime"
                   value={premix.bowlTrialDate ?? ""}
-                  placeholder="DD-MM-YYYY"
+                  placeholder="DD-MM-YYYY HH:mm"
                   fullWidth="100%"
                   disabled={readOnly}
                   error={!!errorMsg}
@@ -724,7 +728,12 @@ const FinalMixStageCard = ({
           {/* Final mix shares premix mixing cycle code automatically via text field */}
           <MixingTextField
             label={S.LABEL_MIXING_CYCLE}
-            value={entry.mixingCycleCode ?? ""}
+            value={
+              `${entry.mixingCycleCode} - ${entry.mixingCycleName}` ||
+              (entry.mixingCycleCode
+                ? `${entry.mixingCycleCode}${entry.mixingCycleName ? ` - ${entry.mixingCycleName}` : ""}`
+                : "")
+            }
             placeholder="Shared from Premix Cycle"
             disabled
             onChange={() => undefined}
@@ -908,6 +917,8 @@ type MixingFormProps = {
   actionLoading?: boolean;
   onSaveMixCardDraft?: (stageType: MixCardStageType, cardNo: string) => void;
   onSubmitMixCard?: (stageType: MixCardStageType, cardNo: string) => void;
+  preferredMixNav?: { kind: MixCardStageType; cardNo: string } | null;
+  onPreferredMixNavChange?: (nav: { kind: MixCardStageType; cardNo: string } | null) => void;
 };
 
 const MixingForm = ({
@@ -926,6 +937,8 @@ const MixingForm = ({
   actionLoading = false,
   onSaveMixCardDraft,
   onSubmitMixCard,
+  preferredMixNav = null,
+  onPreferredMixNavChange,
 }: MixingFormProps) => {
   const {
     premixCards,
@@ -944,6 +957,7 @@ const MixingForm = ({
     setFinalMixMixingCycle,
     applyFinalMixOperationsAndQCs,
     applyPremixOperationsAndQCs,
+    resetMixPairAfterCycleChange,
   } = useMixingFormHook(
     initialData ?? createDefaultMixingFormState(),
     onBlocksChange,
@@ -956,6 +970,8 @@ const MixingForm = ({
     [],
   );
   const [loadingCycles, setLoadingCycles] = useState(false);
+  /** Premix no awaiting Yes/No when user changes an already-set Mixing Cycle. */
+  const [cycleChangeConfirmPremixNo, setCycleChangeConfirmPremixNo] = useState<string | null>(null);
 
   const mode = useThemeStore((state) => state.mode);
   const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -1033,14 +1049,24 @@ const MixingForm = ({
         const navIndex = navItems.findIndex(
           (item) => item.kind === focus.stageType && item.cardIndex === focus.cardIndex,
         );
-        if (navIndex >= 0) setActiveCardIndex(navIndex);
+        if (navIndex >= 0) {
+          const item = navItems[navIndex];
+          setActiveCardIndex(navIndex);
+          if (item) {
+            const cardNo =
+              item.kind === "PREMIX"
+                ? String(premixCards[item.cardIndex]?.premixNo ?? "").trim()
+                : String(finalMixCards[item.cardIndex]?.mixNo ?? "").trim();
+            if (cardNo) onPreferredMixNavChange?.({ kind: item.kind, cardNo });
+          }
+        }
         setValidationFocusRequest((prev) => ({
           id: (prev?.id ?? 0) + 1,
           fieldPath: focus.fieldPath,
         }));
       }
     },
-    [],
+    [finalMixCards, onPreferredMixNavChange, premixCards],
   );
 
   // Focus once per validation failure request. Do NOT depend on validationErrors —
@@ -1157,11 +1183,34 @@ const MixingForm = ({
   }, [premixCards, finalMixCards]);
 
   const activeNavItem = combinedNavItems[activeCardIndex] ?? null;
+  const retainedDisabledNavItemIdRef = React.useRef<string | null>(null);
 
   const activePremix =
     activeNavItem?.kind === "PREMIX" ? (premixCards[activeNavItem.cardIndex] ?? null) : null;
   const activeFinalMix =
     activeNavItem?.kind === "FINAL_MIX" ? (finalMixCards[activeNavItem.cardIndex] ?? null) : null;
+
+  const resolveNavCardNo = useCallback(
+    (item: CombinedNavItem | null | undefined): string => {
+      if (!item) return "";
+      if (item.kind === "PREMIX") {
+        return String(premixCards[item.cardIndex]?.premixNo ?? "").trim();
+      }
+      return String(finalMixCards[item.cardIndex]?.mixNo ?? "").trim();
+    },
+    [finalMixCards, premixCards],
+  );
+
+  const handleActiveCardIndexChange = useCallback(
+    (index: number) => {
+      setActiveCardIndex(index);
+      const item = combinedNavItems[index];
+      const cardNo = resolveNavCardNo(item);
+      if (!item || !cardNo) return;
+      onPreferredMixNavChange?.({ kind: item.kind, cardNo });
+    },
+    [combinedNavItems, onPreferredMixNavChange, resolveNavCardNo],
+  );
 
   // Custom dependency gate: Check if corresponding premix is approved for final mix gating
   const isFinalMixUnlockedByPremix = useCallback(
@@ -1297,7 +1346,7 @@ const MixingForm = ({
   // When active Final Mix has cycle but empty process rows → load only that card
   useEffect(() => {
     if (!activeFinalMix) return;
-    if (isMixCardLocked(activeFinalMix.mixCardSubmissionStatus)) return;
+    if (!shouldSyncMixingCycleMaster(activeFinalMix.mixCardSubmissionStatus)) return;
 
     const pairedPremix = premixCards.find(
       (p) => String(p.premixNo) === String(activeFinalMix.mixNo),
@@ -1400,30 +1449,49 @@ const MixingForm = ({
   useEffect(() => {
     if (combinedNavItems.length === 0) {
       setActiveCardIndex(0);
+      retainedDisabledNavItemIdRef.current = null;
       return;
     }
+
+    const findNavIndex = (kind: MixCardStageType, cardNo: string) =>
+      combinedNavItems.findIndex((item) => {
+        if (item.kind !== kind) return false;
+        return resolveNavCardNo(item) === String(cardNo).trim();
+      });
+
+    const preferredCardNo = String(preferredMixNav?.cardNo ?? "").trim();
+    const preferredIndex =
+      preferredMixNav?.kind && preferredCardNo
+        ? findNavIndex(preferredMixNav.kind, preferredCardNo)
+        : -1;
+
     const firstEnabled = combinedNavItems.findIndex((item) => {
-      const cardNo =
-        item.kind === "PREMIX"
-          ? premixCards[item.cardIndex]?.premixNo
-          : finalMixCards[item.cardIndex]?.mixNo;
-      if (cardNo == null || cardNo === "") return false;
+      const cardNo = resolveNavCardNo(item);
+      if (!cardNo) return false;
       return isMixCardWorkflowEnabled(item.kind, cardNo);
     });
-    setActiveCardIndex((prev) => {
-      const currentItem = combinedNavItems[prev];
-      if (currentItem) {
-        const cardNo =
-          currentItem.kind === "PREMIX"
-            ? premixCards[currentItem.cardIndex]?.premixNo
-            : finalMixCards[currentItem.cardIndex]?.mixNo;
-        if (cardNo != null && cardNo !== "" && isMixCardWorkflowEnabled(currentItem.kind, cardNo)) {
-          return Math.min(prev, combinedNavItems.length - 1);
+    const currentItem = combinedNavItems[activeCardIndex];
+    if (currentItem) {
+      const cardNo =
+        currentItem.kind === "PREMIX"
+          ? premixCards[currentItem.cardIndex]?.premixNo
+          : finalMixCards[currentItem.cardIndex]?.mixNo;
+      if (cardNo != null && cardNo !== "") {
+        if (isMixCardWorkflowEnabled(currentItem.kind, cardNo)) {
+          retainedDisabledNavItemIdRef.current = currentItem.id;
+          return;
+        }
+        if (retainedDisabledNavItemIdRef.current === currentItem.id) {
+          return;
         }
       }
-      return firstEnabled >= 0 ? firstEnabled : Math.min(prev, combinedNavItems.length - 1);
-    });
-  }, [combinedNavItems, finalMixCards, isMixCardWorkflowEnabled, premixCards]);
+    }
+
+    retainedDisabledNavItemIdRef.current = null;
+    setActiveCardIndex(
+      firstEnabled >= 0 ? firstEnabled : Math.min(activeCardIndex, combinedNavItems.length - 1),
+    );
+  }, [activeCardIndex, combinedNavItems, finalMixCards, isMixCardWorkflowEnabled, premixCards]);
 
   const activeMixCardId = activePremix
     ? buildMixCardId("PREMIX", activePremix.premixNo)
@@ -1632,7 +1700,7 @@ const MixingForm = ({
           sectionHint={S.STAGE_NAV_HINT}
           tabs={combinedNavTabs}
           activeIndex={activeCardIndex}
-          onActiveIndexChange={setActiveCardIndex}
+          onActiveIndexChange={handleActiveCardIndexChange}
           isTabDisabled={(_, index) => {
             const item = combinedNavItems[index];
             if (!item) return true;
@@ -1761,7 +1829,44 @@ const MixingForm = ({
                 onRemove={removePremixCard}
                 onPremixFieldChange={updatePremixField}
                 onMixingCycleChange={(premixNo, cycleCode) => {
-                  void handleMixingCycleSelection(String(premixNo), cycleCode);
+                  const key = String(premixNo);
+                  const next = String(cycleCode ?? "").trim();
+                  const premix = premixCards.find((p) => String(p.premixNo) === key);
+                  const finalMix = finalMixCards.find((f) => String(f.mixNo) === key);
+                  const prior = String(premix?.mixingCycleCode ?? "").trim();
+
+                  // Locked Premix or paired Final Mix — ignore cycle changes.
+                  const premixId = buildMixCardId("PREMIX", key);
+                  const finalId = buildMixCardId("FINAL_MIX", key);
+                  const premixStatus =
+                    getMixCardStatus?.(premixId) ??
+                    mixCardStatusById[premixId]?.mixCardSubmissionStatus;
+                  const finalStatus =
+                    getMixCardStatus?.(finalId) ??
+                    mixCardStatusById[finalId]?.mixCardSubmissionStatus;
+                  const premixLocked = !(
+                    checkMixCardEditable?.(premixId) ?? !isMixCardLocked(premixStatus)
+                  );
+                  const finalLocked = !(
+                    checkMixCardEditable?.(finalId) ?? !isMixCardLocked(finalStatus)
+                  );
+                  if (premixLocked || finalLocked) return;
+
+                  // First selection (or same value) — apply immediately.
+                  if (!prior || prior === next) {
+                    void handleMixingCycleSelection(key, next);
+                    return;
+                  }
+
+                  // Confirm only when Premix/Final Mix pair has entered values to lose.
+                  if (mixPairHasEnteredDataForCycleChange(premix, finalMix)) {
+                    setCycleChangeConfirmPremixNo(key);
+                    return;
+                  }
+
+                  // No entered data — clear seeded tables then apply the new cycle.
+                  resetMixPairAfterCycleChange(key);
+                  void handleMixingCycleSelection(key, next);
                 }}
                 onProcessChange={updateProcessParticular}
                 onQualityChange={updateQualityCheck}
@@ -1822,6 +1927,22 @@ const MixingForm = ({
         allMixCardsApproved={allMixCardsApproved}
         hideConfirm
         onClose={() => setFinalApprovalOpen(false)}
+      />
+
+      <ConfirmAlertDialog
+        open={cycleChangeConfirmPremixNo != null}
+        severity="warning"
+        title={S.CYCLE_CHANGE_CONFIRM_TITLE}
+        message={S.CYCLE_CHANGE_CONFIRM_MESSAGE}
+        confirmLabel={S.CYCLE_CHANGE_CONFIRM_YES}
+        cancelLabel={S.CYCLE_CHANGE_CONFIRM_NO}
+        onConfirm={() => {
+          if (cycleChangeConfirmPremixNo != null) {
+            resetMixPairAfterCycleChange(cycleChangeConfirmPremixNo);
+          }
+          setCycleChangeConfirmPremixNo(null);
+        }}
+        onCancel={() => setCycleChangeConfirmPremixNo(null)}
       />
     </Box>
   );

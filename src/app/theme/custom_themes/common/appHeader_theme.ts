@@ -365,6 +365,32 @@ const getAppHeaderTheme = (mode = "light") => {
       divider: {
         borderColor: h.glassBorder,
       },
+      menuItem: {
+        mx: 1,
+        mb: 1,
+        py: spacing.sm ?? 1,
+        borderRadius: "10px",
+        bgcolor: "#ffffff",
+        border: "1px solid rgba(255,255,255,0.55)",
+        "&:hover": {
+          bgcolor: "#ffffff !important",
+        },
+        "&.Mui-focusVisible": {
+          bgcolor: "#ffffff !important",
+        },
+        "&.Mui-selected, &.Mui-selected:hover": {
+          bgcolor: "#ffffff !important",
+        },
+      },
+      menuIcon: {
+        minWidth: 32,
+        color: "#0d2137",
+      },
+      menuLabelProps: {
+        fontSize: fonts.size?.sm ?? "0.875rem",
+        color: "#0d2137",
+        fontWeight: fonts.weight?.bold ?? 700,
+      },
       logoutItem: {
         mx: 1,
         mb: 1,

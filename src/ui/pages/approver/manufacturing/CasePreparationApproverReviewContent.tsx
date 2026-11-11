@@ -1,11 +1,5 @@
 import { useMemo } from "react";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
 import { STRINGS } from "../../../../app/config/strings";
@@ -25,12 +19,15 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../components/custom/UserWorkflowStepPager";
+import { DateField } from "@/ui/components/common/DateField";
+import {
+  FieldLabel,
+  SectionCard,
+} from "../../user/manufacturing/CasePreparation/CasePrepFormPrimitives";
 
 const CP = STRINGS.MANUFACTURING.CASE_PREP;
-const {
-  approved: ApproveIcon,
-  rejected: RejectIcon,
-} = icons.approver.manufacturing.casePreparation;
+const { approved: ApproveIcon, rejected: RejectIcon } =
+  icons.approver.manufacturing.casePreparation;
 
 type CasePreparationApproverReviewContentProps = {
   detailView: CasePreparationDetailView | null;
@@ -141,10 +138,7 @@ const CasePreparationApproverReviewContent = ({
       0,
       enabledMotors.findIndex((motor) => motor.motorId === activeMotorId),
     );
-    const nextIndex = Math.min(
-      enabledMotors.length - 1,
-      Math.max(0, currentIndex + direction),
-    );
+    const nextIndex = Math.min(enabledMotors.length - 1, Math.max(0, currentIndex + direction));
     onActiveMotorChange(enabledMotors[nextIndex].motorId);
   };
 
@@ -195,9 +189,7 @@ const CasePreparationApproverReviewContent = ({
           onStepBack={() => goToEnabledMotor(-1)}
           onStepNext={() => goToEnabledMotor(1)}
           disableStepBack={enabledMotorIndex <= 0}
-          disableStepNext={
-            enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1
-          }
+          disableStepNext={enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1}
           isTabDisabled={(_, index) =>
             isMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
           }
@@ -243,7 +235,12 @@ const CasePreparationApproverReviewContent = ({
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={1.25} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1}
+              mb={1.25}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="contained"
                 size="small"
@@ -266,15 +263,26 @@ const CasePreparationApproverReviewContent = ({
               </Button>
             </Stack>
           ) : null}
-
-          <CasePrepMotorPanel
-            value={activeMotor.casePrepData}
-            onChange={() => undefined}
-            readOnly
-            theme={manufacturingTheme}
-            motorId={activeMotor.motorId}
-            batchId={detailView?.batchId}
-          />
+          {activeMotor.casePrepData && (
+            <>
+              <SectionCard title="" theme={manufacturingTheme}>
+                <FieldLabel>PRRC Clearance Date</FieldLabel>
+                <DateField
+                  value={activeMotor.prrcClearanceDate}
+                  disabled
+                  readOnly
+                />
+              </SectionCard>
+              <CasePrepMotorPanel
+                value={activeMotor.casePrepData}
+                onChange={() => undefined}
+                readOnly
+                theme={manufacturingTheme}
+                motorId={activeMotor.motorId}
+                batchId={detailView?.batchId}
+              />
+            </>
+          )}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{CP.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>

@@ -98,8 +98,7 @@ export const fetchDepartments = async () => {
  */
 export const fetchSubDepartments = async (departmentId = null) => {
   try {
-    const params = departmentId != null && departmentId !== "" ? { departmentId } : {};
-    const body = await publicGet(SYSTEM.SUB_DEPARTMENTS, params);
+    const body = await publicGet(SYSTEM.SUB_DEPARTMENTS);
     assertSuccessEnvelope(body);
     let list = asList(body).map((s) => ({
       subDepartmentId: s.subDepartmentId ?? s.id,
@@ -452,10 +451,7 @@ const mapSubscaleArticleOption = (row: Record<string, unknown>): SubscaleArticle
   subscaleArticleName: String(row.subscaleArticleName ?? row.name ?? "").trim(),
   isActive: row.isActive !== false,
   isBem: row.isBem === true,
-  bemSize:
-    row.bemSize == null || row.bemSize === ""
-      ? null
-      : Number(row.bemSize),
+  bemSize: row.bemSize == null || row.bemSize === "" ? null : Number(row.bemSize),
   bemUnit: row.bemUnit == null || row.bemUnit === "" ? null : String(row.bemUnit).trim(),
 });
 

@@ -1,15 +1,27 @@
 // app/config/routes.jsx
 import { Navigate } from "react-router-dom";
 import LoginPage from "../../ui/pages/auth/LoginPage";
+import ChangePasswordPage from "../../ui/pages/auth/ChangePasswordPage";
 
 import { lazy } from "react";
-import CHUserManagementPage from "@/ui/pages/centrehead/UserManagement/UserManagementPage";
-import CHBatchManagementPage from "@/ui/pages/centrehead/BatchManagement/BatchManagementPage";
-import CHProjectManagementPage from "@/ui/pages/centrehead/ProjectManagement/ProjectManagementPage";
-import CHDashboard from "@/ui/pages/centrehead/Dashboard/CentreheadDashboardPage";
+
+const CHUserManagementPage = lazy(
+  () => import("@/ui/pages/centrehead/UserManagement/UserManagementPage"),
+);
+const CHBatchManagementPage = lazy(
+  () => import("@/ui/pages/centrehead/BatchManagement/BatchManagementPage"),
+);
+const CHProjectManagementPage = lazy(
+  () => import("@/ui/pages/centrehead/ProjectManagement/ProjectManagementPage"),
+);
+const CHDashboard = lazy(() => import("@/ui/pages/centrehead/Dashboard/CentreheadDashboardPage"));
+const BlockchainEvents = lazy(() => import("@/ui/pages/admin/BlockchainEvents/BlockchainPage"));
 
 const DashboardPage = lazy(() => import("@ui/pages/admin/Dashboard/DashboardPage"));
 const UserManagementPage = lazy(() => import("@ui/pages/admin/UserManagement/UserManagementPage"));
+const PasswordResetRequestsPage = lazy(
+  () => import("@ui/pages/admin/UserManagement/PasswordResetRequestsPage"),
+);
 const BatchManagementPage = lazy(
   () => import("@ui/pages/admin/BatchManagement/BatchManagementPage"),
 );
@@ -69,6 +81,12 @@ export const routes = [
     element: <Navigate to="/login?mode=reset" replace />,
     isProtected: false,
   },
+  {
+    path: "/change-password",
+    element: <ChangePasswordPage />,
+    isProtected: true,
+    allowMustChangePassword: true,
+  },
 
   /* ---------- PROTECTED DASHBOARDS ---------- */
   {
@@ -80,6 +98,12 @@ export const routes = [
   {
     path: "/admin/users",
     element: <UserManagementPage />,
+    isProtected: true,
+    roles: ["ADMIN"],
+  },
+  {
+    path: "/admin/users/password-requests",
+    element: <PasswordResetRequestsPage />,
     isProtected: true,
     roles: ["ADMIN"],
   },
@@ -104,6 +128,12 @@ export const routes = [
   {
     path: "/admin/master-data",
     element: <MasterDataPage />,
+    isProtected: true,
+    roles: ["ADMIN"],
+  },
+  {
+    path: "/admin/blockchain-events",
+    element: <BlockchainEvents />,
     isProtected: true,
     roles: ["ADMIN"],
   },
@@ -146,6 +176,12 @@ export const routes = [
   {
     path: "/centre-head/master-data",
     element: <MasterDataPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
+  {
+    path: "/centre-head/blockchain-events",
+    element: <BlockchainEvents />,
     isProtected: true,
     roles: ["CENTRE_HEAD"],
   },

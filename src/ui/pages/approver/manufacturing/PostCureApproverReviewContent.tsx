@@ -25,6 +25,7 @@ import {
   isPostCureMotorApproverTabDisabled,
   type PostCureDetailView,
 } from "../../../../data/models/user/PostCureFormModel";
+import { formatDisplayDateTime } from "../../../../utils/dateUtils";
 import { isPostCureInhibitionDetailsRequired } from "../../../../data/models/user/PostCureMotorDataModel";
 import PremixStatusChip, {
   PremixCountsSummary,
@@ -72,15 +73,7 @@ const formatStatusLabel = (status?: string | null) => {
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDisplayDateTime(value, value);
 };
 
 const resolveInhibitorLabel = (inhibitorType?: string | null) => {
@@ -385,8 +378,15 @@ const PostCureApproverReviewContent = ({
               </Button>
             </Stack>
           ) : null}
-
-          <ToggleButtonGroup
+          <PostCureMotorTabsSection
+            activeMotor={activeMotor}
+            batchId={detailView?.batchId}
+            manufacturingTheme={manufacturingTheme}
+            palette={palette}
+            dt={dt}
+            sectionToggleSx={sectionToggleSx}
+          />
+          {/* <ToggleButtonGroup
             exclusive
             fullWidth
             size="small"
@@ -457,7 +457,7 @@ const PostCureApproverReviewContent = ({
                 </Typography>
               )}
             </Stack>
-          ) : null}
+          ) : null} */}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{PC.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>
@@ -504,4 +504,106 @@ const PostCureApproverReviewContent = ({
   );
 };
 
+interface PostCureMotorTabsSectionProps {
+  activeMotor: any;
+  batchId?: string;
+  manufacturingTheme: any;
+  palette: any;
+  dt: any;
+  sectionToggleSx: any;
+}
+
+export const PostCureMotorTabsSection: React.FC<PostCureMotorTabsSectionProps> = ({
+  activeMotor,
+  batchId,
+  manufacturingTheme,
+  palette,
+  dt,
+  sectionToggleSx,
+}) => {
+  const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
+
+  useEffect(() => {
+    setActiveProcessTab("LOOSE_FLAP");
+  }, [activeMotor?.motorId]);
+
+  if (!activeMotor) return null;
+
+  return (
+    <Box>
+      <ToggleButtonGroup
+        exclusive
+        fullWidth
+        size="small"
+        value={activeProcessTab}
+        onChange={(_, value: MotorProcessTab | null) => value && setActiveProcessTab(value)}
+        sx={sectionToggleSx}
+      >
+        <ToggleButton value="LOOSE_FLAP">{PC.OPERATION_LOOSE_FLAP_FILLING}</ToggleButton>
+        <ToggleButton value="INHIBITION">{PC.OPERATION_INHIBITION}</ToggleButton>
+      </ToggleButtonGroup>
+
+      {activeProcessTab === "LOOSE_FLAP" ? (
+        <PostCureMotorPanel
+          value={activeMotor.looseFlapData}
+          onChange={() => undefined}
+          readOnly
+          theme={manufacturingTheme}
+          batchId={batchId}
+          motorId={activeMotor.motorId}
+        />
+      ) : null}
+
+      {activeProcessTab === "INHIBITION" ? (
+        <Stack spacing={1.25}>
+          <Box
+            sx={{
+              borderRadius: 2,
+              border: `1px solid ${palette.border}`,
+              background: palette.pageBg ?? "#fff",
+              px: 1.25,
+              py: 1,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: "0.78rem",
+                fontWeight: 700,
+                color: palette.primary,
+                mb: 0.75,
+              }}
+            >
+              {PC.INHIBITION_SECTION_TITLE}
+            </Typography>
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+              <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+                {PC.INHIBITOR_TYPE_LABEL}:
+              </Typography>
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
+                {resolveInhibitorLabel(activeMotor.inhibitorType)}
+              </Typography>
+            </Stack>
+          </Box>
+
+          {activeMotor.inhibitionData ? (
+            <PostCureMotorPanel
+              value={activeMotor.inhibitionData}
+              onChange={() => undefined}
+              readOnly
+              theme={manufacturingTheme}
+              batchId={batchId}
+              motorId={activeMotor.motorId}
+            />
+          ) : (
+            <Typography sx={{ ...dt.emptyText, py: 2 }}>
+              {isPostCureInhibitionDetailsRequired(activeMotor.inhibitorType)
+                ? PC.DETAILS_NO_MOTOR_DATA
+                : PC.INHIBITOR_TYPE_NOT_APPLICABLE}
+            </Typography>
+          )}
+        </Stack>
+      ) : null}
+    </Box>
+  );
+};
 export default PostCureApproverReviewContent;

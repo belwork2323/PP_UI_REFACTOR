@@ -1,4 +1,5 @@
 import type { SchemaValidationMaterialContext } from "@/data/validation/configs/rawMaterialPreparation.validation.config";
+import { assertFromToOrderInTree } from "@/data/validation/dateRangeValidation";
 import {
   lotDetailsHaveUserData,
   sumLotDetailQuantities,
@@ -8,6 +9,14 @@ import {
 import type { RmpMaterialUiKey } from "./rmpMaterialUiRegistry";
 
 export type MaterialProcessValidationIntent = "DRAFT" | "SUBMIT";
+
+export const validateMaterialProcessDateRanges = (
+  processForm: RmpMaterialProcessForm,
+): Record<string, string> => {
+  const errors: Record<string, string> = {};
+  assertFromToOrderInTree(processForm, errors);
+  return errors;
+};
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
@@ -93,6 +102,7 @@ export const validateLotDetailsForPremix = (
  * RMP material process validation:
  * - DRAFT: no required gates
  * - SUBMIT: lot details only (drying / sieving / process tables are never required)
+ * - Always: From Date-Time ≤ To Date-Time when both drying/grinding datetimes are filled
  */
 export const validateMaterialProcessForm = (
   _uiKey: RmpMaterialUiKey,
@@ -127,6 +137,8 @@ export const validateMaterialProcessForm = (
       { requireAtLeastOne: validationIntent === "SUBMIT" },
     );
   }
+
+  Object.assign(errors, validateMaterialProcessDateRanges(processForm));
 
   return errors;
 };

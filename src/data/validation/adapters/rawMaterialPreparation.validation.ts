@@ -12,6 +12,7 @@ import {
 import type { RmpMaterialProcessForm } from "@/data/models/user/rmp/defaultSolidProcessForm";
 import {
   validateMaterialProcessForm,
+  validateMaterialProcessDateRanges,
   type MaterialProcessValidationIntent,
 } from "@/data/models/user/rmp/validateMaterialProcessForm";
 import {
@@ -249,10 +250,6 @@ function validatePremixProcessSessions(
   input: RawMaterialPrepValidationInput,
   intent: MaterialProcessValidationIntent,
 ): Record<string, Record<string, string>> {
-  if (intent === "DRAFT") {
-    return {};
-  }
-
   const premixFieldErrors: Record<string, Record<string, string>> = {};
   const selections = input.premixNo
     ? input.addedPremixSelections.filter((entry) => entry.premix === input.premixNo)
@@ -262,6 +259,7 @@ function validatePremixProcessSessions(
     const sessionKey = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
     const session = input.premixSessions[sessionKey];
     if (!session) {
+      if (intent === "DRAFT") continue;
       const slot =
         entry.selectedProcesses.solid && str(entry.solidMaterialCode)
           ? "solid"
@@ -277,14 +275,34 @@ function validatePremixProcessSessions(
     }
 
     if (entry.selectedProcesses.solid && str(entry.solidMaterialCode)) {
-      const errs = validateSolidProcessErrors(entry, session, intent);
+      let errs: Record<string, string>;
+      if (intent === "DRAFT" && session.apGradeSlots?.length) {
+        errs = {};
+        for (const card of session.apGradeSlots) {
+          Object.assign(
+            errs,
+            prefixApGradeErrors(
+              validateMaterialProcessDateRanges(card.slot.processForm),
+              card.gradeCode,
+              session.apGradeSlots.length > 1,
+            ),
+          );
+        }
+      } else if (intent === "DRAFT") {
+        errs = validateMaterialProcessDateRanges(session.solid.processForm);
+      } else {
+        errs = validateSolidProcessErrors(entry, session, intent);
+      }
       if (Object.keys(errs).length > 0) {
         premixFieldErrors[`${sessionKey}:solid`] = errs;
       }
     }
 
     if (entry.selectedProcesses.liquid && str(entry.liquidMaterialCode)) {
-      const errs = validateLiquidProcessErrors(entry, session, intent);
+      const errs =
+        intent === "DRAFT"
+          ? validateMaterialProcessDateRanges(session.liquid.processForm)
+          : validateLiquidProcessErrors(entry, session, intent);
       if (Object.keys(errs).length > 0) {
         premixFieldErrors[`${sessionKey}:liquid`] = errs;
       }
@@ -305,7 +323,7 @@ export function validateRmpPremixSlotLive(params: {
 }): Record<string, string> {
   const intent = resolveRmpPremixValidationIntent(params.attempt);
   if (intent === "DRAFT") {
-    return {};
+    return validateMaterialProcessDateRanges(params.processForm);
   }
   const materialCode =
     params.slot === "solid"
@@ -609,9 +627,12 @@ export function validateRawMaterialPreparation(
     ? input.addedPremixSelections.filter((e) => e.premix === input.premixNo)
     : input.addedPremixSelections;
 
-  // UNIT (draft save): no required-field validation.
+  // UNIT (draft save): enforce date ranges without required-field validation.
   if (tier === "UNIT") {
-    return { premixFieldErrors: {}, weightmentErrors: {} };
+    return {
+      premixFieldErrors: validatePremixProcessSessions(input, "DRAFT"),
+      weightmentErrors: {},
+    };
   }
 
   const premixFieldErrors: Record<string, Record<string, string>> = {};

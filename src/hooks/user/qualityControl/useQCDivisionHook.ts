@@ -90,7 +90,11 @@ import {
   toDivisionAutoPopulateRecord,
 } from "./qcDivisionDataSource";
 import { fetchFreshQcFormDetails } from "./qcBatchBootstrap";
-import { isQcQualificationSubBatch, isQcSubscaleBatch } from "./qcBatchType";
+import {
+  isQcQualificationSubBatch,
+  isQcSubscaleBatch,
+  shouldSkipQcManufacturingAutoPopulate,
+} from "./qcBatchType";
 import {
   canShowQcDivisionUi,
   extractQcBatchUnits,
@@ -284,7 +288,9 @@ import {
   applyMixingDivisionEntryToValues,
   createInitialViscosityValues,
   createSeededMixingDetailsValues,
+  extractMixingCycleCodeFromBatchPayload,
   extractMixingCycleCodeFromPayload,
+  extractMixingCycleLookupFromBatchPayload,
   extractMixingQualityCheckDefinitionsFromPayload,
   findMixingPremixDomainEntry,
   hydrateMixingDetailsValuesFromDomain,
@@ -762,7 +768,7 @@ export const useQCDivisionHook = () => {
     const payload = divisionAutoPopulateData;
     const fromPayloadPremix = extractMixingQualityCheckDefinitionsFromPayload(payload, "PREMIX");
     const fromPayloadFinal = extractMixingQualityCheckDefinitionsFromPayload(payload, "FINAL_MIX");
-    const cycleCode = extractMixingCycleCodeFromPayload(payload);
+    const batchSources = [latestBatchDetailsRef.current, activeBatchRef.current];
 
     const applyFallback = () => {
       if (cancelled) return;
@@ -772,28 +778,117 @@ export const useQCDivisionHook = () => {
       });
     };
 
-    if (!cycleCode) {
-      applyFallback();
-      return;
-    }
+    const applyMasterDefs = (
+      premix: QcMixingQualityCheckDefinition[],
+      finalMix: QcMixingQualityCheckDefinition[],
+    ) => {
+      if (cancelled) return;
+      setMixingQualityChecksByStage({
+        PREMIX: resolvePreferredMixingQualityCheckDefinitions(premix, fromPayloadPremix),
+        FINAL_MIX: resolvePreferredMixingQualityCheckDefinitions(finalMix, fromPayloadFinal),
+      });
+    };
+
+    const unwrapList = (response: unknown): unknown[] => {
+      const root =
+        response && typeof response === "object" ? (response as Record<string, unknown>) : null;
+      const data =
+        root?.data && typeof root.data === "object"
+          ? (root.data as Record<string, unknown>)
+          : root;
+      if (Array.isArray(data)) return data;
+      if (Array.isArray((data as { items?: unknown[] } | null)?.items)) {
+        return (data as { items: unknown[] }).items;
+      }
+      if (Array.isArray(root)) return root;
+      return [];
+    };
+
+    const resolveCycleCode = async (): Promise<string> => {
+      const fromSeed =
+        extractMixingCycleCodeFromPayload(payload) ||
+        extractMixingCycleCodeFromBatchPayload(...batchSources);
+      if (fromSeed) return fromSeed;
+
+      const { projectId, motorStage } = extractMixingCycleLookupFromBatchPayload(...batchSources);
+      if (!projectId || motorStage == null) return "";
+
+      try {
+        const response = await mixingController.fetchMixingCycle(projectId, motorStage);
+        const cycles = unwrapList(response);
+        const codes = cycles
+          .map((item) => {
+            const rec =
+              item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+            return String(rec?.mixingCycleCode ?? rec?.code ?? "").trim();
+          })
+          .filter(Boolean);
+        if (codes.length === 1) return codes[0];
+      } catch (error) {
+        console.error("Failed to resolve Mixing Cycle from project/motorStage", error);
+      }
+      return "";
+    };
 
     void (async () => {
       try {
-        const response = await mixingController.fetchMixingCycleDetails(cycleCode);
+        const cycleCode = await resolveCycleCode();
         if (cancelled) return;
-        const data =
-          (response as { data?: unknown })?.data ??
-          (response as { success?: boolean; data?: unknown })?.data ??
-          response;
-        const resolved = resolveMixingCycleQualityChecks(
-          data && typeof data === "object" ? (data as Record<string, unknown>) : null,
-        );
-        const premix = mapMixingCycleQualityChecksToDefinitions(resolved.premixQualityChecks);
-        const finalMix = mapMixingCycleQualityChecksToDefinitions(resolved.finalMixQualityChecks);
-        setMixingQualityChecksByStage({
-          PREMIX: resolvePreferredMixingQualityCheckDefinitions(premix, fromPayloadPremix),
-          FINAL_MIX: resolvePreferredMixingQualityCheckDefinitions(finalMix, fromPayloadFinal),
-        });
+
+        if (cycleCode) {
+          const response = await mixingController.fetchMixingCycleDetails(cycleCode);
+          if (cancelled) return;
+          const data =
+            (response as { data?: unknown })?.data ??
+            (response as { success?: boolean; data?: unknown })?.data ??
+            response;
+          const resolved = resolveMixingCycleQualityChecks(
+            data && typeof data === "object" ? (data as Record<string, unknown>) : null,
+          );
+          applyMasterDefs(
+            mapMixingCycleQualityChecksToDefinitions(resolved.premixQualityChecks),
+            mapMixingCycleQualityChecksToDefinitions(resolved.finalMixQualityChecks),
+          );
+          return;
+        }
+
+        // No explicit cycle (typical subscale without Mixing form): MDM by motorStage when unique.
+        const { motorStage } = extractMixingCycleLookupFromBatchPayload(...batchSources);
+        if (motorStage == null) {
+          applyFallback();
+          return;
+        }
+
+        const [premixRes, finalRes] = await Promise.all([
+          mixingController.fetchQualityChecks("PREMIX", motorStage),
+          mixingController.fetchQualityChecks("FINAL_MIX", motorStage),
+        ]);
+        if (cancelled) return;
+
+        const toDefs = (response: unknown): QcMixingQualityCheckDefinition[] => {
+          const root =
+            response && typeof response === "object"
+              ? (response as Record<string, unknown>)
+              : null;
+          const data =
+            root?.data && typeof root.data === "object"
+              ? (root.data as Record<string, unknown>)
+              : root;
+          const checks = Array.isArray((data as { qualityChecks?: unknown } | null)?.qualityChecks)
+            ? ((data as { qualityChecks: unknown[] }).qualityChecks)
+            : Array.isArray(root?.qualityChecks)
+              ? (root.qualityChecks as unknown[])
+              : [];
+          return mapMixingCycleQualityChecksToDefinitions(checks);
+        };
+
+        const premix = toDefs(premixRes);
+        const finalMix = toDefs(finalRes);
+        if (!premix.length && !finalMix.length) {
+          applyFallback();
+          return;
+        }
+        applyMasterDefs(premix, finalMix);
       } catch (error) {
         console.error("Failed to fetch Mixing Cycle Master quality checks", error);
         applyFallback();
@@ -803,7 +898,7 @@ export const useQCDivisionHook = () => {
     return () => {
       cancelled = true;
     };
-  }, [divisionAutoPopulateData, selectedDivision]);
+  }, [activeBatch, divisionAutoPopulateData, selectedDivision]);
 
   const buildSeededPremixDetailsValues = (premixNo: number, autoPopulatePayload?: unknown) => {
     const payload = autoPopulatePayload ?? divisionAutoPopulateDataRef.current;
@@ -1483,7 +1578,16 @@ export const useQCDivisionHook = () => {
           };
           hasManufacturingData = Boolean(qcData);
           markSetupLoaded(divisionFlowKey, typeKey);
-        } else if (isBatchMotorSeededQcFlow(divisionFlowKey)) {
+        } else if (
+          isBatchMotorSeededQcFlow(divisionFlowKey) ||
+          shouldSkipQcManufacturingAutoPopulate(
+            bootstrap?.context?.batchType ??
+              (batchPayload as { batchType?: string } | null)?.batchType ??
+              (activeBatch as { batchType?: string } | null)?.batchType,
+            divisionFlowKey,
+          )
+        ) {
+          // Subscale: no mfg subdepartment seed except STF. QC / Weighment: batch motors only.
           seedRecord = {};
         } else {
           let manufacturingPayload: Record<string, unknown> | null = null;
@@ -2797,7 +2901,11 @@ export const useQCDivisionHook = () => {
 
         // TO_BE_INITIATED → manufacturing /qc-division/division-details
         // QC / Weighment have no manufacturing auto-populate.
-        if (isBatchMotorSeededQcFlow(flowKey)) {
+        // Subscale skips mfg auto-populate except STF.
+        if (
+          isBatchMotorSeededQcFlow(flowKey) ||
+          shouldSkipQcManufacturingAutoPopulate(batchContext?.batchType, flowKey)
+        ) {
           return auto;
         }
         const manufacturing =
@@ -4371,6 +4479,7 @@ export const useQCDivisionHook = () => {
     },
     [
       activeBatch,
+      batchContext?.batchType,
       buildEntryFromSelection,
       divisionCatalog,
       ensureQcFormDetailsPayload,
@@ -4825,7 +4934,7 @@ export const useQCDivisionHook = () => {
       const liveForm = formDataRef.current;
       const premixNos = new Set(
         (liveForm.divisionEntries ?? [])
-          .filter((e) => e.kind === "PROCESSING_MATERIAL" && e.schemaUnavailable)
+          .filter((e) => e.kind === "PROCESSING_MATERIAL")
           .map((e) => Number(e.premixNo))
           .filter((n) => Number.isFinite(n) && n > 0),
       );
@@ -6941,7 +7050,7 @@ export const useQCDivisionHook = () => {
 
     // RMP-parity process (lots) + weighment validation for Raw Material Processing.
     const processingEntriesForWeightment = entriesToValidate.filter(
-      (entry) => entry.kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable,
+      (entry) => entry.kind === "PROCESSING_MATERIAL",
     );
     if (processingEntriesForWeightment.length > 0) {
       const weightmentSheet =

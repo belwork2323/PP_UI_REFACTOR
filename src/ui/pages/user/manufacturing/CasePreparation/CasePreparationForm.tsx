@@ -207,11 +207,13 @@ const CasePreparationForm = ({
     if (!motorId || !sheet) return { casingType: "", insulationType: "" };
     const motors = getRocketMotorCasingMotorsFromSheet(sheet);
     const match = motors.find((m) => String(m.motorId ?? "").trim() === motorId);
+    const batchSize = sheet?.batchSize ?? "-";
     return {
       casingType: String(
         match?.castingType ?? (match as { casingType?: string } | undefined)?.casingType ?? "",
       ).trim(),
       insulationType: String(match?.insulationType ?? "").trim(),
+      batchSize: batchSize,
     };
   }, [activeMotorEntry?.motorId, sheet]);
   useEffect(() => {
@@ -220,8 +222,8 @@ const CasePreparationForm = ({
     const currentData = activeMotorSession.data ?? createEmptyCasePrepMotorData();
     const targetCasing = activeMotorMeta.casingType;
     const targetInsulation = activeMotorMeta.insulationType;
+    const batchSize = String(activeMotorMeta.batchSize);
 
-    // Check against the correct nested properties
     if (
       currentData.abradingOperation?.typeOfCasing !== targetCasing ||
       currentData.abradingOperation?.typeOfInsulation !== targetInsulation
@@ -234,6 +236,10 @@ const CasePreparationForm = ({
             ...currentData.abradingOperation, // Preserves abradingWheelType and other fields
             typeOfCasing: targetCasing,
             typeOfInsulation: targetInsulation,
+          },
+          linerCoatingOperation: {
+            ...currentData.linerCoatingOperation,
+            batchSize: batchSize,
           },
         },
       });
@@ -466,7 +472,9 @@ const CasePreparationForm = ({
                   placeholder={S.PRRC_CLEARANCE_DATE_PLACEHOLDER}
                   theme={theme}
                   required
-                  error={Boolean(motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate)}
+                  error={Boolean(
+                    motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate,
+                  )}
                   dataCpField="prrcClearanceDate"
                 />
                 {motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate ? (
@@ -475,7 +483,6 @@ const CasePreparationForm = ({
                   </Typography>
                 ) : null}
               </Box>
-
               <CasePrepMotorPanel
                 value={activeMotorSession.data ?? createEmptyCasePrepMotorData()}
                 onChange={(next) =>

@@ -7,5 +7,7 @@ export const refreshTokenApi = (payload) =>
   post(AUTH_ENDPOINTS.REFRESH_TOKEN, payload, { skipAuth: true });
 export const resetPasswordApi = (payload) =>
   post(AUTH_ENDPOINTS.RESET_PASSWORD, payload, { skipAuth: true });
+export const changePasswordApi = (payload) =>
+  post(AUTH_ENDPOINTS.CHANGE_PASSWORD, payload);
 export const generateCaptchaApi = () => 
   get(AUTH_ENDPOINTS.GENERATE_CAPTCHA, {}, { skipAuth: true });

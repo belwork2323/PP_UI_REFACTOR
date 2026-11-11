@@ -61,14 +61,9 @@ export const applyApproverSubdepartmentBatchListClientFilters = <T extends Recor
   const motorStageFilter = filters.motorStage.trim();
   const projectIdFilter = filters.projectId.trim().toLowerCase();
   const submittedByQuery = filters.submittedBy.trim().toLowerCase();
-  let fromDate = filters.fromDate.trim();
-  let toDate = filters.toDate.trim();
-
-  if (fromDate && toDate && fromDate > toDate) {
-    const swap = fromDate;
-    fromDate = toDate;
-    toDate = swap;
-  }
+  const fromDate = filters.fromDate.trim();
+  const toDate = filters.toDate.trim();
+  // Invalid From>To ranges are blocked in the filter UI (no silent swap).
 
   return rows.filter((row) => {
     if (batchIdQuery && !String(row.batchId ?? "").toLowerCase().includes(batchIdQuery)) {

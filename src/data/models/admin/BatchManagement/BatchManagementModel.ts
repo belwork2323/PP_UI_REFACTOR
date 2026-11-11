@@ -160,7 +160,7 @@ export type IdentificationSheetMixingPremix = {
   mixerId?: string;
   buildingNo?: string;
   bowlId?: string;
-  trialDate?: string | null;
+  trialDateTime?: string | null;
   observations?: string | null;
   mixDate?: string | null;
   mixQuantity?: number | string | null;
@@ -254,7 +254,10 @@ const parseMixingPremixFromApi = (item: unknown): IdentificationSheetMixingPremi
     mixerId: String(row.mixerId ?? "").trim() || undefined,
     buildingNo: String(row.buildingNo ?? "").trim() || undefined,
     bowlId: String(row.bowlId ?? "").trim() || undefined,
-    trialDate: (row.trialDate as string | null | undefined) ?? null,
+    trialDateTime:
+      (row.trialDateTime as string | null | undefined) ??
+      (row.trialDate as string | null | undefined) ??
+      null,
     observations: (row.observations as string | null | undefined) ?? null,
     mixDate: (row.mixDate as string | null | undefined) ?? null,
     mixQuantity: (row.mixQuantity as number | string | null | undefined) ?? null,
@@ -385,6 +388,7 @@ export class BatchListItemModel {
   projectName: string | null;
   numberOfMotors: number;
   motorIds: string[];
+  isBatchLocked?: boolean;
   lotIds: string[];
   motorStage: string | number | null;
   mixingCycle: MixingCycleInfo | null;
@@ -433,7 +437,7 @@ export class BatchListItemModel {
     this.lotIds = Array.isArray(data.lotIds) ? data.lotIds : [];
     this.priority = data.priority ?? "Medium";
     this.status = String(data.status ?? "").trim();
-
+    this.isBatchLocked = Boolean(data.isBatchLocked ?? false);
     this.motorStage = normalizeMotorStage(data.motorStage ?? data.motorType ?? data.motorTypeName);
     this.mixingCycle = parseMixingCycleFromApi(data.mixingCycleCode ?? data.mixingCycle);
 

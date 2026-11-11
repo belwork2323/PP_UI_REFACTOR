@@ -271,6 +271,7 @@ const STFApproverReviewContent = ({
             value={activeMotor.stfData}
             onChange={() => undefined}
             readOnly
+            showQaRemarks
             theme={qcTheme}
             batchId={detailView?.batchId}
             motorId={activeMotor.motorId}

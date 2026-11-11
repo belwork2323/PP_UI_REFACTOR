@@ -27,8 +27,8 @@ const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
-  valueType: "date",
+const datetime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
@@ -46,7 +46,7 @@ export type DispatchValidationTarget = {
 
 export const dispatchValidationFields: Record<string, FieldRuleConfig> = {
   // Setup
-  "setup.dispatchDate": date(["UNIT", "SUBMIT"]),
+  "setup.dispatchDate": datetime(["UNIT", "SUBMIT"]),
   "setup.dispatchLocation": text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
   "setup.ndtClearance": text(["SUBMIT"]),
   "setup.ndtMomNo": text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),

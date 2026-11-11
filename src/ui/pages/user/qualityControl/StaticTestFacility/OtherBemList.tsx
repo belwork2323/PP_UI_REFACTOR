@@ -269,6 +269,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 label={strings.OTHER_BEM_MOTOR_NO_LABEL}
                 value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
                 placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
+                required
                 disabled={isExistingRecord}
                 error={Boolean(activeValidationErrors.motorId || activeValidationErrors.bemMotorNo)}
                 helperText={
@@ -284,6 +285,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 label={strings.STF_TEST_NO_LABEL}
                 value={stfTestNoValue}
                 placeholder={strings.STF_TEST_NO_PLACEHOLDER}
+                required
                 disabled={stfTestNoLocked || actionLoading}
                 error={Boolean(activeValidationErrors.stfTestNo)}
                 helperText={activeValidationErrors.stfTestNo || " "}

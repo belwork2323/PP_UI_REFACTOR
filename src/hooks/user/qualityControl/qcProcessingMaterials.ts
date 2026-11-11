@@ -1449,7 +1449,6 @@ export const buildWeightmentSelectionsFromProcessingEntries = (
   return entries
     .filter((entry) => {
       if (entry.kind !== "PROCESSING_MATERIAL") return false;
-      if (!entry.schemaUnavailable) return false;
       const code = String(entry.materialCode ?? "").trim();
       if (!code) return false;
       if (targetPremix == null) return true;

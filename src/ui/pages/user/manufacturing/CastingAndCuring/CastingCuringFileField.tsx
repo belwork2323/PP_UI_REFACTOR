@@ -46,6 +46,11 @@ type CastingCuringFileFieldProps = {
 const acceptForMode = (mode: FileAcceptMode) =>
   mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
 
+const sanitizeUploadProgress = (value: unknown): number => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 0;
+};
+
 const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;
   if (ref.status === "failed") return S.FILE_UPLOAD_FAILED;
@@ -192,8 +197,10 @@ const CastingCuringFileField = ({
               </Stack>
               {ref.status === "uploading" ? (
                 <LinearProgress
-                  variant={typeof ref.uploadProgress === "number" ? "determinate" : "indeterminate"}
-                  value={ref.uploadProgress ?? 0}
+                  variant={
+                    Number.isFinite(Number(ref.uploadProgress)) ? "determinate" : "indeterminate"
+                  }
+                  value={sanitizeUploadProgress(ref.uploadProgress)}
                   sx={{ mt: 0.75, height: 3, borderRadius: 1 }}
                 />
               ) : null}

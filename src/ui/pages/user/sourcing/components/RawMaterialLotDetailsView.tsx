@@ -32,6 +32,7 @@ import { fileUtils } from "../../../../../utils/FileUtils";
 import { useAuthStore } from "../../../../../app/store/authStore";
 import { useFilePreview } from "../../../../../hooks/useFilePreview";
 import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
+import { formatDisplayDate, formatDisplayDateTime } from "../../../../../utils/dateUtils";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const FH = STRINGS.MANUFACTURING.FORM_HEADER;
@@ -63,13 +64,6 @@ type RawMaterialLotDetailsViewProps = {
   blocks: MaterialBlock[];
   loading: boolean;
   onBack: () => void;
-};
-
-const formatDate = (value?: string) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
 const RawMaterialLotDetailsView = ({
@@ -104,13 +98,19 @@ const RawMaterialLotDetailsView = ({
     { label: BL.COL_MATERIAL_CODE, value: row.materialCode || block?.material || "—" },
     { label: BL.COL_MATERIAL_NAME, value: row.materialName || "—" },
     { label: BL.COL_SUPPLY_ORDER, value: block?.supplyOrderNo || row.supplyOrderNo || "—" },
-    { label: BL.COL_RECEIPT_DATE, value: formatDate(block?.receiptDate || row.receiptDate) },
+    {
+      label: BL.COL_RECEIPT_DATE,
+      value: formatDisplayDate(block?.receiptDate || row.receiptDate),
+    },
     { label: BL.COL_MANUFACTURER, value: block?.manufacturerName || row.manufacturerName || "—" },
     {
       label: BL.COL_CREATED_BY,
       value: row.createdBy?.fullName ?? BL.UNASSIGNED,
     },
-    { label: BL.COL_CREATED_ON, value: formatDate(row.createdOn) },
+    {
+      label: BL.COL_CREATED_ON,
+      value: formatDisplayDateTime(row.createdOn, row.createdOn || "—"),
+    },
   ];
 
   return (

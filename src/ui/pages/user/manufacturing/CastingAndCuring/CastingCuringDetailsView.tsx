@@ -38,7 +38,12 @@ type CastingCuringDetailsViewProps = {
   onBack: () => void;
 };
 
-const CastingCuringDetailsView = ({ row, data, loading, onBack }: CastingCuringDetailsViewProps) => {
+const CastingCuringDetailsView = ({
+  row,
+  data,
+  loading,
+  onBack,
+}: CastingCuringDetailsViewProps) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const dt = theme.manufacturing.castingAndCuring.details;

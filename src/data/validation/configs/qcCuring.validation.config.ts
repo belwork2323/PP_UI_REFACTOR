@@ -1,9 +1,11 @@
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { assertFromToOrderInTree } from "../dateRangeValidation";
 import { str } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
 import { normalizeVisualObservations } from "@/hooks/user/qualityControl/qcCuringTables";
+import { normalizeQcCuringSubscaleParameter } from "@/hooks/user/qualityControl/qcCuringConfig";
 import { toUiDateTime, toUiTime } from "@/data/models/user/castingCuringFieldCodec";
 
 const S = VALIDATIONSTRING;
@@ -73,6 +75,7 @@ export const qcCuringValidationFields: Record<string, FieldRuleConfig> = {
   dispatchDateTime: dateTime(["SUBMIT"]),
 
   // Subscale parameters
+  parameter: number(["SUBMIT"]),
   bemNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   wheelPeelNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   cartonNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -111,7 +114,11 @@ const tableBlockId = (formKey: string, fallback: string): string => {
 };
 
 const rowHasUserData = (row: Record<string, unknown>) =>
-  Object.entries(row).some(([key, value]) => key !== "SR_NO" && Boolean(str(value)));
+  Object.entries(row).some(([key, value]) => {
+    if (key === "SR_NO") return false;
+    if (key === "PARAMETER") return Boolean(normalizeQcCuringSubscaleParameter(value));
+    return Boolean(str(value));
+  });
 
 const subscaleSectionHasData = (values: Record<string, unknown>) =>
   Boolean(
@@ -131,6 +138,11 @@ const subscaleSectionHasData = (values: Record<string, unknown>) =>
 export const qcCuringValidationConfig: SubDeptValidationConfig<QcCuringValidationTarget> = {
   id: "qc-curing",
   fields: qcCuringValidationFields,
+  customRules: [
+    (target, _tier, errors) => {
+      assertFromToOrderInTree(target.values ?? {}, errors);
+    },
+  ],
   resolveFieldPaths: (target) => {
     const values = asRecord(target.values) ?? {};
     const fields: Array<{ path: string; value: unknown; ruleKey: string }> = [];
@@ -296,6 +308,11 @@ export const qcCuringValidationConfig: SubDeptValidationConfig<QcCuringValidatio
         arr.forEach((item, i) => {
           const row = asRecord(item) ?? {};
           if (!rowHasUserData(row) && arr.length > 1) return;
+          fields.push({
+            path: `${prefix}.${i}.PARAMETER`,
+            value: normalizeQcCuringSubscaleParameter(row.PARAMETER),
+            ruleKey: "parameter",
+          });
           fields.push({
             path: `${prefix}.${i}.BEM_NO`,
             value: row.BEM_NO,

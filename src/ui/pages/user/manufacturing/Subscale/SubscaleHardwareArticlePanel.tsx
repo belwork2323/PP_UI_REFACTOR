@@ -64,13 +64,14 @@ import {
   bemNoTextSx,
   formatArticleTypeLabel,
 } from "./utils/subscaleHardwareTableStyles";
-import DateField from "../../../../components/common/DateField";
+import DateField, { DateTimeField } from "../../../../components/common/DateField";
 import { AppDatePickerProvider } from "../../../../components/common/datePickerShared";
 import { APP_CONTROL_HEIGHT } from "../../../../components/common/fieldStyles";
 import { getSubscaleFieldFormatError } from "../../../../../data/validation/configs/subscale.validation.config";
 import FieldErrorText from "../../../../components/validation/FieldErrorText";
 import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
+import { toUiDateTime } from "../../../../../data/models/user/castingCuringFieldCodec";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import fonts from "../../../../../app/theme/fonts";
 import {
@@ -93,6 +94,7 @@ import {
   type TrimmingTableRow,
   type StaticTestingTableRow,
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
+import { recomputeInhibitionPropellantWeight } from "@/data/models/user/subscaleApiPayloadMapper";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import { generalController } from "@/controllers/admin/common/generalController";
@@ -577,16 +579,7 @@ const SubscaleHardwareArticlePanel = ({
       const targetRow = { ...tableData[rowIndex], [fieldId]: value };
 
       if (tableId === "INHIBITION_TABLE") {
-        const aRaw = targetRow.LINER_COATED_SLEEVE_WEIGHT;
-        const bRaw = targetRow.WEIGHT_BEFORE_INHIBITION;
-        const hasInputs = String(aRaw ?? "").trim() !== "" || String(bRaw ?? "").trim() !== "";
-        if (!hasInputs) {
-          targetRow.PROPELLANT_WEIGHT = "";
-        } else {
-          const b = parseFloat(bRaw || 0);
-          const a = parseFloat(aRaw || 0);
-          targetRow.PROPELLANT_WEIGHT = b - a;
-        }
+        targetRow.PROPELLANT_WEIGHT = recomputeInhibitionPropellantWeight(targetRow);
       }
 
       tableData[rowIndex] = targetRow;
@@ -980,20 +973,20 @@ const SubscaleHardwareArticlePanel = ({
             >
               <Box sx={{ mb: 2, maxWidth: 280 }}>
                 {(() => {
-                  const castingDateValue = formatToUiDate(String(values.DATE_OF_CASTING ?? ""));
+                  const castingDateValue = toUiDateTime(values.DATE_OF_CASTING);
                   const errorMessage =
                     getSubscaleFieldFormatError("DATE_OF_CASTING", castingDateValue) ||
                     errors?.DATE_OF_CASTING;
                   return (
                     <Box data-ss-field="DATE_OF_CASTING">
-                      <DateField
+                      <DateTimeField
                         required
-                        label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
+                        label={<FieldLabelWithAsterisk label="Date & Time Of Casting" required />}
                         value={castingDateValue}
                         onChange={(next) => {
                           patchFormValues({ DATE_OF_CASTING: next });
                         }}
-                        placeholder="DD-MM-YYYY"
+                        placeholder="DD-MM-YYYY HH:mm"
                         error={Boolean(errorMessage)}
                         helperText={errorMessage || ""}
                       />
@@ -1003,6 +996,7 @@ const SubscaleHardwareArticlePanel = ({
               </Box>
               <CastingTableSection
                 rows={(values.CASTING_TABLE as []) ?? []}
+                fallbackDate={values.DATE_OF_CASTING}
                 onCellChange={updateTableRowCell}
                 getSyncedMouldNo={getSyncedMouldNo}
                 errors={errors}
@@ -1107,19 +1101,19 @@ const SubscaleHardwareArticlePanel = ({
                 })()}
 
                 {(() => {
-                  const mfgValue = formatToUiDate(String(values.DATE_OF_MFG ?? ""));
+                  const mfgValue = toUiDateTime(values.DATE_OF_MFG);
                   const errorMessage =
                     getSubscaleFieldFormatError("DATE_OF_MFG", mfgValue) || errors?.DATE_OF_MFG;
                   return (
                     <Box data-ss-field="DATE_OF_MFG" sx={{ flex: 1 }}>
-                      <DateField
+                      <DateTimeField
                         required
-                        label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
+                        label={<FieldLabelWithAsterisk label="Date & Time Of Manufacturing" required />}
                         value={mfgValue}
                         onChange={(next) => {
                           patchFormValues({ DATE_OF_MFG: next });
                         }}
-                        placeholder="DD-MM-YYYY"
+                        placeholder="DD-MM-YYYY HH:mm"
                         error={Boolean(errorMessage)}
                         helperText={errorMessage || ""}
                       />
@@ -1156,7 +1150,7 @@ const SubscaleHardwareArticlePanel = ({
                       <TableCell sx={tableHeaderCellSx}>Propellant Wt (C-B-A)</TableCell>
                       <TableCell sx={tableHeaderCellSx}>
                         <FieldLabelWithAsterisk
-                          label="Date of Application"
+                          label="Date & Time Of Application"
                           required
                           sx={tableHeaderCellSx}
                         />
@@ -1167,9 +1161,7 @@ const SubscaleHardwareArticlePanel = ({
                   <TableBody>
                     {((values.INHIBITION_TABLE as []) ?? []).map((row: any, idx: number) => {
                       const errKey = `INHIBITION_TABLE.${idx}.DATE_OF_APPLICATION`;
-                      const applicationDate = formatToUiDate(
-                        String(row.DATE_OF_APPLICATION ?? ""),
-                      );
+                      const applicationDate = toUiDateTime(row.DATE_OF_APPLICATION);
                       const errorMessage =
                         getSubscaleFieldFormatError("DATE_OF_APPLICATION", applicationDate) ||
                         errors?.[errKey];
@@ -1183,7 +1175,6 @@ const SubscaleHardwareArticlePanel = ({
                           <TableCell sx={tableBodyCellSx}>
                             <SubscaleTableTextCell
                               compact
-                              type="number"
                               tableId="INHIBITION_TABLE"
                               rowIndex={idx}
                               fieldId="LINER_COATED_SLEEVE_WEIGHT"
@@ -1197,7 +1188,6 @@ const SubscaleHardwareArticlePanel = ({
                           <TableCell sx={tableBodyCellSx}>
                             <SubscaleTableTextCell
                               compact
-                              type="number"
                               tableId="INHIBITION_TABLE"
                               rowIndex={idx}
                               fieldId="WEIGHT_BEFORE_INHIBITION"
@@ -1211,7 +1201,6 @@ const SubscaleHardwareArticlePanel = ({
                           <TableCell sx={tableBodyCellSx}>
                             <SubscaleTableTextCell
                               compact
-                              type="number"
                               tableId="INHIBITION_TABLE"
                               rowIndex={idx}
                               fieldId="WEIGHT_AFTER_INHIBITION"
@@ -1225,7 +1214,6 @@ const SubscaleHardwareArticlePanel = ({
                           <TableCell sx={tableBodyCellSx}>
                             <SubscaleTableTextCell
                               compact
-                              type="number"
                               tableId="INHIBITION_TABLE"
                               rowIndex={idx}
                               fieldId="IR_APPLIED_WEIGHT"
@@ -1239,7 +1227,7 @@ const SubscaleHardwareArticlePanel = ({
                           </TableCell>
                           <TableCell sx={tableBodyCellSx}>
                             <Box data-ss-field={errKey}>
-                              <DateField
+                              <DateTimeField
                                 compact
                                 required
                                 value={applicationDate}
@@ -1251,7 +1239,7 @@ const SubscaleHardwareArticlePanel = ({
                                     next,
                                   );
                                 }}
-                                placeholder="DD-MM-YYYY"
+                                placeholder="DD-MM-YYYY HH:mm"
                                 error={Boolean(errorMessage)}
                                 helperText={errorMessage || ""}
                               />

@@ -4,8 +4,9 @@ export const AUTH_ENDPOINTS = {
   LOGIN: `${API_BASE}/auth/login`,
   LOGOUT: `${API_BASE}/auth/logout`,
   REFRESH_TOKEN: `${API_BASE}/auth/refresh-token`,
-  RESET_PASSWORD: `${API_BASE}/users/reset-password`,
+  RESET_PASSWORD: `${API_BASE}/auth/reset-password`,
   GENERATE_CAPTCHA: `${API_BASE}/auth/generate-captcha`,
+  CHANGE_PASSWORD: `${API_BASE}/system/change-password`,
 };
 
 export const USER_ENDPOINTS = {
@@ -49,7 +50,6 @@ export const ADMIN_ENDPOINTS = {
     GET_STATS: `${API_BASE}/admin/dashboard/stats`,
     GET_CHART_DATA: `${API_BASE}/admin/dashboard/chartData`,
     GET_ACTIVE_BATCHES: `${API_BASE}/admin/dashboard/active-batches`,
-    GET_BLOCKCHAIN_EVENTS: `${API_BASE}/admin/dashboard/blockchain-events`,
   },
   PROJECT: {
     LIST: `${API_BASE}/admin/project/list`,
@@ -239,7 +239,9 @@ export const USER_MANAGEMENT = {
   CREATE_USER: `${API_BASE}/admin/user/create`,
   UPDATE_USER: `${API_BASE}/admin/user/update`,
   DELETE_USER: `${API_BASE}/admin/user`,
-  RESET_PASSWORD: (id) => `user-management/users/${id}/reset-password`,
+  ACTIVATE_USER: `${API_BASE}/admin/user/activate`,
+  PASSWORD_RESET_LIST: `${API_BASE}/admin/reset-password/list`,
+  PASSWORD_RESET_CHANGE_STATUS: `${API_BASE}/admin/reset-password/changeStatus`,
 };
 
 // =============================
@@ -263,6 +265,8 @@ export const MOTOR_MANAGEMENT = {
 
 export const BLOCKCHAIN = {
   GET_BATCH_BY_ID: `${API_BASE}/admin/blockchain/fetch`,
+  GET_BLOCKCHAIN_EVENTS: `${API_BASE}/admin/blockchain/events`,
+  GET_BLOCKCHAIN_EVENTS_BY_BATCHID: `${API_BASE}/admin/blockchain/events-by-batchId`,
 };
 // System Manager Dashboard — 7 API endpoints (all POST)
 export const SYSTEM_MANAGER = {

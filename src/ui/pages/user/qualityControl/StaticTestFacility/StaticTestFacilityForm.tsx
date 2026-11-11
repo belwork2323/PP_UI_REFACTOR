@@ -5,7 +5,6 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { STATIC_TEST_FACILITY_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { StaticTestFacilityFormState } from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import {
-  createEmptyStfMotorSession,
   normalizeStfMotorSession,
   resolveStfNavigationMotors,
   type StfMotorStatusMeta,
@@ -120,6 +119,7 @@ const StaticTestFacilityForm = ({
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
   const prevMotorCountRef = useRef(0);
+  const lastHandledValidationFocusIdRef = useRef<number | null>(null);
   const formSessionKey = `${batch?.batchId ?? ""}:${batch?.formId ?? "new"}`;
 
   const motorCards = useMemo(
@@ -127,13 +127,19 @@ const StaticTestFacilityForm = ({
     [addedMotors, autoMotorEntries],
   );
 
-  // Switch motor tab when submit validation fails on a different motor, then scroll/focus.
+  // Switch motor tab only for a *new* validation focus request, then scroll/focus.
+  // Do not depend on activeMotorIndex — that would snap the tab back on every user click
+  // while a prior validationFocusRequest is still set.
   useEffect(() => {
-    if (!validationFocusRequest?.id || !validationFocusRequest.fieldPath) return;
+    const requestId = validationFocusRequest?.id;
+    if (!requestId || !validationFocusRequest.fieldPath) return;
+    if (lastHandledValidationFocusIdRef.current === requestId) return;
+    lastHandledValidationFocusIdRef.current = requestId;
+
     const targetMotorId = String(validationFocusRequest.motorId ?? "").trim();
     if (targetMotorId) {
       const idx = motorCards.findIndex((motor) => motor.motorId === targetMotorId);
-      if (idx >= 0 && idx !== activeMotorIndex) {
+      if (idx >= 0) {
         setActiveMotorIndex(idx);
       }
     }
@@ -161,7 +167,6 @@ const StaticTestFacilityForm = ({
     validationFocusRequest?.fieldPath,
     validationFocusRequest?.motorId,
     motorCards,
-    activeMotorIndex,
   ]);
 
   const resolveMotorStatus = useCallback(
@@ -223,6 +228,9 @@ const StaticTestFacilityForm = ({
     return resolvedIndex >= 0 ? stfMotorNavGate.isStfMotorTabEnabled(resolvedIndex) : false;
   };
 
+  // Adjust active tab only when the motor list membership/count changes — not when
+  // gate helper identity churns (status/batch object updates), which would fight clicks.
+  const motorNavIdentity = motorCards.map((m) => `${m.subType}:${m.motorId}`).join("|");
   useEffect(() => {
     if (motorCards.length === 0) {
       setActiveMotorIndex(0);
@@ -239,17 +247,16 @@ const StaticTestFacilityForm = ({
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
     } else if (motorCards.length > prevCount) {
       setActiveMotorIndex(motorCards.length - 1);
-    } else {
+    } else if (motorCards.length < prevCount) {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (current && stfMotorNavGate.isStfMotorTabEnabled(prev)) {
-          return Math.min(prev, motorCards.length - 1);
-        }
-        return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
+        if (current) return Math.min(prev, motorCards.length - 1);
+        return firstEnabled >= 0 ? firstEnabled : Math.max(0, motorCards.length - 1);
       });
     }
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, stfMotorNavGate]);
+    // motorNavIdentity is the intentional trigger; gate is read for first-enabled only.
+  }, [motorNavIdentity]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -261,9 +268,14 @@ const StaticTestFacilityForm = ({
     const found = (formData.motors ?? []).find(
       (motor) => motor.motorId === activeMotorEntry.motorId,
     );
-    return found
-      ? normalizeStfMotorSession(found)
-      : createEmptyStfMotorSession(activeMotorEntry.motorId, activeMotorEntry.subType);
+    return normalizeStfMotorSession({
+      ...(found ?? {}),
+      motorId: activeMotorEntry.motorId,
+      subType: activeMotorEntry.subType,
+      stfTestNo: found?.stfTestNo,
+      formLoaded: found?.formLoaded ?? true,
+      stfData: found?.stfData,
+    });
   }, [activeMotorEntry, formData.motors]);
 
   const activeMotorId = activeMotorEntry?.motorId ?? "";
@@ -513,6 +525,7 @@ const StaticTestFacilityForm = ({
                 label={S.STF_TEST_NO_LABEL}
                 value={activeMotorSession?.stfTestNo || ""}
                 placeholder={S.STF_TEST_NO_PLACEHOLDER}
+                required
                 disabled={actionLoading || activeMotorLocked || activeStfTestNoLocked}
                 error={Boolean(motorValidationErrors[activeMotorId]?.stfTestNo)}
                 helperText={motorValidationErrors[activeMotorId]?.stfTestNo || " "}

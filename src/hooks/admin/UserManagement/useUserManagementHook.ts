@@ -479,6 +479,51 @@ function useUserDeleteSection(onRefresh: () => void) {
   };
 }
 
+function useUserActivateSection(onRefresh: () => void) {
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [activateTarget, setActivateTarget] = useState<any>(null);
+  const [activating, setActivating] = useState(false);
+
+  const openActivate = (user: any) => {
+    setActivateTarget(user);
+    setActivateOpen(true);
+  };
+
+  const handleActivate = async () => {
+    if (!activateTarget) return;
+
+    setActivating(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.ACTIVATING_USER, "info", { loading: true });
+
+    const resp = await userManagementController.activateUser(resolveUserUuid(activateTarget));
+    if (resp?.success) {
+      useAlertStore
+        .getState()
+        .showAlert(resp.message || S.MESSAGES.ACTIVATE_SUCCESS, "success", { autoCloseMs: 2000 });
+      setTimeout(() => {
+        onRefresh();
+        setActivateOpen(false);
+        setActivateTarget(null);
+        setActivating(false);
+      }, 1000);
+    } else {
+      useAlertStore
+        .getState()
+        .showAlert(resp?.message || S.MESSAGES.ACTIVATE_FAILED, "error", { autoCloseMs: 3000 });
+      setActivating(false);
+    }
+  };
+
+  return {
+    activateOpen,
+    setActivateOpen,
+    activateTarget,
+    activating,
+    openActivate,
+    handleActivate,
+  };
+}
+
 export default function useUserManagementHook() {
   const lookups = useUserLookupsSection();
   const stats = useUserStatsSection();
@@ -491,6 +536,7 @@ export default function useUserManagementHook() {
 
   const form = useUserFormSection(lookups.roles, refreshAll);
   const deleteSection = useUserDeleteSection(refreshAll);
+  const activateSection = useUserActivateSection(refreshAll);
 
   return {
     list,
@@ -498,6 +544,7 @@ export default function useUserManagementHook() {
     lookups,
     form,
     delete: deleteSection,
+    activate: activateSection,
     refresh: refreshAll,
   };
 }

@@ -7,7 +7,11 @@ import { ADMIN_ENDPOINTS } from "@data/api/endPoints";
  * @param startDate - Date string "DD-MM-YYYY" (required for custom / rolling ranges)
  * @param endDate - Date string "DD-MM-YYYY" (required for custom / rolling ranges)
  */
-export const fetchDashboardStatsApi = (filterType: string, startDate?: string, endDate?: string) => {
+export const fetchDashboardStatsApi = (
+  filterType: string,
+  startDate?: string,
+  endDate?: string,
+) => {
   const payload: any = { filterType };
 
   if (startDate) payload.startDate = startDate;
@@ -16,7 +20,11 @@ export const fetchDashboardStatsApi = (filterType: string, startDate?: string, e
   return post(ADMIN_ENDPOINTS.DASHBOARD_ENDPOINTS.GET_STATS, payload);
 };
 
-export const fetchDashboardChartDataApi = (filterType: string, startDate?: string, endDate?: string) => {
+export const fetchDashboardChartDataApi = (
+  filterType: string,
+  startDate?: string,
+  endDate?: string,
+) => {
   const payload: any = { filterType };
 
   if (startDate) payload.startDate = startDate;
@@ -27,8 +35,4 @@ export const fetchDashboardChartDataApi = (filterType: string, startDate?: strin
 
 export const fetchDashboardActiveBatchesApi = (payload: any) => {
   return post(ADMIN_ENDPOINTS.DASHBOARD_ENDPOINTS.GET_ACTIVE_BATCHES, payload);
-};
-
-export const fetchDashboardBlockchainEventsApi = (payload: any) => {
-  return post(ADMIN_ENDPOINTS.DASHBOARD_ENDPOINTS.GET_BLOCKCHAIN_EVENTS, payload);
 };

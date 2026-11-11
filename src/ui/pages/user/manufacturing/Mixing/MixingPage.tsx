@@ -47,6 +47,8 @@ const MixingPage = () => {
     handleDiscardAndBack,
     handleFormChange,
     formHydrationKey,
+    preferredMixNav,
+    setPreferredMixNav,
     handleSaveMixCardDraft,
     handleSubmitMixCard,
     detailsRow,
@@ -99,11 +101,15 @@ const MixingPage = () => {
               null
             }
             actionLoading={actionLoading}
+            preferredMixNav={preferredMixNav}
+            onPreferredMixNavChange={setPreferredMixNav}
             onSaveMixCardDraft={(stageType, cardNo) => {
+              setPreferredMixNav({ kind: stageType, cardNo: String(cardNo) });
               setPendingMixCard({ stageType, cardNo });
               setMixCardDraftConfirmOpen(true);
             }}
             onSubmitMixCard={(stageType, cardNo) => {
+              setPreferredMixNav({ kind: stageType, cardNo: String(cardNo) });
               setPendingMixCard({ stageType, cardNo });
               setMixCardSubmitConfirmOpen(true);
             }}

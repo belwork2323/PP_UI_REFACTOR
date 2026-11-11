@@ -107,7 +107,12 @@ export const isCastingCuringMotorApproverTabDisabled = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return isMotorWorkflowTabDisabled(status) || !normalized || normalized === "TO_BE_INITIATED" || normalized === "IN_PROGRESS";
+  return (
+    isMotorWorkflowTabDisabled(status) ||
+    !normalized ||
+    normalized === "TO_BE_INITIATED" ||
+    normalized === "IN_PROGRESS"
+  );
 };
 
 export const isCastingCuringMotorApproverActionable = (
@@ -239,10 +244,7 @@ export const mapCastingCuringMotorStatusesFromApi = (
       motorSubmissionType:
         normalizeCCMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeCCMotorStatus(
-        preferMotorSubmissionStatus(
-          existing?.motorSubmissionStatus,
-          motor?.motorSubmissionStatus,
-        ),
+        preferMotorSubmissionStatus(existing?.motorSubmissionStatus, motor?.motorSubmissionStatus),
       ),
       submittedAt: motor?.submittedAt ?? existing?.submittedAt ?? null,
       reviewedBy: motor?.actionBy ?? motor?.reviewedBy ?? existing?.reviewedBy ?? null,
@@ -403,8 +405,9 @@ export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringF
         motor?.curingSetup?.configuration ?? src?.curingSetup?.configuration ?? "",
       ),
       motorsToCureCount:
-        Number(motor?.curingSetup?.motorsToCureCount ?? src?.curingSetup?.motorsToCureCount ?? "") ||
-        "",
+        Number(
+          motor?.curingSetup?.motorsToCureCount ?? src?.curingSetup?.motorsToCureCount ?? "",
+        ) || "",
       ovensUtilized: String(
         motor?.curingSetup?.ovensUtilized ?? src?.curingSetup?.ovensUtilized ?? "",
       ),
@@ -412,7 +415,8 @@ export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringF
 
     return {
       motorId,
-      motorReceivedAt: toUiDateTime(src?.motorReceivedAt ?? motor?.motorReceivedAt) ||
+      motorReceivedAt:
+        toUiDateTime(src?.motorReceivedAt ?? motor?.motorReceivedAt) ||
         String(src?.motorReceivedAt ?? motor?.motorReceivedAt ?? "").trim(),
       castingType: String(motorSetup?.castingType ?? "").trim(),
       castingStation: String(motorSetup?.castingStation ?? "").trim(),
@@ -425,8 +429,8 @@ export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringF
       ),
       castingSavedForCuring: Boolean(
         motor?.castingSavedForCuring ||
-          hasSectionPayload(castingSections) ||
-          (String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim()),
+        hasSectionPayload(castingSections) ||
+        (String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim()),
       ),
       curingProjectStageMatrix: motor?.curingProjectStageMatrix ?? undefined,
     };
@@ -563,8 +567,94 @@ const getCastingCuringHiddenColumnsForTable = (blockId: string) =>
 
 const CASTING_CURING_COLUMN_PRIORITY = ["srNo", "SR_NO", "sr_no", "BOWL_ID", "BOWL_NO"];
 
+const CURING_TABLE_COLUMN_ORDER = [
+  "srNo",
+  "TEMPERATURE",
+  "TIME",
+  "START_DATE",
+  "START_TIME",
+  "END_DATE",
+  "END_TIME",
+  "PROPELLANT_PRESSURE_READING1",
+  "PROPELLANT_PRESSURE_READING2",
+  "HOT_WATER_STATUS",
+  "DURATION",
+  "REMARKS",
+] as const;
+
+const CURING_TABLE_COLUMN_LABELS: Record<string, string> = {
+  srNo: "S. No",
+  TEMPERATURE: "Temperature (°C)",
+  TIME: "Time (min)",
+  START_DATE: "Start Date",
+  START_TIME: "Start Time",
+  END_DATE: "End Date",
+  END_TIME: "End Time",
+  PROPELLANT_PRESSURE_READING1: "Reading 1",
+  PROPELLANT_PRESSURE_READING2: "Reading 2",
+  HOT_WATER_STATUS: "Status Of Hot Water Circulation",
+  DURATION: "Duration (min)",
+  REMARKS: "Remarks",
+};
+
+const flattenCastingCuringCycleRow = (row: Record<string, unknown>): Record<string, unknown> => {
+  const normalized: Record<string, unknown> = { ...row };
+  const pressure = asRecord(row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? {});
+  const reading1 = String(
+    pressure?.READING1 ??
+      pressure?.reading1 ??
+      pressure?.Reading1 ??
+      row.PROPELLANT_PRESSURE_READING1 ??
+      "",
+  ).trim();
+  const reading2 = String(
+    pressure?.READING2 ??
+      pressure?.reading2 ??
+      pressure?.Reading2 ??
+      row.PROPELLANT_PRESSURE_READING2 ??
+      "",
+  ).trim();
+
+  const startDate = String(row.START_DATE ?? row.startDate ?? "").trim();
+  const startTime = String(row.START_TIME ?? row.startTime ?? "").trim();
+  const endDate = String(row.END_DATE ?? row.endDate ?? "").trim();
+  const endTime = String(row.END_TIME ?? row.endTime ?? "").trim();
+  const duration =
+    String(row.DURATION ?? "").trim() ||
+    (startDate && startTime && endDate && endTime
+      ? `${startDate} ${startTime} → ${endDate} ${endTime}`
+      : "");
+
+  return {
+    ...normalized,
+    PROPELLANT_PRESSURE_READING1: reading1,
+    PROPELLANT_PRESSURE_READING2: reading2,
+    START_DATE: startDate,
+    START_TIME: startTime,
+    END_DATE: endDate,
+    END_TIME: endTime,
+    DURATION: duration,
+  };
+};
+
+const isCastingCuringFileRefLike = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  return "fileId" in entry || "fileName" in entry || "mimeType" in entry;
+};
+
+const isCastingCuringFileRefList = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (entry) => entry == null || typeof entry === "string" || isCastingCuringFileRefLike(entry),
+  ) &&
+  value.some((entry) => isCastingCuringFileRefLike(entry) || typeof entry === "string");
+
 const isFlatCastingCuringTable = (value: unknown): value is Record<string, unknown>[] => {
   if (!Array.isArray(value) || value.length === 0) return false;
+  // File-ref arrays are object rows but must render as file links, not data tables.
+  if (isCastingCuringFileRefList(value)) return false;
   return value.every(
     (item) =>
       item &&
@@ -612,17 +702,41 @@ const buildCastingCuringTableColumnLabels = (
   rows: Record<string, unknown>[],
 ): Record<string, string> => {
   const tableHidden = getCastingCuringHiddenColumnsForTable(blockId);
-  const columns = orderCastingCuringDisplayColumns(
-    Array.from(
-      rows.reduce((keys, row) => {
-        Object.keys(row ?? {}).forEach((key) => keys.add(key));
-        return keys;
-      }, new Set<string>()),
+  const hasCuringCycleColumns = rows.some((row) =>
+    Object.keys(row ?? {}).some(
+      (key) =>
+        key === "START_DATE" ||
+        key === "START_TIME" ||
+        key === "END_DATE" ||
+        key === "END_TIME" ||
+        key === "PROPELLANT_PRESSURE" ||
+        key === "HOT_WATER_STATUS" ||
+        key === "TEMPERATURE",
     ),
-    tableHidden,
   );
+
+  const columns = hasCuringCycleColumns
+    ? CURING_TABLE_COLUMN_ORDER.filter((columnId) => {
+        const present = rows.some(
+          (row) => columnId in row || (columnId === "srNo" && "srNo" in row),
+        );
+        return present && !tableHidden.has(columnId) && !columnId.startsWith("_");
+      })
+    : orderCastingCuringDisplayColumns(
+        Array.from(
+          rows.reduce((keys, row) => {
+            Object.keys(row ?? {}).forEach((key) => keys.add(key));
+            return keys;
+          }, new Set<string>()),
+        ),
+        tableHidden,
+      );
+
   return Object.fromEntries(
-    columns.map((columnId) => [columnId, formatPrepSectionLabel(columnId)]),
+    columns.map((columnId) => [
+      columnId,
+      CURING_TABLE_COLUMN_LABELS[columnId] ?? formatPrepSectionLabel(columnId),
+    ]),
   );
 };
 
@@ -636,6 +750,70 @@ const resolveCastingCuringTableLabel = (blockId: string, tables: CasePrepDetailT
   return { blockId: `${blockId} (${suffix})`, label: `${baseLabel} (${suffix})` };
 };
 
+const pickMandrelDetailCell = (
+  row: Record<string, unknown>,
+  ...keys: string[]
+): unknown => {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key) && row[key] != null && row[key] !== "") {
+      return row[key];
+    }
+  }
+  const compact = (value: string) => value.replace(/[\s_-]+/g, "").toLowerCase();
+  const wanted = new Set(keys.map(compact));
+  for (const [key, value] of Object.entries(row)) {
+    if (wanted.has(compact(key)) && value != null && value !== "") return value;
+  }
+  return undefined;
+};
+
+/** Ensure Mandrel detail rows expose both camelCase and SCREAMING_SNAKE keys. */
+const normalizeMandrelDetailRow = (
+  row: Record<string, unknown>,
+  index: number,
+): Record<string, unknown> => {
+  const srNo = pickMandrelDetailCell(row, "srNo", "SR_NO") ?? index + 1;
+  const aMock = pickMandrelDetailCell(row, "aMock", "A_MOCK");
+  const bMock = pickMandrelDetailCell(row, "bMock", "B_MOCK");
+  const bFinal = pickMandrelDetailCell(row, "bFinal", "B_FINAL");
+  const cMock = pickMandrelDetailCell(row, "cMock", "C_MOCK");
+  const cFinal = pickMandrelDetailCell(row, "cFinal", "C_FINAL");
+  const bellows = pickMandrelDetailCell(row, "bellowsThicknessD", "BELLOWS_THICKNESS_D");
+  const eMock = pickMandrelDetailCell(row, "eMock", "E_MOCK");
+  const eFinal = pickMandrelDetailCell(row, "eFinal", "E_FINAL");
+
+  return {
+    ...row,
+    srNo,
+    SR_NO: srNo,
+    aMock,
+    A_MOCK: aMock,
+    bMock,
+    B_MOCK: bMock,
+    bFinal,
+    B_FINAL: bFinal,
+    cMock,
+    C_MOCK: cMock,
+    cFinal,
+    C_FINAL: cFinal,
+    bellowsThicknessD: bellows,
+    BELLOWS_THICKNESS_D: bellows,
+    eMock,
+    E_MOCK: eMock,
+    eFinal,
+    E_FINAL: eFinal,
+  };
+};
+
+const isMandrelMeasurementsBlockId = (blockId: string) => {
+  const compact = String(blockId ?? "")
+    .replace(/\s+\(\d+\)$/, "")
+    .replace(/[\s-]+/g, "_")
+    .toLowerCase()
+    .replace(/_/g, "");
+  return compact === "mandrelmeasurements";
+};
+
 const pushCastingCuringTable = (
   tables: CasePrepDetailTable[],
   blockId: string,
@@ -644,28 +822,23 @@ const pushCastingCuringTable = (
   const displayRows = filterCastingCuringDisplayRows(rows);
   if (!displayRows.length) return;
   const { blockId: uniqueBlockId, label } = resolveCastingCuringTableLabel(blockId, tables);
+  const isCuring =
+    String(blockId).toLowerCase() === "curingtable" ||
+    String(blockId).toUpperCase() === "CURING_TABLE" ||
+    String(blockId).replace(/[\s_-]/g, "").toLowerCase() === "curingtable";
+  const normalizedRows = isCuring
+    ? displayRows.map((row) => flattenCastingCuringCycleRow(row))
+    : isMandrelMeasurementsBlockId(blockId)
+      ? displayRows.map((row, index) => normalizeMandrelDetailRow(row, index))
+      : displayRows;
+
   tables.push({
     blockId: uniqueBlockId,
     label,
-    rows: displayRows,
-    columnLabels: buildCastingCuringTableColumnLabels(uniqueBlockId, displayRows),
+    rows: normalizedRows,
+    columnLabels: buildCastingCuringTableColumnLabels(uniqueBlockId, normalizedRows),
   });
 };
-
-
-const isCastingCuringFileRefLike = (value: unknown): boolean => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const entry = value as Record<string, unknown>;
-  return "fileId" in entry || "fileName" in entry || "mimeType" in entry;
-};
-
-const isCastingCuringFileRefList = (value: unknown): boolean =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.every(
-    (entry) => entry == null || typeof entry === "string" || isCastingCuringFileRefLike(entry),
-  ) &&
-  value.some((entry) => isCastingCuringFileRefLike(entry) || typeof entry === "string");
 
 const walkCastingCuringObject = (
   blockId: string,
@@ -676,6 +849,16 @@ const walkCastingCuringObject = (
   Object.entries(obj)
     .filter(([key]) => !key.startsWith("_"))
     .forEach(([key, value]) => {
+      // File refs must win over flat-table detection (file arrays look like object rows).
+      if (isCastingCuringFileRefLike(value) || isCastingCuringFileRefList(value)) {
+        fields.push({
+          key: blockId ? `${blockId}.${key}` : key,
+          label: formatPrepSectionLabel(key),
+          value,
+        });
+        return;
+      }
+
       if (isFlatCastingCuringTable(value)) {
         pushCastingCuringTable(tables, key, value);
         return;
@@ -683,15 +866,6 @@ const walkCastingCuringObject = (
 
       if (Array.isArray(value)) {
         walkCastingCuringValue(key, value, fields, tables);
-        return;
-      }
-
-      if (isCastingCuringFileRefLike(value) || isCastingCuringFileRefList(value)) {
-        fields.push({
-          key: blockId ? `${blockId}.${key}` : key,
-          label: formatPrepSectionLabel(key),
-          value,
-        });
         return;
       }
 
@@ -718,17 +892,27 @@ const walkCastingCuringValue = (
 ) => {
   if (value === null || value === undefined || value === "") return;
 
-  if (isFlatCastingCuringTable(value)) {
-    pushCastingCuringTable(tables, blockId, value);
-    return;
-  }
-
+  // Prefer file-link rendering over treating file-ref arrays as data tables.
   if (isCastingCuringFileRefList(value)) {
     fields.push({
       key: blockId,
       label: formatPrepSectionLabel(blockId),
       value,
     });
+    return;
+  }
+
+  if (isCastingCuringFileRefLike(value)) {
+    fields.push({
+      key: blockId,
+      label: formatPrepSectionLabel(blockId),
+      value,
+    });
+    return;
+  }
+
+  if (isFlatCastingCuringTable(value)) {
+    pushCastingCuringTable(tables, blockId, value);
     return;
   }
 
@@ -761,7 +945,13 @@ export const parseCastingCuringSectionData = (
   const fields: CasePrepDetailField[] = [];
   const tables: CasePrepDetailTable[] = [];
 
-  if (isFlatCastingCuringTable(sectionData)) {
+  if (isCastingCuringFileRefList(sectionData) || isCastingCuringFileRefLike(sectionData)) {
+    fields.push({
+      key: sectionId,
+      label: formatPrepSectionLabel(sectionId),
+      value: sectionData,
+    });
+  } else if (isFlatCastingCuringTable(sectionData)) {
     pushCastingCuringTable(tables, sectionId, sectionData);
   } else if (Array.isArray(sectionData)) {
     sectionData.forEach((dataRow) => {
@@ -895,7 +1085,6 @@ export const mapCastingCuringDetailsForDisplay = (
       curingData: createEmptyCuringMotorData(),
     };
   };
-
   const mappedMotors: CastingCuringMotorDetailView[] = rawMotors
     .map((motor) => {
       const entry = motor as Record<string, unknown>;
@@ -907,7 +1096,8 @@ export const mapCastingCuringDetailsForDisplay = (
 
       return {
         motorId,
-        motorReceivedAt: toUiDateTime(src.motorReceivedAt) || String(src.motorReceivedAt ?? "").trim(),
+        motorReceivedAt:
+          toUiDateTime(src.motorReceivedAt) || String(src.motorReceivedAt ?? "").trim(),
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
           normalizeCCMotorSubmissionType(entry.motorSubmissionType as unknown),
@@ -970,8 +1160,7 @@ export const mapCastingCuringDetailsForDisplay = (
   const sortedMotors = sortByPreferredMotorIds(motors, preferredMotorIds);
 
   const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
-    | Partial<CastingCuringMotorCounts>
-    | undefined;
+    Partial<CastingCuringMotorCounts> | undefined;
   const derivedCounts: CastingCuringMotorCounts = {
     pendingMotorCount: 0,
     approvedMotorCount: 0,

@@ -26,8 +26,12 @@ import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRawMaterialApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rawMaterialApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
 import DateField from "../../../components/common/DateField";
-import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
-import dayjs from "dayjs";
+import {
+  formatDisplayDate,
+  formatDisplayDateTime,
+  formatToIsoDateInput,
+  formatToUiDate,
+} from "../../../../utils/dateUtils";
 import {
   canApproverViewBatchDetails,
   isApproverActionableStatus,
@@ -54,6 +58,7 @@ import RawMaterialPreparationDetailsView from "./components/RawMaterialPreparati
 import { useApproverListRefreshStore } from "@/app/store/approverListRefreshStore";
 import { RefreshRounded } from "@mui/icons-material";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
+import { getFromToOrderMessages } from "@/data/validation/dateRangeValidation";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -217,7 +222,7 @@ const RawMaterialDetailDialog = ({
                   <Typography sx={theme.dialog.blockMeta}>
                     RECEIPT DATE :{" "}
                     <Box component="span" sx={theme.dialog.blockMetaStrong}>
-                      {block.receiptDate || "-"}
+                      {formatDisplayDate(block.receiptDate, "-")}
                     </Box>
                   </Typography>
                 </Stack>
@@ -540,19 +545,15 @@ const RawMaterialApproverPage = () => {
     [theme.palette],
   );
 
+  const draftDateRangeErrors = getFromToOrderMessages(draftFrom, draftTo, "date");
+
   const handleApplyPanelFilters = () => {
-    let from = draftFrom;
-    let to = draftTo;
-    if (from && to && from > to) {
-      const swap = from;
-      from = to;
-      to = swap;
-    }
+    if (draftDateRangeErrors) return;
 
     const next: RawMaterialApproverAppliedFilters & { status: string } = {
       materialCode: draftMaterial === filterAllLabel ? "" : draftMaterial,
-      fromDate: from,
-      toDate: to,
+      fromDate: draftFrom,
+      toDate: draftTo,
       status: draftStatus,
     };
     applyPanelFilters(next);
@@ -568,9 +569,7 @@ const RawMaterialApproverPage = () => {
   };
 
   const formatReceiptDate = (value?: string) => {
-    if (!value) return "—";
-    const parsed = dayjs(value);
-    return parsed.isValid() ? parsed.format("DD MMM YYYY") : value;
+    return formatDisplayDate(value);
   };
 
   const searchBarEnd = (
@@ -691,13 +690,18 @@ const RawMaterialApproverPage = () => {
           value={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.from)}
+          helperText={draftDateRangeErrors?.from}
           sx={filterStyles.fieldDate}
         />
         <DateField
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
           value={formatToUiDate(draftTo)}
+          minDate={formatToUiDate(draftFrom)}
           onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
           compact
+          error={Boolean(draftDateRangeErrors?.to)}
+          helperText={draftDateRangeErrors?.to}
           sx={filterStyles.fieldDate}
         />
       </Stack>
@@ -827,11 +831,7 @@ const RawMaterialApproverPage = () => {
                         </TableCell>
                         <TableCell sx={theme.table.bodyCell}>{row.submittedBy}</TableCell>
                         <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                          {new Date(row.createdOn).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {formatDisplayDateTime(row.createdOn)}
                         </TableCell>
                         <TableCell sx={theme.table.bodyCell}>
                           <Chip

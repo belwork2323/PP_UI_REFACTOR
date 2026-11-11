@@ -30,6 +30,7 @@ import getMixingTheme from "../../../../../../app/theme/custom_themes/user/manuf
 import getManufacturingTheme from "../../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import MixingCardNavigation from "../MixingCardNavigation";
 import MixingQualityChecksTable from "../MixingQualityChecksTable";
+import { formatDisplayDateTime } from "../../../../../../utils/dateUtils";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const S = STRINGS.MANUFACTURING.MIXING;
@@ -48,13 +49,6 @@ type CombinedNavItem = {
 };
 
 export type MixingDetailsTheme = ReturnType<typeof getMixingTheme>["details"];
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
 
 const displayValue = (value?: string | null) => {
   const trimmed = String(value ?? "").trim();
@@ -245,7 +239,7 @@ export const FinalMixDetailPanel = ({
         mb: 2.5,
       }}
     >
-      <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.mixNo} dt={dt} />
+      {/* <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.mixNo} dt={dt} /> */}
       <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.finalMixNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_MIXER} value={entry.mixerType} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={entry.bldgNo} dt={dt} />
@@ -336,10 +330,16 @@ const MixingDetailsContent = ({
     { label: BL.COL_CREATED_BY, value: detailView?.createdBy || BL.UNASSIGNED },
     {
       label: BL.COL_CREATED_ON,
-      value: formatDate(detailView?.createdAt ?? (row?.createdOn as string | undefined)),
+      value: formatDisplayDateTime(
+        detailView?.createdAt ?? (row?.createdOn as string | undefined),
+        detailView?.createdAt ?? (row?.createdOn as string | undefined) ?? "—",
+      ),
     },
     { label: "Submitted By", value: detailView?.submittedBy || "—" },
-    { label: "Submitted On", value: formatDate(detailView?.submittedAt) },
+    {
+      label: "Submitted On",
+      value: formatDisplayDateTime(detailView?.submittedAt, detailView?.submittedAt || "—"),
+    },
   ];
 
   if (loading) {

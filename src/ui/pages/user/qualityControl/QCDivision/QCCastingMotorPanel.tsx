@@ -564,10 +564,15 @@ const WEIGHTMENT_COLUMNS: ColumnDef<QcCastingWeightmentRow>[] = [
 ];
 
 const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
-  { id: "START_TIME", label: "Start Time", fieldType: "time" },
-  { id: "END_TIME", label: "End Time", fieldType: "time" },
-  { id: "PRESSURE_SENSOR_USED", label: "Pressure Sensor Id", fieldType: "text" },
-  { id: "INITIAL_PRESSURE_READING", label: "Initial Pressure Reading", fieldType: "number" },
+  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
+  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "PRESSURE_SENSOR_USED", label: "Pressure Sensor Id", fieldType: "text", required: true },
+  {
+    id: "INITIAL_PRESSURE_READING",
+    label: "Initial Pressure Reading",
+    fieldType: "number",
+    required: true,
+  },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
   { id: "QA_REMARKS", label: "QA Remarks", fieldType: "textarea" },
 ];

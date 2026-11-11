@@ -6,10 +6,10 @@
   "functionality": "CREATE_STATIC_TESTING_FORM",
   "subType": "MAIN_MOTOR",
   "subDepartmentId": 115,
-  "message": "Main Motor static testing schema fetched successfully",
+  "message": "Main Motor static testing schema / nested staticTestingDetails example",
   "meta": {
     "title": "Static Testing Facility - Main Motor",
-    "description": "Main Motor static testing parameters and evaluation details"
+    "description": "Main Motor static testing facility process parameters (new sheet layout)"
   },
   "data": {
     "layout": {
@@ -17,319 +17,129 @@
     },
     "meta": {
       "title": "Static Testing Facility - Main Motor",
-      "description": "Main Motor static testing parameters and evaluation details"
-    },
-    "ui": {
-      "layout": "flat",
-      "gap": "md",
-      "sectionVariant": "card",
-      "sectionBorderRadius": "sm",
-      "designSystem": {
-        "colors": {
-          "primary": "#1B4F72",
-          "primaryLight": "#2E86C1",
-          "surface": "#F4F6F8",
-          "border": "#D5D8DC",
-          "text": "#1C2833",
-          "textSub": "#5D6D7E"
-        },
-        "typography": {},
-        "spacing": {
-          "xs": 4,
-          "sm": 8,
-          "md": 12,
-          "lg": 16,
-          "xl": 24
-        },
-        "radius": {
-          "sm": 4,
-          "md": 6,
-          "lg": 8
-        },
-        "icons": {
-          "sectionDefault": "description",
-          "staticTestFacility": "rocket_launch"
-        }
-      }
+      "description": "Main Motor static testing facility process parameters"
     },
     "context": {
       "subDepartmentId": 115,
       "subType": "MAIN_MOTOR"
     },
+    "exampleMotorPayload": {
+      "motorId": "MM-001",
+      "subType": "MAIN_MOTOR",
+      "stfTestNo": "STF-MM-001",
+      "staticTestingDetails": {
+        "testHeader": {
+          "firingDate": "2026-10-08T14:30:00",
+          "ambientTemperature": 28,
+          "qaRemarks": "Optional QA remarks"
+        },
+        "nozzleDetails": {
+          "beforeDt": 12.1,
+          "beforeDe": 45.2,
+          "afterDt": 12.3,
+          "afterDe": 45.4,
+          "nozzleErosionRateMmS": 0.02,
+          "qaRemarks": "Optional QA remarks"
+        },
+        "mainMotorData": {
+          "propellantWeightKg": 120.5,
+          "avgBemBurnRateMmS": 8.2,
+          "nValue": 0.35,
+          "propellantDensity": 1.75,
+          "gamma": 1.25,
+          "qaRemarks": "Optional QA remarks"
+        },
+        "ballisticParameters": [
+          { "parameter": "CHAMBER_PRESSURE_AVG", "channel1": "70" },
+          { "parameter": "CHAMBER_PRESSURE_MAX", "channel1": "85" },
+          { "parameter": "AVERAGE_THRUST_KGF", "channel1": "1200" },
+          { "parameter": "MAX_THRUST_KGF", "channel1": "1450" },
+          { "parameter": "IGNITION_DELAY_MSEC", "channel1": "45" },
+          { "parameter": "ACTION_TIME_SEC", "channel1": "2.1" },
+          { "parameter": "TOTAL_IMPULSE_TON_SEC", "channel1": "2.5" },
+          { "parameter": "CSTAR_CORRECTED", "channel1": "1500" },
+          { "parameter": "ISP_DELIVERED_SEC", "channel1": "240" },
+          { "parameter": "ISP_70_1_033", "channel1": "235" }
+        ],
+        "burnRate": {
+          "burnRateMmS": 8.5,
+          "pressureAbsKsc": 70,
+          "nValue": 0.35,
+          "qaRemarks": "Optional QA remarks"
+        }
+      }
+    },
     "sections": [
       {
-        "sectionId": "IGNITER_DETAILS",
-        "sectionName": "Igniter Details",
-        "type": "table",
-        "addRowAllowed": false,
-        "columns": [
-          {
-            "fieldId": "CONTAINER_TYPE",
-            "label": "Container Type",
-            "type": "text"
-          },
-          {
-            "fieldId": "COMPOSITION",
-            "label": "Composition",
-            "type": "text"
-          },
-          {
-            "fieldId": "WEIGHT_OF_COMPOSITION",
-            "label": "Weight of Composition (g)",
-            "type": "number"
-          },
-          {
-            "fieldId": "SQUIB_RESISTANCE",
-            "label": "Squib Resistance (Ω)",
-            "type": "number"
-          },
-          {
-            "fieldId": "REMARKS",
-            "label": "Remarks",
-            "type": "textarea"
-          }
+        "sectionId": "TEST_HEADER",
+        "sectionName": "Test Header",
+        "type": "form",
+        "fields": [
+          { "fieldId": "FIRING_DATE", "label": "Firing Date & Time", "type": "datetime" },
+          { "fieldId": "AMBIENT_TEMPERATURE", "label": "Amb. Temp.", "type": "number" }
         ]
       },
       {
         "sectionId": "NOZZLE_DETAILS",
-        "sectionName": "Nozzle Details",
-        "type": "table",
-        "addRowAllowed": false,
-        "columns": [
-          {
-            "fieldId": "NOZZLE_CLOSURE_MATERIAL",
-            "label": "Nozzle Closure Material",
-            "type": "text"
-          },
-          {
-            "label": "Nozzle Material",
-            "columns": [
-              {
-                "fieldId": "MOTHER_GRAPHITE",
-                "label": "Mother Graphite",
-                "type": "text"
-              },
-              {
-                "fieldId": "NOZZLE_INSERT",
-                "label": "Nozzle Insert",
-                "type": "text"
-              }
-            ]
-          },
-          {
-            "label": "Before Firing",
-            "columns": [
-              {
-                "fieldId": "DT_BEFORE",
-                "label": "Dt (mm)",
-                "type": "number"
-              },
-              {
-                "fieldId": "DE_BEFORE",
-                "label": "De (mm)",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "label": "After Firing",
-            "columns": [
-              {
-                "fieldId": "DT_AFTER",
-                "label": "Dt (mm)",
-                "type": "number"
-              },
-              {
-                "fieldId": "DE_AFTER",
-                "label": "De (mm)",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "fieldId": "REMARKS",
-            "label": "Remarks",
-            "type": "textarea"
-          }
-        ]
-      },
-      {
-        "sectionId": "TESTING_DETAILS",
-        "sectionName": "Testing Details",
+        "sectionName": "Nozzle",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
+          { "fieldId": "BEFORE_DT", "label": "Before Dt", "type": "number" },
+          { "fieldId": "BEFORE_DE", "label": "Before De", "type": "number" },
+          { "fieldId": "AFTER_DT", "label": "After Dt", "type": "number" },
+          { "fieldId": "AFTER_DE", "label": "After De", "type": "number" },
           {
-            "fieldId": "THROAT_DIAMETER",
-            "label": "Throat Dia.",
-            "type": "number"
-          },
-          {
-            "fieldId": "PROPELLANT_WEIGHT",
-            "label": "Wt. of Propellant",
-            "type": "number"
-          },
-          {
-            "fieldId": "WEB_THICKNESS",
-            "label": "Web Thickness",
-            "type": "number"
-          },
-          {
-            "fieldId": "N_VALUE",
-            "label": "n Value",
-            "type": "number"
-          },
-          {
-            "fieldId": "CONDITIONING_TEMPERATURE",
-            "label": "Conditioning Temp",
-            "type": "number"
-          },
-          {
-            "fieldId": "AMBIENT_TEMPERATURE",
-            "label": "Ambient Temp",
-            "type": "number"
-          },
-          {
-            "fieldId": "RH_PERCENT",
-            "label": "RH (%)",
+            "fieldId": "NOZZLE_EROSION_RATE_MM_S",
+            "label": "Nozzle Erosion Rate (mm/s)",
             "type": "number"
           }
         ]
       },
       {
-        "sectionId": "SENSOR_CONFIGURATION",
-        "sectionName": "Sensor Configuration",
+        "sectionId": "MAIN_MOTOR_DATA",
+        "sectionName": "Main Motor Data",
+        "type": "form",
+        "fields": [
+          { "fieldId": "PROPELLANT_WEIGHT_KG", "label": "Wt of Propellant", "type": "number" },
+          {
+            "fieldId": "AVG_BEM_BURN_RATE_MM_S",
+            "label": "Avg. BEM Burn Rate (mm/s)",
+            "type": "number"
+          },
+          { "fieldId": "N_VALUE", "label": "n value", "type": "number" },
+          { "fieldId": "PROPELLANT_DENSITY", "label": "Propellant Density", "type": "number" },
+          { "fieldId": "GAMMA", "label": "Gamma", "type": "number" }
+        ]
+      },
+      {
+        "sectionId": "BALLISTIC_PARAMETERS",
+        "sectionName": "Ballistic Parameter",
         "type": "table",
-        "addRowAllowed": true,
         "columns": [
-          {
-            "fieldId": "CHANNEL",
-            "label": "Channel",
-            "type": "text",
-            "readonly": true
-          },
-          {
-            "fieldId": "SENSOR",
-            "label": "Sensor",
-            "type": "text"
-          },
-          {
-            "fieldId": "SENSITIVITY",
-            "label": "Sensitivity",
-            "type": "number"
-          },
-          {
-            "label": "Range",
-            "columns": [
-              {
-                "fieldId": "MAX_EXPECTED",
-                "label": "Max",
-                "type": "number"
-              },
-              {
-                "fieldId": "SENSOR_RANGE",
-                "label": "Sensor exp.",
-                "type": "number"
-              }
-            ]
-          },
-          {
-            "fieldId": "FILTER_HZ",
-            "label": "Filter (Hz)",
-            "type": "number"
-          },
-          {
-            "fieldId": "IA_NO",
-            "label": "IA No.",
-            "type": "text"
-          },
-          {
-            "fieldId": "IA_GAIN",
-            "label": "IA Gain",
-            "type": "number"
-          },
-          {
-            "fieldId": "EXT_VOLTAGE",
-            "label": "Ext. (V)",
-            "type": "number"
-          },
-          {
-            "fieldId": "OFFSET_VALUE",
-            "label": "Offset Value",
-            "type": "number"
-          },
-          {
-            "fieldId": "PRELOADING",
-            "label": "Preloading",
-            "type": "number"
-          }
+          { "fieldId": "PARAMETER", "label": "Parameter", "readonly": true },
+          { "fieldId": "CHANNEL_1", "label": "Channel 1" }
         ],
-        "predefinedRows": [
-          { "channel": "PR1" },
-          { "channel": "PR2" },
-          { "channel": "TH1" },
-          { "channel": "TH2" },
-          { "channel": "FP" }
+        "presetRows": [
+          "CHAMBER_PRESSURE_AVG",
+          "CHAMBER_PRESSURE_MAX",
+          "AVERAGE_THRUST_KGF",
+          "MAX_THRUST_KGF",
+          "IGNITION_DELAY_MSEC",
+          "ACTION_TIME_SEC",
+          "TOTAL_IMPULSE_TON_SEC",
+          "CSTAR_CORRECTED",
+          "ISP_DELIVERED_SEC",
+          "ISP_70_1_033"
         ]
       },
       {
-        "sectionId": "STATIC_TEST_RESULT",
-        "sectionName": "Result",
-        "type": "table",
-        "addRowAllowed": false,
-        "columns": [
-          {
-            "fieldId": "AVERAGE_PRESSURE",
-            "label": "Avg. Pressure (ksc)",
-            "type": "number"
-          },
-          {
-            "fieldId": "PEAK_PRESSURE",
-            "label": "Peak Pressure (ksc)",
-            "type": "number"
-          },
-          {
-            "fieldId": "TB",
-            "label": "Tb (s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "BURN_RATE",
-            "label": "Burn Rate (mm/s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "C_STAR",
-            "label": "C star (m/s)",
-            "type": "number"
-          },
-          {
-            "fieldId": "ISP",
-            "label": "Isp (s)",
-            "type": "number"
-          }
-        ]
-      },
-      {
-        "sectionId": "UPLOAD_PT_CURVE",
-        "sectionName": "Upload P-T Curve",
+        "sectionId": "BURN_RATE",
+        "sectionName": "Burn Rate",
         "type": "form",
-        "ui": {
-          "direction": "row",
-          "wrap": true,
-          "gap": "md"
-        },
         "fields": [
-          {
-            "fieldId": "PT_CURVE_FILE",
-            "label": "Upload P-T Curve",
-            "type": "file",
-            "description": "Upload via /files/upload; submit as { fileId }"
-          }
+          { "fieldId": "BURN_RATE_MM_S", "label": "Burn Rate (mm/s)", "type": "number" },
+          { "fieldId": "PRESSURE_ABS_KSC", "label": "Pressure Abs (ksc)", "type": "number" },
+          { "fieldId": "N_VALUE", "label": "n value", "type": "number" }
         ]
       }
     ]
