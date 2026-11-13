@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { rawMaterialProcurementController } from "../../../controllers/user/sourcing/rawMaterialProcurementController";
+import { rawMaterialSourcingController } from "@controllers/user/sourcing/rms/rawMaterialSourcingController";
 import { ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
   toRawMaterialLotListApiStatus,
-} from "../../../data/models/user/RawMaterialProcurementModel";
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { OPERATION_STATUS } from "../../operationStatus";
 
 /**
@@ -28,7 +28,7 @@ export const useQcApprovedLotOptions = (
     let active = true;
     void (async () => {
       try {
-        const response = await rawMaterialProcurementController.fetchLotList({
+        const response = await rawMaterialSourcingController.fetchLotList({
           subDepartmentId: ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
           page: 1,
           limit: 500,

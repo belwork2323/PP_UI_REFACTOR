@@ -37,17 +37,7 @@ const SystemManagerDashboard = lazy(
   () => import("../../ui/pages/systemManager/SystemManagerDashboard"),
 );
 
-const SourcingDashboard = lazy(() => import("../../ui/pages/user/sourcing/SourcingDashboard"));
-
-const ManufacturingDashboard = lazy(
-  () => import("../../ui/pages/user/manufacturing/ManufacturingDashboard"),
-);
-
-const QualityControlDashboard = lazy(
-  () => import("../../ui/pages/user/qualityControl/QualityControlDashboard"),
-);
-
-const DispatchDashboard = lazy(() => import("../../ui/pages/user/dispatch/DispatchDashboard"));
+const UserDashboard = lazy(() => import("../../ui/pages/user/UserDashboard"));
 
 const SourcingApproverDashboard = lazy(
   () => import("../../ui/pages/approver/sourcing/SourcingApproverDashboard"),
@@ -201,25 +191,25 @@ export const routes = [
   /* ---------- USER ROUTES ---------- */
   {
     path: "/user/sourcing/:subDept",
-    element: <SourcingDashboard />,
+    element: <UserDashboard key="sourcing" dept="sourcing" />,
     isProtected: true,
     roles: ["USER"],
   },
   {
     path: "/user/manufacturing/:subDept",
-    element: <ManufacturingDashboard />,
+    element: <UserDashboard key="manufacturing" dept="manufacturing" />,
     isProtected: true,
     roles: ["USER"],
   },
   {
     path: "/user/quality/:subDept",
-    element: <QualityControlDashboard />,
+    element: <UserDashboard key="quality" dept="quality" />,
     isProtected: true,
     roles: ["USER"],
   },
   {
     path: "/user/dispatch/:subDept",
-    element: <DispatchDashboard />,
+    element: <UserDashboard key="dispatch" dept="dispatch" />,
     isProtected: true,
     roles: ["USER"],
   },

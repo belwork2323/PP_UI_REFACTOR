@@ -50,6 +50,7 @@ export type AppDropdownProps = {
   name?: string;
   onOpen?: SelectProps["onOpen"];
   SelectProps?: Omit<SelectProps, "displayEmpty" | "renderValue" | "MenuProps">;
+  startAdornment?: ReactNode;
 };
 
 const AppDropdown = ({
@@ -78,6 +79,7 @@ const AppDropdown = ({
   SelectProps: selectProps,
   compact = false,
   filterPanel = false,
+  startAdornment,
 }: AppDropdownProps) => {
   const resolvedPlaceholder = loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
   const hasPlaceholder = Boolean(resolvedPlaceholder);
@@ -125,6 +127,7 @@ const AppDropdown = ({
           : { ...appDropdownLabelProps, ...InputLabelProps }
       }
       inputProps={filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps}
+      InputProps={startAdornment ? { startAdornment } : undefined}
       SelectProps={{
         displayEmpty: hasPlaceholder,
         renderValue: resolveRenderValue,

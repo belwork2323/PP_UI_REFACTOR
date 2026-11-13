@@ -2,7 +2,7 @@ import {
   INITIAL_ROCKET_FORM,
   RocketFormData,
   type RocketMotorBatch,
-} from "../../../hooks/user/sourcing/sourcingWorkflowData";
+} from "@hooks/user/sourcing/shared/sourcingWorkflowData";
 import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
 import {
   buildMockTrialPayload,
@@ -13,7 +13,7 @@ import {
   type RocketMotorCasingMockTrialData,
   type RocketMotorCasingMockTrialPayload,
 } from "./RocketMotorCasingFormModel";
-import { isReferenceRangeNotApplicable } from "./RawMaterialProcurementModel";
+import { isReferenceRangeNotApplicable } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>

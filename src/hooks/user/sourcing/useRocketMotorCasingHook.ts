@@ -41,7 +41,7 @@ import {
   applyRocketMotorCasingIdentity,
   RocketMotorBatch,
   SOURCING_STATUS,
-} from "./sourcingWorkflowData";
+} from "@hooks/user/sourcing/shared/sourcingWorkflowData";
 import { useRocketMotorCasingList } from "./useRocketMotorCasingList";
 import useRocketMotorCasingLookups from "./useRocketMotorCasingLookups";
 import { OPERATION_STATUS } from "../../operationStatus";

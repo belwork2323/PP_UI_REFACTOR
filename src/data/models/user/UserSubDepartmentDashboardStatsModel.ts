@@ -1,5 +1,9 @@
 import { STRINGS } from "../../../app/config/strings";
-import type { DepartmentHeaderStatItem } from "./RawMaterialProcurementStatsModel";
+export type DepartmentHeaderStatItem = {
+  key: string;
+  label: string;
+  value: number;
+};
 
 export type UserSubDepartmentDashboardStats = {
   allocated: number;

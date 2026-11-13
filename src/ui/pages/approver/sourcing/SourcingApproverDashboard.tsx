@@ -1,13 +1,13 @@
 import { Box } from "@mui/material";
 import { useMemo } from "react";
-import useSourcingDashboardHook from "../../../../hooks/user/sourcing/useSourcingDashboardHook";
+import useSourcingDashboardHook from "@hooks/user/sourcing/shared/useSourcingDashboardHook";
 import useApproverDepartmentHeaderHook from "../../../../hooks/approver/useApproverDepartmentHeaderHook";
 import DepartmentHeader from "../../../components/custom/DepartmentHeader";
 import { STRINGS } from "../../../../app/config/strings";
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 
-import RawMaterialApproverPage from "./RawMaterialProcurementApproverPage";
+import RawMaterialSourcingApproverMainPage from "@ui/pages/approver/sourcing/rms/RawMaterialSourcingApproverMainPage";
 import RocketMotorApproverPage from "./RocketMotorCasingApproverPage";
 
 const S = STRINGS.APPROVER.DASHBOARD.SOURCING;
@@ -31,7 +31,7 @@ const SourcingApproverDashboard = () => {
         statItems={statItems}
       />
       <Box sx={theme.dashboard.content}>
-        {isRawMaterialFlow && <RawMaterialApproverPage />}
+        {isRawMaterialFlow && <RawMaterialSourcingApproverMainPage />}
         {isRocketMotorFlow && <RocketMotorApproverPage />}
       </Box>
     </Box>

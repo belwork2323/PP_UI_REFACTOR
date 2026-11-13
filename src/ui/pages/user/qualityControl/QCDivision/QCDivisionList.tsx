@@ -6,7 +6,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
-import UserSubdepartmentBatchListSection from "../../../../components/custom/UserSubdepartmentBatchListSection";
+import BatchListSection from "../../../../components/custom/BatchListSection";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -33,7 +33,7 @@ const QCDivisionList = ({ hookState, rowsPerPageOptions }: any) => {
   const theme = useMemo(() => getQualityControlTheme(mode), [mode]);
 
   return (
-    <UserSubdepartmentBatchListSection
+    <BatchListSection
       hookState={hookState}
       rowsPerPageOptions={rowsPerPageOptions}
       theme={theme}

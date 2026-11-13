@@ -20,7 +20,7 @@ import {
 
 import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRocketMotorCasingApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rocketMotorCasingApprover_theme";
-import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
+import getApproverSourcingFilterStyles from "@ui/pages/approver/sourcing/shared/approverSourcingFilterStyles";
 import DateField from "../../../components/common/DateField";
 import {
   formatDisplayDateTime,
@@ -37,7 +37,7 @@ import useRocketMotorCasingApproverHook, {
   type RocketMotorCasingApproverAppliedFilters,
 } from "../../../../hooks/approver/sourcing/useRocketMotorCasingApproverHook";
 import { formatMotorStageLabel } from "../../../../data/models/approver/RocketMotorCasingApproverModel";
-import ApproverList from "../components/ApproverList";
+import ApproverList from "@ui/components/custom/ApproverList";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";

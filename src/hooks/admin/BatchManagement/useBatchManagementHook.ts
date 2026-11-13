@@ -4,7 +4,7 @@ import { generalController } from "@controllers/admin/common/generalController";
 import { userManagementController } from "@controllers/admin/UserManagement/userManagementController";
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "@controllers/user/operationsController";
-import rawMaterialProcurementController from "@controllers/user/sourcing/rawMaterialProcurementController";
+import rawMaterialSourcingController from "@controllers/user/sourcing/rms/rawMaterialSourcingController";
 import {
   ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
   createEmptyBatchFormState,
@@ -25,7 +25,7 @@ import {
   mapLotListApiRow,
   toRawMaterialLotListApiStatus,
   type RawMaterialLotListRow,
-} from "@data/models/user/RawMaterialProcurementModel";
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import {
@@ -1051,7 +1051,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
   const loadApprovedLots = useCallback(async () => {
     setLoadingLots(true);
     try {
-      const res = await rawMaterialProcurementController.fetchLotList({
+      const res = await rawMaterialSourcingController.fetchLotList({
         subDepartmentId: ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
         page: 1,
         limit: 500,

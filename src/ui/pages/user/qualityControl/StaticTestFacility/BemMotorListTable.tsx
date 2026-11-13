@@ -21,7 +21,7 @@ import fonts from "@/app/theme/fonts";
 import { STRINGS } from "@/app/config/strings";
 import { useThemeStore } from "@/app/store/themeStore";
 import getQualityControlTheme from "@/app/theme/custom_themes/user/qualityControl/qualityControl_theme";
-import { getBatchListShellTheme } from "@/app/theme/custom_themes/shared/batchListShell_theme";
+import { getListLayoutTheme } from "@/app/theme/custom_themes/shared/listLayout_theme";
 import {
   uniformTableBodyCellSx,
   uniformTableHeaderCellSx,
@@ -31,10 +31,10 @@ import {
   getOperationStatusFilterLabel,
   OPERATION_STATUS,
 } from "@/hooks/operationStatus";
-import BatchListShell, {
-  BatchListShellFilterField,
-  BatchListShellStatusMeta,
-} from "@/ui/components/custom/BatchListShell";
+import ListLayout, {
+  ListLayoutFilterField,
+  ListLayoutStatusMeta,
+} from "@/ui/components/custom/ListLayout";
 import UserWorkflowStatusCell from "@/ui/components/custom/UserWorkflowStatusCell";
 import { icons } from "@/app/theme/icons";
 
@@ -71,10 +71,10 @@ export type BemMotorListTableProps = {
   search?: string;
   activeStatus?: string;
   statusTabs?: string[];
-  statusMeta?: BatchListShellStatusMeta;
+  statusMeta?: ListLayoutStatusMeta;
   statusConfig?: Record<string, any>;
   statusCounts?: Record<string, number>;
-  filterFields?: BatchListShellFilterField[];
+  filterFields?: ListLayoutFilterField[];
   filterValues?: Record<string, string>;
   loading?: boolean;
   onPageChange?: (page: number) => void;
@@ -155,7 +155,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
 
   const listShellTheme = useMemo(
     () =>
-      getBatchListShellTheme(
+      getListLayoutTheme(
         {
           primary: p.primary,
           primaryLight: p.primaryLight,
@@ -272,7 +272,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
   );
 
   return (
-    <BatchListShell
+    <ListLayout
       activeStatus={currentStatus}
       statusTabs={statusTabs}
       statusMeta={resolvedStatusMeta}
@@ -414,7 +414,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
           />
         </Box>
       </Paper>
-    </BatchListShell>
+    </ListLayout>
   );
 };
 

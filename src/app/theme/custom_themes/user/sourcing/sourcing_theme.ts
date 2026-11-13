@@ -1,7 +1,5 @@
 import { alpha } from "@mui/material";
 import { getOperationsTheme } from "../../shared/operations_theme";
-import { getRawMaterialProcurementTheme } from "./rawMaterialProcurement_theme";
-import { getRocketMotorCasingTheme } from "./rocketMotorCasing_theme";
 import {
   dataTableHeaderDivider,
   uniformTableBodyCellSx,
@@ -236,8 +234,6 @@ export const getSourcingTheme = (mode = "light") => {
       dashboard: {
         departmentName: "Sourcing Department",
       },
-      rawMaterial: getRawMaterialProcurementTheme(baseTheme),
-      rocketMotor: getRocketMotorCasingTheme(baseTheme),
     },
   };
 };

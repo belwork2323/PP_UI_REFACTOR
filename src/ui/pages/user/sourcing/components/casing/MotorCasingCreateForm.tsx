@@ -43,7 +43,7 @@ import {
   computeIsOutOfRange,
   isReferenceRangeNotApplicable,
   sanitizeNumericAnalysedResultInput,
-} from "../../../../../../data/models/user/RawMaterialProcurementModel";
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import {
   isCasingIdentificationComplete,
   isCasingFieldRequired,

@@ -22,7 +22,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { useThemeStore } from "@app/store/themeStore";
 import { useAuthStore } from "@app/store/authStore";
 import { getRocketMotorCasingApproverTheme } from "@app/theme/custom_themes/approver/sourcing/rocketMotorCasingApprover_theme";
-import getSourcingTheme from "@app/theme/custom_themes/user/sourcing/sourcing_theme";
+import { getRocketMotorCasingPageTheme } from "@app/theme/custom_themes/user/sourcing/rocketMotorCasing_theme";
 import { isApproverActionableStatus } from "@app/theme/approver";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
@@ -82,7 +82,7 @@ const RocketCasingDetailDialog = ({
 }: RocketCasingDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   const mode = useThemeStore((state) => state.mode);
-  const sourcingTheme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const sourcingTheme = useMemo(() => getRocketMotorCasingPageTheme(mode), [mode]);
   const dimTableTheme = sourcingTheme.sourcing.rocketMotor.casingDetails;
   const authSubDepartmentId = useAuthStore(
     (s) =>

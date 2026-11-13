@@ -63,9 +63,9 @@ export const yourValidationConfig: SubDeptValidationConfig<YourData> = {
 
 ## Pilot: Raw Material Sourcing
 
-- Config: `configs/rawMaterialSourcing.validation.config.ts`
-- Adapter: `adapters/rawMaterialSourcing.validation.ts`
-- Hooks: `useRawMaterialSpecificationForm`, `useRawMaterialProcurementHook`
+- Config: `configs/sourcing/rms/rawMaterialSourcing.validation.config.ts`
+- Adapter: `adapters/sourcing/rms/rawMaterialSourcing.validation.ts`
+- Hooks: `useRawMaterialSpecificationForm`, `useRawMaterialSourcingForm`
 
 Path convention for blocks:
 

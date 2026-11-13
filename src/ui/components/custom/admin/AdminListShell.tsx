@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 import FilterToggleButton from "@ui/components/common/FilterToggleButton";
-import BatchListShell from "@ui/components/custom/BatchListShell";
+import ListLayout from "@ui/components/custom/ListLayout";
 
 type AdminListShellTheme = {
-  batchListShell: Parameters<typeof BatchListShell>[0]["theme"];
+  batchListShell: Parameters<typeof ListLayout>[0]["theme"];
   filterToggle: {
     filterBtn: (active: boolean) => object;
     filterBtnIcon: object;
@@ -72,7 +72,7 @@ const AdminListShell = ({
   );
 
   return (
-    <BatchListShell
+    <ListLayout
       activeStatus=""
       emptyIcon={LayersRoundedIcon}
       emptySubtitle={emptySubtitle}
@@ -89,7 +89,7 @@ const AdminListShell = ({
       theme={batchListShell}
     >
       {children}
-    </BatchListShell>
+    </ListLayout>
   );
 };
 

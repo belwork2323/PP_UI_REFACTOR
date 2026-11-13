@@ -1,5 +1,5 @@
 import { STRINGS } from "../../../app/config/strings";
-import type { DepartmentHeaderStatItem } from "./RawMaterialProcurementStatsModel";
+import type { DepartmentHeaderStatItem } from "@data/models/user/UserSubDepartmentDashboardStatsModel";
 
 export type RocketMotorCasingStats = {
   createdMotors: number;

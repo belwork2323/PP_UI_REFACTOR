@@ -1,4 +1,4 @@
-import type { LotCertificate, MaterialBlock } from "@data/models/user/RawMaterialProcurementModel";
+import type { LotCertificate, MaterialBlock } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
 export type TempFileIdExtractor<T = unknown> = (state: T) => string[];
 

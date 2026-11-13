@@ -12,7 +12,7 @@ import {
   normalizeStageProgressArray,
   parseParallelFlowEnabled,
 } from "../../../../utils/batchStageUtils";
-import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
+import type { RawMaterialLotListRow } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {

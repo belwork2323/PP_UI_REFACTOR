@@ -1,4 +1,4 @@
-import { toLegacyRawMaterialSourcingRules } from "./configs/rawMaterialSourcing.validation.config";
+import { toLegacyRawMaterialSourcingRules } from "@data/validation/configs/sourcing/rms/rawMaterialSourcing.validation.config";
 
 /** Reusable field-rule primitives for subdepartment-owned workflow forms. */
 export type ValidationValueType = "text" | "date" | "number" | "file";

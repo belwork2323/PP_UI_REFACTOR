@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../components/common/WorkflowFormOpeningLoader";
 import { useThemeStore } from "../../../../app/store/themeStore";
-import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
+import { getRocketMotorCasingPageTheme } from "@app/theme/custom_themes/user/sourcing/rocketMotorCasing_theme";
 import useRocketMotorCasingHook from "../../../../hooks/user/sourcing/useRocketMotorCasingHook";
 import UserWorkflowActionBar from "../../../components/custom/UserWorkflowActionBar";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
@@ -20,7 +20,7 @@ import { isRocketMotorCasingMasterFrozen } from "../../../../data/models/user/Ro
 
 const RocketMotorCasing = () => {
   const mode = useThemeStore((state) => state.mode);
-  const theme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const theme = useMemo(() => getRocketMotorCasingPageTheme(mode), [mode]);
   const strings = STRINGS.SOURCING.CASING;
 
   const hookState = useRocketMotorCasingHook();

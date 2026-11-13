@@ -3416,7 +3416,7 @@ export const STRINGS = {
         DEPARTMENT_NAME: "Sourcing Department",
         RAW_MATERIAL_LABEL: "Raw Material Sourcing",
         RAW_MATERIAL_DESCRIPTION:
-          "Procurement approvals, material traceability and vendor clearance records",
+          "Sourcing approvals, material traceability and vendor clearance records",
         RAW_MATERIAL_SECTION: "Raw Material Submissions",
         ROCKET_CASING_LABEL: "Rocket Motor Casing",
         ROCKET_CASING_DESCRIPTION:

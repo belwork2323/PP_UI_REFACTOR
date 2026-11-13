@@ -10,7 +10,7 @@ import {
   rocketMotorCasingMatchesSearch,
 } from "../../../data/models/user/RocketMotorCasingProcurementModel";
 import { OPERATION_STATUS, toOperationStatusApiValue } from "../../operationStatus";
-import type { RocketMotorBatch } from "./sourcingWorkflowData";
+import type { RocketMotorBatch } from "@hooks/user/sourcing/shared/sourcingWorkflowData";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 /** Fetch up to this many rows when filtering search client-side across all columns */

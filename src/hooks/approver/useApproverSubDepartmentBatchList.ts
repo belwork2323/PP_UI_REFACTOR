@@ -4,8 +4,6 @@ import { useApproverListRefreshStore } from "../../app/store/approverListRefresh
 import { useAuthStore } from "../../app/store/authStore";
 import type { ApproverDepartmentKey } from "../../app/theme/approver";
 import { getApproverSubDepartmentBatchList } from "../../controllers/approver/approverController";
-import rawMaterialProcurementApproverController from "../../controllers/approver/rawMaterialProcurementApproverController";
-import rocketMotorCasingApproverController from "../../controllers/approver/rocketMotorCasingApproverController";
 import {
   buildApproverBatchListPayload,
   mapApproverBatchListRow,
@@ -14,20 +12,19 @@ import {
   normalizeApproverBatchStatus,
   resolveSubdepartmentBatchPagination,
 } from "../../data/models/approver/ApproverBatchListModel";
-import {
-  mapRawMaterialApproverStatusCountsForUi,
-  mapRawMaterialProcurementApproverListItem,
-  toRawMaterialApproverListApiStatus,
-} from "../../data/models/approver/RawMaterialProcurementApproverModel";
-import { toOperationStatusApiValue, mapApiStatusCountKeyToUiTab } from "../operationStatus";
+import type { SubDepartmentListFetcher } from "./subDepartmentListFetcher";
 
-const RAW_MATERIAL_PROCUREMENT_SUBDEPT = "raw-material";
-const ROCKET_MOTOR_CASING_SUBDEPT = "rocket-motor";
-
-const SOURCING_REMOTE_LIST_SUBDEPTS = new Set([
-  RAW_MATERIAL_PROCUREMENT_SUBDEPT,
-  ROCKET_MOTOR_CASING_SUBDEPT,
-]);
+/** Subdepartments with their own list API; each fetcher is loaded only when that subdepartment is opened. */
+const SUB_DEPARTMENT_LIST_FETCHERS: Record<string, () => Promise<SubDepartmentListFetcher>> = {
+  "raw-material": () =>
+    import("./sourcing/rms/rawMaterialSourcingApproverListFetcher").then(
+      (m) => m.fetchRawMaterialSourcingApproverList,
+    ),
+  "rocket-motor": () =>
+    import("./sourcing/rocketMotorCasingApproverListFetcher").then(
+      (m) => m.fetchRocketMotorCasingApproverList,
+    ),
+};
 
 type ApproverBatchStatusCounts = {
   initiated?: number;
@@ -98,41 +95,6 @@ const createLookupKeys = (item: Record<string, unknown>) =>
   [item.batchId, item.formId, item.dispatchId]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .map((value) => value.trim().toLowerCase());
-
-const mapStatusCounts = (
-  counts: ApproverBatchStatusCounts | undefined,
-  allLabel: string,
-  fallbackBatches: ApproverBatchSummary[],
-) => {
-  const mapped: Record<string, number> = {
-    [allLabel]: 0,
-  };
-
-  Object.entries(counts ?? {}).forEach(([key, value]) => {
-    const tab = mapApiStatusCountKeyToUiTab(key);
-    if (tab) {
-      mapped[tab] = (mapped[tab] ?? 0) + (value ?? 0);
-      mapped[allLabel] += value ?? 0;
-    }
-  });
-
-  fallbackBatches.forEach((batch) => {
-    if (!batch.status) {
-      return;
-    }
-    const displayStatus = String(batch.status);
-    const tab = mapApiStatusCountKeyToUiTab(displayStatus) ?? displayStatus;
-    if (mapped[tab] === undefined) {
-      mapped[tab] = fallbackBatches.filter((item) => item.status === batch.status).length;
-    }
-  });
-
-  if ((counts == null || Object.keys(counts).length === 0) && fallbackBatches.length > 0) {
-    mapped[allLabel] = fallbackBatches.length;
-  }
-
-  return mapped;
-};
 
 export const useApproverSubDepartmentBatchList = <T extends Record<string, unknown>>({
   allLabel,
@@ -213,7 +175,9 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       return;
     }
 
-    if (!SOURCING_REMOTE_LIST_SUBDEPTS.has(subDepartment ?? "") && !userId) {
+    const loadSubDepartmentFetcher = SUB_DEPARTMENT_LIST_FETCHERS[subDepartment];
+
+    if (!loadSubDepartmentFetcher && !userId) {
       setRemoteBatches([]);
       setPagination(DEFAULT_PAGINATION);
       setStatusCounts({ [allLabel]: items.length });
@@ -229,96 +193,22 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       setIsRefreshing(true);
     }
 
-    if (subDepartment === RAW_MATERIAL_PROCUREMENT_SUBDEPT) {
-      const apiStatus =
-        status !== allLabel ? toRawMaterialApproverListApiStatus(status, allLabel) : null;
-      const materialCode = String(extraFilters.materialCode ?? "").trim();
-      const fromDate = String(extraFilters.fromDate ?? "").trim();
-      const toDate = String(extraFilters.toDate ?? "").trim();
-
-      const payload = {
+    if (loadSubDepartmentFetcher) {
+      const fetchList = await loadSubDepartmentFetcher();
+      const result = await fetchList({
         subDepartmentId: selectedSubDepartment.subDepartmentId,
         page,
         limit: DEFAULT_PAGINATION.limit,
-        ...(apiStatus ? { status: [apiStatus] } : {}),
-        ...(materialCode && materialCode !== allLabel ? { materialCode: [materialCode] } : {}),
-        ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
-        ...(fromDate ? { fromDate } : {}),
-        ...(toDate ? { toDate } : {}),
-      };
+        status,
+        allLabel,
+        search: debouncedSearchText,
+        extraFilters,
+      });
 
-      const response = await rawMaterialProcurementApproverController.fetchLotList(payload);
-
-      if (response.success && response.data) {
-        const nextLots = response.data.lots ?? [];
-        const nextBatches = nextLots.map((lot, index) =>
-          mapRawMaterialProcurementApproverListItem(lot, index),
-        ) as unknown as ApproverBatchSummary[];
-
-        setRemoteBatches(nextBatches);
-        setPagination({
-          page: response.data.pagination?.page ?? page,
-          limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
-          totalRecords: response.data.pagination?.totalRecords ?? nextLots.length,
-          totalPages: response.data.pagination?.totalPages ?? 1,
-        });
-        setStatusCounts(
-          mapRawMaterialApproverStatusCountsForUi(
-            response.data.statusCounts,
-            allLabel,
-            response.data.pagination?.totalRecords ?? nextLots.length,
-          ),
-        );
-      } else {
-        setRemoteBatches([]);
-        setPagination(DEFAULT_PAGINATION);
-        setStatusCounts({ [allLabel]: 0 });
-      }
-
-      setLoading(false);
-      setIsRefreshing(false);
-      hasLoadedOnceRef.current = true;
-      return;
-    }
-
-    if (subDepartment === ROCKET_MOTOR_CASING_SUBDEPT) {
-      const apiStatus = status !== allLabel ? toOperationStatusApiValue(status, allLabel) : null;
-
-      const fromDate = String(extraFilters.fromDate ?? "").trim();
-      const toDate = String(extraFilters.toDate ?? "").trim();
-
-      const motorStage = String(extraFilters.motorStage ?? "").trim();
-      const casingType = String(extraFilters.casingType ?? "").trim();
-      const insulationType = String(extraFilters.insulationType ?? "").trim();
-
-      const payload = {
-        subDepartmentId: selectedSubDepartment.subDepartmentId,
-        page,
-        limit: DEFAULT_PAGINATION.limit,
-        ...(apiStatus ? { status: [apiStatus] } : {}),
-        ...(motorStage && motorStage !== allLabel ? { motorStage: [motorStage] } : {}),
-        ...(casingType && casingType !== allLabel ? { casingType: [casingType] } : {}),
-        ...(insulationType && insulationType !== allLabel
-          ? { insulationType: [insulationType] }
-          : {}),
-        ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
-        ...(fromDate ? { fromDate } : {}),
-        ...(toDate ? { toDate } : {}),
-      };
-
-      const response = await rocketMotorCasingApproverController.fetchCasingList(payload);
-
-      if (response.success && response.data) {
-        const nextBatches = (response.data.casings ?? []) as unknown as ApproverBatchSummary[];
-
-        setRemoteBatches(nextBatches);
-        setPagination({
-          page: response.data.pagination?.page ?? page,
-          limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
-          totalRecords: response.data.pagination?.totalRecords ?? nextBatches.length,
-          totalPages: response.data.pagination?.totalPages ?? 1,
-        });
-        setStatusCounts(mapStatusCounts(response.data.statusCounts, allLabel, nextBatches));
+      if (result) {
+        setRemoteBatches(result.batches as ApproverBatchSummary[]);
+        setPagination(result.pagination);
+        setStatusCounts(result.statusCounts);
       } else {
         setRemoteBatches([]);
         setPagination(DEFAULT_PAGINATION);

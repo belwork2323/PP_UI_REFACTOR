@@ -417,7 +417,7 @@ export const icons = {
         inventory: InventoryRoundedIcon,
         store: StoreRoundedIcon,
       },
-      rawMaterialProcurement: {
+      rawMaterialSourcing: {
         approved: CheckCircleRoundedIcon,
         rejected: CancelRoundedIcon,
         visibility: VisibilityRoundedIcon,

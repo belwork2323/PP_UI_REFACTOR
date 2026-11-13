@@ -36,8 +36,8 @@ export const APPROVER_ENDPOINTS = {
    */
   QC_DIVISIONS: `${API_BASE}/user/qc-division/divisions`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
-  RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
-  RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
+  RAW_MATERIAL_SOURCING_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
+  RAW_MATERIAL_SOURCING_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   ROCKET_MOTOR_CASING_LIST: `${API_BASE}/approver/rocket-motor-casing/list`,
   ROCKET_MOTOR_CASING_CHANGE_STATUS: `${API_BASE}/approver/rocket-motor-casing/change-status`,
 };
@@ -298,7 +298,7 @@ export const USER_OPERATIONS_ENDPOINTS = {
   FETCH_SPECIFICATION: `${API_BASE}/user/subdepartment/insulation/specification-list`,
 };
 
-export const USER_RAW_MATERIAL_PROCUREMENT_ENDPOINTS = {
+export const USER_RAW_MATERIAL_SOURCING_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/raw-material-sourcing/form/create`,
   FORM_DETAILS: `${API_BASE}/user/raw-material-sourcing/form/details`,
   UPDATE_FORM: `${API_BASE}/user/raw-material-sourcing/form/update`,

@@ -5,7 +5,7 @@ import spacing from "@app/theme/spacing";
 import layout from "@app/theme/layout";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { getBatchListShellTheme, getFilterToggleSx } from "@app/theme/custom_themes/shared/batchListShell_theme";
+import { getListLayoutTheme, getFilterToggleSx } from "@app/theme/custom_themes/shared/listLayout_theme";
 import { getTokens } from "@app/theme/tokens/semantics";
 
 export type AdminManagementTableThemeParams = {
@@ -447,7 +447,7 @@ export const getAdminCommonTheme = (mode: "light" | "dark" = "light") => {
   return {
     ...base,
     typography: fonts.typography,
-    batchListShell: getBatchListShellTheme(shellPalette, { filterInputBg: semantic.filterInputBg }),
+    batchListShell: getListLayoutTheme(shellPalette, { filterInputBg: semantic.filterInputBg }),
     filterToggle: {
       ...filterToggleTokens,
       clearChip: filterToggleTokens.clearChip({

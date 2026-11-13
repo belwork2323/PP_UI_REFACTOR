@@ -4,7 +4,7 @@ import { STRINGS } from "../../../../app/config/strings";
 import type { ApproverDepartmentKey, ApproverStatusMeta } from "../../../../app/theme/approver";
 import useApproverBatchListPageFilterBar from "../../../../hooks/approver/useApproverBatchListPageFilterBar";
 import { APPROVER_BATCH_LIST_SEARCH_KEYS } from "../../../../data/models/approver/ApproverBatchListModel";
-import ApproverList from "./ApproverList";
+import ApproverList from "@ui/components/custom/ApproverList";
 import ApproverSubdepartmentBatchListTable, {
   type ApproverSubdepartmentBatchListRow,
 } from "./ApproverSubdepartmentBatchListTable";

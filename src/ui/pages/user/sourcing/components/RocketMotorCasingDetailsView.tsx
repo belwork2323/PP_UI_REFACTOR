@@ -19,7 +19,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { icons } from "../../../../../app/theme/icons";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import { useAuthStore } from "../../../../../app/store/authStore";
-import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
+import { getRocketMotorCasingPageTheme } from "@app/theme/custom_themes/user/sourcing/rocketMotorCasing_theme";
 import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { formatDisplayDate, formatDisplayDateOrDateTime, formatDisplayDateTime } from "../../../../../utils/dateUtils";
@@ -64,7 +64,7 @@ type RocketMotorCasingDetailsViewProps = {
 
 const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMotorCasingDetailsViewProps) => {
   const mode = useThemeStore((state) => state.mode);
-  const theme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const theme = useMemo(() => getRocketMotorCasingPageTheme(mode), [mode]);
   const dt = theme.sourcing.rocketMotor.casingDetails;
   const subDepartmentId = useAuthStore(
     (s) =>

@@ -6,7 +6,7 @@ import { useThemeStore } from "../../../../app/store/themeStore";
 import getOperationsTheme from "../../../../app/theme/custom_themes/shared/operations_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../app/config/strings";
-import UserSubdepartmentBatchListSection from "../../../components/custom/UserSubdepartmentBatchListSection";
+import BatchListSection from "../../../components/custom/BatchListSection";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -33,7 +33,7 @@ const DispatchList = ({ hookState, rowsPerPageOptions }: any) => {
   const theme = useMemo(() => getOperationsTheme(mode), [mode]);
 
   return (
-    <UserSubdepartmentBatchListSection
+    <BatchListSection
       hookState={hookState}
       rowsPerPageOptions={rowsPerPageOptions}
       theme={theme}

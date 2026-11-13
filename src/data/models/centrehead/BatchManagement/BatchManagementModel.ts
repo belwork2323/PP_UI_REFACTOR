@@ -5,7 +5,7 @@
 
 import { icons } from "@app/theme/icons";
 import type { MaterialsListGrade, MaterialsListItem } from "../../user/MaterialsListModel";
-import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
+import type { RawMaterialLotListRow } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 
 /** Map display / list labels to form/API enum values */

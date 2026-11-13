@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../../app/store/authStore";
-import { rawMaterialProcurementController } from "../../../controllers/user/sourcing/rawMaterialProcurementController";
+import { rawMaterialSourcingController } from "@controllers/user/sourcing/rms/rawMaterialSourcingController";
 import {
   mapLotListApiRow,
   toRawMaterialLotListApiStatus,
   type RawMaterialLotListRow,
-} from "../../../data/models/user/RawMaterialProcurementModel";
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { OPERATION_STATUS } from "../../operationStatus";
 
 const normalizeLotId = (lot: RawMaterialLotListRow): string => {
@@ -50,7 +50,7 @@ export function useCasePrepLinerMaterials() {
 
       setLoadingLotsByCode((prev) => ({ ...prev, [cacheKey]: true }));
       try {
-        const response = await rawMaterialProcurementController.fetchLotList({
+        const response = await rawMaterialSourcingController.fetchLotList({
           subDepartmentId,
           page: 1,
           limit: 500,

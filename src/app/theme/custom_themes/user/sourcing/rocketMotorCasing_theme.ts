@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material";
 import { createDataTableTheme, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
+import { getSourcingTheme } from "./sourcing_theme";
 
 export const getRocketMotorCasingTheme = (baseTheme: any) => {
 	const palette = baseTheme?.palette ?? {};
@@ -613,6 +614,18 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 			dimParamCell: { fontWeight: 600, minWidth: 160 },
 			emptyText: { fontSize: "0.85rem", color: palette.textSub, textAlign: "center", py: 4 },
 			loadingBox: { minHeight: 320, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1.5 },
+		},
+	};
+};
+
+/** Sourcing department theme plus the RMC-only `sourcing.rocketMotor` tokens. */
+export const getRocketMotorCasingPageTheme = (mode = "light") => {
+	const base = getSourcingTheme(mode);
+	return {
+		...base,
+		sourcing: {
+			...base.sourcing,
+			rocketMotor: getRocketMotorCasingTheme(base),
 		},
 	};
 };
