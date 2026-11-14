@@ -4,12 +4,16 @@ import { useAlertStore } from "@app/store/alertStore";
 import rawMaterialSourcingController from "@controllers/user/sourcing/rms/rawMaterialSourcingController";
 import {
   MaterialBlock,
-  normalizeRawMaterialLotListStatus,
   RawMaterialLotDetailsContext,
   RawMaterialLotDetailsModel,
   RawMaterialLotListRow,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { getRawMaterialSourcingErrorMessage } from "@hooks/user/sourcing/rms/rawMaterialSourcingErrors";
+import {
+  buildDetailsRowFromListRow,
+  buildDetailsRowFromLotModel,
+  resolveLotDetailsFetchErrorFallback,
+} from "@hooks/user/sourcing/rms/rawMaterialSourcingDetailsHelpers";
 
 type UseRawMaterialSourcingDetailsArgs = {
   /** Called before the details request starts. */
@@ -35,73 +39,44 @@ export const useRawMaterialSourcingDetails = ({
     setLoadingDetails(false);
   }, []);
 
-  const handleViewLotDetails = async (row: RawMaterialLotListRow) => {
-    const lotId = String(row?.lotId ?? "").trim();
-    if (!lotId) {
-      showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.BATCH_ID_MISSING, "error");
-      return;
-    }
-
-    setDetailsRow({
-      lotId,
-      sourcingId: row.sourcingId,
-      materialCode: row.materialCode,
-      materialName: row.materialName,
-      grade: row.grade ?? null,
-      supplyOrderNo: row.supplyOrderNo,
-      receiptDate: row.receiptDate,
-      manufacturerName: row.manufacturerName,
-      rmStatus: row.rmStatus,
-      createdBy: row.createdBy,
-      createdOn: row.createdOn,
-      rejectionReason: row?.rejectionReason,
-    });
-    setDetailsBlocks([]);
-    onOpen();
-    setLoadingDetails(true);
-
-    try {
-      const detailsResponse = await rawMaterialSourcingController.fetchLotDetails({ lotId });
-      if (!detailsResponse?.success || !detailsResponse.data) {
-        const fallback =
-          detailsResponse?.statusCode === 404
-            ? STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_NOT_FOUND
-            : STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_FETCH_ERROR;
-        showAlert(getRawMaterialSourcingErrorMessage(detailsResponse, fallback), "error");
-        onError();
+  const handleViewLotDetails = useCallback(
+    async (row: RawMaterialLotListRow) => {
+      const lotId = String(row?.lotId ?? "").trim();
+      if (!lotId) {
+        showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.BATCH_ID_MISSING, "error");
         return;
       }
 
-      const model = detailsResponse.data;
-      const wf = model.workflowInsights;
-      const blocks = RawMaterialLotDetailsModel.toMaterialBlocks(model);
+      setDetailsRow(buildDetailsRowFromListRow(row, lotId));
+      setDetailsBlocks([]);
+      onOpen();
+      setLoadingDetails(true);
 
-      setDetailsBlocks(blocks);
-      setDetailsRow({
-        lotId: model.lotId || lotId,
-        sourcingId: row.sourcingId,
-        materialCode: model.materialCode || row.materialCode,
-        materialName: row.materialName,
-        grade:
-          row.grade ??
-          (model.grade ? { gradeId: 0, gradeCode: model.grade, gradeName: model.grade } : null),
-        supplyOrderNo: model.supplyOrderNo || row.supplyOrderNo,
-        receiptDate: model.receiptDate || row.receiptDate,
-        manufacturerName: model.manufacturerName || row.manufacturerName,
-        rmStatus: normalizeRawMaterialLotListStatus(wf?.currentStatus || row.rmStatus),
-        createdBy: row.createdBy,
-        createdOn: row.createdOn,
-        rejectionReason: wf?.rejectionReason ?? null,
-      });
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
+      try {
+        const detailsResponse = await rawMaterialSourcingController.fetchLotDetails({ lotId });
+        if (!detailsResponse?.success || !detailsResponse.data) {
+          const fallback = resolveLotDetailsFetchErrorFallback(detailsResponse?.statusCode);
+          showAlert(getRawMaterialSourcingErrorMessage(detailsResponse, fallback), "error");
+          onError();
+          return;
+        }
 
-  const handleBackFromDetails = () => {
+        const model = detailsResponse.data;
+        const blocks = RawMaterialLotDetailsModel.toMaterialBlocks(model);
+
+        setDetailsBlocks(blocks);
+        setDetailsRow(buildDetailsRowFromLotModel(model, row, lotId));
+      } finally {
+        setLoadingDetails(false);
+      }
+    },
+    [onError, onOpen, showAlert],
+  );
+
+  const handleBackFromDetails = useCallback(() => {
     resetDetails();
     onClose();
-  };
+  }, [onClose, resetDetails]);
 
   return {
     detailsRow,

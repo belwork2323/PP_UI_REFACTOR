@@ -137,8 +137,13 @@ export const appDropdownMenuProps = {
   },
 };
 
+/**
+ * Inherit the Select/input color — MUI ThemeProvider is often light while pages
+ * use a custom dark palette; `text.secondary` then paints near-black on dark bg.
+ */
 export const appDropdownPlaceholderSx = {
-  color: "text.secondary",
+  color: "inherit",
+  opacity: 0.72,
   fontSize: "0.78rem",
   fontStyle: "italic",
   lineHeight: 1.4,

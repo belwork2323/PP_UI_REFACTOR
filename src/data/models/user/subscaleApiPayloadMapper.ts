@@ -24,7 +24,7 @@ import {
   normalizeSubscaleMixingCycles,
 } from "../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { formatToUiDate } from "../../../utils/dateUtils";
-import { toApiDateTime } from "./castingCuringFieldCodec";
+import { toApiDate, toApiDateTime, toUiDate, toUiDateTime } from "./castingCuringFieldCodec";
 import { parseFileRefs, type FileRef } from "../common/FileUploadModel";
 
 /** Mirrors backend `SubscaleDetailsDTO.MixParticular` */
@@ -78,6 +78,7 @@ export type HardwarePreparationDetailsDTO = {
   articles?: HardwareArticleSelectionDTO[];
   linerType?: string;
   linerBatchNo?: string;
+  /** LocalDate wire value; property name remains unchanged for compatibility. */
   linerBatchDate?: string;
 };
 
@@ -99,6 +100,8 @@ export type CastingTableDTO = {
   bemNo?: string;
   bemMouldNo?: string;
   castingPitNo?: string;
+  castingStartDateTime?: string;
+  castingEndDateTime?: string;
   castingStartTime?: string;
   castingEndTime?: string;
   vacuumLevel?: string;
@@ -107,6 +110,9 @@ export type CastingTableDTO = {
 
 /** Mirrors backend `CastingDetailsDTO` */
 export type CastingDetailsDTO = {
+  dateTimeOfCasting?: string;
+  dateOfCastingDateTime?: string;
+  /** Legacy JSON property. */
   dateOfCasting?: string;
   castingTable?: CastingTableDTO[];
 };
@@ -117,11 +123,14 @@ export type CuringTableDTO = {
   /** Article No / BEM No (legacy key: bemMouldNo). */
   bemNo?: string;
   bemMouldNo?: string;
+  curingStartDateTime?: string;
+  curingEndDateTime?: string;
   curingStartDate?: string;
   curingEndDate?: string;
   ovenNo?: string;
   temperature?: string;
   hardness?: string;
+  decoringDateTime?: string;
   decoringDate?: string;
   decoringLoad?: string;
   grainSurfaceObservations?: string;
@@ -136,6 +145,8 @@ export type CuringDetailsDTO = {
 export type NdtTableDTO = {
   articleType?: string;
   bemNo?: string;
+  dateTimeOfNdt?: string;
+  dateOfNdtDateTime?: string;
   dateOfNdt?: string;
   observations?: string;
 };
@@ -175,6 +186,8 @@ export type InhibitionTableDTO = {
   weightBeforeInhibition?: string;
   weightAfterInhibition?: string;
   irAppliedWeight?: string;
+  dateTimeOfApplication?: string;
+  dateOfApplicationDateTime?: string;
   dateOfApplication?: string;
   remarks?: string;
 };
@@ -182,6 +195,10 @@ export type InhibitionTableDTO = {
 /** Mirrors backend `InhibitionDetailsDTO` */
 export type InhibitionDetailsDTO = {
   irBatchNo?: string;
+  dateTimeOfManufacturing?: string;
+  dateTimeOfApplication?: string;
+  dateOfManufacturingDateTime?: string;
+  dateOfApplicationDateTime?: string;
   dateOfManufacturing?: string;
   dateOfApplication?: string;
   inhibitionTable?: InhibitionTableDTO[];
@@ -327,6 +344,13 @@ const TABLE_FIELD_TO_API: Record<string, string> = {
   GRAPH_UPLOAD: "graph",
   BEM_NO: "bemNo",
   BEM_MOULD_NO: "bemMouldNo",
+  CASTING_START_TIME: "castingStartDateTime",
+  CASTING_END_TIME: "castingEndDateTime",
+  CURING_START_DATE: "curingStartDateTime",
+  CURING_END_DATE: "curingEndDateTime",
+  DECORING_DATE: "decoringDateTime",
+  DATE_OF_NDT: "dateTimeOfNdt",
+  DATE_OF_APPLICATION: "dateTimeOfApplication",
 };
 
 const DATETIME_TABLE_FIELDS = new Set([
@@ -336,6 +360,7 @@ const DATETIME_TABLE_FIELDS = new Set([
   "CURING_END_DATE",
   "DECORING_DATE",
   "DATE_OF_NDT",
+  "DATE_OF_APPLICATION",
 ]);
 
 const mapGraphFileToApi = (value: unknown): SubscaleGraphFileDTO | undefined => {
@@ -423,7 +448,7 @@ const resolveHardwareCountFieldFromArticleName = (articleName: string): string |
 const RUNTIME_ROW_KEYS = new Set(["SR_NO", "srNo"]);
 
 /** UI-only table columns not sent to the API */
-const TABLE_ROW_EXCLUDED_KEYS = new Set(["PROPELLANT_WEIGHT"]);
+// const TABLE_ROW_EXCLUDED_KEYS = new Set(["PROPELLANT_WEIGHT"]);
 
 /**
  * Propellant Wt (C−B−A): C=Wt After Inhib, B=Wt Before Inhib, A=Liner Coated Sleeve Wt.
@@ -456,7 +481,12 @@ const enrichInhibitionUiRows = (
     if (!rowDate && sectionDate) {
       next.DATE_OF_APPLICATION = sectionDate;
     }
-    next.PROPELLANT_WEIGHT = recomputeInhibitionPropellantWeight(next);
+    const calculatedWeight = recomputeInhibitionPropellantWeight(next);
+    if (calculatedWeight !== "") {
+      next.PROPELLANT_WEIGHT = calculatedWeight;
+    } else if (next.PROPELLANT_WEIGHT == null) {
+      next.PROPELLANT_WEIGHT = "";
+    }
     return next;
   });
 };
@@ -544,7 +574,7 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
   const mapped: Record<string, unknown> = {};
 
   Object.entries(row).forEach(([key, value]) => {
-    if (isRuntimeRowKey(key) || TABLE_ROW_EXCLUDED_KEYS.has(key)) return;
+    if (isRuntimeRowKey(key)) return;
     if (value === null || value === undefined || value === "") return;
 
     if (key === "ARTICLE_TYPE") {
@@ -651,7 +681,7 @@ const mapHardwarePreparationDetails = (
   const linerBatchNo = String(values[LINER_BATCH_NO_FIELD.id] ?? "").trim();
   if (linerBatchNo) details.linerBatchNo = linerBatchNo;
 
-  const linerBatchDate = formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim());
+  const linerBatchDate = toApiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim());
   if (linerBatchDate) details.linerBatchDate = linerBatchDate;
 
   return Object.keys(details).length > 0 ? details : undefined;
@@ -791,10 +821,10 @@ export const mapSubscaleDetails = (values: SchemaFormValues): SubscaleDetailsDTO
   const mixerType = String(values.mixerType ?? values.MIXER_TYPE ?? "").trim();
   if (mixerType) payload.mixerType = mixerType;
 
-  const premixDate = toApiDateTime(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim());
+  const premixDate = toApiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim());
   if (premixDate) payload.premixDate = premixDate;
 
-  const finalMixDate = toApiDateTime(
+  const finalMixDate = toApiDate(
     String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim(),
   );
   if (finalMixDate) payload.finalMixDate = finalMixDate;
@@ -891,7 +921,7 @@ export const mapSubscaleFormValuesToApiPayload = (
     "CASTING_DETAILS",
     "CASTING_TABLE",
     "castingTable",
-    castingDate ? { dateOfCasting: castingDate } : undefined,
+    castingDate ? { dateTimeOfCasting: castingDate } : undefined,
   ) as CastingDetailsDTO;
 
   const curingDetails = buildSectionTablePayload(
@@ -932,7 +962,7 @@ export const mapSubscaleFormValuesToApiPayload = (
         "",
     ).trim(),
   );
-  if (dateOfMfg) inhibitionFields.dateOfManufacturing = dateOfMfg;
+  if (dateOfMfg) inhibitionFields.dateTimeOfManufacturing = dateOfMfg;
   let dateOfApplication = toApiDateTime(
     String(
       dateOfApplicationFromRows ??
@@ -953,14 +983,14 @@ export const mapSubscaleFormValuesToApiPayload = (
       "INHIBITION_TABLE",
     );
     for (const row of inhibitionRows) {
-      const rowDate = formatToUiDate(String(row.DATE_OF_APPLICATION ?? "").trim());
+      const rowDate = toApiDateTime(String(row.DATE_OF_APPLICATION ?? "").trim());
       if (rowDate) {
         dateOfApplication = rowDate;
         break;
       }
     }
   }
-  if (dateOfApplication) inhibitionFields.dateOfApplication = dateOfApplication;
+  if (dateOfApplication) inhibitionFields.dateTimeOfApplication = dateOfApplication;
 
   const inhibitionDetails = buildSectionTablePayload(
     values,
@@ -1022,6 +1052,15 @@ const API_TO_TABLE_FIELD: Record<string, string> = {
   graphDocumentId: "GRAPH_FILE",
   bemNo: "BEM_NO",
   bemMouldNo: "BEM_MOULD_NO",
+  castingStartDateTime: "CASTING_START_TIME",
+  castingEndDateTime: "CASTING_END_TIME",
+  curingStartDateTime: "CURING_START_DATE",
+  curingEndDateTime: "CURING_END_DATE",
+  decoringDateTime: "DECORING_DATE",
+  dateTimeOfNdt: "DATE_OF_NDT",
+  dateOfNdtDateTime: "DATE_OF_NDT",
+  dateTimeOfApplication: "DATE_OF_APPLICATION",
+  dateOfApplicationDateTime: "DATE_OF_APPLICATION",
   nvalue: "N_VALUE",
   nValue: "N_VALUE",
 };
@@ -1091,6 +1130,14 @@ const mapApiTableRowToUi = (row: Record<string, unknown>, index: number) => {
       mapped[uiKey] = refs.length > 0 ? refs : "";
       return;
     }
+    // DateTimeField and the details table both consume the UI-local datetime shape.
+    // The API may return either ISO timestamps or `DD-MM-YYYY HH:mm:ss`; normalize
+    // them here so hydration and read-only details use the same representation.
+    if (DATETIME_TABLE_FIELDS.has(uiKey)) {
+      mapped[uiKey] = value == null || value === "" ? "" : toUiDateTime(value);
+      return;
+    }
+
     // Keep null/empty keys so details tables always render the full column set.
     mapped[uiKey] = value == null ? "" : formatUiCellValue(value);
   });
@@ -1107,13 +1154,12 @@ const mapApiTableRowsToUi = (rows: unknown) => {
 
 const mapInhibitionRowsToUi = (inhibition: Record<string, unknown>) => {
   const rows = mapApiTableRowsToUi(inhibition.inhibitionTable);
-  const dateOfApplication = inhibition.dateOfApplication;
-  if (dateOfApplication == null || dateOfApplication === "") return rows;
-
-  return rows.map((row) => ({
-    ...row,
-    DATE_OF_APPLICATION: row.DATE_OF_APPLICATION || String(dateOfApplication),
-  }));
+  const dateOfApplication =
+    inhibition.dateTimeOfApplication ??
+    inhibition.dateOfApplicationDateTime ??
+    inhibition.dateOfApplication;
+  const sectionDate = dateOfApplication ? toUiDateTime(dateOfApplication) : undefined;
+  return enrichInhibitionUiRows(rows, sectionDate);
 };
 
 /** Normalize curing identity to BEM_NO (legacy curing used BEM_MOULD_NO / bemMouldNo). */
@@ -1202,7 +1248,7 @@ export const mapSubscaleApiDetailsToFormValues = (
     values[LINER_BATCH_NO_FIELD.id] = String(hardware.linerBatchNo);
   }
   if (hardware.linerBatchDate != null) {
-    values[LINER_BATCH_DATE_FIELD.id] = String(hardware.linerBatchDate);
+    values[LINER_BATCH_DATE_FIELD.id] = toUiDate(String(hardware.linerBatchDate));
   }
 
   const hardwareRows = Array.isArray(normalized.hardwarePreparationTable)
@@ -1251,9 +1297,9 @@ export const mapSubscaleApiDetailsToFormValues = (
     values.mixerType = String(subscale.mixerType);
   }
   if (subscale.premixDate != null)
-    values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] = String(subscale.premixDate);
+    values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] = toUiDate(String(subscale.premixDate));
   if (subscale.finalMixDate != null) {
-    values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] = String(subscale.finalMixDate);
+    values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] = toUiDate(String(subscale.finalMixDate));
   }
 
   const mixingCycleRaw = subscale.mixingCycle;
@@ -1304,8 +1350,10 @@ export const mapSubscaleApiDetailsToFormValues = (
   }
 
   const casting = (normalized.castingDetails ?? {}) as Record<string, unknown>;
-  if (casting.dateOfCasting != null) {
-    const dateOfCasting = String(casting.dateOfCasting);
+  const castingDateTime =
+    casting.dateTimeOfCasting ?? casting.dateOfCastingDateTime ?? casting.dateOfCasting;
+  if (castingDateTime != null) {
+    const dateOfCasting = toUiDateTime(castingDateTime);
     values[scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.CASTING, "DATE_OF_CASTING")] = dateOfCasting;
     setUnscopedField(values, "DATE_OF_CASTING", dateOfCasting);
   }
@@ -1343,16 +1391,24 @@ export const mapSubscaleApiDetailsToFormValues = (
       irBatchNo;
     setUnscopedField(values, "IR_BATCH_NO", irBatchNo);
   }
-  if (inhibition.dateOfManufacturing != null) {
-    const dateOfMfg = String(inhibition.dateOfManufacturing);
+  const manufacturingDateTime =
+    inhibition.dateTimeOfManufacturing ??
+    inhibition.dateOfManufacturingDateTime ??
+    inhibition.dateOfManufacturing;
+  if (manufacturingDateTime != null) {
+    const dateOfMfg = toUiDateTime(manufacturingDateTime);
     values[
       scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_MANUFACTURING)
     ] = dateOfMfg;
     setUnscopedField(values, "DATE_OF_MFG", dateOfMfg);
     setUnscopedField(values, "DATE_OF_MANUFACTURING", dateOfMfg);
   }
+  const applicationDateTime =
+    inhibition.dateTimeOfApplication ??
+    inhibition.dateOfApplicationDateTime ??
+    inhibition.dateOfApplication;
   const inhibitionSectionDate =
-    inhibition.dateOfApplication != null ? String(inhibition.dateOfApplication) : "";
+    applicationDateTime != null ? toUiDateTime(applicationDateTime) : "";
   if (inhibitionSectionDate) {
     values[
       scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_APPLICATION)
@@ -1421,8 +1477,8 @@ const mapSubscaleDetailsApiToDisplayMerged = (
   if (source.batchSize != null) merged.BATCH_SIZE = String(source.batchSize);
   if (source.bldgNo) merged.MIXER_BLDG_NO = source.bldgNo;
   if (source.mixerType) merged.MIXER_TYPE = source.mixerType;
-  if (source.premixDate) merged.PREMIX_DATE = source.premixDate;
-  if (source.finalMixDate) merged.FINAL_MIX_DATE = source.finalMixDate;
+  if (source.premixDate) merged.PREMIX_DATE = toUiDate(source.premixDate);
+  if (source.finalMixDate) merged.FINAL_MIX_DATE = toUiDate(source.finalMixDate);
 
   const mixingCycle = source.mixingCycle;
   if (mixingCycle) {
@@ -1472,7 +1528,9 @@ const mapHardwareDetailsApiToDisplayMerged = (
 
   if (source.linerType) merged[LINER_TYPE_FIELD.id] = source.linerType;
   if (source.linerBatchNo) merged[LINER_BATCH_NO_FIELD.id] = source.linerBatchNo;
-  if (source.linerBatchDate) merged[LINER_BATCH_DATE_FIELD.id] = source.linerBatchDate;
+  if (source.linerBatchDate) {
+    merged[LINER_BATCH_DATE_FIELD.id] = toUiDate(source.linerBatchDate);
+  }
 
   return merged;
 };
@@ -1515,7 +1573,7 @@ const mapProcessSectionApiToDisplayMerged = (
 
   scalarFields.forEach(({ apiKey, uiKey }) => {
     const value = section[apiKey];
-    if (value != null && value !== "") merged[uiKey] = value;
+    if (merged[uiKey] == null && value != null && value !== "") merged[uiKey] = value;
   });
 
   const tableRows = mapApiTableRowsToUi(section[tableApiKey]);
@@ -1611,7 +1669,11 @@ const mergeSubscaleApiSectionRecord = (
           value as Record<string, unknown>,
           "castingTable",
           "CASTING_TABLE",
-          [{ apiKey: "dateOfCasting", uiKey: "DATE_OF_CASTING" }],
+          [
+            { apiKey: "dateTimeOfCasting", uiKey: "DATE_OF_CASTING" },
+            { apiKey: "dateOfCastingDateTime", uiKey: "DATE_OF_CASTING" },
+            { apiKey: "dateOfCasting", uiKey: "DATE_OF_CASTING" },
+          ],
         ),
       );
       return;
@@ -1659,8 +1721,20 @@ const mergeSubscaleApiSectionRecord = (
     if (key === "inhibitionDetails") {
       const source = value as InhibitionDetailsDTO;
       if (source.irBatchNo) merged.IR_BATCH_NO = source.irBatchNo;
-      if (source.dateOfManufacturing) merged.DATE_OF_MANUFACTURING = source.dateOfManufacturing;
-      if (source.dateOfApplication) merged.DATE_OF_APPLICATION = source.dateOfApplication;
+      const manufacturingDateTime =
+        source.dateTimeOfManufacturing ??
+        source.dateOfManufacturingDateTime ??
+        source.dateOfManufacturing;
+      const applicationDateTime =
+        source.dateTimeOfApplication ??
+        source.dateOfApplicationDateTime ??
+        source.dateOfApplication;
+      if (manufacturingDateTime) {
+        merged.DATE_OF_MANUFACTURING = toUiDateTime(manufacturingDateTime);
+      }
+      if (applicationDateTime) {
+        merged.DATE_OF_APPLICATION = toUiDateTime(applicationDateTime);
+      }
       const rows = mapInhibitionRowsToUi(source as Record<string, unknown>);
       if (rows.length > 0) merged.INHIBITION_TABLE = rows;
       return;

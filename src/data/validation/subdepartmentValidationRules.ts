@@ -1,5 +1,3 @@
-import { toLegacyRawMaterialSourcingRules } from "@data/validation/configs/sourcing/rms/rawMaterialSourcing.validation.config";
-
 /** Reusable field-rule primitives for subdepartment-owned workflow forms. */
 export type ValidationValueType = "text" | "date" | "number" | "file";
 
@@ -9,16 +7,6 @@ export type FieldValidationRule = {
   /** Applied only when a non-empty text value is supplied. */
   pattern?: RegExp;
 };
-
-export type RawMaterialSourcingRuleKey =
-  | "supplyOrderNo"
-  | "receiptDate"
-  | "manufacturerName"
-  | "lotNo"
-  | "analysedResult"
-  | "acemQcResult"
-  | "certificates"
-  | "certificateType";
 
 export const ROCKET_MOTOR_CASING_VALIDATION_RULES = {
   projectName: { required: true, valueType: "text" as const },
@@ -38,13 +26,6 @@ export const ROCKET_MOTOR_CASING_VALIDATION_RULES = {
   mockTrialText: { required: true, valueType: "text" as const, pattern: /^[A-Za-z0-9][A-Za-z0-9 /-]*$/ },
   mockTrialNumber: { required: true, valueType: "number" as const },
 } as const;
-
-/** Rules supplied by Raw Material Sourcing – Lot Creation. */
-/** @deprecated Use rawMaterialSourcingFieldRules from configs/rawMaterialSourcing.validation.config.ts */
-export const RAW_MATERIAL_SOURCING_VALIDATION_RULES: Record<
-  RawMaterialSourcingRuleKey,
-  FieldValidationRule
-> = toLegacyRawMaterialSourcingRules();
 
 export type CasePrepRuleKey =
   | "abradingWheelType"

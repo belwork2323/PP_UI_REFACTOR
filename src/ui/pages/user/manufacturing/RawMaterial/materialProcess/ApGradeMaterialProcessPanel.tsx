@@ -24,6 +24,7 @@ import {
   isTypedSolidUiKey,
   type RmpMaterialUiKey,
 } from "../../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
+import { isStartAfterEnd } from "../../../../../../data/validation/dateRangeValidation";
 import LotDetailsSection from "./LotDetailsSection";
 import DoaFormatSection from "./DoaFormatSection";
 import DryingTrayOvenSection from "./DryingTrayOvenSection";
@@ -95,15 +96,48 @@ const ApGradeMaterialProcessPanel = ({
   };
   const patchFine = (partial: Partial<ApFineProcessForm>) => {
     if (aligned.uiKey !== "apFine") return;
-    onChange({ ...aligned, ...partial });
+    const next = { ...aligned, ...partial };
+    if (
+      partial.trayOvenStorage?.startDatetime !== undefined &&
+      isStartAfterEnd(partial.trayOvenStorage.startDatetime, aligned.trayOvenStorage.endDatetime)
+    ) {
+      next.trayOvenStorage = { ...next.trayOvenStorage, endDatetime: "" };
+    }
+    if (
+      partial.grindingStartDatetime !== undefined &&
+      isStartAfterEnd(partial.grindingStartDatetime, aligned.grindingEndDatetime)
+    ) {
+      next.grindingEndDatetime = "";
+    }
+    onChange(next);
   };
   const patchUltra = (partial: Partial<ApUltraFineProcessForm>) => {
     if (aligned.uiKey !== "apUltraFine") return;
-    onChange({ ...aligned, ...partial });
+    const next = { ...aligned, ...partial };
+    if (
+      partial.drying?.startDatetime !== undefined &&
+      isStartAfterEnd(partial.drying.startDatetime, aligned.drying.endDatetime)
+    ) {
+      next.drying = { ...next.drying, endDatetime: "" };
+    }
+    if (
+      partial.grindingStartDatetime !== undefined &&
+      isStartAfterEnd(partial.grindingStartDatetime, aligned.grindingEndDatetime)
+    ) {
+      next.grindingEndDatetime = "";
+    }
+    onChange(next);
   };
   const patchAluminum = (partial: Partial<AluminumProcessForm>) => {
     if (aligned.uiKey !== "aluminum") return;
-    onChange({ ...aligned, ...partial });
+    const next = { ...aligned, ...partial };
+    if (
+      partial.startDatetime !== undefined &&
+      isStartAfterEnd(partial.startDatetime, aligned.endDatetime)
+    ) {
+      next.endDatetime = "";
+    }
+    onChange(next);
   };
   const patchDoa = (partial: Partial<DoaProcessForm>) => {
     if (!isLiquidDispatchUiKey(aligned.uiKey)) return;
@@ -291,6 +325,7 @@ const ApGradeMaterialProcessPanel = ({
                   value={aligned.grindingEndDatetime}
                   onChange={(v) => patchFine({ grindingEndDatetime: v })}
                   minDate={aligned.grindingStartDatetime}
+                  requiresMinDateTime
                   disabled={disabled}
                   compact
                   error={Boolean(validationErrors?.grindingEndDatetime)}
@@ -469,6 +504,7 @@ const ApGradeMaterialProcessPanel = ({
                   value={aligned.grindingEndDatetime}
                   onChange={(v) => patchUltra({ grindingEndDatetime: v })}
                   minDate={aligned.grindingStartDatetime}
+                  requiresMinDateTime
                   disabled={disabled}
                   compact
                   error={Boolean(validationErrors?.grindingEndDatetime)}
@@ -595,6 +631,7 @@ const ApGradeMaterialProcessPanel = ({
                 value={aligned.endDatetime}
                 onChange={(v) => patchAluminum({ endDatetime: v })}
                 minDate={aligned.startDatetime}
+                requiresMinDateTime
                 disabled={disabled}
                 compact
                 error={Boolean(validationErrors?.endDatetime)}

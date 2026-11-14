@@ -1,13 +1,12 @@
 import { useMemo } from "react";
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { icons } from "@app/theme/icons";
 import { useThemeStore } from "@app/store/themeStore";
 import { getRawMaterialSourcingPageTheme } from "@app/theme/custom_themes/user/sourcing/rms/rawMaterialSourcing_theme";
 import { STRINGS } from "@app/config/strings";
-import { getOperationStatusConfig, OPERATION_STATUS } from "@hooks/operationStatus";
-import UserWorkflowStatusCell from "@ui/components/custom/UserWorkflowStatusCell";
-import AppButton from "@ui/components/common/Button";
+import { getOperationStatusConfig } from "@hooks/operationStatus";
+import UserWorkflowDetailsShell from "@ui/components/custom/UserWorkflowDetailsShell";
+import WorkflowDetailsMetaSection from "@ui/components/custom/WorkflowDetailsMetaSection";
+import useWorkflowDetailsStatusConfig from "@ui/components/custom/useWorkflowDetailsStatusConfig";
 import type {
   MaterialBlock,
   RawMaterialLotDetailsContext,
@@ -54,19 +53,10 @@ const RawMaterialSourcingDetailsPage = ({
 }: RawMaterialSourcingDetailsPageProps) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getRawMaterialSourcingPageTheme(mode), [mode]);
-  const rmTheme = theme.sourcing.rawMaterial.lotDetails;
+  const dt = theme.sourcing.rawMaterial.lotDetails;
   const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
 
-  const statusConfig = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(STATUS_CONFIG).map(([status, cfg]) => [
-          status,
-          { ...cfg, ...theme.batchList.statusConfig[status] },
-        ]),
-      ),
-    [theme],
-  );
+  const statusConfig = useWorkflowDetailsStatusConfig(STATUS_CONFIG, dt.bannerStatusConfig);
 
   const block = blocks[0];
   const metaFields = [
@@ -90,84 +80,42 @@ const RawMaterialSourcingDetailsPage = ({
     },
   ];
 
+  const subtitle = `${row.lotId}${
+    row.materialName || row.materialCode
+      ? ` · ${row.materialName || row.materialCode}`
+      : ""
+  }`;
+
   return (
-    <Box sx={rmTheme.page}>
-      <Stack direction="row" alignItems="center" gap={1.5} mb={2}>
-        <AppButton
-          variant="text"
-          size="small"
-          fullWidth={false}
-          startIcon={<ArrowBackRoundedIcon />}
-          onClick={onBack}
-          sx={theme.workflow.formHeader.backButton}
-        >
-          {FH.BACK_TO_LIST}
-        </AppButton>
-      </Stack>
+    <>
+      <UserWorkflowDetailsShell
+        dt={dt}
+        theme={theme}
+        title={BL.LOT_DETAILS_TITLE}
+        subtitle={subtitle}
+        icon={InventoryRoundedIcon}
+        status={row.rmStatus}
+        statusConfig={statusConfig}
+        rejectionReason={row.rejectionReason ?? null}
+        onBack={onBack}
+        backLabel={FH.BACK_TO_LIST}
+        loading={loading}
+        loadingText={BL.LOT_DETAILS_LOADING}
+      >
+        <WorkflowDetailsMetaSection
+          dt={dt}
+          title={BL.LOT_DETAILS_PROCUREMENT_SECTION}
+          icon={DescriptionRoundedIcon}
+          fields={metaFields}
+        />
 
-      <Box sx={rmTheme.document}>
-        <Box sx={rmTheme.banner}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ sm: "center" }}
-            justifyContent="space-between"
-            gap={2}
-          >
-            <Stack direction="row" alignItems="flex-start" gap={1.5}>
-              <InventoryRoundedIcon sx={rmTheme.bannerIcon} />
-              <Box>
-                <Typography sx={rmTheme.bannerTitle}>{BL.LOT_DETAILS_TITLE}</Typography>
-                <Typography sx={rmTheme.bannerSubtitle}>
-                  {row.lotId}
-                  {row.materialName || row.materialCode
-                    ? ` · ${row.materialName || row.materialCode}`
-                    : ""}
-                </Typography>
-              </Box>
-            </Stack>
-            <UserWorkflowStatusCell
-              status={row.rmStatus}
-              statusConfig={statusConfig}
-              rejectedStatus={OPERATION_STATUS.REJECTED}
-              rejectionReason={row.rejectionReason ?? null}
-              theme={theme}
-            />
-          </Stack>
-        </Box>
-
-        <Box sx={rmTheme.body}>
-          {loading ? (
-            <Box sx={rmTheme.loadingBox}>
-              <CircularProgress size={36} sx={{ color: theme.palette.primaryLight }} />
-              <Typography sx={rmTheme.emptyText}>{BL.LOT_DETAILS_LOADING}</Typography>
-            </Box>
-          ) : (
-            <>
-              <Box sx={rmTheme.section}>
-                <Typography sx={rmTheme.sectionTitle}>
-                  <DescriptionRoundedIcon sx={rmTheme.sectionTitleIcon} />
-                  {BL.LOT_DETAILS_PROCUREMENT_SECTION}
-                </Typography>
-                <Box sx={rmTheme.metaGrid}>
-                  {metaFields.map((field) => (
-                    <Box key={field.label} sx={rmTheme.metaItem}>
-                      <Typography sx={rmTheme.metaLabel}>{field.label}</Typography>
-                      <Typography sx={rmTheme.metaValue}>{field.value}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-
-              <LotDetailsSpecificationSection block={block} theme={theme} />
-              <LotDetailsCertificatesSection
-                certificates={block?.certificates}
-                theme={theme}
-                openFile={openFile}
-              />
-            </>
-          )}
-        </Box>
-      </Box>
+        <LotDetailsSpecificationSection block={block} theme={theme} />
+        <LotDetailsCertificatesSection
+          certificates={block?.certificates}
+          theme={theme}
+          openFile={openFile}
+        />
+      </UserWorkflowDetailsShell>
 
       <FilePreviewDialog
         preview={preview}
@@ -176,7 +124,7 @@ const RawMaterialSourcingDetailsPage = ({
         themeColor={theme.palette.primary}
         themeColorLight={theme.palette.primaryLight}
       />
-    </Box>
+    </>
   );
 };
 

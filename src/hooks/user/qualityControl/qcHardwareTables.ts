@@ -1,7 +1,7 @@
-import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
-import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
+import { formatToUiDate } from "../../../utils/dateUtils";
+import { toApiDateTime, toUiDateTime } from "../../../data/models/user/castingCuringFieldCodec";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import {
   QC_HARDWARE_ATTACHMENTS_SECTION_ID,
@@ -1136,12 +1136,14 @@ const pickApiField = (row: Record<string, unknown>, ...keys: string[]) => {
 const cutRowToApiRow = (row: QcHardwareCutRow, index: number) =>
   omitEmpty({
     srNo: index + 1,
-    // Keep `date` for older consumers while persisting both endpoint dates.
-    date: row.START_DATE ?? row.DATE,
-    startDate: row.START_DATE ?? row.DATE,
-    startTime: row.START_TIME,
-    endDate: row.END_DATE ?? row.DATE,
-    endTime: row.END_TIME,
+    startDateTime:
+      row.START_DATE && row.START_TIME
+        ? toApiDateTime(`${row.START_DATE} ${row.START_TIME}`)
+        : undefined,
+    endDateTime:
+      row.END_DATE && row.END_TIME
+        ? toApiDateTime(`${row.END_DATE} ${row.END_TIME}`)
+        : undefined,
     dustQty: row.DUST_QTY,
     observations: row.OBSERVATIONS,
   });
@@ -1316,21 +1318,22 @@ const splitAbradingDateTimeValue = (value: unknown): { date: string; time: strin
   const raw = String(value ?? "").trim();
   if (!raw) return { date: "", time: "" };
 
-  if (raw.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    const parsed = dayjs(raw);
-    if (parsed.isValid()) {
-      return {
-        date: parsed.format("DD-MM-YYYY"),
-        time: parsed.format("HH:mm"),
-      };
-    }
-  }
-
-  const timeMatch = raw.match(/^(\d{1,2}):(\d{2})/);
+  const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (timeMatch) {
     return {
       date: "",
-      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}${
+        timeMatch[3] ? `:${timeMatch[3]}` : ""
+      }`,
+    };
+  }
+
+  const uiDateTime = toUiDateTime(raw);
+  if (uiDateTime) {
+    const [date = "", time = ""] = uiDateTime.split(" ");
+    return {
+      date,
+      time: /[T ]\d{1,2}:\d{2}/.test(raw) ? time : "",
     };
   }
 
@@ -1348,8 +1351,8 @@ const apiDateTimeParts = (
   const dateTimeValue = pickApiField(row, `${endpoint}DateTime`, `${upper}_DATE_TIME`);
   const parsed = splitAbradingDateTimeValue(dateTimeValue || dateValue);
   return {
-    date: formatApiDateForUi(dateValue) || parsed.date,
-    time: timeValue || parsed.time,
+    date: parsed.date || formatApiDateForUi(dateValue),
+    time: parsed.time || timeValue,
   };
 };
 

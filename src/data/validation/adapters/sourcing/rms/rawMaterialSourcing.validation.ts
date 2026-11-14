@@ -3,7 +3,6 @@ import type {
   MaterialBlock,
   MaterialFormGroup,
   MaterialLotBlock,
-  SpecRow,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import {
   areBlocksSubmitComplete,
@@ -93,7 +92,7 @@ export function validateRawMaterialBlocks(
   intent: RawMaterialValidationIntent,
   _messages?: Partial<MandatoryValidationMessages>,
 ): ValidationErrors {
-  const tier = intent === "SUBMIT" ? "SUBMIT" : "FORMAT";
+  const tier = intent === "SUBMIT" ? "SUBMIT" : "UNIT";
   return validateRawMaterialSourcing(blocks, tier);
 }
 
@@ -155,7 +154,7 @@ export const areMaterialGroupsMandatoryComplete = (groups: MaterialFormGroup[]):
 
 export const areBlocksMandatoryComplete = areBlocksSubmitComplete;
 
-export { areBlocksUnitComplete };
+export { areBlocksSubmitComplete, areBlocksUnitComplete };
 
 export const areAllAnalyzedResultsFilled = (blocks: MaterialBlock[]): boolean => {
   const rows = (blocks ?? []).flatMap((block) => block.rows ?? []);
@@ -203,6 +202,7 @@ const RMS_FOCUS_PATH_PRIORITY = (path: string): number => {
   if (/\.manufacturerName$/.test(path)) return 10;
   if (/\.lots\.0\.lotNo$/.test(path)) return 20;
   if (/\.lots\.0\.rows\.\d+\.analysedResult$/.test(path)) return 30;
+  if (/\.lots\.0\.rows\.\d+\.acemQcResult$/.test(path)) return 35;
   if (/\.lots\.0\.certificates$/.test(path)) return 40;
   if (/\.lots\.0\.certificates\.\d+\.certificateType$/.test(path)) return 50;
   if (/\.adductPreparation\./.test(path) || /\.htpbBlendingPreparation\./.test(path)) return 60;
@@ -232,93 +232,6 @@ export function resolveFirstRmsValidationFocus(
 /** Scroll + focus the control tagged with `data-rms-field`. */
 export function focusRmsField(fieldPath: string, root: ParentNode = document): boolean {
   return focusFieldByDataAttr("rms-field", fieldPath, root);
-}
-
-/** @deprecated Use fieldError(errors, path) with validationErrors from hook */
-export function getMaterialMetaErrors(
-  meta: { supplyOrderNo?: string; receiptDate?: string; manufacturerName?: string },
-  _messages: MandatoryValidationMessages,
-  show: boolean,
-  _showRequired = show,
-): MaterialMetaFieldErrors {
-  if (!show) return {};
-  const errors = validateRawMaterialSourcing(
-    [
-      {
-        material: "",
-        lotNo: "",
-        supplyOrderNo: meta.supplyOrderNo,
-        receiptDate: meta.receiptDate,
-        manufacturerName: meta.manufacturerName,
-        certificates: [],
-        rows: [],
-      },
-    ],
-    "SUBMIT",
-  );
-  return {
-    supplyOrderNo: errors["blocks.0.supplyOrderNo"],
-    receiptDate: errors["blocks.0.receiptDate"],
-    manufacturerName: errors["blocks.0.manufacturerName"],
-  };
-}
-
-/** @deprecated Use fieldError(errors, path) with validationErrors from hook */
-export function getLotFieldErrors(
-  lot: Pick<MaterialLotBlock, "lotNo">,
-  _messages: MandatoryValidationMessages,
-  show: boolean,
-  _showRequired = show,
-): LotFieldErrors {
-  if (!show) return {};
-  const errors = validateRawMaterialSourcing(
-    [{ material: "", lotNo: lot.lotNo, certificates: [], rows: [] }],
-    "SUBMIT",
-  );
-  return { lotNo: errors["blocks.0.lots.0.lotNo"] };
-}
-
-/** @deprecated Use fieldError(errors, path) with validationErrors from hook */
-export function getAnalyzedResultError(
-  row: Pick<SpecRow, "analysedResult">,
-  _messages: MandatoryValidationMessages,
-  show: boolean,
-  _showRequired = show,
-): string | undefined {
-  if (!show) return undefined;
-  const errors = validateRawMaterialSourcing(
-    [
-      {
-        material: "",
-        lotNo: "",
-        certificates: [],
-        rows: [
-          {
-            specification: "",
-            refRange: "",
-            acemQcResult: "",
-            ...row,
-          },
-        ],
-      },
-    ],
-    "SUBMIT",
-  );
-  return errors["blocks.0.lots.0.rows.0.analysedResult"];
-}
-
-/** @deprecated Use fieldError(errors, path) with validationErrors from hook */
-export function getCertificateError(
-  certs: LotCertificate[] | undefined,
-  messages: MandatoryValidationMessages,
-  show: boolean,
-): string | undefined {
-  if (!show) return undefined;
-  const errors = validateRawMaterialSourcing(
-    [{ material: "", lotNo: "", certificates: certs, rows: [] }],
-    "SUBMIT",
-  );
-  return errors["blocks.0.lots.0.certificates"] ?? messages.certificates;
 }
 
 export { tierToLegacyIntent, legacyIntentToTier };

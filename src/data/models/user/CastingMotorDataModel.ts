@@ -554,15 +554,21 @@ const parseBowlDetailRow = (item: unknown): CastingBowlDetailRow => {
     BOWL_ID: str(pickField(row, "bowlId", "BOWL_ID") ?? ""),
     PREMIX_NO: str(pickField(row, "premixNo", "PREMIX_NO") ?? ""),
     BOWL_NO: str(pickField(row, "bowlNo", "BOWL_NO") ?? ""),
-    BOWL_RECEIPT_TIME: toUiDateTime(pickField(row, "bowlReceiptTime", "BOWL_RECEIPT_TIME") ?? ""),
+    BOWL_RECEIPT_TIME: toUiDateTime(
+      pickField(row, "bowlReceiptDateTime", "bowlReceiptTime", "BOWL_RECEIPT_TIME") ?? "",
+    ),
     INITIAL_WEIGHT: str(pickField(row, "initialWeight", "INITIAL_WEIGHT") ?? ""),
     FINAL_WEIGHT: str(pickField(row, "finalWeight", "FINAL_WEIGHT") ?? ""),
     INITIAL_SLURRY_DEPTH: str(pickField(row, "initialSlurryDepth", "INITIAL_SLURRY_DEPTH") ?? ""),
-    DC_OPEN_TIME: toUiDateTime(pickField(row, "dcOpenTime", "DC_OPEN_TIME") ?? ""),
-    DC_CLOSE_TIME: toUiDateTime(pickField(row, "dcCloseTime", "DC_CLOSE_TIME") ?? ""),
+    DC_OPEN_TIME: toUiDateTime(
+      pickField(row, "dcOpenDateTime", "dcOpenTime", "DC_OPEN_TIME") ?? "",
+    ),
+    DC_CLOSE_TIME: toUiDateTime(
+      pickField(row, "dcCloseDateTime", "dcCloseTime", "DC_CLOSE_TIME") ?? "",
+    ),
     SLURRY_DEPTH_AFTER_DC: str(pickField(row, "slurryDepthAfterDc", "SLURRY_DEPTH_AFTER_DC") ?? ""),
     BALL_VALVE_OPEN_TIME: toUiDateTime(
-      pickField(row, "ballValveOpenTime", "BALL_VALVE_OPEN_TIME") ?? "",
+      pickField(row, "ballValveOpenDateTime", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME") ?? "",
     ),
   };
 };

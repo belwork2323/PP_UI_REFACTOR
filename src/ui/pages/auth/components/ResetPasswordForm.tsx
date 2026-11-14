@@ -6,6 +6,7 @@ import Input from "../../../components/common/Input";
 import Button from "../../../components/common/Button";
 import { icons } from "../../../../app/theme";
 import { STRINGS } from "../../../../app/config/strings";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 /**
  * Presentational only — logic lives in `useResetPasswordForm`.
@@ -39,7 +40,7 @@ const ResetPasswordForm = ({
 
     <Box sx={t.form.wrapper}>
       <Input
-        label={STRINGS.AUTH.USER_ID_LABEL}
+        label={<FieldLabelWithAsterisk label={STRINGS.AUTH.USER_ID_LABEL} required />}
         icon={<icons.person />}
         sx={t.inputField.sx}
         value={values.userId}
@@ -47,10 +48,14 @@ const ResetPasswordForm = ({
         helperText={errors.userId}
         onChange={(e) => onFieldChange("userId", e.target.value)}
         disabled={submitting}
+        inputProps={{
+          maxLength: 20,
+          minLength: 3,
+        }}
       />
 
       <Input
-        label={STRINGS.AUTH.REASON_LABEL}
+        label={<FieldLabelWithAsterisk label={STRINGS.AUTH.REASON_LABEL} required />}
         icon={<DescriptionOutlinedIcon />}
         sx={{ ...t.inputField.sx, ...t.resetForm.reasonField }}
         value={values.reason}

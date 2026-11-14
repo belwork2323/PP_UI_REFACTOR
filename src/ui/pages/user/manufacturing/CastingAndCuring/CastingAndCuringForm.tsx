@@ -15,6 +15,10 @@ import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { useAlertStore } from "../../../../../app/store/alertStore";
 import { hasValidationErrors } from "../../../../../data/validation/validationErrors";
+import {
+  DATE_RANGE_MESSAGES,
+  assertFromToOrderInTree,
+} from "../../../../../data/validation/dateRangeValidation";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import {
   CASTING_CURING_FLOW_LABELS,
@@ -61,6 +65,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/ovenSelectOptions";
 import {
   buildMotorNavGateHelpers,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import {
@@ -89,6 +94,20 @@ const CURING_VALIDATION_PREFIXES = [
   "DECORING_DETAILS.",
 ] as const;
 
+const DATE_RANGE_ERROR_MESSAGES = new Set<string>(Object.values(DATE_RANGE_MESSAGES));
+
+const updateDateRangeErrors = (
+  previous: Record<string, string>,
+  data: unknown,
+): Record<string, string> => {
+  const next = { ...previous };
+  Object.entries(next).forEach(([path, message]) => {
+    if (DATE_RANGE_ERROR_MESSAGES.has(message)) delete next[path];
+  });
+  assertFromToOrderInTree(data, next);
+  return next;
+};
+
 const stripValidationErrorsByPrefix = (
   errors: Record<string, string>,
   prefixes: readonly string[],
@@ -103,7 +122,7 @@ const stripValidationErrorsByPrefix = (
 };
 
 type CastingAndCuringFormProps = {
-  batch?: CastingCuringBatchMotorSource | null;
+  batch?: (CastingCuringBatchMotorSource & BatchStageContext) | null;
   formData: CastingCuringFormState;
   castingMotorDraftsById: Record<string, { castingStation: string; motorReceivedAt: string }>;
   addedMotors: Array<{ motorId: string; motorReceivedAt: string; castingStation?: string }>;
@@ -805,12 +824,13 @@ const CastingAndCuringForm = ({
                   <CastingMotorPanel
                     key={`casting-${activeMotorSession.motorId}`}
                     value={activeMotorSession.castingData ?? createEmptyCastingMotorData()}
-                    onChange={(next) =>
+                    onChange={(next) => {
                       onMotorSessionChange(String(activeMotorSession.motorId).trim(), {
                         ...activeMotorSession,
                         castingData: next,
-                      })
-                    }
+                      });
+                      setValidationErrors((previous) => updateDateRangeErrors(previous, next));
+                    }}
                     motorId={activeMotorSession.motorId}
                     batchId={batch?.batchId}
                     bowlSeedRows={bowlSeedRows}
@@ -880,12 +900,13 @@ const CastingAndCuringForm = ({
                       <CuringMotorPanel
                         key={`curing-${activeMotorSession.motorId}`}
                         value={activeMotorSession.curingData ?? createEmptyCuringMotorData()}
-                        onChange={(next) =>
+                        onChange={(next) => {
                           onMotorSessionChange(String(activeMotorSession.motorId).trim(), {
                             ...activeMotorSession,
                             curingData: next,
-                          })
-                        }
+                          });
+                          setValidationErrors((previous) => updateDateRangeErrors(previous, next));
+                        }}
                         motorId={activeMotorSession.motorId}
                         disabled={activeMotorLocked}
                         theme={theme}

@@ -21,14 +21,15 @@ import {
 } from "@mui/material";
 import FormInput from "../../../../components/common/FormInput";
 import AppDropdown from "../../../../components/common/AppDropdown";
-import { DateTimeField } from "../../../../components/common/DateField";
+import { DateField } from "../../../../components/common/DateField";
 import {
   APP_CONTROL_FONT_SIZE,
   appDropdownMenuProps,
   appDropdownPlaceholderSx,
 } from "../../../../components/common/fieldStyles";
 import { STRINGS } from "../../../../../app/config/strings";
-import { toUiDateTime } from "../../../../../data/models/user/castingCuringFieldCodec";
+import { toUiDate } from "../../../../../data/models/user/castingCuringFieldCodec";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import {
   uniformTableBodyCellSx,
@@ -748,15 +749,24 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               "";
             return (
               <Box data-ss-field={SUBSCALE_BATCH_FIELDS.PREMIX_DATE} sx={{ minWidth: 0 }}>
-                <DateTimeField
-                  label={`${S.PREMIX_DATE} & Time`}
+                <DateField
+                  label={S.PREMIX_DATE}
                   required
-                  value={toUiDateTime(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE])}
+                  value={toUiDate(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE])}
                   onChange={(next) => {
                     clearFieldError?.(SUBSCALE_BATCH_FIELDS.PREMIX_DATE);
-                    patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next });
+                    const clearFinalMix = isStartAfterEnd(
+                      next,
+                      values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE],
+                    );
+                    if (clearFinalMix) {
+                      clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
+                    }
+                    patchValues({
+                      [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next,
+                      ...(clearFinalMix ? { [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: "" } : {}),
+                    });
                   }}
-                  placeholder="DD-MM-YYYY HH:mm"
                   error={Boolean(premixErrorMsg)}
                   helperText={premixErrorMsg || undefined}
                   sx={{ mb: 0 }}
@@ -772,16 +782,15 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               "";
             return (
               <Box data-ss-field={SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE} sx={{ minWidth: 0 }}>
-                <DateTimeField
-                  label={`${S.FINAL_MIX_DATE} & Time`}
+                <DateField
+                  label={S.FINAL_MIX_DATE}
                   required
-                  value={toUiDateTime(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE])}
-                  minDate={toUiDateTime(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE])}
+                  value={toUiDate(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE])}
+                  minDate={toUiDate(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE])}
                   onChange={(next) => {
                     clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
                     patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next });
                   }}
-                  placeholder="DD-MM-YYYY HH:mm"
                   error={Boolean(finalMixErrorMsg)}
                   helperText={finalMixErrorMsg || undefined}
                   sx={{ mb: 0 }}

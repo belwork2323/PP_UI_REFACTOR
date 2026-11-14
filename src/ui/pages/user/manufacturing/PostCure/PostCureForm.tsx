@@ -24,6 +24,7 @@ import FinalApprovalMotorDialog, {
 } from "../CasePreparation/components/FinalApprovalMotorDialog";
 import {
   buildMotorNavGateHelpers,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
@@ -57,12 +58,14 @@ const { handyman: HandymanRoundedIcon } = icons.user.manufacturing.postCure.form
 type MotorProcessTab = "LOOSE_FLAP" | "INHIBITION";
 
 type PostCureFormProps = {
-  batch?: {
-    batchId?: string;
-    formId?: string | null;
-    motorId?: string;
-    motorIds?: Array<string | number>;
-  } | null;
+  batch?:
+    | ({
+        batchId?: string;
+        formId?: string | null;
+        motorId?: string;
+        motorIds?: Array<string | number>;
+      } & BatchStageContext)
+    | null;
   formData: PostCureFormState;
   addedMotors: PostCureAddedMotor[];
   activeMotorId: string;

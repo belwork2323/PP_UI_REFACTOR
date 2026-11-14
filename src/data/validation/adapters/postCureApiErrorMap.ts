@@ -16,6 +16,14 @@ const applyRules = (path: string, rules: RemapRule[]): string | null => {
 
 const LOOSE_FLAP_RULES: RemapRule[] = [
   {
+    pattern: /^looseFlapFillingDetails\.bellowRemovalDetails\.(\d+)\.fromDateTime$/,
+    to: "bellowRemovalDetails.bellowRemovalTable.$1.fromDate",
+  },
+  {
+    pattern: /^looseFlapFillingDetails\.bellowRemovalDetails\.(\d+)\.toDateTime$/,
+    to: "bellowRemovalDetails.bellowRemovalTable.$1.toDate",
+  },
+  {
     pattern: /^looseFlapFillingDetails\.bellowRemovalDetails\.(\d+)\.(.+)$/,
     to: "bellowRemovalDetails.bellowRemovalTable.$1.$2",
   },
@@ -24,7 +32,8 @@ const LOOSE_FLAP_RULES: RemapRule[] = [
     to: "looseFlapEpoxyPreparation.epoxyBatchNo",
   },
   {
-    pattern: /^looseFlapFillingDetails\.epoxyPreparationIngredients\.preparationDate$/,
+    pattern:
+      /^looseFlapFillingDetails\.epoxyPreparationIngredients\.(?:preparationDateTime|preparationDate)$/,
     to: "looseFlapEpoxyPreparation.epoxyPreparationDate",
   },
   {
@@ -40,7 +49,7 @@ const LOOSE_FLAP_RULES: RemapRule[] = [
     to: "qualificationDetails.qualificationBatchNo",
   },
   {
-    pattern: /^looseFlapFillingDetails\.qualificationDetails\.preparationDate$/,
+    pattern: /^looseFlapFillingDetails\.qualificationDetails\.(?:preparationDateTime|preparationDate)$/,
     to: "qualificationDetails.qualificationPreparationDate",
   },
   {
@@ -54,6 +63,14 @@ const LOOSE_FLAP_RULES: RemapRule[] = [
   {
     pattern: /^looseFlapFillingDetails\.fillingDetails\.(\d+)\.quantityFilled$/,
     to: "lfEpoxyFillingDetails.lfFillingTable.$1.qtyFilled",
+  },
+  {
+    pattern: /^looseFlapFillingDetails\.fillingDetails\.(\d+)\.fromDateTime$/,
+    to: "lfEpoxyFillingDetails.lfFillingTable.$1.fromDate",
+  },
+  {
+    pattern: /^looseFlapFillingDetails\.fillingDetails\.(\d+)\.toDateTime$/,
+    to: "lfEpoxyFillingDetails.lfFillingTable.$1.toDate",
   },
   {
     pattern: /^looseFlapFillingDetails\.fillingDetails\.(\d+)\.(.+)$/,
@@ -127,7 +144,7 @@ const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
       to: `${premixPrefix}.${premixBatch}`,
     },
     {
-      pattern: /^inhibitionDetails\.premixDetails\.preparationDate$/,
+      pattern: /^inhibitionDetails\.premixDetails\.(?:preparationDateTime|preparationDate)$/,
       to: `${premixPrefix}.${premixDate}`,
     },
     {
@@ -143,7 +160,7 @@ const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
       to: `${finalPrefix}.${finalBatch}`,
     },
     {
-      pattern: /^inhibitionDetails\.finalMixDetails\.preparationDate$/,
+      pattern: /^inhibitionDetails\.finalMixDetails\.(?:preparationDateTime|preparationDate)$/,
       to: `${finalPrefix}.${finalDate}`,
     },
     {
@@ -159,7 +176,7 @@ const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
       to: `${qualPrefix}.qualificationBatchNo`,
     },
     {
-      pattern: /^inhibitionDetails\.qualificationDetails\.preparationDate$/,
+      pattern: /^inhibitionDetails\.qualificationDetails\.(?:preparationDateTime|preparationDate)$/,
       to: `${qualPrefix}.qualificationPreparationDate`,
     },
     {
@@ -183,11 +200,19 @@ const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
       to: "inhibitionApplicationDetails.inhibitionApplicationTable.$1.qtyApplied",
     },
     {
+      pattern: /^inhibitionDetails\.applicationDetails\.(\d+)\.fromDateTime$/,
+      to: "inhibitionApplicationDetails.inhibitionApplicationTable.$1.fromDate",
+    },
+    {
+      pattern: /^inhibitionDetails\.applicationDetails\.(\d+)\.toDateTime$/,
+      to: "inhibitionApplicationDetails.inhibitionApplicationTable.$1.toDate",
+    },
+    {
       pattern: /^inhibitionDetails\.applicationDetails\.(\d+)\.(.+)$/,
       to: "inhibitionApplicationDetails.inhibitionApplicationTable.$1.$2",
     },
     {
-      pattern: /^inhibitionDetails\.dispatchDetails\.dispatchDate$/,
+      pattern: /^inhibitionDetails\.dispatchDetails\.(?:dispatchDateTime|dispatchDate)$/,
       to: "dispatchDetails.dispatchDate",
     },
     {
@@ -210,6 +235,7 @@ const inhibitionRulesForType = (inhibitorType?: string): RemapRule[] => {
 };
 
 const remapMotorRelativePath = (apiPath: string, inhibitorType?: string): string => {
+  if (apiPath === "motorReceiptDateTime") return "motorReceiptDate";
   const loose = applyRules(apiPath, LOOSE_FLAP_RULES);
   if (loose) return loose;
   const inhibition = applyRules(apiPath, inhibitionRulesForType(inhibitorType));

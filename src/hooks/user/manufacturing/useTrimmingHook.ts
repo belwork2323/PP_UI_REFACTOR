@@ -138,9 +138,11 @@ const resolveBatchMotorEntries = (
   ).trim();
 
   const fallbackReceivedAt = String(
-    batchDetailsRecord?.motorReceivedAt ??
+    batchDetailsRecord?.motorReceivedDateTime ??
+      batchDetailsRecord?.motorReceivedAt ??
       batchDetailsRecord?.motorReceiptDate ??
       batchDetailsRecord?.receivedAt ??
+      batch?.motorReceivedDateTime ??
       batch?.motorReceivedAt ??
       batch?.receivedAt ??
       "",

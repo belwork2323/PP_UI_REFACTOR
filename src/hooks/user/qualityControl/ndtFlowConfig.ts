@@ -136,7 +136,7 @@ export const NDT_FLOW_LABELS = {
   motorIdPlaceholder: "Select motor",
   loadForm: "Load Form",
   addMotors: "Add Motors",
-  setupHint: "Select radiography setup details and motor IDs, then load the form.",
+  setupHint: "Select radiography setup details then load the form.",
   setupHintLoaded: "Radiography setup is locked per motor. Select setup below to add more motors.",
   motorNavTitle: "Motor navigation",
   motorNavHint: "Switch between motors to fill inspection details.",

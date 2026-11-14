@@ -122,11 +122,17 @@ export const parseTrimmingSectionData = (
       .map((row) => {
         const next: Record<string, unknown> = {};
         TRIMMING_DETAILS_COLUMN_ORDER.forEach((key) => {
-          if (row[key] != null) {
+          const value =
+            key === "startDate"
+              ? (row.startDatetime ?? row.startDateTime ?? row.startDate)
+              : key === "completionDate"
+                ? (row.completionDatetime ?? row.completionDateTime ?? row.completionDate)
+                : row[key];
+          if (value != null) {
             next[key] =
               key === "startDate" || key === "completionDate"
-                ? toUiDateTime(row[key])
-                : row[key];
+                ? toUiDateTime(value)
+                : value;
           }
         });
         return next;
@@ -543,6 +549,8 @@ export type TrimmingDetails = {
   formSubmissionType: string;
   status?: string;
   batchType?: string;
+  motorReceivedDateTime?: string | null;
+  /** Legacy response alias. */
   motorReceivedDate?: string | null;
   createdBy?: string | null;
   createdAt?: string | null;
@@ -554,7 +562,11 @@ export type TrimmingDetails = {
   motors?: Array<{
     motorId?: string;
     motorStage?: number | string;
+    motorReceivedDateTime?: string;
+    /** Legacy response alias. */
     motorReceivedAt?: string;
+    /** Legacy QC response alias. */
+    motorReceivedDate?: string;
     motorSubmissionType?: TrimmingMotorSubmissionType;
     motorSubmissionStatus?: TrimmingMotorSubmissionStatus;
     rejectionReason?: string | null;
@@ -576,7 +588,7 @@ export type TrimmingDetails = {
 export type TrimmingMotorSubmission = {
   motorId: string;
   motorStage: number;
-  motorReceivedAt: string;
+  motorReceivedDateTime: string;
   sections: SchemaSectionSubmission[];
   motorSubmissionType?: TrimmingMotorSubmissionType;
 };
@@ -678,14 +690,37 @@ export const mapTrimmingDetailsToFormState = (
         motorStage: resolveTrimmingMotorStageNumber({
           motorStage: motor?.motorStage ?? motorStage,
         }),
-        motorReceivedAt: toUiDateTime(motor?.motorReceivedAt),
+        motorReceivedAt: toUiDateTime(
+          motor?.motorReceivedDateTime ??
+            motor?.motorReceivedAt ??
+            motor?.motorReceivedDate ??
+            details?.motorReceivedDateTime,
+        ),
         savedSections: motorSections.length > 0 ? motorSections : undefined,
         trimmingDetails: Array.isArray(detailsSection?.sectionData)
-          ? (detailsSection.sectionData as TrimmingDetailsRow[]).map((row) => ({
-              ...row,
-              startDate: toUiDateTime(row.startDate),
-              completionDate: toUiDateTime(row.completionDate),
-            }))
+          ? (detailsSection.sectionData as TrimmingDetailsRow[]).map((row) => {
+              const {
+                startDatetime,
+                completionDatetime,
+                startDateTime,
+                completionDateTime,
+                startDate,
+                completionDate,
+                ...rowFields
+              } = row as TrimmingDetailsRow & {
+                startDatetime?: string;
+                completionDatetime?: string;
+                startDateTime?: string;
+                completionDateTime?: string;
+              };
+              return {
+                ...rowFields,
+                startDate: toUiDateTime(startDatetime ?? startDateTime ?? startDate),
+                completionDate: toUiDateTime(
+                  completionDatetime ?? completionDateTime ?? completionDate,
+                ),
+              };
+            })
           : createDefaultTrimmingDetailsRows(),
         commonFormatParameters:
           (commonSection?.sectionData as TrimmingCommonFormatParameter[]) ??
@@ -746,11 +781,14 @@ export const mapTrimmingFormStateToPayload = (
       if (motor.trimmingDetails?.length) {
         sections.push({
           sectionId: "TRIMMING_DETAILS",
-          sectionData: motor.trimmingDetails.map((row) => ({
-            ...row,
-            startDate: toApiDateTime(row.startDate) ?? "",
-            completionDate: toApiDateTime(row.completionDate) ?? "",
-          })),
+          sectionData: motor.trimmingDetails.map((row) => {
+            const { startDate, completionDate, ...rowFields } = row;
+            return {
+              ...rowFields,
+              startDatetime: toApiDateTime(startDate) ?? "",
+              completionDatetime: toApiDateTime(completionDate) ?? "",
+            };
+          }),
         });
       }
 
@@ -800,7 +838,7 @@ export const mapTrimmingFormStateToPayload = (
       return {
         motorId: motor.motorId,
         motorStage: motor.motorStage,
-        motorReceivedAt: toApiDateTime(motor.motorReceivedAt) ?? "",
+        motorReceivedDateTime: toApiDateTime(motor.motorReceivedAt) ?? "",
         sections,
         ...(options?.motorSubmissionType
           ? { motorSubmissionType: options.motorSubmissionType }
@@ -912,7 +950,12 @@ export const mapTrimmingDetailsFromSavedForm = (
         motorStage: resolveTrimmingMotorStageNumber({
           motorStage: motor?.motorStage ?? payload?.motorStage,
         }),
-        motorReceivedAt: String(motor?.motorReceivedAt ?? "").trim(),
+        motorReceivedDateTime: String(
+          motor?.motorReceivedDateTime ??
+            motor?.motorReceivedAt ??
+            motor?.motorReceivedDate ??
+            "",
+        ).trim(),
         sections: Array.isArray(motor?.sections)
           ? motor.sections
           : Array.isArray(motor?.details?.sections)
@@ -1003,7 +1046,14 @@ export const mapTrimmingDetailsForDisplay = (
       return {
         motorId,
         motorStageLabel: mapTrimmingMotorStage(motorStage),
-        motorReceivedAt: toUiDateTime(src.motorReceivedAt ?? entry.motorReceivedAt),
+        motorReceivedAt: toUiDateTime(
+          src.motorReceivedDateTime ??
+            src.motorReceivedAt ??
+            src.motorReceivedDate ??
+            entry.motorReceivedDateTime ??
+            entry.motorReceivedAt ??
+            entry.motorReceivedDate,
+        ),
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
           normalizeTrimmingMotorSubmissionType(entry.motorSubmissionType),
@@ -1126,8 +1176,12 @@ export class TrimmingDetailsModel {
       formSubmissionType: String(payload?.formSubmissionType ?? ""),
       status: payload?.status != null ? String(payload.status) : undefined,
       batchType: payload?.batchType != null ? String(payload.batchType) : undefined,
-      motorReceivedDate:
-        payload?.motorReceivedDate != null ? String(payload.motorReceivedDate) : null,
+      motorReceivedDateTime:
+        payload?.motorReceivedDateTime != null
+          ? String(payload.motorReceivedDateTime)
+          : payload?.motorReceivedDate != null
+            ? String(payload.motorReceivedDate)
+            : null,
       createdBy: mapCastingCuringPersonLabel(payload?.createdBy),
       createdAt: payload?.createdAt != null ? String(payload.createdAt) : null,
       submittedBy: mapCastingCuringPersonLabel(payload?.submittedBy),
@@ -1145,7 +1199,13 @@ export class TrimmingDetailsModel {
           ? rawMotors.map((motor: any) => ({
               motorId: String(motor?.motorId ?? ""),
               motorStage: motor?.motorStage,
-              motorReceivedAt: String(motor?.motorReceivedAt ?? ""),
+              motorReceivedDateTime: String(
+                motor?.motorReceivedDateTime ??
+                  motor?.motorReceivedAt ??
+                  motor?.motorReceivedDate ??
+                  payload?.motorReceivedDateTime ??
+                  "",
+              ),
               motorSubmissionType: normalizeTrimmingMotorSubmissionType(motor?.motorSubmissionType),
               motorSubmissionStatus: normalizeTrimmingMotorStatus(motor?.motorSubmissionStatus),
               rejectionReason: motor?.rejectionReason ?? null,

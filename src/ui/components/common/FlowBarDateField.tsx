@@ -9,6 +9,7 @@ import {
   UI_DATE_FORMAT,
   UI_DATE_PLACEHOLDER,
 } from "./datePickerShared";
+import { ReactNode } from "react";
 
 export type FlowBarDateFieldTheme = {
   selectField?: (width?: number | string) => object;
@@ -42,7 +43,7 @@ const resolveInputSx = (
 };
 
 export interface FlowBarDateFieldProps {
-  label?: string;
+  label?: string | ReactNode;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;

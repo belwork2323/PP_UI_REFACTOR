@@ -39,6 +39,30 @@ const normalizeSubDeptIds = (subDepts: any[]) =>
     .filter((id: number) => Number.isFinite(id))
     .sort((a, b) => a - b);
 
+const validateUserForm = (form: any, isEditMode: boolean) => {
+  const errors: Record<string, string> = {};
+
+  const username = String(form.username || "").trim();
+  if (!username) {
+    errors.username = "Username is required";
+  } else if (!/^[A-Za-z\s]+$/.test(username)) {
+    errors.username = "Username must contain only alphabetic characters and spaces";
+  }
+
+  if (!isEditMode) {
+    const userId = String(form.userId || "").trim();
+    if (!userId) {
+      errors.userId = "User ID is required";
+    } else if (userId.length < 3) {
+      errors.userId = "User ID must be at least 3 characters long";
+    } else if (!/^[A-Za-z0-9]+$/.test(userId)) {
+      errors.userId = "User ID must be alphanumeric only (no spaces or special characters)";
+    }
+  }
+
+  return errors;
+};
+
 const CreateUserManagementForm = ({
   open,
   onClose,
@@ -54,17 +78,42 @@ const CreateUserManagementForm = ({
 }: any) => {
   const { modal, input } = t;
 
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationAttempt, setValidationAttempt] = useState({
+    format: false,
+    submit: false,
+  });
+
+  const getFieldError = (fieldPath: string) => {
+    if (validationAttempt.format || validationAttempt.submit) {
+      return validationErrors[fieldPath];
+    }
+    return undefined;
+  };
+
+  // Reset errors and validation attempts when dialog opens/closes or target changes
+  useEffect(() => {
+    if (!open) {
+      setValidationErrors({});
+      setValidationAttempt({ format: false, submit: false });
+    }
+  }, [open, editTarget]);
+
+  const handleFieldChange = (field: string) => (e: any) => {
+    const value = e?.target?.value ?? e;
+    onFormChange(field)({ target: { value } });
+
+    // Enable format validation attempt on change for live feedback
+    setValidationAttempt((prev) => (prev.format ? prev : { ...prev, format: true }));
+
+    const updatedForm = { ...form, [field]: value };
+    const errors = validateUserForm(updatedForm, Boolean(editTarget));
+    setValidationErrors(errors);
+  };
+
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [pendingSubDepts, setPendingSubDepts] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!open) {
-      setSelectorOpen(false);
-      setSearch("");
-      setPendingSubDepts([]);
-    }
-  }, [open, editTarget]);
 
   const subDeptsRestricted = useMemo(
     () => SUBDEPT_RESTRICTED_ROLES.includes(form.role),
@@ -73,23 +122,26 @@ const CreateUserManagementForm = ({
 
   const subDeptsMandatory = useMemo(() => SUBDEPT_MANDATORY_ROLES.includes(form.role), [form.role]);
 
+  const formErrors = useMemo(() => validateUserForm(form, Boolean(editTarget)), [form, editTarget]);
+
   const createFormValid = useMemo(
     () =>
       Boolean(
-        form.username?.trim() &&
-        form.userId?.trim() &&
+        Object.keys(formErrors).length === 0 &&
         form.role &&
         (subDeptsMandatory ? form.subDepts.length > 0 : true),
       ),
-    [form.username, form.userId, form.role, form.subDepts, subDeptsMandatory],
+    [formErrors, form.role, form.subDepts, subDeptsMandatory],
   );
 
   const updateFormValid = useMemo(
     () =>
       Boolean(
-        form.username?.trim() && form.role && (subDeptsMandatory ? form.subDepts.length > 0 : true),
+        Object.keys(formErrors).length === 0 &&
+        form.role &&
+        (subDeptsMandatory ? form.subDepts.length > 0 : true),
       ),
-    [form.username, form.role, form.subDepts, subDeptsMandatory],
+    [formErrors, form.role, form.subDepts, subDeptsMandatory],
   );
 
   const hasCommittedChanges = useMemo(() => {
@@ -111,6 +163,16 @@ const CreateUserManagementForm = ({
     () => (editTarget ? updateFormValid && hasCommittedChanges : createFormValid),
     [editTarget, updateFormValid, hasCommittedChanges, createFormValid],
   );
+
+  const handleSaveClick = () => {
+    setValidationAttempt({ format: true, submit: true });
+    const errors = validateUserForm(form, Boolean(editTarget));
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length === 0) {
+      onSave();
+    }
+  };
 
   const pendingSubDeptIds = useMemo(
     () => pendingSubDepts.map((sd: any) => sd.subDepartmentId),
@@ -189,35 +251,39 @@ const CreateUserManagementForm = ({
         <Stack spacing={modal.stackSpacing}>
           {/* Credentials */}
           <Box>
-            <Typography sx={modal.fieldLabel}>Credentials *</Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
               <Input
                 fullWidth
                 label="Username"
                 value={form.username}
-                onChange={onFormChange("username")}
-                placeholder="e.g. arjun.sharma"
+                onChange={handleFieldChange("username")}
+                placeholder="e.g. arjunsharma"
                 size="small"
                 sx={input}
                 required
+                inputProps={{ maxLength: 100 }}
+                error={Boolean(getFieldError("username"))}
+                helperText={getFieldError("username")}
               />
               <Input
                 fullWidth
                 label="User ID"
                 value={form.userId}
-                onChange={onFormChange("userId")}
-                placeholder="e.g. EMP12345"
+                onChange={handleFieldChange("userId")}
+                placeholder="e.g. EMP123"
                 size="small"
                 sx={input}
                 required
+                inputProps={{ maxLength: 20 }}
                 disabled={Boolean(editTarget)}
+                error={Boolean(getFieldError("userId"))}
+                helperText={getFieldError("userId")}
               />
             </Stack>
           </Box>
 
           {/* Role */}
           <Box>
-            <Typography sx={modal.fieldLabel}>Role *</Typography>
             <FormControl fullWidth size="small" sx={input} required disabled={Boolean(editTarget)}>
               <InputLabel>Role</InputLabel>
               <Select
@@ -243,7 +309,6 @@ const CreateUserManagementForm = ({
 
           {/* Sub-Departments */}
           <Box>
-            {/* Section header */}
             <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
               <Box display="flex" alignItems="center" gap={1}>
                 <Typography sx={modal.fieldLabel}>
@@ -280,12 +345,10 @@ const CreateUserManagementForm = ({
               )}
             </Box>
 
-            {/* Inline selector card — height adapts to viewport */}
             {!subDeptsRestricted && (
               <Box sx={modal.selectorWrapper}>
                 <Collapse in={selectorOpen} unmountOnExit sx={modal.selectorCollapse}>
                   <Card variant="outlined" sx={modal.selectorCard}>
-                    {/* Header: Selection Status, Clear All & Close List */}
                     <Box sx={modal.selectorHeader}>
                       <Typography sx={modal.selectorHeaderCount}>
                         {pendingSubDepts.length} selected
@@ -310,7 +373,6 @@ const CreateUserManagementForm = ({
                       </Box>
                     </Box>
 
-                    {/* Search */}
                     <Box sx={modal.selectorSearchBox}>
                       <Input
                         fullWidth
@@ -324,7 +386,6 @@ const CreateUserManagementForm = ({
                       />
                     </Box>
 
-                    {/* Select All Option */}
                     {filteredDepts.length > 0 &&
                       (() => {
                         const allFilteredIds = filteredDepts.map((sd) => sd.subDepartmentId);
@@ -334,13 +395,11 @@ const CreateUserManagementForm = ({
 
                         const handleToggleSelectAll = () => {
                           if (isAllSelected) {
-                            // Remove all filtered items from pending
                             const updated = pendingSubDepts.filter(
                               (item) => !allFilteredIds.includes(item.subDepartmentId),
                             );
                             setPendingSubDepts(updated);
                           } else {
-                            // Add missing filtered items to pending
                             const newItems = filteredDepts.filter(
                               (sd) => !pendingSubDeptIds.includes(sd.subDepartmentId),
                             );
@@ -373,7 +432,6 @@ const CreateUserManagementForm = ({
 
                     <Divider sx={{ flexShrink: 0 }} />
 
-                    {/* List */}
                     <Box sx={modal.selectorListBox}>
                       {filteredDepts.length === 0 ? (
                         <Typography sx={modal.selectorEmptyText}>No results found</Typography>
@@ -406,7 +464,6 @@ const CreateUserManagementForm = ({
               </Box>
             )}
 
-            {/* Selected cards / state messages */}
             {subDeptsRestricted ? (
               <Box sx={(theme) => modal.restrictedBox(theme)}>
                 <icons.userMgmt.info sx={modal.restrictedIcon} />
@@ -451,7 +508,7 @@ const CreateUserManagementForm = ({
         </Button>
         <Button
           variant="contained"
-          onClick={onSave}
+          onClick={handleSaveClick}
           disabled={!canSubmit || saving}
           sx={modal.saveButton}
         >

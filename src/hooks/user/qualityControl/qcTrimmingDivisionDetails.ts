@@ -82,18 +82,23 @@ export const resolveTrimmingMotorReceivedAt = (
   const batch = asRecord((payload as Record<string, unknown> | null)?.__batchDetails);
 
   return pickFirstValue(
+    motor?.motorReceivedDateTime,
     motor?.motorReceivedAt,
     motor?.motorReceivedDate,
+    motorDetails?.motorReceivedDateTime,
     motorDetails?.motorReceivedAt,
     motorDetails?.motorReceivedDate,
     motorDetails?.motorReceiptDate,
     motorDetails?.receivedAt,
+    rootDetails?.motorReceivedDateTime,
     rootDetails?.motorReceivedAt,
     rootDetails?.motorReceivedDate,
     rootDetails?.motorReceiptDate,
     rootDetails?.receivedAt,
+    root?.motorReceivedDateTime,
     root?.motorReceivedAt,
     root?.motorReceivedDate,
+    batch?.motorReceivedDateTime,
     batch?.motorReceivedAt,
     batch?.motorReceivedDate,
     batch?.receivedAt,
@@ -183,7 +188,14 @@ export const applyTrimmingDivisionDetailsSeed = (
     Array.isArray(detailSource.trimmingOperationDetails) ||
     Boolean(asRecord(detailSource.trimmingRemarks)) ||
     Boolean(String(detailSource.measurementQaRemarks ?? "").trim()) ||
-    Boolean(String(detailSource.motorReceivedDate ?? detailSource.motorReceivedAt ?? "").trim()) ||
+    Boolean(
+      String(
+        detailSource.motorReceivedDateTime ??
+          detailSource.motorReceivedAt ??
+          detailSource.motorReceivedDate ??
+          "",
+      ).trim(),
+    ) ||
     detailSource.motorStage != null;
 
   let next = base;
@@ -219,7 +231,10 @@ export const applyTrimmingDivisionDetailsSeed = (
       ...detailSource,
       ...(motorStage != null ? { motorStage } : {}),
       ...(receivedAt
-        ? { motorReceivedAt: receivedAt, motorReceivedDate: receivedAt }
+        ? {
+            motorReceivedAt: receivedAt,
+            motorReceivedDateTime: receivedAt,
+          }
         : {}),
     });
     next = onlyIfEmpty

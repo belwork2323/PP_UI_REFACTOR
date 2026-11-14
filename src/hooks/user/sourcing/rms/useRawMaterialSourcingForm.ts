@@ -30,6 +30,7 @@ import {
 import { hasValidationErrors } from "@data/validation/validationErrors";
 import type { ValidationErrors, ValidationTier } from "@data/validation/submissionIntent";
 import { getRawMaterialSourcingErrorMessage as getErrorMessage } from "@hooks/user/sourcing/rms/rawMaterialSourcingErrors";
+import { resolveLotDetailsFetchErrorFallback } from "@hooks/user/sourcing/rms/rawMaterialSourcingDetailsHelpers";
 
 export type RawMaterialSourcingFormEntryMode = "create" | "fill" | "edit";
 
@@ -166,10 +167,7 @@ export const useRawMaterialSourcingForm = ({
     try {
       const detailsResponse = await rawMaterialSourcingController.fetchLotDetails({ lotId: id });
       if (!detailsResponse?.success || !detailsResponse.data) {
-        const fallback =
-          detailsResponse?.statusCode === 404
-            ? STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_NOT_FOUND
-            : STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_FETCH_ERROR;
+        const fallback = resolveLotDetailsFetchErrorFallback(detailsResponse?.statusCode);
         showAlert(getErrorMessage(detailsResponse, fallback), "error");
         return false;
       }
@@ -252,10 +250,7 @@ export const useRawMaterialSourcingForm = ({
         rejectionReason: null,
       });
     } else {
-      const fallback =
-        detailsResponse?.statusCode === 404
-          ? STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_NOT_FOUND
-          : STRINGS.SOURCING.SPECIFICATION_FORM.DETAILS_FETCH_ERROR;
+      const fallback = resolveLotDetailsFetchErrorFallback(detailsResponse?.statusCode);
       showAlert(getErrorMessage(detailsResponse, fallback), "error");
       return;
     }

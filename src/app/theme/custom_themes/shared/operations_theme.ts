@@ -113,6 +113,21 @@ export const getOperationsTheme = (mode = "light") => {
           },
         },
       },
+      /** Shared create/fill body shells (empty state, info callout). */
+      formElements: {
+        emptyStateBox: {
+          textAlign: "center",
+          py: 3,
+          borderRadius: 2,
+          border: `1px dashed ${palette.border}`,
+          background: alpha(palette.surface, 0.5),
+        },
+        infoFooterNote: {
+          borderRadius: 2,
+          background: alpha(palette.primaryLight, 0.05),
+          border: `1px dashed ${alpha(palette.primaryLight, 0.25)}`,
+        },
+      },
     },
     batchList: {
       // Same uniform header as form data tables (vertical gradient + white column dividers).
@@ -132,6 +147,7 @@ export const getOperationsTheme = (mode = "light") => {
           fontSize: "0.72rem",
           borderRadius: "6px",
           bgcolor: isDark ? "#121212" : "#f8fafc",
+          color: palette.text,
           boxSizing: "border-box",
           "& fieldset, & .MuiPickersOutlinedInput-notchedOutline": {
             borderColor: alpha(palette.border, 0.65),
@@ -147,19 +163,34 @@ export const getOperationsTheme = (mode = "light") => {
           fontSize: "0.72rem",
           padding: "5px 8px",
           minHeight: "unset !important",
+          color: palette.text,
+          WebkitTextFillColor: palette.text,
           "&::placeholder": {
             fontSize: "0.68rem",
             opacity: 0.65,
+            color: palette.textSub,
+            WebkitTextFillColor: palette.textSub,
           },
         },
         "& .MuiInputLabel-root": {
           fontSize: "0.72rem",
+          color: palette.textSub,
+          "&.Mui-focused": { color: palette.primaryLight },
+          "&.Mui-error": { color: palette.danger },
         },
         "& .MuiInputLabel-shrink": {
           transform: "translate(14px, -8px) scale(0.85)",
         },
+        "& .MuiFormHelperText-root": {
+          color: palette.textSub,
+          "&.Mui-error": { color: palette.danger },
+        },
+        "& .MuiSelect-icon, & .MuiSvgIcon-root": {
+          color: palette.textSub,
+        },
         "& .MuiInputAdornment-root .MuiIconButton-root": {
           padding: 2,
+          color: palette.textSub,
         },
       },
       filterPanelMenuItem: {
@@ -276,16 +307,32 @@ export const getOperationsTheme = (mode = "light") => {
           fontSize: "0.62rem",
           color: palette.danger,
           mt: 0.4,
-          cursor: "help",
+          cursor: "pointer",
           textDecoration: "underline dotted",
           fontWeight: 600,
         },
       },
       priorityConfig: {
-        Critical: { color: isDark ? "#ef5350" : "#922B21", bg: alpha(isDark ? "#ef5350" : "#C0392B", 0.08), border: alpha(isDark ? "#ef5350" : "#C0392B", 0.22) },
-        High: { color: isDark ? "#fbc02d" : "#7D6608", bg: alpha(isDark ? "#fbc02d" : "#D4AC0D", 0.1), border: alpha(isDark ? "#fbc02d" : "#D4AC0D", 0.28) },
-        Medium: { color: isDark ? "#64b5f6" : "#1A5276", bg: alpha(isDark ? "#64b5f6" : "#2E86C1", 0.1), border: alpha(isDark ? "#64b5f6" : "#2E86C1", 0.28) },
-        Low: { color: isDark ? "#b0bec5" : "#2E4053", bg: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.08), border: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.2) },
+        Critical: {
+          color: isDark ? "#ef5350" : "#922B21",
+          bg: alpha(isDark ? "#ef5350" : "#C0392B", 0.08),
+          border: alpha(isDark ? "#ef5350" : "#C0392B", 0.22),
+        },
+        High: {
+          color: isDark ? "#fbc02d" : "#7D6608",
+          bg: alpha(isDark ? "#fbc02d" : "#D4AC0D", 0.1),
+          border: alpha(isDark ? "#fbc02d" : "#D4AC0D", 0.28),
+        },
+        Medium: {
+          color: isDark ? "#64b5f6" : "#1A5276",
+          bg: alpha(isDark ? "#64b5f6" : "#2E86C1", 0.1),
+          border: alpha(isDark ? "#64b5f6" : "#2E86C1", 0.28),
+        },
+        Low: {
+          color: isDark ? "#b0bec5" : "#2E4053",
+          bg: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.08),
+          border: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.2),
+        },
       } as Record<string, { color: string; bg: string; border: string }>,
       statusConfig: {
         ["To Be Initiated"]: {

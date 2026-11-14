@@ -52,11 +52,7 @@ const ChangePasswordPage = () => {
       </Box>
 
       <Box sx={t.belLogo.wrapper}>
-        <img
-          src={images.belLogoDark}
-          alt="BEL Logo"
-          style={t.belLogo.img as React.CSSProperties}
-        />
+        <img src={images.belLogoDark} alt="BEL Logo" style={t.belLogo.img as React.CSSProperties} />
       </Box>
 
       <Box sx={t.leftPanel.wrapper}>
@@ -115,6 +111,10 @@ const ChangePasswordPage = () => {
                   helperText={form.errors.currentPassword}
                   onChange={(e) => form.setField("currentPassword", e.target.value)}
                   disabled={form.submitting}
+                  inputProps={{
+                    maxLength: 20,
+                    minLength: 8,
+                  }}
                 />
                 <Input
                   label={STRINGS.AUTH.NEW_PASSWORD_LABEL}
@@ -126,6 +126,10 @@ const ChangePasswordPage = () => {
                   helperText={form.errors.newPassword}
                   onChange={(e) => form.setField("newPassword", e.target.value)}
                   disabled={form.submitting}
+                  inputProps={{
+                    maxLength: 20,
+                    minLength: 8,
+                  }}
                 />
                 <Input
                   label={STRINGS.AUTH.CONFIRM_PASSWORD_LABEL}
@@ -137,6 +141,10 @@ const ChangePasswordPage = () => {
                   helperText={form.errors.confirmPassword}
                   onChange={(e) => form.setField("confirmPassword", e.target.value)}
                   disabled={form.submitting}
+                  inputProps={{
+                    maxLength: 20,
+                    minLength: 8,
+                  }}
                 />
 
                 <PasswordRulesList rules={form.rules} />
@@ -150,7 +158,12 @@ const ChangePasswordPage = () => {
                   >
                     {STRINGS.AUTH.CHANGE_PASSWORD_BUTTON}
                   </Button>
-                  <Button fullWidth variant="text" onClick={handleLogout} disabled={form.submitting}>
+                  <Button
+                    fullWidth
+                    variant="text"
+                    onClick={handleLogout}
+                    disabled={form.submitting}
+                  >
                     {STRINGS.APP_HEADER.LOGOUT_LABEL}
                   </Button>
                 </Stack>

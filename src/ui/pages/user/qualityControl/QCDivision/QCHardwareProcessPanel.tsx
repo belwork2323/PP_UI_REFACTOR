@@ -60,6 +60,7 @@ import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_t
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import { fieldError } from "@/data/validation/adapters/qcHardware.validation";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -133,9 +134,10 @@ const DISPATCH_NUMBER_FIELDS = [
 const normalizeTimeValue = (value: unknown) => {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return "";
-  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (!match) return trimmed;
-  return `${match[1].padStart(2, "0")}:${match[2]}`;
+  const time = `${match[1].padStart(2, "0")}:${match[2]}`;
+  return match[3] ? `${time}:${match[3]}` : time;
 };
 
 type ColumnDef<T> = {
@@ -268,12 +270,20 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
                 ? dateTimeValue(row, { ...column, id: "START_DATE" })
                 : undefined
             }
+            requiresMinDateTime={column.id === "END_DATE"}
             onChange={(next) => {
               const [date = "", time = ""] = next.split(/\s+/, 2);
-              updateRowFields(index, {
+              const patch: Partial<T> = {
                 [dateField]: date,
                 [timeField]: time,
-              } as Partial<T>);
+              } as Partial<T>;
+              if (column.id === "START_DATE") {
+                const endDateTime = dateTimeValue(row, { ...column, id: "END_DATE" });
+                if (!next || isStartAfterEnd(next, endDateTime)) {
+                  Object.assign(patch, { END_DATE: "", END_TIME: "" });
+                }
+              }
+              updateRowFields(index, patch);
             }}
             placeholder="DD-MM-YYYY HH:mm"
             inputSx={tableDateTimeFieldSx}

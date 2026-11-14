@@ -1,9 +1,46 @@
 import { alpha } from "@mui/material";
 import { createDataTableTheme, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
+import { createWorkflowDetailsTheme } from "../../shared/workflow_details_theme";
 import { getSourcingTheme } from "./sourcing_theme";
 
-export const getRocketMotorCasingTheme = (baseTheme: any) => {
+export const getRocketMotorCasingTheme = (baseTheme: any, mode: string = "light") => {
 	const palette = baseTheme?.palette ?? {};
+
+	const casingDetails = {
+		...createWorkflowDetailsTheme(palette, mode),
+		blockWrapper: (isLast: boolean) => ({
+			mb: isLast ? 0 : 2.5,
+			p: 2,
+			borderRadius: 2,
+			border: `1px solid ${alpha(palette.border ?? "#D5D8DC", 0.85)}`,
+			background: palette.pageBg ?? (mode === "dark" ? "#0f1117" : "#fff"),
+		}),
+		blockMeta: { fontSize: "0.72rem", color: palette.textSub },
+		blockMetaStrong: { color: palette.text, fontWeight: 700 },
+		nestedTableGap: { mt: 1.5 },
+		materialChip: {
+			height: 22,
+			fontSize: "0.68rem",
+			fontWeight: 800,
+			background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+			color: "#fff",
+		},
+		...createDataTableTheme(palette),
+		specText: { fontWeight: 600 },
+		resultText: { fontWeight: 600, color: palette.text },
+		remarksText: { fontSize: "0.8rem", color: palette.textSub },
+		specRangeChip: {
+			height: 22,
+			fontSize: "0.65rem",
+			fontWeight: 600,
+			background: alpha(palette.warn ?? "#D4AC0D", 0.1),
+			color: palette.warn ?? "#7D6608",
+			border: `1px solid ${alpha(palette.warn ?? "#D4AC0D", 0.28)}`,
+			whiteSpace: "nowrap",
+		},
+		dimReadingCell: { fontWeight: 700, color: palette.primary, textAlign: "center" as const },
+		dimParamCell: { fontWeight: 600, minWidth: 160 },
+	};
 
 	return {
 		header: {
@@ -491,130 +528,9 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 			sectionHeaderLabel: { fontSize: "0.82rem", fontWeight: 700, color: palette.text },
 			sectionRow: { mb: 1 },
 		},
-		casingDetails: {
-			/** Opaque chips for the dark gradient banner (batch-list tints are too faint here). */
-			bannerStatusConfig: (() => {
-				const warnBase = palette.warn ?? "#D4AC0D";
-				const primary = palette.primary ?? "#1B4F72";
-				const primaryLight = palette.primaryLight ?? "#2E86C1";
-				const success = palette.success ?? "#148F77";
-				const danger = palette.danger ?? "#C0392B";
-				return {
-					["To Be Initiated"]: {
-						color: "#334155",
-						bg: "#F8FAFC",
-						border: "#CBD5E1",
-					},
-					["In Progress"]: {
-						color: primary,
-						bg: "#E8F4FC",
-						border: alpha(primaryLight, 0.5),
-					},
-					["Waiting for Approval"]: {
-						color: "#7D6608",
-						bg: "#FFF4D6",
-						border: warnBase,
-					},
-					["Approved"]: {
-						color: success,
-						bg: "#E8F8F5",
-						border: alpha(success, 0.5),
-					},
-					["Completely Approved"]: {
-						color: success,
-						bg: "#E8F8F5",
-						border: alpha(success, 0.5),
-					},
-					["Rejected"]: {
-						color: danger,
-						bg: "#FDEDEC",
-						border: alpha(danger, 0.5),
-					},
-				} as Record<string, { color: string; bg: string; border: string }>;
-			})(),
-			page: { animation: "fadeIn 0.35s ease both" },
-			document: {
-				borderRadius: 3,
-				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
-				boxShadow: `0 4px 24px ${alpha(palette.primary ?? "#1B4F72", 0.08)}`,
-				overflow: "hidden",
-				background: palette.pageBg ?? "#fff",
-			},
-			banner: {
-				p: "18px 24px",
-				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
-				color: "#fff",
-			},
-			bannerTitle: { fontWeight: 800, fontSize: "1.05rem", color: "#fff" },
-			bannerSubtitle: { fontSize: "0.78rem", color: alpha("#fff", 0.78), mt: 0.35 },
-			bannerIcon: { fontSize: 28, color: "#fff", opacity: 0.95 },
-			body: { p: { xs: 2, sm: 3 }, background: palette.surface ?? palette.pageBg },
-			section: {
-				mb: 3,
-				p: 2,
-				borderRadius: 2,
-				border: `1px solid ${alpha(palette.border ?? "#D5D8DC", 0.65)}`,
-				background: palette.pageBg ?? "#fff",
-			},
-			sectionTitle: {
-				fontSize: "0.72rem",
-				fontWeight: 800,
-				letterSpacing: "0.08em",
-				textTransform: "uppercase",
-				color: palette.primaryLight,
-				mb: 1.5,
-				display: "flex",
-				alignItems: "center",
-				gap: 0.75,
-			},
-			metaGrid: {
-				display: "grid",
-				gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
-				gap: 1.5,
-			},
-			metaItem: {
-				p: 1.25,
-				borderRadius: 1.5,
-				background: alpha(palette.primaryLight ?? "#2E86C1", 0.04),
-				border: `1px solid ${alpha(palette.primaryLight ?? "#2E86C1", 0.12)}`,
-			},
-			metaLabel: { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: palette.textSub },
-			metaValue: { fontSize: "0.88rem", fontWeight: 700, color: palette.text, mt: 0.35 },
-			blockWrapper: (isLast: boolean) => ({
-				mb: isLast ? 0 : 2.5,
-				p: 2,
-				borderRadius: 2,
-				border: `1px solid ${alpha(palette.border ?? "#D5D8DC", 0.85)}`,
-				background: palette.pageBg ?? "#fff",
-			}),
-			blockMeta: { fontSize: "0.72rem", color: palette.textSub },
-			blockMetaStrong: { color: palette.text, fontWeight: 700 },
-			nestedTableGap: { mt: 1.5 },
-			materialChip: {
-				height: 22,
-				fontSize: "0.68rem",
-				fontWeight: 800,
-				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
-				color: "#fff",
-			},
-			...createDataTableTheme(palette),
-			specText: { fontWeight: 600 },
-			resultText: { fontWeight: 600, color: palette.text },
-			remarksText: { fontSize: "0.8rem", color: palette.textSub },
-			specRangeChip: {
-				height: 22,
-				fontSize: "0.65rem",
-				fontWeight: 600,
-				background: alpha(palette.warn ?? "#D4AC0D", 0.1),
-				color: palette.warn ?? "#7D6608",
-				border: `1px solid ${alpha(palette.warn ?? "#D4AC0D", 0.28)}`,
-				whiteSpace: "nowrap",
-			},
-			dimReadingCell: { fontWeight: 700, color: palette.primary, textAlign: "center" as const },
-			dimParamCell: { fontWeight: 600, minWidth: 160 },
-			emptyText: { fontSize: "0.85rem", color: palette.textSub, textAlign: "center", py: 4 },
-			loadingBox: { minHeight: 320, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1.5 },
-		},
+		casingDetails,
+		/** Canonical alias — prefer `details` for shared shell consumers. */
+		details: casingDetails,
 	};
 };
 
@@ -625,7 +541,7 @@ export const getRocketMotorCasingPageTheme = (mode = "light") => {
 		...base,
 		sourcing: {
 			...base.sourcing,
-			rocketMotor: getRocketMotorCasingTheme(base),
+			rocketMotor: getRocketMotorCasingTheme(base, mode),
 		},
 	};
 };

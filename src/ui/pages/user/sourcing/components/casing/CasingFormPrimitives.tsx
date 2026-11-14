@@ -96,6 +96,9 @@ export const casingLightPlaceholderSx = (theme: any) => ({
   },
 });
 
+/** `Omit` that preserves MUI's TextField variant union instead of collapsing it. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 type CasingDeferredInputProps = {
   value: string;
   onChange: (value: string) => void;
@@ -103,7 +106,10 @@ type CasingDeferredInputProps = {
   disabled?: boolean;
   error?: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
-} & Omit<React.ComponentProps<typeof FormInput>, "value" | "onChange" | "defaultValue">;
+} & DistributiveOmit<
+  React.ComponentProps<typeof FormInput>,
+  "value" | "onChange" | "defaultValue" | "inputRef"
+>;
 
 export const CasingDeferredInput = memo(function CasingDeferredInput({
   value,
@@ -295,6 +301,7 @@ export const DateField = ({
   disabled,
   error,
   required,
+  maxDate,
   fieldPath,
 }: {
   label: string;
@@ -304,6 +311,7 @@ export const DateField = ({
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  maxDate?: string;
   fieldPath?: string;
 }) => (
   <Field label={label} theme={theme} required={required} fieldPath={fieldPath}>
@@ -311,6 +319,7 @@ export const DateField = ({
       value={formatToUiDate(value)}
       onChange={(next) => onChange(formatToIsoDateInput(next))}
       disabled={disabled}
+      maxDate={maxDate}
       error={Boolean(error)}
       helperText={error}
       placeholder="DD-MM-YYYY"

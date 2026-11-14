@@ -4,6 +4,7 @@ import CasePrepTextField from "../../CasePreparation/CasePrepTextField";
 import CasePrepSelect, { type CasePrepSelectOption } from "../../CasePreparation/CasePrepSelect";
 import { DateTimeField } from "../../../../../components/common/DateField";
 import type { DryingTrayOvenForm } from "../../../../../../data/models/user/rmp/defaultSolidProcessForm";
+import { isStartAfterEnd } from "../../../../../../data/validation/dateRangeValidation";
 import { sanitizeMasterDataDecimalInput } from "../../../../../../data/models/admin/MasterData/masterDataNumericInput";
 
 const OVEN_TYPE_OPTIONS: CasePrepSelectOption[] = [
@@ -32,7 +33,16 @@ const DryingTrayOvenSection = ({
   title = "Drying in Tray Oven",
   showQaRemarks = false,
 }: Props) => {
-  const patch = (patchValue: Partial<DryingTrayOvenForm>) => onChange({ ...value, ...patchValue });
+  const patch = (patchValue: Partial<DryingTrayOvenForm>) => {
+    const next = { ...value, ...patchValue };
+    if (
+      patchValue.startDatetime !== undefined &&
+      isStartAfterEnd(patchValue.startDatetime, value.endDatetime)
+    ) {
+      next.endDatetime = "";
+    }
+    onChange(next);
+  };
 
   return (
     <Box sx={{ mb: 2 }}>
@@ -102,6 +112,7 @@ const DryingTrayOvenSection = ({
             value={value.endDatetime}
             onChange={(v) => patch({ endDatetime: v })}
             minDate={value.startDatetime}
+            requiresMinDateTime
             disabled={disabled}
             compact
             error={Boolean(fieldErrors.endDatetime)}

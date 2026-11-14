@@ -271,6 +271,7 @@ const BlendingStylePreparationSection = ({
             <DateTimeField
               value={details.processEndTime}
               minDate={details.processStartTime}
+              requiresMinDateTime
               disabled={disabled}
               onChange={(value) => updateField("processEndTime", value)}
               error={Boolean(visibleError(fieldPath("processEndTime")))}

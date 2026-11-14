@@ -24,11 +24,7 @@ export const toComparableTimestamp = (value: unknown): number | null => {
     const minute = dmyTime[5] != null ? Number(dmyTime[5]) : 0;
     const second = dmyTime[6] != null ? Number(dmyTime[6]) : 0;
     const d = new Date(year, month - 1, day, hour, minute, second);
-    if (
-      d.getFullYear() !== year ||
-      d.getMonth() !== month - 1 ||
-      d.getDate() !== day
-    ) {
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
       return null;
     }
     return d.getTime();
@@ -46,12 +42,34 @@ export const toComparableTimestamp = (value: unknown): number | null => {
   return null;
 };
 
+export const isStartAfterEnd = (start: unknown, end: unknown): boolean => {
+  const startTimestamp = toComparableTimestamp(start);
+  const endTimestamp = toComparableTimestamp(end);
+  if (startTimestamp != null && endTimestamp != null) {
+    return startTimestamp > endTimestamp;
+  }
+
+  const startTime = str(start).match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  const endTime = str(end).match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!startTime || !endTime) return false;
+  const startHour = Number(startTime[1]);
+  const startMinute = Number(startTime[2]);
+  const endHour = Number(endTime[1]);
+  const endMinute = Number(endTime[2]);
+  if (startHour > 23 || startMinute > 59 || endHour > 23 || endMinute > 59) {
+    return false;
+  }
+  const startMinutes = startHour * 60 + startMinute;
+  const endMinutes = endHour * 60 + endMinute;
+  return startMinutes > endMinutes;
+};
+
 const combineDateAndTime = (dateValue: unknown, timeValue: unknown): string => {
   const date = str(dateValue);
   const time = str(timeValue);
   if (!date) return "";
   if (!time) return date;
-  const timePart = time.includes("T") ? time.split(/[T ]/).pop() ?? time : time;
+  const timePart = time.includes("T") ? (time.split(/[T ]/).pop() ?? time) : time;
   return `${date} ${timePart}`.trim();
 };
 
@@ -126,7 +144,21 @@ export const assertFromToDateTimeParts = ({
   const toCombined = combineDateAndTime(toDate, toTime);
   if (!str(fromDate) || !str(toDate)) return true;
 
-  const hasTime = Boolean(str(fromTime) || str(toTime));
+  const fromTimeText = str(fromTime);
+  const toTimeText = str(toTime);
+  const hasTime = Boolean(fromTimeText || toTimeText);
+  const fromDateTimestamp = toComparableTimestamp(fromDate);
+  const toDateTimestamp = toComparableTimestamp(toDate);
+  // Let the user finish entering a same-day time pair before validating its order.
+  if (
+    hasTime &&
+    fromDateTimestamp != null &&
+    fromDateTimestamp === toDateTimestamp &&
+    (!fromTimeText || !toTimeText)
+  ) {
+    return true;
+  }
+
   const ok = assertFromToOrder({
     from: fromCombined,
     to: toCombined,

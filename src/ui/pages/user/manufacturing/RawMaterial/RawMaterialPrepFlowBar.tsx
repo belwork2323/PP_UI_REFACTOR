@@ -11,6 +11,7 @@ import {
   type RawMaterialPrepProcessKey,
   type RawMaterialPrepSelectedProcesses,
 } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
+import WorkflowEntitySelectorRow from "../../../../components/custom/WorkflowEntitySelectorRow";
 import RawMaterialPrepSelect from "./RawMaterialPrepSelect";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -136,62 +137,10 @@ const RawMaterialPrepFlowBar = ({
         </Box>
 
         {showMaterialRow && (
-          <Box sx={flowBarTheme.materialSelectorBox}>
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                gap: 2,
-                alignItems: { sm: "flex-end" },
-              }}
-            >
-              {safeProcesses.solid && (
-                <Box sx={{ flex: "0 0 auto" }}>
-                  <RawMaterialPrepSelect
-                    label={`Select Solid ${rawMaterialLabel}`}
-                    value={solidMaterialCode}
-                    placeholder={materialPlaceholder}
-                    options={solidMaterialSelectOptions}
-                    variant="material"
-                    disabled={loadingMaterials}
-                    width={360}
-                    theme={theme}
-                    onChange={onSolidMaterialChange}
-                  />
-                </Box>
-              )}
-              {showSolidGradeSelect && (
-                <Box sx={{ flex: "0 0 auto" }}>
-                  <RawMaterialPrepSelect
-                    label={RM.SELECT_GRADE_LABEL}
-                    value={solidGradeCode}
-                    placeholder={RM.SELECT_GRADE_PLACEHOLDER}
-                    options={solidGradeSelectOptions}
-                    variant="premix"
-                    disabled={loadingMaterials}
-                    width={280}
-                    theme={theme}
-                    onChange={onSolidGradeChange}
-                  />
-                </Box>
-              )}
-              {safeProcesses.liquid && (
-                <Box sx={{ flex: "0 0 auto" }}>
-                  <RawMaterialPrepSelect
-                    label={`Select Liquid ${rawMaterialLabel}`}
-                    value={liquidMaterialCode}
-                    placeholder={materialPlaceholder}
-                    options={liquidMaterialSelectOptions}
-                    variant="material"
-                    disabled={loadingMaterials}
-                    width={360}
-                    theme={theme}
-                    onChange={onLiquidMaterialChange}
-                  />
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.25 }}>
+          <WorkflowEntitySelectorRow
+            containerSx={flowBarTheme.materialSelectorBox}
+            actionPlacement="below"
+            action={
               <Button
                 variant="contained"
                 size="small"
@@ -200,8 +149,54 @@ const RawMaterialPrepFlowBar = ({
               >
                 Add
               </Button>
-            </Box>
-          </Box>
+            }
+          >
+            {safeProcesses.solid && (
+              <Box sx={{ flex: "0 0 auto" }}>
+                <RawMaterialPrepSelect
+                  label={`Select Solid ${rawMaterialLabel}`}
+                  value={solidMaterialCode}
+                  placeholder={materialPlaceholder}
+                  options={solidMaterialSelectOptions}
+                  variant="material"
+                  disabled={loadingMaterials}
+                  width={360}
+                  theme={theme}
+                  onChange={onSolidMaterialChange}
+                />
+              </Box>
+            )}
+            {showSolidGradeSelect && (
+              <Box sx={{ flex: "0 0 auto" }}>
+                <RawMaterialPrepSelect
+                  label={RM.SELECT_GRADE_LABEL}
+                  value={solidGradeCode}
+                  placeholder={RM.SELECT_GRADE_PLACEHOLDER}
+                  options={solidGradeSelectOptions}
+                  variant="premix"
+                  disabled={loadingMaterials}
+                  width={280}
+                  theme={theme}
+                  onChange={onSolidGradeChange}
+                />
+              </Box>
+            )}
+            {safeProcesses.liquid && (
+              <Box sx={{ flex: "0 0 auto" }}>
+                <RawMaterialPrepSelect
+                  label={`Select Liquid ${rawMaterialLabel}`}
+                  value={liquidMaterialCode}
+                  placeholder={materialPlaceholder}
+                  options={liquidMaterialSelectOptions}
+                  variant="material"
+                  disabled={loadingMaterials}
+                  width={360}
+                  theme={theme}
+                  onChange={onLiquidMaterialChange}
+                />
+              </Box>
+            )}
+          </WorkflowEntitySelectorRow>
         )}
       </Box>
     </Box>

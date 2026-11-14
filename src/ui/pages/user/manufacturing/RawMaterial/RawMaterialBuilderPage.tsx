@@ -20,6 +20,7 @@ import {
 import PremixStatusChip from "./components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
+import WorkflowEmptyState from "../../../../components/custom/WorkflowEmptyState";
 import FinalApprovalPremixDialog, {
   buildFinalApprovalPremixRows,
 } from "./components/FinalApprovalPremixDialog";
@@ -669,15 +670,19 @@ const RawMaterialBuilderForm = ({
       )}
 
       {groups.length === 0 && (
-        <Box sx={rmTheme.builder.emptyStateBox}>
-          <InfoOutlinedIcon sx={rmTheme.builder.emptyStateIcon} />
-          <Typography sx={rmTheme.builder.emptyStateTitle}>{RM.NO_PROCESS_SELECTED_TITLE}</Typography>
-          <Typography sx={rmTheme.builder.emptyStateSubtitle}>
-            {sheetMaterialCount > 0
+        <WorkflowEmptyState
+          icon={InfoOutlinedIcon}
+          title={RM.NO_PROCESS_SELECTED_TITLE}
+          subtitle={
+            sheetMaterialCount > 0
               ? "Batch identification sheet premix details are required to load this form."
-              : "No materials found in the batch identification sheet."}
-          </Typography>
-        </Box>
+              : "No materials found in the batch identification sheet."
+          }
+          sx={rmTheme.builder.emptyStateBox}
+          iconSx={rmTheme.builder.emptyStateIcon}
+          titleSx={rmTheme.builder.emptyStateTitle}
+          subtitleSx={rmTheme.builder.emptyStateSubtitle}
+        />
       )}
 
       <FinalApprovalPremixDialog

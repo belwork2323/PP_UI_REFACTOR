@@ -44,6 +44,7 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
     valueType: "text",
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
   },
   LINER_TYPE: textRule(["UNIT", "SUBMIT"]),
   LINER_BATCH_NO: textRule(["UNIT", "SUBMIT"], 50, S.FIELD_REQUIRED),
@@ -51,26 +52,30 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
 
   // General Batch Info / Process Fields
   MIXER_BLDG_NO: textRule(["UNIT", "SUBMIT"], S.LENGTH.MAX_STANDARD, S.FIELD_REQUIRED),
-  PREMIX_DATE: dateTimeRule(["UNIT", "SUBMIT"]),
-  FINAL_MIX_DATE: dateTimeRule(["UNIT", "SUBMIT"]),
+  PREMIX_DATE: dateRule(["UNIT", "SUBMIT"]),
+  FINAL_MIX_DATE: dateRule(["UNIT", "SUBMIT"]),
   DATE_OF_CASTING: dateTimeRule(["SUBMIT"]),
   IR_BATCH_NO: textRule(["SUBMIT"], 50, S.FIELD_REQUIRED),
   DATE_OF_MFG: dateTimeRule(["SUBMIT"]),
 
-  // System-generated labels (MDM article names) — presence only, no pattern.
+  // System-generated labels (MDM article names)
   ARTICLE_TYPE: {
     valueType: "text",
     requiredIn: [],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     maxLength: S.LENGTH.MAX_STANDARD,
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
   },
   RUBBER_MATERIAL: textRule(["UNIT", "SUBMIT"]),
   SLEEVE_NO: textRule(["UNIT", "SUBMIT"], 50),
   MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
   BEM_MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
   BEM_NO: textRule(["UNIT", "SUBMIT"], 50),
-  SIZE_MM: textRule([], S.LENGTH.MAX_STANDARD),
-  THICKNESS_MM: textRule([], S.LENGTH.MAX_STANDARD),
+
+  // Article Type Table (Length & Thickness as numeric)
+  SIZE_MM: numberRule(),
+  THICKNESS_MM: numberRule(),
+
   LINER_APPLIED: textRule([], S.LENGTH.MAX_STANDARD),
   OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   CASTING_PIT_NO: textRule([], S.LENGTH.MAX_STANDARD),
@@ -78,8 +83,11 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   CASTING_END_TIME: dateTimeRule(),
   REMARKS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   OVEN_NO: textRule([], S.LENGTH.MAX_STANDARD),
+
+  // Curing Details (Temperature as numeric)
   TEMPERATURE: numberRule(),
-  HARDNESS: numberRule(),
+
+  HARDNESS: textRule([]),
   DECORING_DATE: dateTimeRule(),
   DECORING_LOAD: numberRule(),
   CURING_START_DATE: dateTimeRule(),
@@ -88,16 +96,16 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   ACTOR: textRule([], S.LENGTH.MAX_STANDARD),
   DATE_OF_NDT: dateTimeRule(["UNIT", "SUBMIT"]),
   DATE_OF_APPLICATION: dateTimeRule(["UNIT", "SUBMIT"]),
-  VACUUM_LEVEL: numberRule(["SUBMIT"]),
+  VACUUM_LEVEL: textRule(["SUBMIT"]),
   BATCH_SIZE: numberRule(["UNIT", "SUBMIT"]),
 
-  // Inhibition weights (alphanumeric / special text)
-  LINER_COATED_SLEEVE_WEIGHT: textRule([], S.LENGTH.MAX_STANDARD),
-  WEIGHT_BEFORE_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
-  WEIGHT_AFTER_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
-  IR_APPLIED_WEIGHT: textRule([], S.LENGTH.MAX_STANDARD),
-
-  // Trimming measurements (alphanumeric / special text)
+  // Inhibition Weights (All weights as numeric fields)
+  LINER_COATED_SLEEVE_WEIGHT: numberRule(),
+  WEIGHT_BEFORE_INHIBITION: numberRule(),
+  WEIGHT_AFTER_INHIBITION: numberRule(),
+  IR_APPLIED_WEIGHT: numberRule(),
+  PROPELLANT_WEIGHT: numberRule(),
+  // Trimming Measurements (Length before inhibition as numeric; others as text with special chars)
   HE_OD: textRule([], S.LENGTH.MAX_STANDARD),
   HE_PORT_INNER: textRule([], S.LENGTH.MAX_STANDARD),
   HE_PORT_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
@@ -108,25 +116,25 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   NE_PORT_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
   NE_WEB_INNER: textRule([], S.LENGTH.MAX_STANDARD),
   NE_WEB_OUTER: textRule([], S.LENGTH.MAX_STANDARD),
-  LENGTH_BEFORE_INHIBITION: textRule([], S.LENGTH.MAX_STANDARD),
+  LENGTH_BEFORE_INHIBITION: numberRule(),
 
   // Static testing
-  PROPELLANT_MASS: numberRule(),
-  DT: numberRule(),
-  WEB_THICKNESS: numberRule(),
-  N_VALUE: numberRule(),
-  PRESSURE_AVG: numberRule(),
-  THRUST_AVG: numberRule(),
-  BURN_RATE: numberRule(),
+  PROPELLANT_MASS: textRule([], S.LENGTH.MAX_STANDARD),
+  DT: textRule([], S.LENGTH.MAX_STANDARD),
+  WEB_THICKNESS: textRule([], S.LENGTH.MAX_STANDARD),
+  N_VALUE: textRule([], S.LENGTH.MAX_STANDARD),
+  PRESSURE_AVG: textRule([], S.LENGTH.MAX_STANDARD),
+  THRUST_AVG: textRule([], S.LENGTH.MAX_STANDARD),
+  BURN_RATE: textRule([], S.LENGTH.MAX_STANDARD),
 
   // Mechanical properties
-  TS: numberRule(),
-  ELONGATION: numberRule(),
-  MODULUS: numberRule(),
-  SBS: numberRule(),
-  TBS: numberRule(),
-  PEEL_STRENGTH: numberRule(),
-  DENSITY: numberRule(),
+  TS: textRule([], S.LENGTH.MAX_STANDARD),
+  ELONGATION: textRule([], S.LENGTH.MAX_STANDARD),
+  MODULUS: textRule([], S.LENGTH.MAX_STANDARD),
+  SBS: textRule([], S.LENGTH.MAX_STANDARD),
+  TBS: textRule([], S.LENGTH.MAX_STANDARD),
+  PEEL_STRENGTH: textRule([], S.LENGTH.MAX_STANDARD),
+  DENSITY: textRule([], S.LENGTH.MAX_STANDARD),
 
   // Mixing Cycle Particulars Fields
   rpm: numberRule(["SUBMIT"]),
@@ -254,7 +262,6 @@ function resolveFieldPaths(data: any) {
     }
   }
 
-  // 4. Table Traversals — skip SR_NO / ARTICLE_TYPE (system-generated, display-only).
   const tableMappings: Record<string, string[]> = {
     ARTICLE_TYPE_TABLE: [
       "RUBBER_MATERIAL",
@@ -305,6 +312,7 @@ function resolveFieldPaths(data: any) {
       "LINER_COATED_SLEEVE_WEIGHT",
       "WEIGHT_BEFORE_INHIBITION",
       "WEIGHT_AFTER_INHIBITION",
+      "PROPELLANT_WEIGHT",
       "IR_APPLIED_WEIGHT",
       "DATE_OF_APPLICATION",
       "REMARKS",

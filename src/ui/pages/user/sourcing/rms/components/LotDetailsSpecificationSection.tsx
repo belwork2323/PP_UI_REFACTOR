@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 
 import { STRINGS } from "@app/config/strings";
 import { icons } from "@app/theme/icons";
@@ -12,6 +12,7 @@ import SpecificationResultTable, {
   type SpecificationResultRow,
   type SpecificationResultTableStyles,
 } from "@ui/components/custom/SpecificationResultTable";
+import WorkflowDetailsSection from "@ui/components/custom/WorkflowDetailsSection";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const { visibility: VisibilityRoundedIcon } = icons.user.sourcing.rawMaterialBatchList;
@@ -60,17 +61,17 @@ const LotDetailsSpecificationSection = ({ block, theme }: LotDetailsSpecificatio
   );
 
   return (
-    <Box sx={rmTheme.section}>
-      <Typography sx={rmTheme.sectionTitle}>
-        <VisibilityRoundedIcon sx={rmTheme.sectionTitleIcon} />
-        {BL.LOT_DETAILS_SPEC_SECTION}
-      </Typography>
+    <WorkflowDetailsSection
+      dt={rmTheme}
+      title={BL.LOT_DETAILS_SPEC_SECTION}
+      icon={VisibilityRoundedIcon}
+    >
       {rows.length ? (
         <SpecificationResultTable rows={rows} styles={styles} showStatus />
       ) : (
         <Typography sx={rmTheme.emptyText}>{BL.LOT_DETAILS_EMPTY}</Typography>
       )}
-    </Box>
+    </WorkflowDetailsSection>
   );
 };
 

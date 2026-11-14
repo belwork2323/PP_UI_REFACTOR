@@ -148,7 +148,7 @@ export const getTrimmingSessionFromValues = (
   return {
     motorStage: rec.motorStage as number | string | undefined,
     motorReceivedAt: toTrimmingUiMotorReceivedAt(
-      String(rec.motorReceivedAt ?? rec.motorReceivedDate ?? "").trim(),
+      String(rec.motorReceivedDateTime ?? rec.motorReceivedAt ?? rec.motorReceivedDate ?? "").trim(),
     ),
     trimmingDetails: normalizedDetails,
     commonFormatParameters: params.length ? params : createDefaultCommonFormatParameters(),
@@ -212,8 +212,12 @@ export const hydrateTrimmingValuesFromSections = (
     .filter(Boolean)
     .map((row) => ({
       machineDetails: String(row!.machineDetails ?? "").trim(),
-      startDate: toTrimmingUiMotorReceivedAt(String(row!.startDate ?? "")),
-      completionDate: toTrimmingUiMotorReceivedAt(String(row!.completionDate ?? "")),
+      startDate: toTrimmingUiMotorReceivedAt(
+        String(row!.startDatetime ?? row!.startDateTime ?? row!.startDate ?? ""),
+      ),
+      completionDate: toTrimmingUiMotorReceivedAt(
+        String(row!.completionDatetime ?? row!.completionDateTime ?? row!.completionDate ?? ""),
+      ),
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
       ingestSize: String(row!.ingestSize ?? "").trim(),
@@ -260,14 +264,14 @@ export const hydrateTrimmingValuesFromSections = (
   });
 };
 
-/** UI `DD-MM-YYYY HH:mm` → API local datetime (`YYYY-MM-DDTHH:mm:ss`), manufacturing Trimming parity. */
+/** UI `DD-MM-YYYY HH:mm:ss` → API local datetime (`YYYY-MM-DDTHH:mm:ss`). */
 export const toTrimmingApiMotorReceivedDate = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   return toApiDateTime(raw) ?? "";
 };
 
-/** API datetime / date → UI `DD-MM-YYYY HH:mm` (the field is a date-time picker). */
+/** API datetime / date → UI date-time text with seconds when supplied by the backend. */
 export const toTrimmingUiMotorReceivedAt = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -306,8 +310,8 @@ export const buildTrimmingOperationDetailsPayload = (
     .map((row) =>
       omitEmpty({
         machineDetails: String(row.machineDetails ?? "").trim() || undefined,
-        startDate: toTrimmingApiMotorReceivedDate(row.startDate) || undefined,
-        completionDate: toTrimmingApiMotorReceivedDate(row.completionDate) || undefined,
+        startDatetime: toTrimmingApiMotorReceivedDate(row.startDate) || undefined,
+        completionDatetime: toTrimmingApiMotorReceivedDate(row.completionDate) || undefined,
         arborSize: String(row.arborSize ?? "").trim() || undefined,
         cutterSize: String(row.cutterSize ?? "").trim() || undefined,
         ingestSize: String(row.ingestSize ?? "").trim() || undefined,
@@ -327,8 +331,12 @@ export const hydrateTrimmingDetailsFromOperationDetails = (
     .filter(Boolean)
     .map((row) => ({
       machineDetails: String(row!.machineDetails ?? "").trim(),
-      startDate: toTrimmingUiMotorReceivedAt(String(row!.startDate ?? "")),
-      completionDate: toTrimmingUiMotorReceivedAt(String(row!.completionDate ?? "")),
+      startDate: toTrimmingUiMotorReceivedAt(
+        String(row!.startDatetime ?? row!.startDateTime ?? row!.startDate ?? ""),
+      ),
+      completionDate: toTrimmingUiMotorReceivedAt(
+        String(row!.completionDatetime ?? row!.completionDateTime ?? row!.completionDate ?? ""),
+      ),
       arborSize: String(row!.arborSize ?? "").trim(),
       cutterSize: String(row!.cutterSize ?? "").trim(),
       ingestSize: String(row!.ingestSize ?? "").trim(),
@@ -434,7 +442,14 @@ export const buildTrimmingMotorSections = (
   if (session.trimmingDetails?.length) {
     sections.push({
       sectionId: QC_TRIMMING_SECTION_IDS.DETAILS,
-      sectionData: session.trimmingDetails as unknown as Record<string, unknown>[],
+      sectionData: session.trimmingDetails.map((row) => {
+        const { startDate, completionDate, ...rowFields } = row;
+        return {
+          ...rowFields,
+          startDatetime: toTrimmingApiMotorReceivedDate(startDate) || "",
+          completionDatetime: toTrimmingApiMotorReceivedDate(completionDate) || "",
+        };
+      }),
     });
   }
 
@@ -469,7 +484,7 @@ export const buildTrimmingMotorSections = (
 /**
  * Flat QC Trimming motor payload for create/update (`data.trimmingDetails[]`).
  * Matches:
- * `{ motorIdNo, motorSubmissionType, motorStage, motorReceivedDate,
+ * `{ motorIdNo, motorSubmissionType, motorStage, motorReceivedDateTime,
  *    trimmingMeasurementDetails, trimmingOperationDetails, trimmingRemarks }`
  */
 export const buildTrimmingMotorDetailPayload = (
@@ -479,7 +494,7 @@ export const buildTrimmingMotorDetailPayload = (
 ): Record<string, unknown> => {
   const session = getTrimmingSessionFromValues(values);
   const motorStage = toTrimmingApiMotorStage(session.motorStage);
-  const motorReceivedDate = toTrimmingApiMotorReceivedDate(session.motorReceivedAt);
+  const motorReceivedDateTime = toTrimmingApiMotorReceivedDate(session.motorReceivedAt);
   const trimmingOperationDetails = buildTrimmingOperationDetailsPayload(session.trimmingDetails);
   const trimmingMeasurementDetails = buildTrimmingMeasurementDetailsPayload(
     session.commonFormatParameters,
@@ -495,7 +510,7 @@ export const buildTrimmingMotorDetailPayload = (
   return omitEmpty({
     motorIdNo: motorId,
     motorSubmissionType,
-    motorReceivedDate: motorReceivedDate || undefined,
+    motorReceivedDateTime: motorReceivedDateTime || undefined,
     motorStage: motorStage ?? undefined,
     trimmingMeasurementDetails:
       trimmingMeasurementDetails.length > 0 ? trimmingMeasurementDetails : undefined,
@@ -527,6 +542,7 @@ export const isTrimmingNestedMotorDetail = (rec: Record<string, unknown>) => {
     Array.isArray(source.trimmingDetails) ||
     Array.isArray(source.commonFormatParameters) ||
     hasValue(source.motorReceivedAt) ||
+    hasValue(source.motorReceivedDateTime) ||
     hasValue(source.motorReceivedDate) ||
     source.motorStage != null
   );
@@ -537,7 +553,9 @@ export const hydrateTrimmingValuesFromMotorDetail = (
 ): SchemaFormValues => {
   const source = resolveTrimmingDetailSource(rec);
   const receivedAt = toTrimmingUiMotorReceivedAt(
-    String(source.motorReceivedAt ?? source.motorReceivedDate ?? "").trim(),
+    String(
+      source.motorReceivedDateTime ?? source.motorReceivedAt ?? source.motorReceivedDate ?? "",
+    ).trim(),
   );
   const nested = asArray(source.sections);
 
@@ -610,8 +628,10 @@ export const trimmingMotorDetailToSections = (
         sectionId: String(section!.sectionId ?? "").trim(),
         sectionData: asArray(section!.sectionData) as Record<string, unknown>[],
         motorId,
-        motorReceivedDate:
-          String(source.motorReceivedAt ?? source.motorReceivedDate ?? "").trim() || undefined,
+        motorReceivedDateTime:
+          String(
+            source.motorReceivedDateTime ?? source.motorReceivedAt ?? source.motorReceivedDate ?? "",
+          ).trim() || undefined,
       })) as SchemaSectionSubmission[];
   }
 
@@ -620,16 +640,19 @@ export const trimmingMotorDetailToSections = (
     Array.isArray(source.trimmingMeasurementDetails) ||
     Array.isArray(source.trimmingOperationDetails) ||
     asRecord(source.trimmingRemarks) ||
+    hasValue(source.motorReceivedDateTime) ||
     hasValue(source.motorReceivedDate) ||
     hasValue(source.motorReceivedAt)
   ) {
     const values = hydrateTrimmingValuesFromMotorDetail(source);
-    const motorReceivedDate =
-      String(source.motorReceivedAt ?? source.motorReceivedDate ?? "").trim() || undefined;
+    const motorReceivedDateTime =
+      String(
+        source.motorReceivedDateTime ?? source.motorReceivedAt ?? source.motorReceivedDate ?? "",
+      ).trim() || undefined;
     return buildTrimmingMotorSections(values).map((section) => ({
       ...section,
       motorId,
-      motorReceivedDate,
+      motorReceivedDateTime,
     })) as SchemaSectionSubmission[];
   }
 

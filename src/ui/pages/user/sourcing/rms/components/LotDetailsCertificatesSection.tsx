@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 
 import { STRINGS } from "@app/config/strings";
 import { icons } from "@app/theme/icons";
@@ -10,6 +10,7 @@ import {
   type LotCertificate,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import DocumentAttachmentList from "@ui/components/custom/DocumentAttachmentList";
+import WorkflowDetailsSection from "@ui/components/custom/WorkflowDetailsSection";
 import { toLotCertificateAttachments } from "./lotCertificateAttachments";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
@@ -44,11 +45,12 @@ const LotDetailsCertificatesSection = ({
   );
 
   return (
-    <Box sx={{ ...rmTheme.section, mb: 0 }}>
-      <Typography sx={rmTheme.sectionTitle}>
-        <InsertDriveFileOutlinedIcon sx={rmTheme.sectionTitleIcon} />
-        {BL.LOT_DETAILS_CERTIFICATES_SECTION}
-      </Typography>
+    <WorkflowDetailsSection
+      dt={rmTheme}
+      title={BL.LOT_DETAILS_CERTIFICATES_SECTION}
+      icon={InsertDriveFileOutlinedIcon}
+      sx={{ mb: 0 }}
+    >
       {attachments.length ? (
         <DocumentAttachmentList
           items={attachments}
@@ -61,7 +63,7 @@ const LotDetailsCertificatesSection = ({
       ) : (
         <Typography sx={rmTheme.emptyText}>{BL.LOT_DETAILS_NO_CERTIFICATES}</Typography>
       )}
-    </Box>
+    </WorkflowDetailsSection>
   );
 };
 

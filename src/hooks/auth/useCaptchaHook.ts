@@ -68,7 +68,7 @@ export const useCaptchaHook = ({
     setValue(nextValue);
     setTouched(true);
 
-    const isValid = nextValue.trim().length > 0;
+    const isValid = nextValue.trim().length > 0 && nextValue.trim().length < 7;
     onChangeRef.current?.(nextValue, isValid);
   }, []);
 

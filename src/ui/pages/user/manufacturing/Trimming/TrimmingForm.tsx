@@ -13,6 +13,7 @@ import type {
 import type { TrimmingAddedMotor } from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
 import {
   buildMotorNavGateHelpers,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
@@ -35,13 +36,15 @@ const S = STRINGS.MANUFACTURING.TRIMMING;
 const { straighten: StraightenRoundedIcon } = icons.user.manufacturing.trimming.form;
 
 type TrimmingFormProps = {
-  batch?: {
-    batchId?: string;
-    formId?: string | null;
-    motorId?: string;
-    motorStage?: unknown;
-    motorType?: unknown;
-  } | null;
+  batch?:
+    | ({
+        batchId?: string;
+        formId?: string | null;
+        motorId?: string;
+        motorStage?: unknown;
+        motorType?: unknown;
+      } & BatchStageContext)
+    | null;
   formData: TrimmingFormState;
   addedMotors: TrimmingAddedMotor[];
   autoMotorEntries?: TrimmingAddedMotor[];

@@ -19,7 +19,10 @@ import {
   buildStfMotorNavGateHelpers,
   STF_FLOW_LABELS,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import type { PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
+import type {
+  BatchStageContext,
+  PreviousStageApprovedUnits,
+} from "../../../../../hooks/user/previousStageApproval";
 import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
@@ -42,12 +45,14 @@ const { rocketLaunch: RocketLaunchRoundedIcon, warning: WarningAmberRoundedIcon 
   icons.user.qualityControl.staticTestFacility.form;
 
 type StaticTestFacilityFormProps = {
-  batch?: {
-    batchId?: string;
-    formId?: string | null;
-    batchType?: string | null;
-    subBatchType?: string | null;
-  } | null;
+  batch?:
+    | ({
+        batchId?: string;
+        formId?: string | null;
+        batchType?: string | null;
+        subBatchType?: string | null;
+      } & BatchStageContext)
+    | null;
   formData: StaticTestFacilityFormState;
   subDepartmentId?: number;
   selectedMotorType: StfSubType | "";

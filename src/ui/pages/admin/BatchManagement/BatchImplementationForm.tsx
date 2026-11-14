@@ -33,6 +33,7 @@ import { normalizeMaterialCodeKey } from "@data/models/admin/BatchManagement/Bat
 import type { SystemMasterOption } from "@data/api/common/generalAPI";
 import DateField from "@ui/components/common/DateField";
 import { formatToUiDate } from "@utils/dateUtils";
+import { isStartAfterEnd } from "@data/validation/dateRangeValidation";
 import { appDenseControlSx } from "@ui/components/common/fieldStyles";
 import MultiSelectWithSearch from "@/ui/components/common/MultiSelectCheckbox";
 
@@ -376,9 +377,16 @@ export default function BatchImplementationForm({
 
   const handleMaterialChange = (index: number, field: string, value: any) => {
     const newMaterials = [...(form.identificationSheet?.materials ?? [])];
+    const material = newMaterials[index] as Material | undefined;
+    if (!material) return;
+
     newMaterials[index] = {
-      ...newMaterials[index],
+      ...material,
       [field]: value,
+      ...(field === "revalidationFromDate" &&
+      isStartAfterEnd(value, material.revalidationToDate)
+        ? { revalidationToDate: "" }
+        : {}),
     };
     onMaterialsChange(newMaterials);
   };
@@ -943,10 +951,12 @@ export default function BatchImplementationForm({
                                 <DateField
                                   value={formatToUiDate(material.revalidationToDate ?? "")}
                                   minDate={formatToUiDate(material.revalidationFromDate ?? "")}
+                                  disabled={
+                                    fieldDisabled || rowLocked || !material.revalidationFromDate
+                                  }
                                   onChange={(date) =>
                                     handleMaterialChange(idx, "revalidationToDate", date)
                                   }
-                                  disabled={fieldDisabled || rowLocked}
                                   compact
                                   placeholder="DD-MM-YYYY"
                                   sx={materialsTable?.dateControl}

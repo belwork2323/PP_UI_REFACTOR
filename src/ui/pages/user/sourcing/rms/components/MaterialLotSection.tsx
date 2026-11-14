@@ -29,10 +29,13 @@ import {
   computeIsOutOfRange,
   emptyAdductPreparationDetails,
   emptyHtpbBlendingPreparationDetails,
+  isAcemQcOutOfRange,
   isReferenceRangeNotApplicable,
+  isSpecResultField,
   isSpecRowFailed,
-  sanitizeNumericAnalysedResultInput,
+  sanitizeSpecResultInput,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
+import type { GetSpecResultError } from "@hooks/user/sourcing/rms/useRawMaterialSpecificationForm";
 import AdductPreparationSection from "@ui/pages/user/sourcing/rms/components/AdductPreparationSection";
 import HtpbBlendingPreparationSection from "@ui/pages/user/sourcing/rms/components/HtpbBlendingPreparationSection";
 import { useLotCertificateActions } from "@hooks/user/sourcing/rms/useLotCertificateActions";
@@ -65,11 +68,7 @@ type MaterialLotSectionProps = {
   onRemove: () => void;
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
-  getAnalysedResultError: (
-    blockIndex: number,
-    rowIndex: number,
-    touched: boolean,
-  ) => string | undefined;
+  getAnalysedResultError: GetSpecResultError;
   showAdductPreparation?: boolean;
   showHtpbBlendingPreparation?: boolean;
   approvedPreparationLots: ApprovedPreparationLotLookups;
@@ -97,6 +96,9 @@ const MaterialLotSection = ({
   const [touchedAnalysedRows, setTouchedAnalysedRows] = useState(
     () => new Set<number>(),
   );
+  const [touchedAcemRows, setTouchedAcemRows] = useState(
+    () => new Set<number>(),
+  );
   const lotNoError = visibleError(blockLotPath(blockIndex, "lotNo"));
   const certificateError = visibleError(
     blockLotPath(blockIndex, "certificates"),
@@ -104,6 +106,7 @@ const MaterialLotSection = ({
 
   useEffect(() => {
     setTouchedAnalysedRows(new Set());
+    setTouchedAcemRows(new Set());
   }, [lot.lotNo]);
 
   const handleCertificatesChange = useCallback(
@@ -137,14 +140,15 @@ const MaterialLotSection = ({
       if (field === "analysedResult") {
         setTouchedAnalysedRows((previous) => new Set(previous).add(rowIndex));
       }
+      if (field === "acemQcResult") {
+        setTouchedAcemRows((previous) => new Set(previous).add(rowIndex));
+      }
       onUpdate((current) => {
         const updatedRows = current.rows.map((row, currentIndex) => {
           if (currentIndex !== rowIndex) return row;
-          const nextValue =
-            field === "analysedResult" &&
-            !isReferenceRangeNotApplicable(row.referenceRange)
-              ? sanitizeNumericAnalysedResultInput(value)
-              : value;
+          const nextValue = isSpecResultField(field)
+            ? sanitizeSpecResultInput(value, row.referenceRange)
+            : value;
           const next = { ...row, [field]: nextValue };
           if (field === "analysedResult") {
             next.status = null;
@@ -364,6 +368,13 @@ const MaterialLotSection = ({
                   rowIndex,
                   touchedAnalysedRows.has(rowIndex),
                 );
+                const acemError = getAnalysedResultError(
+                  blockIndex,
+                  rowIndex,
+                  touchedAcemRows.has(rowIndex),
+                  "acemQcResult",
+                );
+                const acemOutOfRange = isAcemQcOutOfRange(row);
                 return (
                   <TableRow
                     key={rowIndex}
@@ -457,24 +468,56 @@ const MaterialLotSection = ({
                         ...specStyles.inputCell,
                       }}
                     >
-                      <AppTextField
-                        compact
-                        size="small"
-                        fullWidth
-                        value={row.acemQcResult || ""}
-                        onChange={(event) =>
-                          handleCellChange(
-                            rowIndex,
-                            "acemQcResult",
-                            event.target.value,
-                          )
-                        }
-                        placeholder={formStrings.REMARKS_PLACEHOLDER}
-                        sx={[
-                          theme.workflow.formElements.cellField,
-                          specStyles.remarksField,
-                        ]}
-                      />
+                      <Box
+                        data-rms-field={blockRowPath(
+                          blockIndex,
+                          rowIndex,
+                          "acemQcResult",
+                        )}
+                      >
+                        <AppTextField
+                          compact
+                          size="small"
+                          fullWidth
+                          value={row.acemQcResult || ""}
+                          onChange={(event) =>
+                            handleCellChange(
+                              rowIndex,
+                              "acemQcResult",
+                              event.target.value,
+                            )
+                          }
+                          placeholder={formStrings.REMARKS_PLACEHOLDER}
+                          inputMode={
+                            isReferenceRangeNotApplicable(row.referenceRange)
+                              ? "text"
+                              : "decimal"
+                          }
+                          error={Boolean(acemError)}
+                          helperText={
+                            acemError ??
+                            (acemOutOfRange
+                              ? formStrings.SPEC_STATUS_OUT_OF_RANGE
+                              : undefined)
+                          }
+                          FormHelperTextProps={{
+                            sx: {
+                              mx: 0,
+                              fontSize: "0.65rem",
+                              ...(acemOutOfRange && !acemError
+                                ? { color: "error.main" }
+                                : {}),
+                            },
+                          }}
+                          sx={[
+                            theme.workflow.formElements.cellField,
+                            specStyles.remarksField,
+                            ...(acemOutOfRange || acemError
+                              ? [specStyles.failedAnalyzedField]
+                              : []),
+                          ]}
+                        />
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );

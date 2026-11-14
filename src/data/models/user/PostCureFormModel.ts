@@ -247,6 +247,7 @@ export type PostCureDetails = {
   lastUpdatedBy?: string | null;
   lastUpdatedAt?: string | null;
   motorId?: string;
+  motorReceiptDateTime?: string;
   motorReceiptDate?: string;
   operation?: string;
   inhibitorType?: string;
@@ -254,6 +255,7 @@ export type PostCureDetails = {
   inhibitionDetails?: InhibitionDetailsApi;
   motors?: Array<{
     motorId: string;
+    motorReceiptDateTime?: string;
     motorReceiptDate?: string;
     operation?: string;
     inhibitorType?: string;
@@ -284,7 +286,7 @@ export type PostCureDetails = {
 
 export type PostCureMotorPayload = {
   motorId: string;
-  motorReceiptDate: string;
+  motorReceiptDateTime: string;
   inhibitorType?: "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE";
   looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
   inhibitionDetails?: InhibitionDetailsApi;
@@ -399,6 +401,7 @@ const mapApiInhibitorType = (inhibitorType: string) => {
 const mapDetailsMotorToSession = (
   motor: {
     motorId?: string;
+    motorReceiptDateTime?: string;
     motorReceiptDate?: string;
     operation?: string;
     inhibitorType?: string;
@@ -423,7 +426,9 @@ const mapDetailsMotorToSession = (
 
   return hydratePostCureMotorSession({
     motorId,
-    motorReceiptDate: formatPostCureMotorReceiptDateForUi(motor?.motorReceiptDate),
+    motorReceiptDate: formatPostCureMotorReceiptDateForUi(
+      motor?.motorReceiptDateTime ?? motor?.motorReceiptDate,
+    ),
     operation,
     inhibitorType,
     apiMotor: motor as Record<string, unknown>,
@@ -477,7 +482,7 @@ export const mapPostCureFormStateToPayload = (
       .filter((motor) => !targetIds || targetIds.has(motor.motorId))
       .map((motor) => ({
         motorId: String(motor.motorId ?? ""),
-        motorReceiptDate: formatPostCureMotorReceiptDateForApi(motor.motorReceiptDate),
+        motorReceiptDateTime: formatPostCureMotorReceiptDateForApi(motor.motorReceiptDate),
         ...(motor.formLoaded ? buildDualPostCureMotorPayload(motor) : {}),
         ...(options?.motorSubmissionType
           ? { motorSubmissionType: options.motorSubmissionType }
@@ -635,7 +640,9 @@ export const mapPostCureDetailsForDisplay = (
       };
       const session = hydratePostCureMotorSession({
         motorId,
-        motorReceiptDate: formatPostCureMotorReceiptDateForUi(src.motorReceiptDate),
+        motorReceiptDate: formatPostCureMotorReceiptDateForUi(
+          src.motorReceiptDateTime ?? src.motorReceiptDate,
+        ),
         operation,
         inhibitorType,
         apiMotor,
@@ -643,7 +650,9 @@ export const mapPostCureDetailsForDisplay = (
 
       return {
         motorId,
-        motorReceiptDate: formatPostCureMotorReceiptDateForUi(src.motorReceiptDate),
+        motorReceiptDate: formatPostCureMotorReceiptDateForUi(
+          src.motorReceiptDateTime ?? src.motorReceiptDate,
+        ),
         inhibitorType: session.inhibitorType,
         operationLabel: formatPostCureMotorOperationLabel(
           POST_CURE_OPERATION_LOOSE_FLAP,
@@ -790,14 +799,18 @@ export class PostCureDetailsModel {
             ? String(payload.updatedAt)
             : null,
       motorId: String(payload?.motorId ?? ""),
-      motorReceiptDate: formatPostCureMotorReceiptDateForUi(payload?.motorReceiptDate),
+      motorReceiptDate: formatPostCureMotorReceiptDateForUi(
+        payload?.motorReceiptDateTime ?? payload?.motorReceiptDate,
+      ),
       operation,
       inhibitorType: mappedInhibitorType,
       motors:
         rawMotors.length > 0
           ? rawMotors.map((motor: any) => ({
               motorId: String(motor?.motorId ?? ""),
-              motorReceiptDate: formatPostCureMotorReceiptDateForUi(motor?.motorReceiptDate),
+              motorReceiptDate: formatPostCureMotorReceiptDateForUi(
+                motor?.motorReceiptDateTime ?? motor?.motorReceiptDate,
+              ),
               operation: mapApiOperationType(String(motor?.operationType ?? "")) || operation,
               inhibitorType:
                 mapApiInhibitorType(String(motor?.inhibitorType ?? "")) || mappedInhibitorType,

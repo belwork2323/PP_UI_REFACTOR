@@ -4,6 +4,17 @@ import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation"
 import type { ValidationTier } from "../submissionIntent";
 import { ALPHA_NUM, str } from "../fieldValidators";
 import { VALIDATIONSTRING } from "./validationString";
+import {
+  isAcemQcResultOutOfRange,
+  sanitizeAcemQcResultInput,
+  specificationImpliesNumeric,
+} from "../specResultValidation";
+
+export {
+  isAcemQcResultOutOfRange,
+  sanitizeAcemQcResultInput,
+  specificationImpliesNumeric,
+} from "../specResultValidation";
 
 const S = VALIDATIONSTRING;
 
@@ -40,26 +51,6 @@ export type QcRawMaterialValidationTarget = {
   entryId?: string;
   values: SchemaFormValues | Record<string, unknown>;
 };
-
-/** Specs without a numeric bound (N/A / blank) → alphanumeric ACEM result; otherwise numeric. */
-export function specificationImpliesNumeric(spec: unknown): boolean {
-  const text = String(spec ?? "").trim();
-  if (!text) return false;
-  const normalized = text.replace(/\s+/g, " ").toLowerCase();
-  if (
-    normalized === "n/a" ||
-    normalized === "na" ||
-    normalized === "n.a." ||
-    normalized === "n.a" ||
-    normalized === "not applicable" ||
-    normalized === "-" ||
-    normalized === "—" ||
-    normalized === "–"
-  ) {
-    return false;
-  }
-  return /\d/.test(text);
-}
 
 export function acemQcResultRuleKey(specification: unknown): "acemQcResult" | "acemQcResultAlphanumeric" {
   return specificationImpliesNumeric(specification) ? "acemQcResult" : "acemQcResultAlphanumeric";

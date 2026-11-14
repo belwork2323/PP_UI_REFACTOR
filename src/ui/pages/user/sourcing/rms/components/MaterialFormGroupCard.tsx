@@ -10,8 +10,9 @@ import {
 } from "@mui/material";
 import AppTextField from "@ui/components/common/AppTextField";
 import AppButton from "@ui/components/common/Button";
-import ReceiptDateField from "@ui/pages/user/sourcing/rms/components/ReceiptDateField";
+import DateField from "@ui/components/common/DateField";
 import { icons } from "@app/theme/icons";
+import { getTodayInIstDate } from "@utils/dateUtils";
 import { STRINGS } from "@app/config/strings";
 import StackRow from "@ui/components/common/StackRow";
 import type {
@@ -20,6 +21,7 @@ import type {
   MaterialLotBlock,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import MaterialLotSection from "@ui/pages/user/sourcing/rms/components/MaterialLotSection";
+import type { GetSpecResultError } from "@hooks/user/sourcing/rms/useRawMaterialSpecificationForm";
 import MandatoryFormField, {
   mandatoryFieldInputSx,
 } from "@ui/components/validation/ValidatedFormField";
@@ -67,11 +69,7 @@ type MaterialFormGroupCardProps = {
   onRemoveLot: (materialIndex: number, lotIndex: number) => void;
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
-  getAnalysedResultError: (
-    blockIndex: number,
-    rowIndex: number,
-    touched: boolean,
-  ) => string | undefined;
+  getAnalysedResultError: GetSpecResultError;
   approvedPreparationLots: ApprovedPreparationLotLookups;
   theme: any;
 };
@@ -229,13 +227,21 @@ const MaterialFormGroupCard = ({
           required={false}
         >
           <Box data-rms-field={blockMetaPath(metaBlockIndex, "receiptDate")}>
-            <ReceiptDateField
+            <DateField
               value={group.receiptDate}
               onChange={(next) =>
                 onUpdateMaterial(materialIndex, { receiptDate: next })
               }
-              theme={theme}
+              placeholder="DD-MM-YYYY"
+              maxDate={getTodayInIstDate()}
               error={Boolean(receiptDateError)}
+              compact
+              sx={{ mb: 0, width: "100%" }}
+              inputSx={mandatoryFieldInputSx(
+                theme.workflow.formElements.metaRowTextField,
+                Boolean(receiptDateError),
+                theme,
+              )}
             />
           </Box>
         </MandatoryFormField>

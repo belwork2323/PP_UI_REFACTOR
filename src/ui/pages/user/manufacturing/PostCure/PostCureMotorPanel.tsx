@@ -50,6 +50,7 @@ import {
 } from "./PostCureFormPrimitives";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import { WorkflowReadOnlyText } from "@/ui/components/common/WorkflowReadOnlyText";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 
 const str = (value: unknown): string => String(value ?? "");
 
@@ -97,7 +98,12 @@ export const LocationDateTable = ({
 
   const handleFieldChange = (index: number, fieldName: string, val: any) => {
     const updated = [...rows];
-    updated[index] = { ...updated[index], [fieldName]: val };
+    const updatedRow = { ...updated[index], [fieldName]: val };
+    if (fieldName === "fromDate" && isStartAfterEnd(val, updatedRow.toDate)) {
+      updatedRow.toDate = "";
+      clearFieldError?.(`${basePath}.${index}.toDate`);
+    }
+    updated[index] = updatedRow;
     const errorKey = `${basePath}.${index}.${fieldName}`;
     clearFieldError?.(errorKey);
     onChange(updated);
@@ -158,6 +164,7 @@ export const LocationDateTable = ({
                         <DateTimeField
                           value={row.toDate ?? ""}
                           minDate={row.fromDate ?? ""}
+                          requiresMinDateTime
                           onChange={(val: any) => handleFieldChange(index, "toDate", val)}
                           error={Boolean(validationErrors[toDateErrKey])}
                           helperText={validationErrors[toDateErrKey]}
@@ -261,7 +268,12 @@ export const LocationQtyTable = ({
 
   const handleFieldChange = (index: number, fieldName: string, val: any) => {
     const updated = [...rows];
-    updated[index] = { ...updated[index], [fieldName]: val };
+    const updatedRow = { ...updated[index], [fieldName]: val };
+    if (fieldName === "fromDate" && isStartAfterEnd(val, updatedRow.toDate)) {
+      updatedRow.toDate = "";
+      clearFieldError?.(`${basePath}.${index}.toDate`);
+    }
+    updated[index] = updatedRow;
 
     const errorKey = `${basePath}.${index}.${fieldName}`;
     clearFieldError?.(errorKey);
@@ -325,6 +337,7 @@ export const LocationQtyTable = ({
                         <DateTimeField
                           value={row.toDate ?? ""}
                           minDate={row.fromDate ?? ""}
+                          requiresMinDateTime
                           onChange={(val: any) => handleFieldChange(index, "toDate", val)}
                           error={Boolean(validationErrors[toDateErrKey])}
                           helperText={validationErrors[toDateErrKey]}
@@ -1299,7 +1312,6 @@ export const QualificationSection = ({
               const specificationErrKey = `${basePath}.qualificationTable.${index}.specification`;
               const qaErrKey = `${basePath}.qualificationTable.${index}.qaRemarks`;
               const canEditSpec = editableSpecification && !readOnly;
-              console.log(row.specification);
 
               // Helper to format the specification object into a single display string
               const formatSpecification = (spec: any) => {

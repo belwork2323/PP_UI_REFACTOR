@@ -51,6 +51,8 @@ export type AppDropdownProps = {
   onOpen?: SelectProps["onOpen"];
   SelectProps?: Omit<SelectProps, "displayEmpty" | "renderValue" | "MenuProps">;
   startAdornment?: ReactNode;
+  /** Applied on the OutlinedInput — use for border/chrome that must beat MUI theme defaults. */
+  inputSx?: SxProps<Theme>;
 };
 
 const AppDropdown = ({
@@ -80,9 +82,14 @@ const AppDropdown = ({
   compact = false,
   filterPanel = false,
   startAdornment,
+  inputSx,
 }: AppDropdownProps) => {
   const resolvedPlaceholder = loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
   const hasPlaceholder = Boolean(resolvedPlaceholder);
+  const sxList = [
+    ...(filterPanel ? [{ mb: 0 }] : [compact ? appDenseControlSx : appDropdownSx]),
+    ...(sx == null ? [] : Array.isArray(sx) ? sx : [sx]),
+  ];
 
   const resolveRenderValue = (selected: unknown) => {
     const selectedValue = String(selected ?? "");
@@ -127,19 +134,33 @@ const AppDropdown = ({
           : { ...appDropdownLabelProps, ...InputLabelProps }
       }
       inputProps={filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps}
-      InputProps={startAdornment ? { startAdornment } : undefined}
+      InputProps={{
+        ...(startAdornment ? { startAdornment } : {}),
+        ...(inputSx ? { sx: inputSx } : {}),
+      }}
       SelectProps={{
         displayEmpty: hasPlaceholder,
         renderValue: resolveRenderValue,
-        MenuProps: { ...appDropdownMenuProps, ...MenuProps },
+        MenuProps: {
+          ...appDropdownMenuProps,
+          ...MenuProps,
+          PaperProps: {
+            ...appDropdownMenuProps.PaperProps,
+            ...MenuProps?.PaperProps,
+            sx: [
+              appDropdownMenuProps.PaperProps?.sx,
+              ...(MenuProps?.PaperProps?.sx
+                ? Array.isArray(MenuProps.PaperProps.sx)
+                  ? MenuProps.PaperProps.sx
+                  : [MenuProps.PaperProps.sx]
+                : []),
+            ],
+          },
+        },
         onOpen,
         ...selectProps,
       }}
-      sx={
-        (filterPanel
-          ? [{ mb: 0 }, sx]
-          : [compact ? appDenseControlSx : appDropdownSx, sx]) as SxProps<Theme>
-      }
+      sx={sxList as SxProps<Theme>}
     >
       {hasPlaceholder ? (
         <MenuItem value="">

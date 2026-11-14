@@ -14,6 +14,12 @@ import { STRINGS } from "../../../app/config/strings";
 import { FieldLabelWithAsterisk } from "../common/FieldLabelWithAsterisk";
 import { useEffect, useState } from "react";
 
+export const REASON_MIN_LENGTH = 10;
+export const REASON_MAX_LENGTH = 500;
+
+// Alphanumeric + spaces + @$%^&*()-+[]/\"':,.<>
+export const REASON_PATTERN = /^[A-Za-z0-9\s@$%^&*()=\-\+\[\]\/\\"'.,:<>]+$/;
+
 type ApproverActionDialogProps = {
   actionType: ApproverFormActionType | null;
   batchId?: string | null;
@@ -49,10 +55,32 @@ const ApproverActionDialog = ({
   const [errorMsg, setErrorMsg] = useState("");
   const [showBlockchainWarning, setShowBlockchainWarning] = useState(false);
 
+  const validateReason = (val: string, isRequired: boolean = true) => {
+    const trimmed = val.trim();
+
+    if (isRequired && !trimmed) {
+      return "This field is required";
+    }
+    if (trimmed && trimmed.length < REASON_MIN_LENGTH) {
+      return `Must be at least ${REASON_MIN_LENGTH} characters long`;
+    }
+    if (trimmed && trimmed.length > REASON_MAX_LENGTH) {
+      return `Cannot exceed ${REASON_MAX_LENGTH} characters`;
+    }
+    if (trimmed && !REASON_PATTERN.test(trimmed)) {
+      return "Contains invalid characters. Allowed: A-Z a-z 0-9 Space @ $ % ^ & * ( ) - + [ ] / \\ \" ' . , : < >";
+    }
+    return "";
+  };
+
+  const validationError = validateReason(value);
+  const isInvalid = Boolean(validationError);
+
   const handleInitialClick = () => {
-    if (!value.trim()) {
-      setErrorMsg("This field is required");
-      return; // Stop execution here
+    const error = validateReason(value);
+    if (error) {
+      setErrorMsg(error);
+      return;
     }
     setErrorMsg("");
 
@@ -74,7 +102,6 @@ const ApproverActionDialog = ({
   }, [open]);
 
   const handleBlockchainConfirm = () => {
-    // Keep warning flag set so the remarks dialog does not flash open under the loading alert.
     onConfirm();
   };
 
@@ -139,8 +166,10 @@ const ApproverActionDialog = ({
             }
             value={value}
             onChange={(event) => {
-              onValueChange(event.target.value);
-              if (errorMsg) setErrorMsg("");
+              const newValue = event.target.value;
+              onValueChange(newValue);
+              const err = validateReason(newValue);
+              setErrorMsg(err);
             }}
             error={Boolean(helperText) || Boolean(errorMsg)}
             helperText={helperText || errorMsg}
@@ -161,7 +190,7 @@ const ApproverActionDialog = ({
           </Button>
           <Button
             onClick={handleInitialClick}
-            disabled={confirmDisabled || submitting}
+            disabled={confirmDisabled || submitting || isInvalid}
             variant="contained"
             color={isReject ? "error" : "primary"}
             sx={{ textTransform: "none" }}

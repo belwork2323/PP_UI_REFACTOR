@@ -1,5 +1,5 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
-import type { QcDivisionSetupDefinition } from "../../../../../hooks/user/qualityControl/qcDivisionSetupConfig";
+import type { QcDivisionSetupDefinition } from "../../../../../../hooks/user/qualityControl/qcDivisionSetupConfig";
 
 type QcDivisionSetupPanelProps = {
   definition: QcDivisionSetupDefinition;

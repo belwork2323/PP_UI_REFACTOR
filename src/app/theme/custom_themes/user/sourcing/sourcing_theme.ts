@@ -19,15 +19,15 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
         color: palette.textSub,
         marginBottom: "4px",
       },
-      /** Shared 40px row height for supply order, receipt date, and manufacturer fields. */
+      /** Shared compact (32px) row height for supply order, receipt date, and manufacturer. */
       metaRowTextField: {
         "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
           borderRadius: 1.5,
           background: isDark ? palette.pageBg : "#fff",
-          fontSize: "0.84rem",
-          height: 40,
-          minHeight: 40,
-          maxHeight: 40,
+          fontSize: "0.8rem",
+          height: 32,
+          minHeight: 32,
+          maxHeight: 32,
           boxSizing: "border-box",
           transition: "all 0.18s",
           "& fieldset, & .MuiPickersOutlinedInput-notchedOutline": { borderColor: palette.border },
@@ -46,8 +46,8 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
         "& .MuiInputBase-input, & .MuiPickersSectionList-root": {
           fontWeight: 500,
           color: palette.text,
-          fontSize: "0.84rem",
-          padding: "8.5px 10px",
+          fontSize: "0.8rem",
+          padding: "0 8px",
           height: "100%",
           boxSizing: "border-box",
         },
@@ -56,9 +56,9 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
           height: "100%",
           maxHeight: "none",
           "& .MuiIconButton-root": {
-            padding: 4,
-            width: 28,
-            height: 28,
+            padding: 2,
+            width: 24,
+            height: 24,
             color: alpha(palette.text, 0.55),
           },
         },
@@ -66,15 +66,55 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
       textField: {
         "& .MuiOutlinedInput-root": {
           borderRadius: 1.5,
-          background: isDark ? palette.pageBg : "#fff",
+          // Lift + stronger edge so the control is obvious on dark pageBg.
+          background: isDark ? alpha("#fff", 0.09) : "#fff",
           fontSize: "0.84rem",
           transition: "all 0.18s",
-          "& fieldset": { borderColor: palette.border },
-          "&:hover fieldset": { borderColor: palette.primaryLight },
-          "&.Mui-focused fieldset": { borderColor: palette.primaryLight, borderWidth: 1.5 },
-          "&.Mui-focused": { background: isDark ? palette.pageBg : "#fff", boxShadow: `0 0 0 2px ${alpha(palette.primaryLight, 0.1)}` },
+          color: palette.text,
+          // MUI light theme paints notchedOutline near-black — beat it on dark pages.
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: isDark ? "rgba(255,255,255,0.5) !important" : palette.border,
+            borderWidth: isDark ? "1.5px" : "1px",
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: `${palette.primaryLight} !important`,
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: `${palette.primaryLight} !important`,
+            borderWidth: "1.5px",
+          },
+          "&.Mui-focused": {
+            background: isDark ? alpha("#fff", 0.12) : "#fff",
+            boxShadow: `0 0 0 2px ${alpha(palette.primaryLight, 0.18)}`,
+          },
+          // MUI disabled opacity makes dark fields vanish — keep chrome readable.
+          "&.Mui-disabled": {
+            opacity: 1,
+            background: isDark ? alpha("#fff", 0.05) : alpha(palette.border, 0.35),
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderColor: isDark
+                ? "rgba(255,255,255,0.35) !important"
+                : palette.border,
+            },
+          },
         },
-        "& .MuiInputBase-input": { fontWeight: 500, color: palette.text, padding: "7px 10px" },
+        "& .MuiInputBase-input, & .MuiSelect-select": {
+          fontWeight: 500,
+          color: palette.text,
+          WebkitTextFillColor: `${palette.text} !important`,
+          padding: "7px 10px",
+        },
+        "& .MuiOutlinedInput-root.Mui-disabled .MuiSelect-select, & .MuiOutlinedInput-root.Mui-disabled .MuiInputBase-input":
+          {
+            WebkitTextFillColor: `${palette.textSub} !important`,
+            color: palette.textSub,
+          },
+        "& .MuiSelect-icon": { color: palette.textSub },
+        "& .MuiOutlinedInput-root.Mui-disabled .MuiSelect-icon": {
+          color: alpha(palette.textSub, 0.7),
+        },
+        // Do not use `inherit` — MUI light theme text is dark and hides adornments.
+        "& .MuiInputAdornment-root .MuiSvgIcon-root": { color: palette.textSub },
       },
       multilineField: {
         "& .MuiOutlinedInput-root": {

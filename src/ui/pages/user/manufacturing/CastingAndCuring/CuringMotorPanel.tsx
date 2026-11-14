@@ -13,6 +13,10 @@ import {
   type CuringCycleRow,
   type CuringMotorData,
 } from "../../../../../data/models/user/CuringMotorDataModel";
+import {
+  DATE_RANGE_MESSAGES,
+  isStartAfterEnd,
+} from "../../../../../data/validation/dateRangeValidation";
 import { DateTimeField } from "../../../../components/common/DateField";
 import CastingCuringFileField from "./CastingCuringFileField";
 import {
@@ -35,26 +39,28 @@ const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 const joinDateTime = (date: string, time: string) => (date && time ? `${date} ${time}` : "");
 
 const splitDateTime = (value: string): { date: string; time: string } => {
-  const match = value.match(/^(\d{1,2}-\d{1,2}-\d{4})\s+(\d{1,2}:\d{2})$/);
+  const match = value.match(/^(\d{1,2}-\d{1,2}-\d{4})\s+(\d{1,2}:\d{2}(?::\d{2})?)$/);
   return match ? { date: match[1], time: match[2] } : { date: "", time: "" };
 };
 
 const elapsedMinutes = (start: string, end: string): string => {
   const parse = (value: string) => {
-    const match = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    const match = value.match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (!match) return null;
     const day = Number(match[1]);
     const month = Number(match[2]);
     const year = Number(match[3]);
     const hour = Number(match[4]);
     const minute = Number(match[5]);
-    const date = new Date(year, month - 1, day, hour, minute);
+    const second = Number(match[6] ?? "0");
+    const date = new Date(year, month - 1, day, hour, minute, second);
     if (
       date.getFullYear() !== year ||
       date.getMonth() !== month - 1 ||
       date.getDate() !== day ||
       date.getHours() !== hour ||
-      date.getMinutes() !== minute
+      date.getMinutes() !== minute ||
+      date.getSeconds() !== second
     )
       return null;
     return date.getTime();
@@ -101,11 +107,12 @@ const CompactDateTime = ({
     <DateTimeField
       value={value}
       minDate={minDate}
+      requiresMinDateTime={minDate !== undefined}
       onChange={onChange}
       disabled={disabled}
       readOnly={readOnly}
       compact
-      placeholder="DD-MM-YYYY HH:mm"
+      placeholder="DD-MM-YYYY HH:mm:ss"
       inputSx={castingCuringTableInputSx}
       required={required}
       error={error}
@@ -121,6 +128,11 @@ const CYCLE_HEADERS = [
   "Start Date & Time",
   "End Date & Time",
 ] as const;
+
+const isDateRangeError = (message?: string) =>
+  Boolean(
+    message && Object.values(DATE_RANGE_MESSAGES).some((rangeMessage) => rangeMessage === message),
+  );
 
 const CuringMotorPanel = ({
   value,
@@ -203,9 +215,16 @@ const CuringMotorPanel = ({
                 const reading1 = `CURING_CYCLES.CURING_TABLE.${index}.PROPELLANT_PRESSURE.READING1`;
                 const reading2 = `CURING_CYCLES.CURING_TABLE.${index}.PROPELLANT_PRESSURE.READING2`;
                 const waterStatusPath = `CURING_CYCLES.CURING_TABLE.${index}.HOT_WATER_STATUS`;
-                const startError =
+                const rawStartError =
                   validationErrors?.[startDatePath] || validationErrors?.[startTimePath];
-                const endError = validationErrors?.[endDatePath] || validationErrors?.[endTimePath];
+                const rawEndError =
+                  validationErrors?.[endDatePath] || validationErrors?.[endTimePath];
+                const startError = isDateRangeError(rawStartError)
+                  ? "Start Date & Time cannot be later than End Date & Time."
+                  : rawStartError;
+                const endError = isDateRangeError(rawEndError)
+                  ? "End Date & Time cannot be earlier than Start Date & Time."
+                  : rawEndError;
                 const startDateTime = joinDateTime(row.START_DATE, row.START_TIME);
                 const endDateTime = joinDateTime(row.END_DATE, row.END_TIME);
                 const duration = elapsedMinutes(startDateTime, endDateTime);
@@ -254,7 +273,13 @@ const CuringMotorPanel = ({
                           clearFieldError?.(startDatePath);
                           clearFieldError?.(startTimePath);
                           const parts = splitDateTime(v);
-                          updateCycleRow(index, { START_DATE: parts.date, START_TIME: parts.time });
+                          updateCycleRow(index, {
+                            START_DATE: parts.date,
+                            START_TIME: parts.time,
+                            ...(isStartAfterEnd(v, endDateTime)
+                              ? { END_DATE: "", END_TIME: "" }
+                              : {}),
+                          });
                         }}
                         disabled={disabled}
                         readOnly={readOnly}
@@ -401,7 +426,7 @@ const CuringMotorPanel = ({
             />
           </Box>
           <Box>
-            <FieldLabel>Date & Time Of Removal Of Pressure Plate</FieldLabel>
+            <FieldLabelWithAsterisk label="Date & Time Of Removal Of Pressure Plate" />
             <CompactDateTime
               value={post.PRESSURE_PLATE_REMOVAL_DATE_TIME}
               onChange={(v) => {

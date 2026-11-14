@@ -22,6 +22,8 @@ import { icons } from "../../../../../../app/theme/icons";
 import VisualInspectionMediaField from "./VisualInspectionMediaField";
 import CasingInsulationReportUpload from "./CasingInsulationReportUpload";
 import StackRow from "../../../../../components/common/StackRow";
+import UserWorkflowFormDetailsHeader from "../../../../../components/custom/UserWorkflowFormDetailsHeader";
+import WorkflowEmptyState from "../../../../../components/custom/WorkflowEmptyState";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
   CASING_DETECTOR_TYPE_OPTIONS,
@@ -71,6 +73,7 @@ import {
 } from "./CasingFormPrimitives";
 import CasingReportUpload from "./CasingReportUpload";
 import rocketMotorCasingController from "@/controllers/user/sourcing/rocketMotorCasingController";
+import { getTodayInIstDate } from "@utils/dateUtils";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 const SF = STRINGS.SOURCING.CASING_FORM;
@@ -364,30 +367,27 @@ const MotorCasingCreateForm = ({
   return (
     <Box sx={{ ...casingTheme.root, ...cf.pageRoot }}>
       <Box sx={cf.headerRow}>
-        <Stack direction="row" alignItems="center" gap={1.5}>
-          <Box sx={casingTheme.headerIconBox}>
-            <RocketLaunchRoundedIcon sx={casingTheme.headerLaunchIcon} />
-          </Box>
-          <Box>
-            <Typography sx={casingTheme.headerTitle}>{S.TITLE}</Typography>
-            <Typography sx={casingTheme.headerSubtitle}>{S.SUBTITLE}</Typography>
-          </Box>
-        </Stack>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          {showDeleteCasing && onDeleteCasing ? (
-            <Button
-              variant="outlined"
-              color="error"
-              size="small"
-              startIcon={<DeleteOutlineRoundedIcon />}
-              onClick={onDeleteCasing}
-              disabled={deleteLoading}
-              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
-            >
-              {SF.DELETE_CASING}
-            </Button>
-          ) : null}
-        </Stack>
+        <UserWorkflowFormDetailsHeader
+          title={S.TITLE}
+          subtitle={S.SUBTITLE}
+          icon={RocketLaunchRoundedIcon}
+          theme={theme}
+          endAction={
+            showDeleteCasing && onDeleteCasing ? (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                startIcon={<DeleteOutlineRoundedIcon />}
+                onClick={onDeleteCasing}
+                disabled={deleteLoading}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+              >
+                {SF.DELETE_CASING}
+              </Button>
+            ) : null
+          }
+        />
       </Box>
 
       <CasingFormStepNav
@@ -761,6 +761,7 @@ const MotorCasingCreateForm = ({
                 required={req("receivingDate")}
                 value={form.receivingDate}
                 onChange={(v) => patch({ receivingDate: v })}
+                maxDate={getTodayInIstDate()}
                 theme={theme}
                 error={validationErrors.receivingDate}
                 fieldPath="receivingDate"
@@ -1312,9 +1313,11 @@ const MotorCasingCreateForm = ({
             </Typography>
           ) : null}
           {!motorStage ? (
-            <Box sx={theme.workflow.formElements.emptyStateBox}>
-              <Typography sx={casingTheme.emptyStateSubtitle}>{SF.EMPTY_DIM_SUBTITLE}</Typography>
-            </Box>
+            <WorkflowEmptyState
+              subtitle={SF.EMPTY_DIM_SUBTITLE}
+              sx={theme.workflow.formElements.emptyStateBox}
+              subtitleSx={casingTheme.emptyStateSubtitle}
+            />
           ) : dimensionalParametersErrorMessage ? (
             <Typography sx={{ color: theme.palette.danger, fontWeight: 600 }}>
               {dimensionalParametersErrorMessage}
@@ -1333,12 +1336,14 @@ const MotorCasingCreateForm = ({
               </Typography>
             </Stack>
           ) : form.dimensionalData.length === 0 ? (
-            <Box sx={theme.workflow.formElements.emptyStateBox}>
-              <Typography sx={casingTheme.emptyStateSubtitle}>
-                {dimensionalParametersErrorMessage ||
-                  `No dimensional parameters for motor ${motorStage}.`}
-              </Typography>
-            </Box>
+            <WorkflowEmptyState
+              subtitle={
+                dimensionalParametersErrorMessage ||
+                `No dimensional parameters for motor ${motorStage}.`
+              }
+              sx={theme.workflow.formElements.emptyStateBox}
+              subtitleSx={casingTheme.emptyStateSubtitle}
+            />
           ) : (
             <TableContainer sx={{ ...casingTheme.tableContainer, mt: 0.5, overflowX: "auto" }}>
               <Table size="small" sx={{ minWidth: 720 }}>

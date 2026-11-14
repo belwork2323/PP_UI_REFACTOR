@@ -117,9 +117,10 @@ const BatchList = ({
       }),
       ...(t.tableHeaderBg ? { background: t.tableHeaderBg } : {}),
       ...(t.tableHeaderText ? { color: t.tableHeaderText } : {}),
-      ...(t.tableHeaderBorder
+      // Keep uniform cell borders from data_table_theme; only override when a real color is set.
+      ...(t.tableHeaderBorder && t.tableHeaderBorder !== "transparent"
         ? { borderBottom: `2px solid ${t.tableHeaderBorder}` }
-        : { borderBottom: "none" }),
+        : {}),
     }),
     [t, p],
   );

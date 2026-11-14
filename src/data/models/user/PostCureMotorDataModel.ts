@@ -462,8 +462,10 @@ const parseLocationDateRows = (rows: unknown): LocationDateRow[] =>
     const rec = asRecord(row) ?? {};
     return {
       location: str(pickField(rec, "LOCATION", "location")),
-      fromDate: postCureDateTimeForUi(pickField(rec, "FROM_DATE", "fromDate")),
-      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDate")),
+      fromDate: postCureDateTimeForUi(
+        pickField(rec, "FROM_DATE", "fromDateTime", "fromDate"),
+      ),
+      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDateTime", "toDate")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
       qaRemarks: pickLocationQaRemarks(rec),
     };
@@ -474,8 +476,10 @@ const parseLocationQtyRows = (rows: unknown): LocationQtyRow[] =>
     const rec = asRecord(row) ?? {};
     return {
       location: str(pickField(rec, "LOCATION", "location")),
-      fromDate: postCureDateTimeForUi(pickField(rec, "FROM_DATE", "fromDate")),
-      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDate")),
+      fromDate: postCureDateTimeForUi(
+        pickField(rec, "FROM_DATE", "fromDateTime", "fromDate"),
+      ),
+      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDateTime", "toDate")),
       qtyFilled: str(pickField(rec, "QTY_FILLED", "qtyFilled", "quantityFilled")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
       qaRemarks: pickLocationQaRemarks(rec),
@@ -487,8 +491,10 @@ const parseLocationAppliedRows = (rows: unknown): LocationAppliedRow[] =>
     const rec = asRecord(row) ?? {};
     return {
       location: str(pickField(rec, "LOCATION", "location")),
-      fromDate: postCureDateTimeForUi(pickField(rec, "FROM_DATE", "fromDate")),
-      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDate")),
+      fromDate: postCureDateTimeForUi(
+        pickField(rec, "FROM_DATE", "fromDateTime", "fromDate"),
+      ),
+      toDate: postCureDateTimeForUi(pickField(rec, "TO_DATE", "toDateTime", "toDate")),
       qtyApplied: str(pickField(rec, "QTY_APPLIED", "qtyApplied", "quantityApplied")),
       observations: str(pickField(rec, "OBSERVATIONS", "observations")),
       qaRemarks: pickLocationQaRemarks(rec),
@@ -763,6 +769,7 @@ export const parsePostCureMotorDataFromSections = (
             pickField(
               prep,
               "EPOXY_PREPARATION_DATE",
+              "preparationDateTime",
               "epoxyPreparationDate",
               "LF_EPOXY_PREPARATION_DATE",
               "preparationDate",
@@ -778,7 +785,13 @@ export const parsePostCureMotorDataFromSections = (
             pickField(qual, "QUALIFICATION_BATCH_NO", "qualificationBatchNo"),
           ),
           qualificationPreparationDate: postCureDateTimeForUi(
-            pickField(qual, "QUALIFICATION_PREPARATION_DATE", "qualificationPreparationDate"),
+            pickField(
+              qual,
+              "preparationDateTime",
+              "preparationDate",
+              "QUALIFICATION_PREPARATION_DATE",
+              "qualificationPreparationDate",
+            ),
           ),
           qualificationTable: mergeQualificationRows(
             empty.qualificationDetails.qualificationTable,
@@ -854,7 +867,9 @@ export const parsePostCureMotorDataFromSections = (
             : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
         },
         dispatchDetails: {
-          dispatchDate: postCureDateTimeForUi(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
+          dispatchDate: postCureDateTimeForUi(
+            pickField(dispatch, "DISPATCH_DATE", "dispatchDateTime", "dispatchDate"),
+          ),
           dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
           qaRemarks: pickLocationQaRemarks(dispatch),
         },
@@ -925,7 +940,9 @@ export const parsePostCureMotorDataFromSections = (
             : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
         },
         dispatchDetails: {
-          dispatchDate: postCureDateTimeForUi(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
+          dispatchDate: postCureDateTimeForUi(
+            pickField(dispatch, "DISPATCH_DATE", "dispatchDateTime", "dispatchDate"),
+          ),
           dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
           qaRemarks: pickLocationQaRemarks(dispatch),
         },
@@ -992,7 +1009,9 @@ export const parsePostCureMotorDataFromSections = (
             : empty.inhibitionApplicationDetails.inhibitionApplicationTable,
         },
         dispatchDetails: {
-          dispatchDate: postCureDateTimeForUi(pickField(dispatch, "DISPATCH_DATE", "dispatchDate")),
+          dispatchDate: postCureDateTimeForUi(
+            pickField(dispatch, "DISPATCH_DATE", "dispatchDateTime", "dispatchDate"),
+          ),
           dispatchStation: str(pickField(dispatch, "DISPATCH_STATION", "dispatchStation")),
           qaRemarks: pickLocationQaRemarks(dispatch),
         },
@@ -1124,6 +1143,8 @@ const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string,
 export type LooseFlapFillingDetailsApi = {
   bellowRemovalDetails?: Array<{
     location?: string;
+    fromDateTime?: string;
+    toDateTime?: string;
     fromDate?: string;
     toDate?: string;
     observations?: string;
@@ -1131,6 +1152,7 @@ export type LooseFlapFillingDetailsApi = {
   }>;
   epoxyPreparationIngredients?: {
     batchNo?: string;
+    preparationDateTime?: string;
     preparationDate?: string;
     parameters?: Array<{
       rowKey?: string | number;
@@ -1142,6 +1164,7 @@ export type LooseFlapFillingDetailsApi = {
   };
   qualificationDetails?: {
     batchNo?: string;
+    preparationDateTime?: string;
     preparationDate?: string;
     parameters?: Array<{
       srNo?: number;
@@ -1153,6 +1176,8 @@ export type LooseFlapFillingDetailsApi = {
   };
   fillingDetails?: Array<{
     location?: string;
+    fromDateTime?: string;
+    toDateTime?: string;
     fromDate?: string;
     toDate?: string;
     quantityFilled?: number;
@@ -1165,6 +1190,7 @@ export type InhibitionDetailsApi = {
   inhibitorType?: "IR1" | "HEMCOAT_3K" | "OTHERS" | "NOT_APPLICABLE";
   premixDetails?: {
     batchNo?: string;
+    preparationDateTime?: string;
     preparationDate?: string;
     ingredients?: Array<{
       rowKey?: string | number;
@@ -1177,6 +1203,7 @@ export type InhibitionDetailsApi = {
   };
   finalMixDetails?: {
     batchNo?: string;
+    preparationDateTime?: string;
     preparationDate?: string;
     ingredients?: Array<{
       rowKey?: string | number;
@@ -1189,6 +1216,7 @@ export type InhibitionDetailsApi = {
   };
   qualificationDetails?: {
     batchNo?: string;
+    preparationDateTime?: string;
     preparationDate?: string;
     parameters?: Array<{
       srNo?: number;
@@ -1205,6 +1233,8 @@ export type InhibitionDetailsApi = {
   };
   applicationDetails?: Array<{
     location?: string;
+    fromDateTime?: string;
+    toDateTime?: string;
     fromDate?: string;
     toDate?: string;
     quantityApplied?: number;
@@ -1212,6 +1242,7 @@ export type InhibitionDetailsApi = {
     qaRemarks?: string;
   }>;
   dispatchDetails?: {
+    dispatchDateTime?: string;
     dispatchDate?: string;
     dispatchStation?: string;
     qaRemarks?: string;
@@ -1228,8 +1259,8 @@ const mapLocationDateRowsForApi = (rows: LocationDateRow[]) =>
   rows.map((row) =>
     omitEmpty({
       location: row.location || undefined,
-      fromDate: apiDateTimeOrUi(row.fromDate),
-      toDate: apiDateTimeOrUi(row.toDate),
+      fromDateTime: apiDateTimeOrUi(row.fromDate),
+      toDateTime: apiDateTimeOrUi(row.toDate),
       observations: row.observations.trim() || undefined,
       qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
     }),
@@ -1239,8 +1270,8 @@ const mapLocationQtyRowsForApi = (rows: LocationQtyRow[]) =>
   rows.map((row) =>
     omitEmpty({
       location: row.location || undefined,
-      fromDate: apiDateTimeOrUi(row.fromDate),
-      toDate: apiDateTimeOrUi(row.toDate),
+      fromDateTime: apiDateTimeOrUi(row.fromDate),
+      toDateTime: apiDateTimeOrUi(row.toDate),
       quantityFilled: toApiNumber(row.qtyFilled),
       observations: row.observations.trim() || undefined,
       qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
@@ -1251,8 +1282,8 @@ const mapLocationAppliedRowsForApi = (rows: LocationAppliedRow[]) =>
   rows.map((row) =>
     omitEmpty({
       location: row.location || undefined,
-      fromDate: apiDateTimeOrUi(row.fromDate),
-      toDate: apiDateTimeOrUi(row.toDate),
+      fromDateTime: apiDateTimeOrUi(row.fromDate),
+      toDateTime: apiDateTimeOrUi(row.toDate),
       quantityApplied: toApiNumber(row.qtyApplied),
       observations: row.observations.trim() || undefined,
       qaRemarks: String(row.qaRemarks ?? "").trim() || undefined,
@@ -1326,12 +1357,12 @@ const buildLooseFlapFillingDetailsPayload = (
   bellowRemovalDetails: mapLocationDateRowsForApi(data.bellowRemovalDetails.bellowRemovalTable),
   epoxyPreparationIngredients: omitEmpty({
     batchNo: data.looseFlapEpoxyPreparation.epoxyBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.looseFlapEpoxyPreparation.epoxyPreparationDate),
+    preparationDateTime: apiDateTimeOrUi(data.looseFlapEpoxyPreparation.epoxyPreparationDate),
     parameters: mapIngredientQuantityRowsForApi(data.looseFlapEpoxyPreparation.preparationDetails),
   }) as LooseFlapFillingDetailsApi["epoxyPreparationIngredients"],
   qualificationDetails: omitEmpty({
     batchNo: data.qualificationDetails.qualificationBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.qualificationDetails.qualificationPreparationDate),
+    preparationDateTime: apiDateTimeOrUi(data.qualificationDetails.qualificationPreparationDate),
     parameters: mapQualificationParamsForApi(data.qualificationDetails.qualificationTable),
     qcReport: (() => {
       const files = toFileIdListPayload(data.qualificationDetails.qualificationQcReport);
@@ -1344,17 +1375,17 @@ const buildLooseFlapFillingDetailsPayload = (
 const buildInhibitionIr1DetailsPayload = (data: InhibitionIr1MotorData): InhibitionDetailsApi => ({
   premixDetails: omitEmpty({
     batchNo: data.ir1Premix.ir1PremixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.ir1Premix.ir1PremixDate),
+    preparationDateTime: apiDateTimeOrUi(data.ir1Premix.ir1PremixDate),
     ingredients: mapIngredientTakenRowsForApi(data.ir1Premix.ir1PremixTable),
   }) as InhibitionDetailsApi["premixDetails"],
   finalMixDetails: omitEmpty({
     batchNo: data.ir1FinalMix.ir1FinalMixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.ir1FinalMix.ir1FinalMixDate),
+    preparationDateTime: apiDateTimeOrUi(data.ir1FinalMix.ir1FinalMixDate),
     ingredients: mapIngredientTakenRowsForApi(data.ir1FinalMix.ir1FinalMixTable),
   }) as InhibitionDetailsApi["finalMixDetails"],
   qualificationDetails: omitEmpty({
     batchNo: data.ir1Qualification.qualificationBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.ir1Qualification.qualificationPreparationDate),
+    preparationDateTime: apiDateTimeOrUi(data.ir1Qualification.qualificationPreparationDate),
     parameters: mapQualificationParamsForApi(data.ir1Qualification.qualificationTable),
     qcReport: (() => {
       const files = toFileIdListPayload(data.ir1Qualification.qualificationQcReport);
@@ -1370,7 +1401,7 @@ const buildInhibitionIr1DetailsPayload = (data: InhibitionIr1MotorData): Inhibit
     data.inhibitionApplicationDetails.inhibitionApplicationTable,
   ),
   dispatchDetails: omitEmpty({
-    dispatchDate: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
+    dispatchDateTime: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
     dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
     qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["dispatchDetails"],
@@ -1381,17 +1412,17 @@ const buildInhibitionHemcoatDetailsPayload = (
 ): InhibitionDetailsApi => ({
   premixDetails: omitEmpty({
     batchNo: data.hemcoat3kPreparation.hemcoatPremixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.hemcoat3kPreparation.hemcoatPremixDate),
+    preparationDateTime: apiDateTimeOrUi(data.hemcoat3kPreparation.hemcoatPremixDate),
     ingredients: mapIngredientTakenRowsForApi(data.hemcoat3kPreparation.premixPreparationTable),
   }) as InhibitionDetailsApi["premixDetails"],
   finalMixDetails: omitEmpty({
     batchNo: data.hemcoat3kFinalMix.hemcoatFinalMixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.hemcoat3kFinalMix.hemcoatFinalMixDate),
+    preparationDateTime: apiDateTimeOrUi(data.hemcoat3kFinalMix.hemcoatFinalMixDate),
     ingredients: mapIngredientTakenRowsForApi(data.hemcoat3kFinalMix.finalMixTable),
   }) as InhibitionDetailsApi["finalMixDetails"],
   qualificationDetails: omitEmpty({
     batchNo: data.hemcoat3kQualification.qualificationBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.hemcoat3kQualification.qualificationPreparationDate),
+    preparationDateTime: apiDateTimeOrUi(data.hemcoat3kQualification.qualificationPreparationDate),
     parameters: mapQualificationParamsForApi(data.hemcoat3kQualification.qualificationTable),
     qcReport: (() => {
       const files = toFileIdListPayload(data.hemcoat3kQualification.qualificationQcReport);
@@ -1407,7 +1438,7 @@ const buildInhibitionHemcoatDetailsPayload = (
     data.inhibitionApplicationDetails.inhibitionApplicationTable,
   ),
   dispatchDetails: omitEmpty({
-    dispatchDate: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
+    dispatchDateTime: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
     dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
     qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["dispatchDetails"],
@@ -1418,17 +1449,17 @@ const buildInhibitionOthersDetailsPayload = (
 ): InhibitionDetailsApi => ({
   premixDetails: omitEmpty({
     batchNo: data.othersPremix.othersPremixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.othersPremix.othersPremixDate),
+    preparationDateTime: apiDateTimeOrUi(data.othersPremix.othersPremixDate),
     ingredients: mapIngredientTakenRowsForApi(data.othersPremix.othersPremixTable),
   }) as InhibitionDetailsApi["premixDetails"],
   finalMixDetails: omitEmpty({
     batchNo: data.othersFinalMix.othersFinalMixBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.othersFinalMix.othersFinalMixDate),
+    preparationDateTime: apiDateTimeOrUi(data.othersFinalMix.othersFinalMixDate),
     ingredients: mapIngredientTakenRowsForApi(data.othersFinalMix.othersFinalMixTable),
   }) as InhibitionDetailsApi["finalMixDetails"],
   qualificationDetails: omitEmpty({
     batchNo: data.othersQualification.qualificationBatchNo.trim() || undefined,
-    preparationDate: apiDateTimeOrUi(data.othersQualification.qualificationPreparationDate),
+    preparationDateTime: apiDateTimeOrUi(data.othersQualification.qualificationPreparationDate),
     parameters: mapQualificationParamsForApi(data.othersQualification.qualificationTable),
     qcReport: (() => {
       const files = toFileIdListPayload(data.othersQualification.qualificationQcReport);
@@ -1444,7 +1475,7 @@ const buildInhibitionOthersDetailsPayload = (
     data.inhibitionApplicationDetails.inhibitionApplicationTable,
   ),
   dispatchDetails: omitEmpty({
-    dispatchDate: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
+    dispatchDateTime: apiDateTimeOrUi(data.dispatchDetails.dispatchDate),
     dispatchStation: data.dispatchDetails.dispatchStation.trim() || undefined,
     qaRemarks: String(data.dispatchDetails.qaRemarks ?? "").trim() || undefined,
   }) as InhibitionDetailsApi["dispatchDetails"],
@@ -1540,7 +1571,13 @@ const parseLooseFlapFromApi = (details: Record<string, unknown>): LooseFlapMotor
     looseFlapEpoxyPreparation: {
       epoxyBatchNo: str(pickField(epoxy, "batchNo", "EPOXY_BATCH_NO", "epoxyBatchNo")),
       epoxyPreparationDate: postCureDateTimeForUi(
-        pickField(epoxy, "preparationDate", "EPOXY_PREPARATION_DATE", "epoxyPreparationDate"),
+        pickField(
+          epoxy,
+          "preparationDateTime",
+          "preparationDate",
+          "EPOXY_PREPARATION_DATE",
+          "epoxyPreparationDate",
+        ),
       ),
       preparationDetails: mergeIngredientQuantityRows(
         empty.looseFlapEpoxyPreparation.preparationDetails,
@@ -1554,6 +1591,7 @@ const parseLooseFlapFromApi = (details: Record<string, unknown>): LooseFlapMotor
       qualificationPreparationDate: postCureDateTimeForUi(
         pickField(
           qual,
+          "preparationDateTime",
           "preparationDate",
           "QUALIFICATION_PREPARATION_DATE",
           "qualificationPreparationDate",
@@ -1594,8 +1632,8 @@ const parseInhibitionFromApi = (
   // Legacy QC wire stored dispatchDate/dispatchStation flat on inhibitionDetails.
   const resolveDispatchDate = () =>
     postCureDateTimeForUi(
-      pickField(dispatch, "dispatchDate", "DISPATCH_DATE") ||
-        pickField(details, "dispatchDate", "DISPATCH_DATE"),
+      pickField(dispatch, "dispatchDateTime", "dispatchDate", "DISPATCH_DATE") ||
+        pickField(details, "dispatchDateTime", "dispatchDate", "DISPATCH_DATE"),
     );
   const resolveDispatchStation = () =>
     str(
@@ -1613,7 +1651,7 @@ const parseInhibitionFromApi = (
       hemcoat3kPreparation: {
         hemcoatPremixBatchNo: str(pickField(premix, "batchNo", "HEMCOAT_PREMIX_BATCH_NO")),
         hemcoatPremixDate: postCureDateTimeForUi(
-          pickField(premix, "preparationDate", "HEMCOAT_PREMIX_DATE"),
+          pickField(premix, "preparationDateTime", "preparationDate", "HEMCOAT_PREMIX_DATE"),
         ),
         premixPreparationTable: mergeIngredientTakenRows(
           empty.hemcoat3kPreparation.premixPreparationTable,
@@ -1623,7 +1661,7 @@ const parseInhibitionFromApi = (
       hemcoat3kFinalMix: {
         hemcoatFinalMixBatchNo: str(pickField(finalMix, "batchNo", "HEMCOAT_FINAL_MIX_BATCH_NO")),
         hemcoatFinalMixDate: postCureDateTimeForUi(
-          pickField(finalMix, "preparationDate", "HEMCOAT_FINAL_MIX_DATE"),
+          pickField(finalMix, "preparationDateTime", "preparationDate", "HEMCOAT_FINAL_MIX_DATE"),
         ),
         finalMixTable: mergeIngredientTakenRows(
           empty.hemcoat3kFinalMix.finalMixTable,
@@ -1633,7 +1671,12 @@ const parseInhibitionFromApi = (
       hemcoat3kQualification: {
         qualificationBatchNo: str(pickField(qual, "batchNo", "QUALIFICATION_BATCH_NO")),
         qualificationPreparationDate: postCureDateTimeForUi(
-          pickField(qual, "preparationDate", "QUALIFICATION_PREPARATION_DATE"),
+          pickField(
+            qual,
+            "preparationDateTime",
+            "preparationDate",
+            "QUALIFICATION_PREPARATION_DATE",
+          ),
         ),
         qualificationTable: parseQualificationParamsFromApi(
           empty.hemcoat3kQualification.qualificationTable,
@@ -1672,7 +1715,7 @@ const parseInhibitionFromApi = (
       othersPremix: {
         othersPremixBatchNo: str(pickField(premix, "batchNo", "OTHERS_PREMIX_BATCH_NO")),
         othersPremixDate: postCureDateTimeForUi(
-          pickField(premix, "preparationDate", "OTHERS_PREMIX_DATE"),
+          pickField(premix, "preparationDateTime", "preparationDate", "OTHERS_PREMIX_DATE"),
         ),
         othersPremixTable: parseFlexibleIngredientTakenRowsFromSaved(
           premix.ingredients ?? premix.parameters,
@@ -1681,7 +1724,7 @@ const parseInhibitionFromApi = (
       othersFinalMix: {
         othersFinalMixBatchNo: str(pickField(finalMix, "batchNo", "OTHERS_FINAL_MIX_BATCH_NO")),
         othersFinalMixDate: postCureDateTimeForUi(
-          pickField(finalMix, "preparationDate", "OTHERS_FINAL_MIX_DATE"),
+          pickField(finalMix, "preparationDateTime", "preparationDate", "OTHERS_FINAL_MIX_DATE"),
         ),
         othersFinalMixTable: parseFlexibleIngredientTakenRowsFromSaved(
           finalMix.ingredients ?? finalMix.parameters,
@@ -1690,7 +1733,12 @@ const parseInhibitionFromApi = (
       othersQualification: {
         qualificationBatchNo: str(pickField(qual, "batchNo", "QUALIFICATION_BATCH_NO")),
         qualificationPreparationDate: postCureDateTimeForUi(
-          pickField(qual, "preparationDate", "QUALIFICATION_PREPARATION_DATE"),
+          pickField(
+            qual,
+            "preparationDateTime",
+            "preparationDate",
+            "QUALIFICATION_PREPARATION_DATE",
+          ),
         ),
         qualificationTable: parseQualificationParamsFromApi(
           empty.othersQualification.qualificationTable,
@@ -1730,7 +1778,13 @@ const parseInhibitionFromApi = (
         pickField(premix, "batchNo", "IR1_PREMIX_BATCH_NO", "ir1PremixBatchNo"),
       ),
       ir1PremixDate: postCureDateTimeForUi(
-        pickField(premix, "preparationDate", "IR1_PREMIX_DATE", "ir1PremixDate"),
+        pickField(
+          premix,
+          "preparationDateTime",
+          "preparationDate",
+          "IR1_PREMIX_DATE",
+          "ir1PremixDate",
+        ),
       ),
       ir1PremixTable: mergeIngredientTakenRows(
         empty.ir1Premix.ir1PremixTable,
@@ -1742,7 +1796,13 @@ const parseInhibitionFromApi = (
         pickField(finalMix, "batchNo", "IR1_FINAL_MIX_BATCH_NO", "ir1FinalMixBatchNo"),
       ),
       ir1FinalMixDate: postCureDateTimeForUi(
-        pickField(finalMix, "preparationDate", "IR1_FINAL_MIX_DATE", "ir1FinalMixDate"),
+        pickField(
+          finalMix,
+          "preparationDateTime",
+          "preparationDate",
+          "IR1_FINAL_MIX_DATE",
+          "ir1FinalMixDate",
+        ),
       ),
       ir1FinalMixTable: mergeIngredientTakenRows(
         empty.ir1FinalMix.ir1FinalMixTable,
@@ -1756,6 +1816,7 @@ const parseInhibitionFromApi = (
       qualificationPreparationDate: postCureDateTimeForUi(
         pickField(
           qual,
+          "preparationDateTime",
           "preparationDate",
           "QUALIFICATION_PREPARATION_DATE",
           "qualificationPreparationDate",

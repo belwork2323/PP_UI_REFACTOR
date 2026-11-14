@@ -32,23 +32,27 @@ import {
   emptyHtpbBlendingPreparationDetails,
   isAcemAdductMaterial,
   isAcemHtpbBlendingMaterial,
+  isAcemQcOutOfRange,
   isReferenceRangeNotApplicable,
+  isSpecResultField,
   isSpecRowFailed,
-  sanitizeNumericAnalysedResultInput,
+  sanitizeSpecResultInput,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import AdductPreparationSection from "@ui/pages/user/sourcing/rms/components/AdductPreparationSection";
 import HtpbBlendingPreparationSection from "@ui/pages/user/sourcing/rms/components/HtpbBlendingPreparationSection";
 import { useLotCertificateActions } from "@hooks/user/sourcing/rms/useLotCertificateActions";
 import {
+  GetSpecResultError,
   SpecificationBlock,
   SpecificationBlockUpdater,
   SpecificationRow,
 } from "@hooks/user/sourcing/rms/useRawMaterialSpecificationForm";
-import ReceiptDateField from "@ui/pages/user/sourcing/rms/components/ReceiptDateField";
+import DateField from "@ui/components/common/DateField";
 import MandatoryFormField, {
   mandatoryAsteriskSx,
   mandatoryFieldInputSx,
 } from "@ui/components/validation/ValidatedFormField";
+import { getTodayInIstDate } from "@utils/dateUtils";
 import {
   blockLotPath,
   blockMetaPath,
@@ -78,11 +82,7 @@ type MaterialSpecificationBlockProps = {
   onRemove: (index: number) => void;
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
-  getAnalysedResultError: (
-    blockIndex: number,
-    rowIndex: number,
-    touched: boolean,
-  ) => string | undefined;
+  getAnalysedResultError: GetSpecResultError;
   approvedPreparationLots: ApprovedPreparationLotLookups;
   theme: any;
 };
@@ -99,11 +99,9 @@ function useMaterialBlockState(
       onUpdate(index, (current) => {
         const updatedRows = current.rows.map((row, currentIndex) => {
           if (currentIndex !== rowIndex) return row;
-          const nextValue =
-            field === "analysedResult" &&
-            !isReferenceRangeNotApplicable(row.referenceRange)
-              ? sanitizeNumericAnalysedResultInput(value)
-              : value;
+          const nextValue = isSpecResultField(field)
+            ? sanitizeSpecResultInput(value, row.referenceRange)
+            : value;
           const next = { ...row, [field]: nextValue };
           if (field === "analysedResult") {
             next.status = null;
@@ -188,9 +186,13 @@ const MaterialSpecificationBlock = ({
   const [touchedAnalysedRows, setTouchedAnalysedRows] = useState(
     () => new Set<number>(),
   );
+  const [touchedAcemRows, setTouchedAcemRows] = useState(
+    () => new Set<number>(),
+  );
 
   useEffect(() => {
     setTouchedAnalysedRows(new Set());
+    setTouchedAcemRows(new Set());
   }, [block.lotNo, block.material]);
 
   const {
@@ -204,6 +206,9 @@ const MaterialSpecificationBlock = ({
   } = useMaterialBlockState(block, index, onUpdate, (rowIndex, field) => {
     if (field === "analysedResult") {
       setTouchedAnalysedRows((previous) => new Set(previous).add(rowIndex));
+    }
+    if (field === "acemQcResult") {
+      setTouchedAcemRows((previous) => new Set(previous).add(rowIndex));
     }
   });
 
@@ -361,11 +366,19 @@ const MaterialSpecificationBlock = ({
           required={false}
         >
           <Box data-rms-field={blockMetaPath(index, "receiptDate")}>
-            <ReceiptDateField
+            <DateField
               value={block.receiptDate ?? ""}
               onChange={(next) => handleBlockMeta("receiptDate", next)}
-              theme={theme}
+              placeholder="DD-MM-YYYY"
+              maxDate={getTodayInIstDate()}
               error={Boolean(receiptDateError)}
+              compact
+              sx={{ mb: 0, width: "100%" }}
+              inputSx={mandatoryFieldInputSx(
+                theme.workflow.formElements.metaRowTextField,
+                Boolean(receiptDateError),
+                theme,
+              )}
             />
           </Box>
         </MandatoryFormField>
@@ -520,6 +533,13 @@ const MaterialSpecificationBlock = ({
                   rowIndex,
                   touchedAnalysedRows.has(rowIndex),
                 );
+                const acemError = getAnalysedResultError(
+                  index,
+                  rowIndex,
+                  touchedAcemRows.has(rowIndex),
+                  "acemQcResult",
+                );
+                const acemOutOfRange = isAcemQcOutOfRange(row);
                 return (
                   <TableRow
                     key={rowIndex}
@@ -706,24 +726,56 @@ const MaterialSpecificationBlock = ({
                         ...specStyles.inputCell,
                       }}
                     >
-                      <AppTextField
-                        compact
-                        size="small"
-                        fullWidth
-                        value={row.acemQcResult || ""}
-                        onChange={(event) =>
-                          handleCellChange(
-                            rowIndex,
-                            "acemQcResult",
-                            event.target.value,
-                          )
-                        }
-                        placeholder={formStrings.REMARKS_PLACEHOLDER}
-                        sx={[
-                          theme.workflow.formElements.cellField,
-                          specStyles.remarksField,
-                        ]}
-                      />
+                      <Box
+                        data-rms-field={blockRowPath(
+                          index,
+                          rowIndex,
+                          "acemQcResult",
+                        )}
+                      >
+                        <AppTextField
+                          compact
+                          size="small"
+                          fullWidth
+                          value={row.acemQcResult || ""}
+                          onChange={(event) =>
+                            handleCellChange(
+                              rowIndex,
+                              "acemQcResult",
+                              event.target.value,
+                            )
+                          }
+                          placeholder={formStrings.REMARKS_PLACEHOLDER}
+                          inputMode={
+                            isReferenceRangeNotApplicable(row.referenceRange)
+                              ? "text"
+                              : "decimal"
+                          }
+                          error={Boolean(acemError)}
+                          helperText={
+                            acemError ??
+                            (acemOutOfRange
+                              ? formStrings.SPEC_STATUS_OUT_OF_RANGE
+                              : undefined)
+                          }
+                          FormHelperTextProps={{
+                            sx: {
+                              mx: 0,
+                              fontSize: "0.65rem",
+                              ...(acemOutOfRange && !acemError
+                                ? { color: "error.main" }
+                                : {}),
+                            },
+                          }}
+                          sx={[
+                            theme.workflow.formElements.cellField,
+                            specStyles.remarksField,
+                            ...(acemOutOfRange || acemError
+                              ? [specStyles.failedAnalyzedField]
+                              : []),
+                          ]}
+                        />
+                      </Box>
                     </TableCell>
                   </TableRow>
                 );

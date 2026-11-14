@@ -74,7 +74,7 @@ export const toApiDate = (value: unknown): string | undefined => {
 export const toUiDate = (value: unknown): string => formatToUiDate(str(value));
 
 /**
- * UI `DD-MM-YYYY HH:mm` → API local ISO `YYYY-MM-DDTHH:mm:ss` (no Z).
+ * UI `DD-MM-YYYY HH:mm[:ss]` → API local ISO `YYYY-MM-DDTHH:mm:ss` (no Z).
  * Empty → omitted.
  */
 export const toApiDateTime = (value: unknown): string | undefined => {
@@ -98,17 +98,20 @@ export const toApiDateTime = (value: unknown): string | undefined => {
   return isoDate || undefined;
 };
 
-/** API local/UTC ISO datetime → UI `DD-MM-YYYY HH:mm`. */
+/** API local/UTC ISO datetime → UI `DD-MM-YYYY HH:mm[:ss]`, preserving seconds. */
 export const toUiDateTime = (value: unknown): string => {
   const raw = str(value).trim();
   if (!raw) return "";
 
-  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  const dmy = raw.match(
+    /^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/,
+  );
   if (dmy) {
-    const [, day, month, year, hour, minute] = dmy;
+    const [, day, month, year, hour, minute, second] = dmy;
     const date = `${pad2(day)}-${pad2(month)}-${year}`;
     if (hour == null) return `${date} 00:00`;
-    return `${date} ${pad2(hour)}:${pad2(minute)}`;
+    const time = `${date} ${pad2(hour)}:${pad2(minute)}`;
+    return second == null ? time : `${time}:${pad2(second)}`;
   }
 
   const isoDateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -116,18 +119,16 @@ export const toUiDateTime = (value: unknown): string => {
     return `${isoDateOnly[3]}-${isoDateOnly[2]}-${isoDateOnly[1]} 00:00`;
   }
 
-  const isoLocal = raw.match(
-    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/,
-  );
+  const isoLocal = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (isoLocal) {
-    return `${isoLocal[3]}-${isoLocal[2]}-${isoLocal[1]} ${pad2(isoLocal[4])}:${pad2(isoLocal[5])}`;
+    const dateTime = `${isoLocal[3]}-${isoLocal[2]}-${isoLocal[1]} ${pad2(isoLocal[4])}:${pad2(isoLocal[5])}`;
+    return isoLocal[6] == null ? dateTime : `${dateTime}:${pad2(isoLocal[6])}`;
   }
 
   const parsed = new Date(raw);
   if (!Number.isNaN(parsed.getTime())) {
-    return `${pad2(parsed.getDate())}-${pad2(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${pad2(
-      parsed.getHours(),
-    )}:${pad2(parsed.getMinutes())}`;
+    const dateTime = `${pad2(parsed.getDate())}-${pad2(parsed.getMonth() + 1)}-${parsed.getFullYear()} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+    return /:\d{2}:\d{2}/.test(raw) ? `${dateTime}:${pad2(parsed.getSeconds())}` : dateTime;
   }
 
   return formatToUiDate(raw);

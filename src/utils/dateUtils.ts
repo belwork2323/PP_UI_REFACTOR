@@ -24,6 +24,17 @@ export const UI_DATE_FORMAT = "DD-MM-YYYY";
 export const UI_DATE_PLACEHOLDER = "DD-MM-YYYY";
 export const UI_DATETIME_FORMAT = "DD-MM-YYYY HH:mm";
 export const UI_DATETIME_SECONDS_FORMAT = "DD-MM-YYYY HH:mm:ss";
+export const getTodayInIstDate = (): string => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+  const datePart = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${datePart("day")}-${datePart("month")}-${datePart("year")}`;
+};
+
 export const UI_DATE_PARSE_FORMATS = [
   "DD-MM-YYYY",
   "DD-MM-YYYY HH:mm",

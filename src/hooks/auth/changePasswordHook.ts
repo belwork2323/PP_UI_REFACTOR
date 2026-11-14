@@ -37,10 +37,7 @@ export function useChangePasswordForm({
   const [errors, setErrors] = useState(INITIAL_ERRORS);
   const [submitting, setSubmitting] = useState(false);
 
-  const rules = useMemo(
-    () => evaluatePasswordRules(values.newPassword),
-    [values.newPassword],
-  );
+  const rules = useMemo(() => evaluatePasswordRules(values.newPassword), [values.newPassword]);
 
   const setField = useCallback((field: keyof typeof INITIAL, value: string) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -56,13 +53,18 @@ export function useChangePasswordForm({
       next.currentPassword = V.CURRENT_PASSWORD_REQUIRED;
       ok = false;
     }
+
     if (!values.newPassword) {
       next.newPassword = V.NEW_PASSWORD_REQUIRED;
+      ok = false;
+    } else if (values.newPassword.length > 20) {
+      next.newPassword = "Password cannot exceed 20 characters";
       ok = false;
     } else if (!isPasswordStrong(values.newPassword)) {
       next.newPassword = V.PASSWORD_INVALID;
       ok = false;
     }
+
     if (!values.confirmPassword) {
       next.confirmPassword = V.CONFIRM_PASSWORD_REQUIRED;
       ok = false;
@@ -77,6 +79,7 @@ export function useChangePasswordForm({
 
   const canSubmit =
     Boolean(values.currentPassword) &&
+    values.newPassword.length <= 20 &&
     isPasswordStrong(values.newPassword) &&
     values.newPassword === values.confirmPassword &&
     !submitting;
@@ -111,11 +114,7 @@ export function useChangePasswordForm({
         const selectedSubDept = pendingSubDeptId
           ? updated.getSubDepartment(pendingSubDeptId)
           : null;
-        const route = getRouteByRole(
-          updated.role,
-          pendingSubDeptId,
-          selectedSubDept,
-        );
+        const route = getRouteByRole(updated.role, pendingSubDeptId, selectedSubDept);
         navigate(route, { replace: true });
       }
     } else {

@@ -37,6 +37,11 @@ import {
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import { fieldError } from "@/data/validation/adapters/qcRawMaterial.validation";
+import {
+  isAcemQcResultOutOfRange,
+  sanitizeAcemQcResultInput,
+  specificationImpliesNumeric,
+} from "@/data/validation/configs/qcRawMaterial.validation.config";
 
 type QCRawMaterialRevalidationTableProps = {
   values: SchemaFormValues;
@@ -182,7 +187,13 @@ const QCRawMaterialRevalidationTable = ({
     value: string,
     onValueChange: (next: string) => void,
     placeholder: string,
-    options?: { fieldPath?: string; errorMessage?: string; disabled?: boolean },
+    options?: {
+      fieldPath?: string;
+      errorMessage?: string;
+      disabled?: boolean;
+      inputMode?: "text" | "decimal";
+      flagged?: boolean;
+    },
   ) => (
     <TextField
       size="small"
@@ -191,10 +202,11 @@ const QCRawMaterialRevalidationTable = ({
       disabled={options?.disabled || readOnly}
       placeholder={placeholder}
       onChange={(event) => onValueChange(event.target.value)}
-      error={Boolean(options?.errorMessage)}
-      inputProps={
-        options?.fieldPath ? { "data-qc-field": options.fieldPath } : undefined
-      }
+      error={Boolean(options?.errorMessage) || Boolean(options?.flagged)}
+      inputProps={{
+        ...(options?.fieldPath ? { "data-qc-field": options.fieldPath } : {}),
+        ...(options?.inputMode ? { inputMode: options.inputMode } : {}),
+      }}
       sx={{ ...uniformInputSx, minWidth: 90 }}
     />
   );
@@ -355,6 +367,10 @@ const QCRawMaterialRevalidationTable = ({
                   {group.rowIndices.map((rowIndex) => {
                     const row = rows[rowIndex];
                     const isExpanded = row._rowRole === "expanded";
+                    const acemOutOfRange = isAcemQcResultOutOfRange(
+                      row.SPECIFICATION,
+                      row.ACEM_QC_RESULT,
+                    );
 
                     return (
                       <TableRow
@@ -398,14 +414,31 @@ const QCRawMaterialRevalidationTable = ({
                               <Box>
                                 {renderText(
                                   String(row.ACEM_QC_RESULT ?? ""),
-                                  (next) => updateRow(rowIndex, { ACEM_QC_RESULT: next }),
+                                  (next) =>
+                                    updateRow(rowIndex, {
+                                      ACEM_QC_RESULT: sanitizeAcemQcResultInput(
+                                        row.SPECIFICATION,
+                                        next,
+                                      ),
+                                    }),
                                   "ACEM QC Result",
                                   {
                                     fieldPath: `rows.${rowIndex}.ACEM_QC_RESULT`,
                                     errorMessage: err(`rows.${rowIndex}.ACEM_QC_RESULT`),
+                                    inputMode: specificationImpliesNumeric(row.SPECIFICATION)
+                                      ? "decimal"
+                                      : "text",
+                                    flagged: acemOutOfRange,
                                   },
                                 )}
                                 <FieldErrorText message={err(`rows.${rowIndex}.ACEM_QC_RESULT`)} />
+                                {acemOutOfRange && !err(`rows.${rowIndex}.ACEM_QC_RESULT`) ? (
+                                  <Typography
+                                    sx={{ fontSize: "0.65rem", color: "error.main", mt: 0.25 }}
+                                  >
+                                    Out of Range
+                                  </Typography>
+                                ) : null}
                               </Box>
                             )
                           ) : null}

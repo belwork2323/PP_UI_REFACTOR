@@ -17,6 +17,7 @@ import type {
 import { DISPATCH_FLOW_LABELS } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
 import {
   buildMotorNavGateHelpers,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../hooks/user/previousStageApproval";
 import { SUB_DEPT } from "../../../../utils/batchStageUtils";
@@ -40,7 +41,7 @@ const S = STRINGS.DISPATCH;
 const { localShipping: LocalShippingRoundedIcon } = icons.user.dispatch.form;
 
 type DispatchFormProps = {
-  batch?: { batchId?: string; formId?: string | null } | null;
+  batch?: ({ batchId?: string; formId?: string | null } & BatchStageContext) | null;
   formData: DispatchFormState;
   draftMotorId: string;
   addedMotors: DispatchAddedMotor[];

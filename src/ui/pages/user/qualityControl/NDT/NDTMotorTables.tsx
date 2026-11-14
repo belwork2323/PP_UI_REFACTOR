@@ -33,10 +33,7 @@ import {
 import { STRINGS } from "../../../../../app/config/strings";
 import NdtFileField from "./NdtFileField";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
-import {
-  fieldError,
-  type ValidationErrors,
-} from "@/data/validation/adapters/ndt.validation";
+import { fieldError, type ValidationErrors } from "@/data/validation/adapters/ndt.validation";
 
 const S = STRINGS.QUALITY_CONTROL.NDT;
 
@@ -345,7 +342,12 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         <FieldLabelWithAsterisk
                           label={label}
                           required
-                          sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit" }}
+                          sx={{
+                            display: "inline",
+                            fontSize: "inherit",
+                            fontWeight: "inherit",
+                            color: "inherit",
+                          }}
                         />
                       ) : (
                         label
@@ -363,82 +365,82 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                   const tangentialErr = err(`radiographyPlanRows.${index}.tangentialExposures`);
                   const detectorErr = err(`radiographyPlanRows.${index}.detectorType`);
                   return (
-                  <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
-                    <TableCell sx={TD}>{row.srNo}</TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.sections`}>
-                        <CNumericInput
-                          fieldSx={fieldSx}
-                          value={row.sections}
-                          placeholder="Sections"
-                          error={Boolean(sectionsErr)}
-                          onChange={(v) => updatePlanRow(index, { sections: v })}
-                        />
-                        <FieldErrorText message={sectionsErr} />
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.orientations`}>
-                        <CNumericInput
-                          fieldSx={fieldSx}
-                          value={row.orientations}
-                          placeholder="Orientations"
-                          error={Boolean(orientationsErr)}
-                          onChange={(v) => updatePlanRow(index, { orientations: v })}
-                        />
-                        <FieldErrorText message={orientationsErr} />
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.sfd`}>
-                        <CNumericInput
-                          fieldSx={fieldSx}
-                          value={row.sfd}
-                          placeholder="SFD"
-                          error={Boolean(sfdErr)}
-                          onChange={(v) => updatePlanRow(index, { sfd: v })}
-                        />
-                        <FieldErrorText message={sfdErr} />
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.normalExposures`}>
-                        <CNumericInput
-                          fieldSx={fieldSx}
-                          value={row.normalExposures}
-                          placeholder="Normal"
-                          error={Boolean(normalErr)}
-                          onChange={(v) => updatePlanRow(index, { normalExposures: v })}
-                        />
-                        <FieldErrorText message={normalErr} />
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.tangentialExposures`}>
-                        <CNumericInput
-                          fieldSx={fieldSx}
-                          value={row.tangentialExposures}
-                          placeholder="Tangential"
-                          error={Boolean(tangentialErr)}
-                          onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
-                        />
-                        <FieldErrorText message={tangentialErr} />
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={TD}>
-                      <Box data-ndt-field={`radiographyPlanRows.${index}.detectorType`}>
-                        <CSelect
-                          fieldSx={fieldSx}
-                          value={row.detectorType}
-                          options={NDT_DETECTOR_OPTIONS}
-                          placeholder="Select detector"
-                          error={Boolean(detectorErr)}
-                          onChange={(v) => updatePlanRow(index, { detectorType: v })}
-                        />
-                        <FieldErrorText message={detectorErr} />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                    <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
+                      <TableCell sx={TD}>{row.srNo}</TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.sections`}>
+                          <CNumericInput
+                            fieldSx={fieldSx}
+                            value={row.sections}
+                            placeholder="Sections"
+                            error={Boolean(sectionsErr)}
+                            onChange={(v) => updatePlanRow(index, { sections: v })}
+                          />
+                          <FieldErrorText message={sectionsErr} />
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.orientations`}>
+                          <CNumericInput
+                            fieldSx={fieldSx}
+                            value={row.orientations}
+                            placeholder="Orientations"
+                            error={Boolean(orientationsErr)}
+                            onChange={(v) => updatePlanRow(index, { orientations: v })}
+                          />
+                          <FieldErrorText message={orientationsErr} />
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.sfd`}>
+                          <CNumericInput
+                            fieldSx={fieldSx}
+                            value={row.sfd}
+                            placeholder="SFD"
+                            error={Boolean(sfdErr)}
+                            onChange={(v) => updatePlanRow(index, { sfd: v })}
+                          />
+                          <FieldErrorText message={sfdErr} />
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.normalExposures`}>
+                          <CNumericInput
+                            fieldSx={fieldSx}
+                            value={row.normalExposures}
+                            placeholder="Normal"
+                            error={Boolean(normalErr)}
+                            onChange={(v) => updatePlanRow(index, { normalExposures: v })}
+                          />
+                          <FieldErrorText message={normalErr} />
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.tangentialExposures`}>
+                          <CNumericInput
+                            fieldSx={fieldSx}
+                            value={row.tangentialExposures}
+                            placeholder="Tangential"
+                            error={Boolean(tangentialErr)}
+                            onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
+                          />
+                          <FieldErrorText message={tangentialErr} />
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={TD}>
+                        <Box data-ndt-field={`radiographyPlanRows.${index}.detectorType`}>
+                          <CSelect
+                            fieldSx={fieldSx}
+                            value={row.detectorType}
+                            options={NDT_DETECTOR_OPTIONS}
+                            placeholder="Select detector"
+                            error={Boolean(detectorErr)}
+                            onChange={(v) => updatePlanRow(index, { detectorType: v })}
+                          />
+                          <FieldErrorText message={detectorErr} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
               </TableBody>
@@ -457,9 +459,15 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
           <Table size="small" sx={{ minWidth: 420 }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={TH}>Section</TableCell>
-                <TableCell sx={TH}>Orientation</TableCell>
-                <TableCell sx={TH}>Exposures</TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk required label="Section" sx={TH} />
+                </TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk required label="Orientation" sx={TH} />
+                </TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk required label="Exposures" sx={TH} />
+                </TableCell>
                 <TableCell sx={{ ...TH, width: 44 }} />
               </TableRow>
             </TableHead>
@@ -469,61 +477,61 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 const orientationErr = err(`additionalExposureRows.${index}.orientation`);
                 const countErr = err(`additionalExposureRows.${index}.exposureCount`);
                 return (
-                <TableRow key={index} sx={rowBg(index)}>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`additionalExposureRows.${index}.sectionNumber`}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.sectionNumber}
-                        placeholder="Section no."
-                        error={Boolean(sectionErr)}
-                        onChange={(v) => updateExposure(index, { sectionNumber: v })}
-                      />
-                      <FieldErrorText message={sectionErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`additionalExposureRows.${index}.orientation`}>
-                      <CInput
-                        fieldSx={fieldSx}
-                        value={row.orientation}
-                        placeholder="Orientation"
-                        error={Boolean(orientationErr)}
-                        onChange={(v) => updateExposure(index, { orientation: v })}
-                      />
-                      <FieldErrorText message={orientationErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`additionalExposureRows.${index}.exposureCount`}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.exposureCount}
-                        placeholder="Count"
-                        error={Boolean(countErr)}
-                        onChange={(v) => updateExposure(index, { exposureCount: v })}
-                      />
-                      <FieldErrorText message={countErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    {motor.additionalExposureRows.length > 1 ? (
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          onChange({
-                            additionalExposureRows: motor.additionalExposureRows.filter(
-                              (_, i) => i !== index,
-                            ),
-                          })
-                        }
-                        sx={{ color: brand.danger, p: 0.5 }}
-                      >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
+                  <TableRow key={index} sx={rowBg(index)}>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`additionalExposureRows.${index}.sectionNumber`}>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.sectionNumber}
+                          placeholder="Section no."
+                          error={Boolean(sectionErr)}
+                          onChange={(v) => updateExposure(index, { sectionNumber: v })}
+                        />
+                        <FieldErrorText message={sectionErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`additionalExposureRows.${index}.orientation`}>
+                        <CInput
+                          fieldSx={fieldSx}
+                          value={row.orientation}
+                          placeholder="Orientation"
+                          error={Boolean(orientationErr)}
+                          onChange={(v) => updateExposure(index, { orientation: v })}
+                        />
+                        <FieldErrorText message={orientationErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`additionalExposureRows.${index}.exposureCount`}>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.exposureCount}
+                          placeholder="Count"
+                          error={Boolean(countErr)}
+                          onChange={(v) => updateExposure(index, { exposureCount: v })}
+                        />
+                        <FieldErrorText message={countErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      {motor.additionalExposureRows.length > 1 ? (
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            onChange({
+                              additionalExposureRows: motor.additionalExposureRows.filter(
+                                (_, i) => i !== index,
+                              ),
+                            })
+                          }
+                          sx={{ color: brand.danger, p: 0.5 }}
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -561,9 +569,25 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
             <TableHead>
               <TableRow>
                 <TableCell sx={{ ...TH, width: 44 }}>#</TableCell>
-                <TableCell sx={TH}>Section</TableCell>
-                <TableCell sx={TH}>Orientation</TableCell>
-                <TableCell sx={TH}><FieldLabelWithAsterisk label="Observations" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk required label="Section" sx={TH} />
+                </TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk required label="Orientation" sx={TH} />
+                </TableCell>
+                <TableCell sx={TH}>
+                  <FieldLabelWithAsterisk
+                    label="Observations"
+                    required
+                    sx={{
+                      display: "inline",
+                      fontSize: "inherit",
+                      fontWeight: "inherit",
+                      color: "inherit",
+                      mb: 0,
+                    }}
+                  />
+                </TableCell>
                 <TableCell sx={TH}>Image</TableCell>
                 <TableCell sx={{ ...TH, width: 44 }} />
               </TableRow>
@@ -574,73 +598,73 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 const orientationErr = err(`radiographyObservationRows.${index}.orientation`);
                 const observationsErr = err(`radiographyObservationRows.${index}.observations`);
                 return (
-                <TableRow key={index} sx={rowBg(index)}>
-                  <TableCell sx={TD}>{index + 1}</TableCell>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`radiographyObservationRows.${index}.section`}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.section}
-                        placeholder="Section no."
-                        error={Boolean(sectionErr)}
-                        onChange={(v) => updateObservation(index, { section: v })}
+                  <TableRow key={index} sx={rowBg(index)}>
+                    <TableCell sx={TD}>{index + 1}</TableCell>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`radiographyObservationRows.${index}.section`}>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.section}
+                          placeholder="Section no."
+                          error={Boolean(sectionErr)}
+                          onChange={(v) => updateObservation(index, { section: v })}
+                        />
+                        <FieldErrorText message={sectionErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`radiographyObservationRows.${index}.orientation`}>
+                        <CInput
+                          fieldSx={fieldSx}
+                          value={row.orientation}
+                          placeholder="Orientation"
+                          error={Boolean(orientationErr)}
+                          onChange={(v) => updateObservation(index, { orientation: v })}
+                        />
+                        <FieldErrorText message={orientationErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <Box data-ndt-field={`radiographyObservationRows.${index}.observations`}>
+                        <CInput
+                          fieldSx={fieldSx}
+                          value={row.observations}
+                          error={Boolean(observationsErr)}
+                          onChange={(v) => updateObservation(index, { observations: v })}
+                          multiline
+                        />
+                        <FieldErrorText message={observationsErr} />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <NdtFileField
+                        files={row.files ?? []}
+                        onChange={(next) => updateObservation(index, { files: next })}
+                        multiple
+                        acceptMode="image"
+                        subDeptSlug="ndt"
+                        compact
+                        emptyLabel={S.FILE_EMPTY_IMAGE}
                       />
-                      <FieldErrorText message={sectionErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`radiographyObservationRows.${index}.orientation`}>
-                      <CInput
-                        fieldSx={fieldSx}
-                        value={row.orientation}
-                        placeholder="Orientation"
-                        error={Boolean(orientationErr)}
-                        onChange={(v) => updateObservation(index, { orientation: v })}
-                      />
-                      <FieldErrorText message={orientationErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <Box data-ndt-field={`radiographyObservationRows.${index}.observations`}>
-                      <CInput
-                        fieldSx={fieldSx}
-                        value={row.observations}
-                        error={Boolean(observationsErr)}
-                        onChange={(v) => updateObservation(index, { observations: v })}
-                        multiline
-                      />
-                      <FieldErrorText message={observationsErr} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <NdtFileField
-                      files={row.files ?? []}
-                      onChange={(next) => updateObservation(index, { files: next })}
-                      multiple
-                      acceptMode="image"
-                      subDeptSlug="ndt"
-                      compact
-                      emptyLabel={S.FILE_EMPTY_IMAGE}
-                    />
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    {motor.radiographyObservationRows.length > 1 ? (
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          onChange({
-                            radiographyObservationRows: motor.radiographyObservationRows.filter(
-                              (_, i) => i !== index,
-                            ),
-                          })
-                        }
-                        sx={{ color: brand.danger, p: 0.5 }}
-                      >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      {motor.radiographyObservationRows.length > 1 ? (
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            onChange({
+                              radiographyObservationRows: motor.radiographyObservationRows.filter(
+                                (_, i) => i !== index,
+                              ),
+                            })
+                          }
+                          sx={{ color: brand.danger, p: 0.5 }}
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -674,7 +698,19 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
             <TableHead>
               <TableRow>
                 <TableCell sx={{ ...TH, width: 44 }}>#</TableCell>
-                <TableCell sx={{ ...TH, minWidth: 180 }}><FieldLabelWithAsterisk label="Observation" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                <TableCell sx={{ ...TH, minWidth: 180 }}>
+                  <FieldLabelWithAsterisk
+                    label="Observation"
+                    required
+                    sx={{
+                      display: "inline",
+                      fontSize: "inherit",
+                      fontWeight: "inherit",
+                      color: "inherit",
+                      mb: 0,
+                    }}
+                  />
+                </TableCell>
                 <TableCell sx={TH}>Section</TableCell>
                 <TableCell sx={TH}>Orientation</TableCell>
                 <TableCell sx={TH}>Media</TableCell>
@@ -688,91 +724,91 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                   : `visualInspectionRows.${index}.observation`;
                 const observationErr = err(observationPath);
                 return (
-                <TableRow key={`${row.observation}-${index}`} sx={rowBg(index)}>
-                  <TableCell sx={TD}>{index + 1}</TableCell>
-                  <TableCell sx={TD}>
-                    {row.isPreset ? (
-                      <Stack gap={0.75}>
-                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
-                          {row.observation}
-                        </Typography>
+                  <TableRow key={`${row.observation}-${index}`} sx={rowBg(index)}>
+                    <TableCell sx={TD}>{index + 1}</TableCell>
+                    <TableCell sx={TD}>
+                      {row.isPreset ? (
+                        <Stack gap={0.75}>
+                          <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                            {row.observation}
+                          </Typography>
+                          <Box data-ndt-field={observationPath}>
+                            <CInput
+                              fieldSx={fieldSx}
+                              value={row.observationNotes ?? ""}
+                              onChange={(v) => updateVisual(index, { observationNotes: v })}
+                              placeholder="Observation"
+                              multiline
+                              error={Boolean(observationErr)}
+                            />
+                            <FieldErrorText message={observationErr} />
+                          </Box>
+                        </Stack>
+                      ) : (
                         <Box data-ndt-field={observationPath}>
                           <CInput
                             fieldSx={fieldSx}
-                            value={row.observationNotes ?? ""}
-                            onChange={(v) => updateVisual(index, { observationNotes: v })}
-                            placeholder="Observation"
-                            multiline
+                            value={row.observation}
+                            onChange={(v) => updateVisual(index, { observation: v })}
+                            placeholder="Enter observation"
                             error={Boolean(observationErr)}
                           />
                           <FieldErrorText message={observationErr} />
                         </Box>
-                      </Stack>
-                    ) : (
-                      <Box data-ndt-field={observationPath}>
-                        <CInput
-                          fieldSx={fieldSx}
-                          value={row.observation}
-                          onChange={(v) => updateVisual(index, { observation: v })}
-                          placeholder="Enter observation"
-                          error={Boolean(observationErr)}
-                        />
-                        <FieldErrorText message={observationErr} />
-                      </Box>
-                    )}
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <CNumericInput
-                      fieldSx={fieldSx}
-                      value={row.section}
-                      placeholder="Section no."
-                      onChange={(v) => updateVisual(index, { section: v })}
-                    />
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    {/* <CSelect
+                      )}
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.section}
+                        placeholder="Section no."
+                        onChange={(v) => updateVisual(index, { section: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      {/* <CSelect
                       fieldSx={fieldSx}
                       value={row.orientation}
                       options={NDT_ORIENTATION_OPTIONS}
                       placeholder="Select orientation"
                       onChange={(v) => updateVisual(index, { orientation: v })}
                     /> */}
-                    <CInput
-                      fieldSx={fieldSx}
-                      value={row.orientation}
-                      placeholder="Orientation"
-                      onChange={(v) => updateVisual(index, { orientation: v })}
-                    />
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    <NdtFileField
-                      files={row.files ?? []}
-                      onChange={(next) => updateVisual(index, { files: next })}
-                      multiple
-                      acceptMode="imageVideo"
-                      subDeptSlug="ndt"
-                      compact
-                      emptyLabel={S.FILE_EMPTY_IMAGE}
-                    />
-                  </TableCell>
-                  <TableCell sx={TD}>
-                    {!row.isPreset ? (
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          onChange({
-                            visualInspectionRows: motor.visualInspectionRows.filter(
-                              (_, i) => i !== index,
-                            ),
-                          })
-                        }
-                        sx={{ color: brand.danger, p: 0.5 }}
-                      >
-                        <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
+                      <CInput
+                        fieldSx={fieldSx}
+                        value={row.orientation}
+                        placeholder="Orientation"
+                        onChange={(v) => updateVisual(index, { orientation: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <NdtFileField
+                        files={row.files ?? []}
+                        onChange={(next) => updateVisual(index, { files: next })}
+                        multiple
+                        acceptMode="imageVideo"
+                        subDeptSlug="ndt"
+                        compact
+                        emptyLabel={S.FILE_EMPTY_IMAGE}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      {!row.isPreset ? (
+                        <IconButton
+                          size="small"
+                          onClick={() =>
+                            onChange({
+                              visualInspectionRows: motor.visualInspectionRows.filter(
+                                (_, i) => i !== index,
+                              ),
+                            })
+                          }
+                          sx={{ color: brand.danger, p: 0.5 }}
+                        >
+                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>

@@ -1,15 +1,9 @@
-import type { CSSProperties } from "react";
-import {
-  Box,
-  TextField,
-  CircularProgress,
-  Typography,
-  InputAdornment,
-} from "@mui/material";
-import { icons }         from "../../../../app/theme";
-import getLoginTheme     from "../../../../app/theme/custom_themes/auth/login_theme";
+import type { CSSProperties, ReactNode } from "react";
+import { Box, TextField, CircularProgress, Typography, InputAdornment } from "@mui/material";
+import { icons } from "../../../../app/theme";
+import getLoginTheme from "../../../../app/theme/custom_themes/auth/login_theme";
 import { useThemeStore } from "../../../../app/store/themeStore";
-import { STRINGS }       from "../../../../app/config/strings";
+import { STRINGS } from "../../../../app/config/strings";
 import { useCaptchaHook } from "../../../../hooks/auth/useCaptchaHook";
 
 const S = STRINGS.CAPTCHA;
@@ -18,19 +12,28 @@ const CaptchaField = ({
   onChange,
   onCaptchaId,
   reloadKey = 0,
-  label       = S.LABEL,
-  required    = false,
-  disabled    = false,
+  label = S.LABEL,
+  required = false,
+  disabled = false,
   // ── External validation props (from LoginPage) ──
-  // When the parent runs validate() on submit, it passes these in.
-  // They take priority over the component's own internal helper text.
-  error       = false,
-  helperText  = "",
-  sx          = {},
-  inputSx     = {},
+  error = false,
+  helperText = "",
+  sx = {},
+  inputSx = {},
+}: {
+  onChange?: (val: string, isValid?: boolean) => void;
+  onCaptchaId?: (id: string) => void;
+  reloadKey?: number;
+  label?: ReactNode; // Updated to ReactNode so it accepts JSX from ControlledField
+  required?: boolean;
+  disabled?: boolean;
+  error?: boolean;
+  helperText?: string;
+  sx?: object;
+  inputSx?: object;
 }) => {
   const mode = useThemeStore((s) => s.mode);
-  const t    = getLoginTheme(mode).captcha;
+  const t = getLoginTheme(mode).captcha;
   const {
     captcha,
     loading,
@@ -54,13 +57,10 @@ const CaptchaField = ({
 
   return (
     <Box sx={{ ...t.wrapper, ...sx }}>
-
       {/* ── Row: [image col] [input col] ── */}
       <Box sx={t.row}>
-
         {/* Left col: image + reload */}
         <Box sx={t.leftCol}>
-
           <Box sx={{ ...t.imageBox, ...(fetchErr ? t.imageBoxError : {}) }}>
             {loading && <CircularProgress size={18} thickness={4} />}
 
@@ -94,9 +94,7 @@ const CaptchaField = ({
                 ...(loading ? t.reloadIcon.spin : {}),
               }}
             />
-            <Typography sx={t.reloadText}>
-              {loading ? S.LOADING_TEXT : S.RELOAD_BUTTON}
-            </Typography>
+            <Typography sx={t.reloadText}>{loading ? S.LOADING_TEXT : S.RELOAD_BUTTON}</Typography>
           </Box>
         </Box>
 
@@ -106,45 +104,45 @@ const CaptchaField = ({
             fullWidth
             label={label}
             value={value}
-            required={required}
             disabled={disabled || loading || !!fetchErr}
             onChange={(e) => handleInputChange(e.target.value)}
             onBlur={markTouched}
             autoComplete="off"
-            inputProps={{ maxLength: 6, spellCheck: false }}
+            inputProps={{
+              maxLength: 6,
+              spellCheck: false,
+              onKeyPress: (e) => {
+                if (!/^[a-zA-Z0-9]$/.test(e.key)) {
+                  e.preventDefault();
+                }
+              },
+            }}
             InputLabelProps={{ sx: t.inputLabel }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  {internalShowSuccess && <icons.captchaSuccess sx={t.successIcon} />}
-                  {resolvedError       && <icons.captchaError   sx={t.errorIcon}   />}
+                  {internalShowSuccess && !resolvedError && (
+                    <icons.captchaSuccess sx={t.successIcon} />
+                  )}
+                  {resolvedError && <icons.captchaError sx={t.errorIcon} />}
                 </InputAdornment>
               ),
             }}
             error={resolvedError}
+            helperText={resolvedError ? resolvedHelperText : ""}
             sx={{
               ...t.input,
               "& .MuiOutlinedInput-root": {
                 ...t.input["& .MuiOutlinedInput-root"],
                 "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: focusBorderColor },
-                "&:hover .MuiOutlinedInput-notchedOutline":        { borderColor: resolvedError ? "error.main" : "primary.main" },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: resolvedError ? "error.main" : "primary.main",
+                },
               },
               ...inputSx,
             }}
           />
-
-          {/* Helper text — always rendered to keep layout stable */}
-          <Typography
-            variant="caption"
-            sx={{
-              ...t.helperText,
-              color: resolvedHelperColor,
-            }}
-          >
-            {resolvedHelperText}
-          </Typography>
         </Box>
-
       </Box>
     </Box>
   );

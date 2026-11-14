@@ -40,7 +40,7 @@ const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
 const time = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
-  pattern: /^([01]?\d|2[0-3]):[0-5]\d$/,
+  pattern: /^([01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 

@@ -48,6 +48,7 @@ import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import { useFileService } from "../../../hooks/useFileService";
@@ -65,7 +66,7 @@ import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler
 
 type WorkflowView = "list" | "form" | "details";
 
-type CasePrepBatch = {
+type CasePrepBatch = BatchStageContext & {
   batchId: string;
   cpStatus?: string;
   formId?: string | null;

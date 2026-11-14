@@ -10,7 +10,10 @@ import {
 } from "./datePickerShared";
 import { APP_CONTROL_HEIGHT } from "./fieldStyles";
 import { formatDateToApiDate, formatToUiDate } from "../../../utils/dateUtils";
-import { getFromToOrderMessages } from "../../../data/validation/dateRangeValidation";
+import {
+  getFromToOrderMessages,
+  isStartAfterEnd,
+} from "../../../data/validation/dateRangeValidation";
 
 interface DateRangeRowProps {
   from: string;
@@ -147,7 +150,9 @@ const DateRangeRow = ({
           disabled={currentMonthOnly}
           value={toDayjsValue(from)}
           onChange={(value) => {
-            onFromChange(toFilterDate(value));
+            const nextFrom = toFilterDate(value);
+            if (isStartAfterEnd(nextFrom, to)) onToChange("");
+            onFromChange(nextFrom);
           }}
           slotProps={{
             ...sharedSlotProps,

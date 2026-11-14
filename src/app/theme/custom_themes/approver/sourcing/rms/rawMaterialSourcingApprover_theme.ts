@@ -4,6 +4,7 @@ import { keyframes } from "@mui/material/styles";
 import fonts from "@app/theme/fonts";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { uniformTableBodyCellSx, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { detailsBannerGradientColors } from "@app/theme/custom_themes/shared/workflow_details_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -29,6 +30,10 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
     errorBg: isDark ? alpha("#ef5350", 0.12) : alpha("#C0392B", 0.08),
     errorBorder: isDark ? alpha("#ef5350", 0.35) : alpha("#C0392B", 0.3),
   };
+  // Dark accent tokens are for text — fills need deep blues (same as user lot details).
+  const fill = detailsBannerGradientColors(palette, mode);
+  const headerPrimary = fill.from;
+  const headerPrimaryLight = fill.to;
 
   return {
     palette,
@@ -43,7 +48,7 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
         overflow: "hidden",
       },
       headerCell: {
-        background: `linear-gradient(180deg, ${palette.primaryLight}, ${palette.primary})`,
+        background: `linear-gradient(180deg, ${headerPrimaryLight}, ${headerPrimary})`,
         color: palette.white,
         fontWeight: 700,
         fontSize: "0.68rem",
@@ -134,13 +139,13 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
         height: 22,
         fontSize: "0.68rem",
         fontWeight: 800,
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(135deg, ${headerPrimary}, ${headerPrimaryLight})`,
         color: palette.white,
       },
       inlineMaterial: {
         fontWeight: 800,
         fontSize: "0.7rem",
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(135deg, ${headerPrimary}, ${headerPrimaryLight})`,
         color: palette.white,
         height: 22,
       },
@@ -148,9 +153,9 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
         height: 18,
         fontSize: "0.64rem",
         fontWeight: 600,
-        background: alpha(palette.warn, 0.1),
-        color: "#7D6608",
-        border: `1px solid ${alpha(palette.warn, 0.3)}`,
+        background: alpha(palette.warn, isDark ? 0.2 : 0.1),
+        color: isDark ? palette.warn : "#7D6608",
+        border: `1px solid ${alpha(palette.warn, isDark ? 0.45 : 0.3)}`,
       },
     },
     dialog: {
@@ -171,7 +176,7 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
       },
       header: {
         p: "14px 20px",
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(135deg, ${headerPrimary}, ${headerPrimaryLight})`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -269,14 +274,21 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
         boxShadow: `0 1px 6px ${alpha(palette.primary, 0.05)}`,
       },
       innerHeaderCell: (_isLead = false) =>
-        uniformTableHeaderCellSx(palette.primary, palette.primaryLight, {
+        uniformTableHeaderCellSx(headerPrimary, headerPrimaryLight, {
           headerFontSize: "0.63rem",
           headerLetterSpacing: "0.05em",
           headerPaddingY: "7px",
           headerPaddingX: "10px",
         }),
       innerRow: (index: number) => ({
-        background: index % 2 === 0 ? "#fff" : alpha(palette.surface, 0.7),
+        background:
+          index % 2 === 0
+            ? isDark
+              ? alpha("#fff", 0.03)
+              : "#fff"
+            : isDark
+              ? alpha(headerPrimary, 0.12)
+              : alpha(palette.surface, 0.7),
         "&:last-child td": { borderBottom: "none" },
       }),
       innerCell: { padding: "6px 10px" },

@@ -25,7 +25,10 @@ export function usesParallelUnitLocks(batch: Pick<BatchView, "parallelFlowEnable
 }
 
 /** Active subdept screens — currentStage only (see parallel batch spec). */
-export function getActiveStage(batch: BatchView, subDeptId: number): StageProgress | undefined {
+export function getActiveStage(
+  batch: Pick<BatchView, "currentStage">,
+  subDeptId: number,
+): StageProgress | undefined {
   return batch.currentStage?.find((s) => s.subDepartmentId === subDeptId);
 }
 
@@ -82,7 +85,7 @@ export function canSubmitUnit(
   );
 }
 
-const normalizePremixNo = (value: number | string | null | undefined): number | null => {
+const normalizePremixNo = (value: unknown): number | null => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };

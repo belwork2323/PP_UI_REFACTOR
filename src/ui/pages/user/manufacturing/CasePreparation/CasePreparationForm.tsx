@@ -41,6 +41,7 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import {
   buildMotorNavGateHelpers,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import {
@@ -57,15 +58,17 @@ const { cleaningServices: CleaningServicesRoundedIcon } =
   icons.user.manufacturing.casePreparation.form;
 
 type CasePreparationFormProps = {
-  batch?: {
-    batchId?: string;
-    batchType?: string;
-    motorId?: string;
-    motorIds?: Array<string | number>;
-    numberOfMotors?: number | string;
-    formId?: string | null;
-    identificationSheet?: IdentificationSheet | Record<string, unknown> | null;
-  } | null;
+  batch?:
+    | ({
+        batchId?: string;
+        batchType?: string;
+        motorId?: string;
+        motorIds?: Array<string | number>;
+        numberOfMotors?: number | string;
+        formId?: string | null;
+        identificationSheet?: IdentificationSheet | Record<string, unknown> | null;
+      } & BatchStageContext)
+    | null;
   formData: CasePreparationFormState;
   addedMotors: CasePrepAddedMotor[];
   batchMotorCount?: number;

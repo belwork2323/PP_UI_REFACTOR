@@ -4,8 +4,8 @@ import { CASTING_CURING_BRAND } from "../../../app/theme/custom_themes/user/manu
 const BRAND = CASTING_CURING_BRAND;
 
 export const formatWorkflowReadOnlyValue = (value: unknown) => {
-  const text = String(value ?? "").trim();
-  return text || "—";
+  const text = value == null ? "" : String(value);
+  return text.trim() ? text : "—";
 };
 
 type WorkflowReadOnlyTextProps = {

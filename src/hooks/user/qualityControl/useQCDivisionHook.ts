@@ -2098,6 +2098,7 @@ export const useQCDivisionHook = () => {
       motorId?: string,
       motorMeta?: {
         motorCount?: number;
+        motorReceivedDateTime?: string;
         motorReceivedDate?: string;
         weighscaleNo?: string;
         calibrationDueDate?: string;
@@ -2124,6 +2125,8 @@ export const useQCDivisionHook = () => {
         premixNo,
         motorId,
         motorCount: motorMeta?.motorCount,
+        motorReceivedDateTime:
+          motorMeta?.motorReceivedDateTime ?? motorMeta?.motorReceivedDate,
         motorReceivedDate: motorMeta?.motorReceivedDate,
         weighscaleNo: motorMeta?.weighscaleNo,
         calibrationDueDate: motorMeta?.calibrationDueDate,
@@ -6155,7 +6158,8 @@ export const useQCDivisionHook = () => {
 
               if (sectionsToHydrate.length > 0) {
                 let schemaValues = hydrateTrimmingValuesFromSections(sectionsToHydrate, {
-                  motorReceivedAt: entry.motorReceivedDate ?? "",
+                  motorReceivedAt:
+                    entry.motorReceivedDateTime ?? entry.motorReceivedDate ?? "",
                 });
                 if (awaitingInitiation) {
                   const manufacturingPayload = resolveManufacturingDivisionDetailsPayload(
@@ -6182,7 +6186,9 @@ export const useQCDivisionHook = () => {
                   schemaValues:
                     manufacturingPayload && entry.motorId
                       ? buildInitialTrimmingValuesForMotor(manufacturingPayload, entry.motorId)
-                      : createInitialTrimmingValues(entry.motorReceivedDate ?? ""),
+                      : createInitialTrimmingValues(
+                          entry.motorReceivedDateTime ?? entry.motorReceivedDate ?? "",
+                        ),
                 };
               }
               continue;

@@ -26,6 +26,7 @@ import type {
   MaterialBlock,
   MaterialFormGroup,
   MaterialLotBlock,
+  SpecResultField,
   SpecRow,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import {
@@ -41,10 +42,8 @@ import {
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { useApprovedPreparationLots } from "@hooks/user/sourcing/rms/useApprovedPreparationLots";
 import {
-  areAllAnalyzedResultsFilled,
-  areBlocksMandatoryComplete,
+  areBlocksSubmitComplete,
   areBlocksUnitComplete,
-  areMaterialGroupsMandatoryComplete,
   areMaterialGroupsUnitComplete,
   blockRowPath,
   firstRmsValidationErrorMessage,
@@ -53,11 +52,19 @@ import {
   type RmsValidationFocusTarget,
   validateRawMaterialSourcing,
 } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
-import { fieldError, hasValidationErrors } from "@data/validation/validationErrors";
+import { reconcileLiveValidationErrors } from "@data/validation/utils/reconcileLiveValidationErrors";
+import { getTouchedFieldError, hasValidationErrors } from "@data/validation/validationErrors";
 import type { ValidationErrors } from "@data/validation/submissionIntent";
 import type { ValidationAttemptFlags } from "@ui/components/validation/useValidationDisplay";
 export type SpecificationRow = SpecRow;
 export type SpecificationBlock = MaterialBlock;
+
+export type GetSpecResultError = (
+  blockIndex: number,
+  rowIndex: number,
+  touched: boolean,
+  field?: SpecResultField,
+) => string | undefined;
 export type SpecificationBlockUpdater =
   | SpecificationBlock
   | ((previous: SpecificationBlock) => SpecificationBlock);
@@ -453,28 +460,23 @@ export const useRawMaterialSpecificationForm = ({
     [blocks, createLotMode, materialGroups],
   );
 
-  const mandatoryComplete = useMemo(
-    () =>
-      createLotMode
-        ? areMaterialGroupsMandatoryComplete(materialGroups)
-        : areBlocksMandatoryComplete(blocks),
-    [blocks, createLotMode, materialGroups],
-  );
-
-  const allAnalyzedFilled = useMemo(() => areAllAnalyzedResultsFilled(blocks), [blocks]);
-
-  const activeValidationTier = validationAttempt.submit
-    ? "SUBMIT"
-    : validationAttempt.unit
-      ? "UNIT"
-      : validationAttempt.format
-        ? "FORMAT"
-        : null;
+  /** Flattened blocks include prep + analysed rules (same as SUBMIT completeness). */
+  const mandatoryComplete = useMemo(() => areBlocksSubmitComplete(blocks), [blocks]);
 
   useEffect(() => {
-    if (!activeValidationTier) return;
-    setValidationErrors(validateRawMaterialSourcing(blocks, activeValidationTier));
-  }, [activeValidationTier, blocks]);
+    if (!validationAttempt.format && !validationAttempt.unit && !validationAttempt.submit) {
+      return;
+    }
+    const liveFormat = validateRawMaterialSourcing(blocks, "FORMAT");
+    const liveFull = validationAttempt.submit
+      ? validateRawMaterialSourcing(blocks, "SUBMIT")
+      : validationAttempt.unit
+        ? validateRawMaterialSourcing(blocks, "UNIT")
+        : liveFormat;
+    setValidationErrors((previous) =>
+      reconcileLiveValidationErrors(previous, liveFormat, liveFull),
+    );
+  }, [blocks, validationAttempt.format, validationAttempt.unit, validationAttempt.submit]);
 
   const formatErrors = useMemo(
     () => validateRawMaterialSourcing(blocks, "FORMAT"),
@@ -495,11 +497,10 @@ export const useRawMaterialSpecificationForm = ({
     return (
       hasBlocks &&
       mandatoryComplete &&
-      allAnalyzedFilled &&
       !hasValidationErrors(submitErrors) &&
       !hasIncompleteCertificateUploads(blocks)
     );
-  }, [allAnalyzedFilled, blocks, hasBlocks, mandatoryComplete]);
+  }, [blocks, hasBlocks, mandatoryComplete]);
   const allMaterialsAdded =
     createLotMode &&
     !loadingMaterials &&
@@ -703,20 +704,30 @@ export const useRawMaterialSpecificationForm = ({
   );
 
   const getAnalysedResultError = useCallback(
-    (blockIndex: number, rowIndex: number, touched: boolean) => {
-      const path = blockRowPath(blockIndex, rowIndex, "analysedResult");
-      if (validationAttempt.submit) {
-        return fieldError(validateRawMaterialSourcing(blocks, "SUBMIT"), path);
-      }
-      if (validationAttempt.unit) {
-        return fieldError(validateRawMaterialSourcing(blocks, "UNIT"), path);
-      }
-      if (touched) {
-        return fieldError(validateRawMaterialSourcing(blocks, "FORMAT"), path);
-      }
-      return undefined;
+    (
+      blockIndex: number,
+      rowIndex: number,
+      touched: boolean,
+      field: SpecResultField = "analysedResult",
+    ) => {
+      const path = blockRowPath(blockIndex, rowIndex, field);
+      return getTouchedFieldError(
+        validationErrors,
+        path,
+        {
+          showFormat: validationAttempt.format,
+          showUnit: validationAttempt.unit,
+          showSubmit: validationAttempt.submit,
+        },
+        { touched },
+      );
     },
-    [blocks, validationAttempt.submit, validationAttempt.unit],
+    [
+      validationAttempt.format,
+      validationAttempt.submit,
+      validationAttempt.unit,
+      validationErrors,
+    ],
   );
 
   const handleRemoveBlock = useCallback(

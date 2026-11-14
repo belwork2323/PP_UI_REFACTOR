@@ -19,6 +19,7 @@ import ResetPasswordForm from "./components/ResetPasswordForm";
 import { useResetPasswordForm } from "../../../hooks/auth/resetPasswordHook";
 import { useLoginForm } from "../../../hooks/auth/loginHook";
 import { images } from "@app/assets/images";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -50,30 +51,38 @@ const LoginPage = () => {
 
       <Box sx={t.toggleButton.wrapper}>
         <IconButton onClick={() => useThemeStore.getState().toggleMode()} sx={t.toggleButton.root}>
-          {mode === "dark"
-            ? <icons.lightModeToggleIcon sx={t.toggleButton.icon} />
-            : <icons.darkModeToggleIcon sx={t.toggleButton.icon} />}
+          {mode === "dark" ? (
+            <icons.lightModeToggleIcon sx={t.toggleButton.icon} />
+          ) : (
+            <icons.darkModeToggleIcon sx={t.toggleButton.icon} />
+          )}
         </IconButton>
       </Box>
 
       <Box sx={t.belLogo.wrapper}>
-        <img
-          src={images.belLogoDark}
-          alt="BEL Logo"
-          style={t.belLogo.img as React.CSSProperties}
-        />
+        <img src={images.belLogoDark} alt="BEL Logo" style={t.belLogo.img as React.CSSProperties} />
       </Box>
 
       <Box sx={t.leftPanel.wrapper}>
         <Box sx={t.leftPanel.inner}>
           <Box sx={t.drdoLogo.wrapper}>
             <Box sx={t.drdoLogo.badge}>
-              <img src={images.drdoLogo} alt="DRDO Logo" style={t.drdoLogo.img as React.CSSProperties} />
+              <img
+                src={images.drdoLogo}
+                alt="DRDO Logo"
+                style={t.drdoLogo.img as React.CSSProperties}
+              />
             </Box>
           </Box>
-          <Typography sx={t.intro_details}>{STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.DEPARTMENT_NAME}</Typography>
-          <Typography sx={t.intro_details}>{STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.RESEARCH_DETAILS}</Typography>
-          <Typography sx={t.intro_details}>{STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.ORG_NAME}</Typography>
+          <Typography sx={t.intro_details}>
+            {STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.DEPARTMENT_NAME}
+          </Typography>
+          <Typography sx={t.intro_details}>
+            {STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.RESEARCH_DETAILS}
+          </Typography>
+          <Typography sx={t.intro_details}>
+            {STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.ORG_NAME}
+          </Typography>
           <Typography sx={t.title}>{STRINGS.LOGIN_DETAILS.TITLE}</Typography>
           <Typography sx={t.subtitle}>{STRINGS.LOGIN_DETAILS.SUBTITLE}</Typography>
           <Box>
@@ -102,7 +111,9 @@ const LoginPage = () => {
                 <>
                   <Box sx={t.cardHeading.wrapper}>
                     <Typography sx={t.cardHeading.title}>{STRINGS.AUTH.LOGIN_TITLE}</Typography>
-                    <Typography sx={t.cardHeading.subtitle}>{STRINGS.AUTH.LOGIN_SUBTITLE}</Typography>
+                    <Typography sx={t.cardHeading.subtitle}>
+                      {STRINGS.AUTH.LOGIN_SUBTITLE}
+                    </Typography>
                   </Box>
 
                   <Box sx={t.form.wrapper}>
@@ -116,7 +127,7 @@ const LoginPage = () => {
                     )}
 
                     <Dropdown
-                      label="Select Role"
+                      label={<FieldLabelWithAsterisk label="Select Role" required />}
                       value={loginForm.credentials.roleId}
                       options={loginForm.roleOptions}
                       sx={t.roleDropdown.select}
@@ -128,7 +139,7 @@ const LoginPage = () => {
 
                     {loginForm.showDeptDropdown && (
                       <Dropdown
-                        label="Select Sub Department"
+                        label={<FieldLabelWithAsterisk label="Select Sub Department" required />}
                         value={loginForm.credentials.subDepartmentId}
                         options={loginForm.subDeptOptions}
                         sx={t.deptDropdown.select}
@@ -141,23 +152,34 @@ const LoginPage = () => {
                         }
                         helperText={loginForm.subDeptHelperText}
                         onChange={(e) =>
-                          loginForm.handleChange("subDepartmentId", e.target.value === "" ? "" : Number(e.target.value))
+                          loginForm.handleChange(
+                            "subDepartmentId",
+                            e.target.value === "" ? "" : Number(e.target.value),
+                          )
                         }
                       />
                     )}
 
                     <Input
-                      label={STRINGS.AUTH.USERNAME_LABEL}
+                      label={
+                        <FieldLabelWithAsterisk label={STRINGS.AUTH.USERNAME_LABEL} required />
+                      }
                       icon={<icons.person />}
                       sx={t.inputField.sx}
                       value={loginForm.credentials.username}
                       error={Boolean(loginForm.errors.username)}
                       helperText={loginForm.errors.username}
                       onChange={(e) => loginForm.handleChange("username", e.target.value)}
+                      inputProps={{
+                        maxLength: 20,
+                        minLength: 3,
+                      }}
                     />
 
                     <Input
-                      label={STRINGS.AUTH.PASSWORD_LABEL}
+                      label={
+                        <FieldLabelWithAsterisk label={STRINGS.AUTH.PASSWORD_LABEL} required />
+                      }
                       type="password"
                       icon={<icons.lock />}
                       sx={t.inputField.sx}
@@ -165,10 +187,15 @@ const LoginPage = () => {
                       error={Boolean(loginForm.errors.password)}
                       helperText={loginForm.errors.password}
                       onChange={(e) => loginForm.handleChange("password", e.target.value)}
+                      inputProps={{
+                        maxLength: 20,
+                        minLength: 8,
+                        spellCheck: false,
+                      }}
                     />
 
                     <CaptchaField
-                      label="Enter Captcha"
+                      label={<FieldLabelWithAsterisk label="Enter Captcha" required />}
                       required
                       error={Boolean(loginForm.errors.captcha)}
                       helperText={loginForm.errors.captcha}

@@ -3,6 +3,8 @@ import { DateTimeField } from "../../../../components/common/DateField";
 import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { mixingFieldSx } from "./MixingFormFields";
+import { ReactNode } from "react";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 export interface MixingDateFieldProps {
   label?: string;
@@ -32,7 +34,8 @@ export const MixingDateField = ({
   type = "date",
   fieldPath,
 }: MixingDateFieldProps) => {
-  const resolvedPlaceholder = placeholder ?? (type === "datetime" ? "DD-MM-YYYY HH:mm" : "DD-MM-YYYY");
+  const resolvedPlaceholder =
+    placeholder ?? (type === "datetime" ? "DD-MM-YYYY HH:mm" : "DD-MM-YYYY");
   const inputSx = {
     ...mixingFieldSx,
     "& .MuiFormLabel-root": {
@@ -47,20 +50,18 @@ export const MixingDateField = ({
     <Box data-mix-field={fieldPath || undefined} sx={{ width: fullWidth ?? 220 }}>
       {type === "datetime" ? (
         <DateTimeField
-          label={label}
+          label={<FieldLabelWithAsterisk label={label} required={required} />}
           value={value}
           onChange={onChange}
           disabled={disabled}
           placeholder={resolvedPlaceholder}
-          required={required}
           error={error}
           helperText={helperText}
-          compact
           inputSx={inputSx}
         />
       ) : (
         <FlowBarDateField
-          label={label}
+          label={<FieldLabelWithAsterisk label={label} required={required} />}
           value={value}
           onChange={onChange}
           disabled={disabled}
@@ -69,7 +70,6 @@ export const MixingDateField = ({
           width="100%"
           error={error}
           helperText={helperText}
-          required={required}
           inputSx={inputSx}
           flowBar={{
             selectLabel: {

@@ -86,6 +86,7 @@ export const CC_FIELD_LABELS: Record<string, string> = {
   decoringDispatchDateTime: "Date & Time Of Dispatch For De-coring",
   DECORING_DISPATCH_DATE_TIME: "Date & Time Of Dispatch For De-coring",
   // De-coring
+  decoringDateTime: "Date & Time Of De-coring",
   decoringDate: "Date & Time Of De-coring",
   DECORING_DATE: "Date & Time Of De-coring",
   buildingNo: "Building No",
@@ -222,14 +223,14 @@ export const FEED_PIPE_COLUMNS: CcDetailsColumn[] = [
 /** Map fixed-column keys → possible row key aliases. */
 const COLUMN_KEY_ALIASES: Record<string, string[]> = {
   bowlId: ["bowlId", "BOWL_ID"],
-  bowlReceiptTime: ["bowlReceiptTime", "BOWL_RECEIPT_TIME"],
+  bowlReceiptTime: ["bowlReceiptDateTime", "bowlReceiptTime", "BOWL_RECEIPT_TIME"],
   initialWeight: ["initialWeight", "INITIAL_WEIGHT"],
   finalWeight: ["finalWeight", "FINAL_WEIGHT"],
   initialSlurryDepth: ["initialSlurryDepth", "INITIAL_SLURRY_DEPTH"],
-  dcOpenTime: ["dcOpenTime", "DC_OPEN_TIME"],
-  dcCloseTime: ["dcCloseTime", "DC_CLOSE_TIME"],
+  dcOpenTime: ["dcOpenDateTime", "dcOpenTime", "DC_OPEN_TIME"],
+  dcCloseTime: ["dcCloseDateTime", "dcCloseTime", "DC_CLOSE_TIME"],
   slurryDepthAfterDc: ["slurryDepthAfterDc", "SLURRY_DEPTH_AFTER_DC"],
-  ballValveOpenTime: ["ballValveOpenTime", "BALL_VALVE_OPEN_TIME"],
+  ballValveOpenTime: ["ballValveOpenDateTime", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"],
   timeInterval: ["timeInterval", "TIME_INTERVAL", "TIME", "time"],
   rh: ["rh", "RH"],
   viscosity: ["viscosity", "VISCOSITY"],

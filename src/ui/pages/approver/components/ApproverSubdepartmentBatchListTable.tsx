@@ -116,7 +116,7 @@ const ApproverSubdepartmentBatchListTable = ({
       }}
     >
       <TableContainer>
-        <Table>
+        <Table sx={{ borderCollapse: "separate", borderSpacing: 0 }}>
           <TableHead>
             <TableRow>
               <TableCell sx={thSx}>{BL.COL_BATCH_ID}</TableCell>
@@ -138,22 +138,29 @@ const ApproverSubdepartmentBatchListTable = ({
               });
               const meta = statusMeta[status];
 
+              const rowBg = idx % 2 === 0 ? "#fff" : alpha(surfaceColor, 0.5);
+              const cellSx = {
+                ...tdSx,
+                backgroundColor: rowBg,
+                transition: "background 0.15s",
+                ".MuiTableRow-root:hover &": {
+                  backgroundColor: alpha(accentMain, 0.04),
+                },
+              };
+
               return (
                 <TableRow
                   key={String(row.id ?? row.batchId ?? row.formId ?? idx)}
                   sx={{
-                    background: idx % 2 === 0 ? "#fff" : alpha(surfaceColor, 0.5),
-                    "&:hover": { background: alpha(accentMain, 0.04) },
-                    "&:last-child td": { borderBottom: "none" },
                     animation: `${slideUp} 0.3s ease ${idx * 0.04}s both`,
                   }}
                 >
-                  <TableCell sx={tdSx}>
+                  <TableCell sx={cellSx}>
                     <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: accentMain }}>
                       {String(row.batchId ?? "—")}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={tdSx}>
+                  <TableCell sx={cellSx}>
                     <Box sx={theme.batchList.projectCell}>
                       <icons.batchMgmt.projectId sx={theme.batchList.projectIcon} />
                       <Box sx={theme.batchList.projectInfo}>
@@ -166,7 +173,7 @@ const ApproverSubdepartmentBatchListTable = ({
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={tdSx}>
+                  <TableCell sx={cellSx}>
                     <Chip
                       label={formatSubdepartmentBatchTypeLabel(row.batchType)}
                       size="small"
@@ -180,10 +187,10 @@ const ApproverSubdepartmentBatchListTable = ({
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ ...tdSx, fontSize: "0.78rem", color: textSubColor }}>
+                  <TableCell sx={{ ...cellSx, fontSize: "0.78rem", color: textSubColor }}>
                     {String(row.motorId ?? "—")}
                   </TableCell>
-                  <TableCell sx={tdSx}>
+                  <TableCell sx={cellSx}>
                     <Chip
                       label={motorStageLabel(row.motorStage ?? row.motorType)}
                       size="small"
@@ -197,15 +204,15 @@ const ApproverSubdepartmentBatchListTable = ({
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ ...tdSx, fontSize: "0.78rem" }}>
+                  <TableCell sx={{ ...cellSx, fontSize: "0.78rem" }}>
                     {String(row.submittedBy ?? "—")}
                   </TableCell>
                   <TableCell
-                    sx={{ ...tdSx, color: textSubColor, fontSize: "0.76rem", whiteSpace: "nowrap" }}
+                    sx={{ ...cellSx, color: textSubColor, fontSize: "0.76rem", whiteSpace: "nowrap" }}
                   >
                     {formatDisplayDateTime(row.createdOn)}
                   </TableCell>
-                  <TableCell sx={tdSx}>
+                  <TableCell sx={cellSx}>
                     <Chip
                       label={getApproverBatchStatusDisplayLabel(status) || "—"}
                       size="small"
@@ -219,7 +226,7 @@ const ApproverSubdepartmentBatchListTable = ({
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                  <TableCell sx={{ ...cellSx, textAlign: "center" }}>
                     <Button
                       size="small"
                       variant="outlined"

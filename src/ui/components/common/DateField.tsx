@@ -1,4 +1,4 @@
-import type { SxProps, Theme } from "@mui/material";
+import { Box, Tooltip } from "@mui/material";
 import { DatePicker, DateTimePicker, TimePicker } from "@mui/x-date-pickers";
 import dayjs, { Dayjs } from "dayjs";
 import {
@@ -18,6 +18,33 @@ import { WorkflowReadOnlyText } from "./WorkflowReadOnlyText";
 import React from "react";
 
 const UI_TIME_PLACEHOLDER = "HH:mm";
+const DEFAULT_DATETIME_PLACEHOLDER = `${UI_DATE_PLACEHOLDER} ${UI_TIME_PLACEHOLDER}:ss`;
+const DATE_TIME_DEPENDENCY_TOOLTIP =
+  "Select the related start/from date and time first to enable this field.";
+
+const withDateTimeDependencyTooltip = (picker: React.ReactElement, blocked: boolean) =>
+  blocked ? (
+    <Tooltip title={DATE_TIME_DEPENDENCY_TOOLTIP} arrow>
+      <Box sx={{ display: "block", width: "100%" }}>{picker}</Box>
+    </Tooltip>
+  ) : (
+    picker
+  );
+
+const resolveDateTimePlaceholder = (placeholder?: string): string => {
+  const resolved = placeholder || DEFAULT_DATETIME_PLACEHOLDER;
+  if (/HH:mm:ss/i.test(resolved)) return resolved;
+  return resolved.replace(/HH:mm/i, "HH:mm:ss");
+};
+
+const parseUiDateTimeValue = (value: unknown) => {
+  const uiDateTime = toUiDateTime(value);
+  if (!uiDateTime) return null;
+  const withSeconds = /^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/.test(uiDateTime)
+    ? uiDateTime
+    : `${uiDateTime}:00`;
+  return dayjs(withSeconds, UI_DATETIME_SECONDS_FORMAT, true);
+};
 
 export type DateFieldProps = {
   label?: string | React.ReactNode;
@@ -31,7 +58,10 @@ export type DateFieldProps = {
   compact?: boolean;
   placeholder?: string;
   minDate?: string;
+  maxDate?: string;
   minTime?: string;
+  requiresMinDateTime?: boolean;
+  blockedByDateTimeDependency?: boolean;
   sx?: object;
   inputSx?: object;
   inputRef?: React.Ref<HTMLInputElement>;
@@ -51,6 +81,8 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
       compact = false,
       placeholder,
       minDate,
+      maxDate,
+      blockedByDateTimeDependency = false,
       sx,
       inputSx,
       inputRef,
@@ -62,7 +94,8 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
     }
 
     const dateValue = parseUiDate(value);
-    const minDateValue = minDate ? parseUiDate(minDate) ?? undefined : undefined;
+    const minDateValue = minDate ? (parseUiDate(minDate) ?? undefined) : undefined;
+    const maxDateValue = maxDate ? (parseUiDate(maxDate) ?? undefined) : undefined;
 
     // String labels use shared appDropdownLabelProps via DatePickerTextField.
     // Native MUI `required` draws the asterisk (same as AppTextField / AppDropdown).
@@ -76,30 +109,35 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
       inputSx,
     });
 
+    const picker = (
+      <DatePicker
+        {...appDatePickerFieldSlots}
+        label={label}
+        format={UI_DATE_FORMAT}
+        value={dateValue}
+        minDate={minDateValue}
+        maxDate={maxDateValue}
+        disabled={disabled || blockedByDateTimeDependency}
+        onChange={(next: Dayjs | null) => {
+          if (onChange) {
+            onChange(next && next.isValid() ? next.format(UI_DATE_FORMAT) : "");
+          }
+        }}
+        slotProps={{
+          ...pickerSlotProps,
+          textField: {
+            ...pickerSlotProps.textField,
+            inputRef: ref ?? inputRef,
+            inputProps: { readOnly: true },
+          },
+        }}
+        sx={{ width: "100%", ...sx }}
+      />
+    );
+
     return (
       <AppDatePickerProvider>
-        <DatePicker
-          {...appDatePickerFieldSlots}
-          label={label}
-          format={UI_DATE_FORMAT}
-          value={dateValue}
-          minDate={minDateValue}
-          disabled={disabled}
-          onChange={(next: Dayjs | null) => {
-            if (onChange) {
-              onChange(next && next.isValid() ? next.format(UI_DATE_FORMAT) : "");
-            }
-          }}
-          slotProps={{
-            ...pickerSlotProps,
-            textField: {
-              ...pickerSlotProps.textField,
-              inputRef: ref ?? inputRef,
-              inputProps: { readOnly: true },
-            },
-          }}
-          sx={{ width: "100%", ...sx }}
-        />
+        {withDateTimeDependencyTooltip(picker, blockedByDateTimeDependency)}
       </AppDatePickerProvider>
     );
   },
@@ -121,6 +159,7 @@ export const TimeField = ({
   placeholder,
   sx,
   inputSx,
+  blockedByDateTimeDependency = false,
 }: DateFieldProps) => {
   if (readOnly) {
     return <WorkflowReadOnlyText value={value ? toUiTime(value) : ""} />;
@@ -128,26 +167,30 @@ export const TimeField = ({
 
   const parsedMinTime = minTime ? dayjs(toUiTime(minTime) || minTime, "HH:mm") : null;
 
+  const picker = (
+    <TimePicker
+      {...appDatePickerFieldSlots}
+      label={label}
+      value={value ? dayjs(toUiTime(value) || String(value), "HH:mm") : null}
+      minTime={parsedMinTime?.isValid() ? parsedMinTime : undefined}
+      disabled={disabled || blockedByDateTimeDependency}
+      onChange={(next) => onChange(next ? next.format("HH:mm") : "")}
+      slotProps={buildAppDatePickerSlotProps({
+        required,
+        error,
+        helperText,
+        compact,
+        placeholder: placeholder ?? UI_TIME_PLACEHOLDER,
+        sx,
+        inputSx,
+      })}
+      sx={{ width: "100%" }}
+    />
+  );
+
   return (
     <AppDatePickerProvider>
-      <TimePicker
-        {...appDatePickerFieldSlots}
-        label={label}
-        value={value ? dayjs(toUiTime(value) || String(value), "HH:mm") : null}
-        minTime={parsedMinTime?.isValid() ? parsedMinTime : undefined}
-        disabled={disabled}
-        onChange={(next) => onChange(next ? next.format("HH:mm") : "")}
-        slotProps={buildAppDatePickerSlotProps({
-          required,
-          error,
-          helperText,
-          compact,
-          placeholder: placeholder ?? UI_TIME_PLACEHOLDER,
-          sx,
-          inputSx,
-        })}
-        sx={{ width: "100%" }}
-      />
+      {withDateTimeDependencyTooltip(picker, blockedByDateTimeDependency)}
     </AppDatePickerProvider>
   );
 };
@@ -164,6 +207,7 @@ export const DateTimeField = ({
   compact,
   placeholder,
   minDate,
+  requiresMinDateTime = false,
   sx,
   inputSx,
 }: DateFieldProps) => {
@@ -172,59 +216,61 @@ export const DateTimeField = ({
   }
 
   const minDateValue = minDate
-    ? parseUiDate(toUiDateTime(minDate) || minDate) ?? undefined
+    ? (parseUiDate(toUiDateTime(minDate) || minDate) ?? undefined)
     : undefined;
-  const minDateTimeRaw = String(minDate ?? "").trim();
-  const minDateTimeUi = minDateTimeRaw ? toUiDateTime(minDateTimeRaw) : "";
-  const minDateTimeSeconds =
-    minDateTimeRaw.match(/[T ]\d{1,2}:\d{2}:(\d{2})/)?.[1] ?? "00";
-  const minDateTimeValue = minDateTimeUi
-    ? dayjs(
-        `${minDateTimeUi}:${minDateTimeSeconds}`,
-        UI_DATETIME_SECONDS_FORMAT,
-        true,
-      )
-    : null;
-  const uiDateTime = toUiDateTime(value);
-  const seconds = String(value ?? "").match(/[T ]\d{1,2}:\d{2}:(\d{2})/)?.[1] ?? "00";
-  const dateTimeValue = uiDateTime
-    ? dayjs(`${uiDateTime}:${seconds}`, UI_DATETIME_SECONDS_FORMAT, true)
-    : null;
+  const minDateTimeValue = parseUiDateTimeValue(minDate);
+  const dateTimeValue = parseUiDateTimeValue(value);
+  const waitingForStartDateTime = requiresMinDateTime && !minDateTimeValue?.isValid();
   const pickerSlotProps = buildAppDatePickerSlotProps({
     required,
     error,
     helperText,
     compact,
-    placeholder: placeholder ?? `${UI_DATE_PLACEHOLDER} ${UI_TIME_PLACEHOLDER}:ss`,
+    placeholder: resolveDateTimePlaceholder(placeholder),
     sx,
-    inputSx,
+    inputSx: [{ minWidth: compact ? 220 : 240 }, inputSx],
   });
+
+  const picker = (
+    <DateTimePicker
+      {...appDatePickerFieldSlots}
+      label={label}
+      format={UI_DATETIME_SECONDS_FORMAT}
+      value={dateTimeValue?.isValid() ? dateTimeValue : null}
+      minDate={minDateValue}
+      minDateTime={minDateTimeValue?.isValid() ? minDateTimeValue : undefined}
+      ampm={false}
+      timeSteps={{ hours: 1, minutes: 1, seconds: 1 }}
+      views={["year", "month", "day", "hours", "minutes", "seconds"]}
+      disabled={disabled || waitingForStartDateTime}
+      onChange={(next) => {
+        if (!next) {
+          onChange("");
+          return;
+        }
+
+        const nextDateTime =
+          minDateTimeValue?.isValid() &&
+          next.isSame(minDateTimeValue, "day") &&
+          (!dateTimeValue?.isValid() || next.isBefore(minDateTimeValue))
+            ? minDateTimeValue
+            : next;
+        onChange(nextDateTime.format(UI_DATETIME_SECONDS_FORMAT));
+      }}
+      slotProps={{
+        ...pickerSlotProps,
+        textField: {
+          ...pickerSlotProps.textField,
+          inputProps: { readOnly: true },
+        },
+      }}
+      sx={{ width: "100%" }}
+    />
+  );
 
   return (
     <AppDatePickerProvider>
-      <DateTimePicker
-        {...appDatePickerFieldSlots}
-        label={label}
-        format={UI_DATETIME_SECONDS_FORMAT}
-        value={dateTimeValue?.isValid() ? dateTimeValue : null}
-        minDate={minDateValue}
-        minDateTime={minDateTimeValue?.isValid() ? minDateTimeValue : undefined}
-        ampm={false}
-        timeSteps={{ hours: 1, minutes: 1, seconds: 1 }}
-        views={["year", "month", "day", "hours", "minutes", "seconds"]}
-        disabled={disabled}
-        onChange={(next) =>
-          onChange(next ? next.format(UI_DATETIME_SECONDS_FORMAT) : "")
-        }
-        slotProps={{
-          ...pickerSlotProps,
-          textField: {
-            ...pickerSlotProps.textField,
-            inputProps: { readOnly: true },
-          },
-        }}
-        sx={{ width: "100%" }}
-      />
+      {withDateTimeDependencyTooltip(picker, waitingForStartDateTime)}
     </AppDatePickerProvider>
   );
 };

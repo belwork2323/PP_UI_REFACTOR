@@ -8,6 +8,7 @@ import type {
   CasePrepQualificationParameterRow,
 } from "./CasePrepMotorDataModel";
 import { assertFromToOrder } from "@/data/validation/dateRangeValidation";
+import { VALIDATIONSTRING } from "@/data/validation/configs/validationString";
 
 export type CasePrepSubmissionIntent = "DRAFT" | "SUBMIT";
 export type CasePrepValidationErrors = Record<string, string>;
@@ -108,6 +109,7 @@ type AddHelpers = {
     label: string,
     mandatory: boolean,
     alpha?: boolean,
+    regex?: RegExp,
   ) => void;
   addNumber: (path: string, value: unknown, label: string, mandatory: boolean) => void;
   addDate: (path: string, value: unknown, label: string, mandatory: boolean) => void;
@@ -121,6 +123,7 @@ const createAddHelpers = (errors: CasePrepValidationErrors, required: boolean): 
     label: string,
     mandatory: boolean,
     alpha = false,
+    regex?: RegExp,
   ) => {
     const text = str(value);
     if (!text) {
@@ -128,6 +131,9 @@ const createAddHelpers = (errors: CasePrepValidationErrors, required: boolean): 
       return;
     }
     if (alpha && !ALPHA_NUM.test(text) && !ALPHA_NUM_LOOSE.test(text)) {
+      errors[path] = "Invalid value.";
+    }
+    if (regex && !new RegExp(regex).test(text)) {
       errors[path] = "Invalid value.";
     }
   };
@@ -198,6 +204,7 @@ const validateObservationRows = (
       `${label} observation`,
       true,
       true,
+      VALIDATIONSTRING.PATTERNS.ALPHABET_WITH_SPECIAL,
     );
   });
 };
@@ -343,31 +350,6 @@ const validateParameterDateTimeOrder = (
     to.value,
     `${pathPrefix}.${from.index}.value`,
     `${pathPrefix}.${to.index}.value`,
-    errors,
-  );
-};
-
-const validateCrossSectionDateTimeOrder = (
-  fromRows: CasePrepParameterRow[],
-  fromParameter: string,
-  fromPathPrefix: string,
-  toRows: CasePrepParameterRow[],
-  toParameter: string,
-  toPathPrefix: string,
-  errors: CasePrepValidationErrors,
-) => {
-  const fromIndex = (fromRows ?? []).findIndex(
-    (row) => str(row.parameter).toLowerCase() === fromParameter.toLowerCase(),
-  );
-  const toIndex = (toRows ?? []).findIndex(
-    (row) => str(row.parameter).toLowerCase() === toParameter.toLowerCase(),
-  );
-  if (fromIndex < 0 || toIndex < 0) return;
-  validateDateTimePair(
-    fromRows[fromIndex].value,
-    toRows[toIndex].value,
-    `${fromPathPrefix}.${fromIndex}.value`,
-    `${toPathPrefix}.${toIndex}.value`,
     errors,
   );
 };
@@ -536,15 +518,6 @@ export function validateCasePrepMotorData(
     "linerCoatingOperation.linerApplicationLog",
     h,
     { valueMandatory: true, useFieldType: true },
-  );
-  validateCrossSectionDateTimeOrder(
-    preHeating.preHeatingMonitoring ?? [],
-    "Oven Start Date & Time",
-    "preHeating.preHeatingMonitoring",
-    liner.linerApplicationLog ?? [],
-    "Oven Out Date & Time",
-    "linerCoatingOperation.linerApplicationLog",
-    errors,
   );
   validateParameterDateTimeOrder(
     liner.linerApplicationLog ?? [],

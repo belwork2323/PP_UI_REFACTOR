@@ -260,6 +260,11 @@ const str = (value: unknown): string => {
   return String(value);
 };
 
+const preserveNoteText = (value: unknown): string => {
+  const text = str(value);
+  return text.trim() ? text : "";
+};
+
 const createParameterRow = (
   parameter: string,
   valueFieldType?: string,
@@ -465,7 +470,7 @@ const resolveTemperatureDurationCount = (recipe: string, otherDuration: string):
   if (normalized === "OTHERS") {
     const n = parseNumeric(otherDuration);
     if (n === null) return 0;
-    return Math.max(0, Math.min(12, Math.floor(n)));
+    return Math.max(0, Math.min(24, Math.floor(n)));
   }
   return 0;
 };
@@ -621,9 +626,7 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
   const raw = str(value).trim();
   if (!raw) return { date: "", time: "" };
 
-  const localIso = raw.match(
-    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?$/,
-  );
+  const localIso = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (localIso) {
     return {
       date: `${localIso[3]}-${localIso[2]}-${localIso[1]}`,
@@ -631,9 +634,7 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
     };
   }
 
-  const uiDateTime = raw.match(
-    /^(\d{1,2})-(\d{1,2})-(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/,
-  );
+  const uiDateTime = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (uiDateTime) {
     return {
       date: `${uiDateTime[1].padStart(2, "0")}-${uiDateTime[2].padStart(2, "0")}-${uiDateTime[3]}`,
@@ -641,7 +642,11 @@ const splitAbradingUiDateTime = (value: unknown): { date: string; time: string }
     };
   }
 
-  const parsed = dayjs(raw, [...UI_DATE_PARSE_FORMATS, UI_DATETIME_FORMAT, "YYYY-MM-DDTHH:mm:ssZ"], true);
+  const parsed = dayjs(
+    raw,
+    [...UI_DATE_PARSE_FORMATS, UI_DATETIME_FORMAT, "YYYY-MM-DDTHH:mm:ssZ"],
+    true,
+  );
   if (parsed.isValid()) {
     return {
       date: parsed.format("DD-MM-YYYY"),
@@ -804,10 +809,8 @@ const applyApiCutToAbradingPreset = (
   const startDateTime = splitAbradingUiDateTime(cut.startDateTime ?? cut.START_DATE_TIME);
   const endDateTime = splitAbradingUiDateTime(cut.endDateTime ?? cut.END_DATE_TIME);
   const date = startDateTime.date || endDateTime.date || legacyDate;
-  const startTime =
-    startDateTime.time || normalizeAbradingApiTime(cut.startTime ?? cut.START_TIME);
-  const endTime =
-    endDateTime.time || normalizeAbradingApiTime(cut.endTime ?? cut.END_TIME);
+  const startTime = startDateTime.time || normalizeAbradingApiTime(cut.startTime ?? cut.START_TIME);
+  const endTime = endDateTime.time || normalizeAbradingApiTime(cut.endTime ?? cut.END_TIME);
   const dustQty = str(cut.dustQty ?? cut.DUST_QTY);
   const observations = str(cut.observations ?? cut.OBSERVATIONS ?? cut.remarksObservations);
   const attachments = parseFileRefs(cut.attachments ?? cut.ATTACHMENTS);
@@ -893,7 +896,7 @@ const parameterRowsForPayload = (rows: CasePrepParameterRow[]): unknown[] =>
       SR_NO: index + 1,
       parameter: row.parameter,
       value: row.value,
-      remarks: row.remarks,
+      remarks: preserveNoteText(row.remarks) || null,
     }),
   );
 
@@ -963,9 +966,9 @@ const observationRowsForPayload = (rows: CasePrepObservationRow[]): unknown[] =>
     stripRowForPayload({
       SR_NO: index + 1,
       parameter: row.parameter,
-      observations: row.observations,
+      observations: preserveNoteText(row.observations),
       // Always include remarks (user input); null when blank so the key is not dropped.
-      remarks: str(row.remarks ?? "").trim() || null,
+      remarks: preserveNoteText(row.remarks) || null,
     }),
   );
 
@@ -1047,7 +1050,9 @@ export const buildCasePrepMotorDetailsPayload = (
 
   // Fold UI dates into monitoring/application-log "Date" rows when empty (display sync).
   const preHeatingDateTime = toApiLocalDateTime(synced.preHeating.preHeatingDateTime);
-  const linerCoatingDateTime = toApiLocalDateTime(synced.linerCoatingOperation.linerCoatingDateTime);
+  const linerCoatingDateTime = toApiLocalDateTime(
+    synced.linerCoatingOperation.linerCoatingDateTime,
+  );
   const preHeatingDateOnly = toApiDateOnly(preHeatingDateTime);
   const linerCoatingDateOnly = toApiDateOnly(linerCoatingDateTime);
   const preHeatingMonitoring = applyDateToParameterRows(
@@ -1068,19 +1073,19 @@ export const buildCasePrepMotorDetailsPayload = (
       secondCut,
     },
     bellowBonding: {
-      adhesiveDetails: str(synced.bellowBonding.adhesiveDetails).trim(),
-      heBellowDimension: str(synced.bellowBonding.heBellowDimension).trim(),
+      adhesiveDetails: preserveNoteText(synced.bellowBonding.adhesiveDetails),
+      heBellowDimension: preserveNoteText(synced.bellowBonding.heBellowDimension),
       ...(heMotorPastingDateTime ? { heMotorPastingDateTime } : {}),
-      neBellowDimension: str(synced.bellowBonding.neBellowDimension).trim(),
+      neBellowDimension: preserveNoteText(synced.bellowBonding.neBellowDimension),
       ...(neMotorPastingDateTime ? { neMotorPastingDateTime } : {}),
       ...(numberOfSpacers !== undefined ? { numberOfSpacers } : {}),
-      pastingDetails: str(synced.bellowBonding.pastingDetails).trim(),
-      remarks: str(synced.bellowBonding.remarks).trim(),
+      pastingDetails: preserveNoteText(synced.bellowBonding.pastingDetails),
+      remarks: preserveNoteText(synced.bellowBonding.remarks),
     },
     tceCleaning: {
       ...(tceCleaningDateTime ? { tceCleaningDateTime } : {}),
       ...(solventUsedQtyKg !== undefined ? { solventUsedQtyKg } : {}),
-      observation: str(synced.tceCleaning.observation).trim(),
+      observation: preserveNoteText(synced.tceCleaning.observation),
       testReport:
         fileIdsFromFormRefs(
           synced.tceCleaning.testReport ? [synced.tceCleaning.testReport] : [],

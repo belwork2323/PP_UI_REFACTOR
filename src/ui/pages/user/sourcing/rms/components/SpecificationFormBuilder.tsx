@@ -12,8 +12,11 @@ import { icons } from "@app/theme/icons";
 
 import AppDropdown from "@ui/components/common/AppDropdown";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
-import StackRow from "@ui/components/common/StackRow";
 import UserWorkflowActionBar from "@ui/components/custom/UserWorkflowActionBar";
+import UserWorkflowFormDetailsHeader from "@ui/components/custom/UserWorkflowFormDetailsHeader";
+import WorkflowEmptyState from "@ui/components/custom/WorkflowEmptyState";
+import WorkflowEntitySelectorRow from "@ui/components/custom/WorkflowEntitySelectorRow";
+import WorkflowInfoCallout from "@ui/components/custom/WorkflowInfoCallout";
 import MaterialSpecificationBlock from "@ui/pages/user/sourcing/rms/components/MaterialSpecificationBlock";
 import MaterialFormGroupCard from "@ui/pages/user/sourcing/rms/components/MaterialFormGroupCard";
 import useRawMaterialSpecificationForm, {
@@ -136,28 +139,14 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
         </Box>
       )}
 
-      <Stack
-        direction="row"
-        alignItems="flex-start"
-        justifyContent="space-between"
-        mb={2.5}
-        flexWrap="wrap"
-        gap={1.5}
-      >
-        <Stack direction="row" alignItems="center" gap={1.5}>
-          <Box sx={specStyles.headerIconBadge}>
-            <ScienceRoundedIcon
-              sx={{ ...specStyles.whiteIcon, ...specStyles.headerScienceIcon }}
-            />
-          </Box>
-          <Box>
-            <Typography sx={specStyles.headerTitle}>{headerTitle}</Typography>
-            <Typography sx={specStyles.headerSubtitle}>
-              {headerSubtitle}
-            </Typography>
-          </Box>
-        </Stack>
-      </Stack>
+      <Box sx={{ mb: 2.5 }}>
+        <UserWorkflowFormDetailsHeader
+          title={headerTitle}
+          subtitle={headerSubtitle}
+          icon={ScienceRoundedIcon}
+          theme={theme}
+        />
+      </Box>
 
       {hasBlocks && (
         <Stack direction="row" gap={1.5} mb={2.5} flexWrap="wrap">
@@ -200,69 +189,14 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
       )}
 
       {showMaterialSelector && (
-        <Box sx={specStyles.materialSelectorBox}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            gap={2}
-            alignItems="flex-end"
-          >
-            <Box flex={1}>
-              <Typography sx={theme.workflow.formElements.fieldLabel}>
-                {formStrings.SELECT_MATERIAL_LABEL}
-              </Typography>
-              <AppDropdown
-                value={selectedMaterial}
-                onChange={setSelectedMaterial}
-                placeholder={
-                  loadingMaterials
-                    ? formStrings.LOADING_MATERIALS
-                    : formStrings.SELECT_MATERIAL_PLACEHOLDER
-                }
-                sx={theme.workflow.formElements.textField}
-                SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}
-                MenuProps={{
-                  PaperProps: {
-                    sx: specStyles.materialMenuPaper(mode === "dark"),
-                  },
-                }}
-                disabled={
-                  loadingMaterials ||
-                  (createLotMode && materialsForDropdown.length === 0)
-                }
-                startAdornment={
-                  <InputAdornment position="start">
-                    <ScienceRoundedIcon
-                      sx={specStyles.materialSelectIcon(
-                        Boolean(selectedMaterial),
-                      )}
-                    />
-                  </InputAdornment>
-                }
-              >
-                {materialsForDropdown.map((material) => (
-                  <MenuItem
-                    key={material.materialCode}
-                    value={material.materialCode}
-                    sx={{
-                      ...specStyles.materialOption,
-                      color: theme.palette.text,
-                    }}
-                  >
-                    {material.materialCode} - {material.materialName}
-                    <Typography
-                      component="span"
-                      sx={specStyles.materialOptionMeta}
-                    >
-                      ({material.specCount} {formStrings.SPEC_COUNT_SUFFIX})
-                    </Typography>
-                  </MenuItem>
-                ))}
-              </AppDropdown>
-            </Box>
-
+        <WorkflowEntitySelectorRow
+          label={formStrings.SELECT_MATERIAL_LABEL}
+          labelSx={{ ...theme.workflow.formElements.fieldLabel, mb: 0.75 }}
+          containerSx={specStyles.materialSelectorBox}
+          action={
             <AppButton
               fullWidth={false}
-              size="medium"
+              size="small"
               variant="contained"
               onClick={handleAdd}
               disabled={
@@ -276,8 +210,97 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                 ? formStrings.ADDING_TO_FORM
                 : formStrings.ADD_TO_FORM}
             </AppButton>
-          </Stack>
-        </Box>
+          }
+        >
+          <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
+            <AppDropdown
+              value={selectedMaterial}
+              onChange={setSelectedMaterial}
+              placeholder={
+                loadingMaterials
+                  ? formStrings.LOADING_MATERIALS
+                  : formStrings.SELECT_MATERIAL_PLACEHOLDER
+              }
+              sx={[
+                theme.workflow.formElements.textField,
+                specStyles.materialDropdownField,
+              ]}
+              inputSx={
+                mode === "dark"
+                  ? {
+                      minHeight: 36,
+                      height: 36,
+                      bgcolor: "rgba(255,255,255,0.1)",
+                      // Inset ring — survives MUI light-theme notchedOutline (near-black).
+                      boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.7)",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(255,255,255,0.7) !important",
+                        borderWidth: "1.5px !important",
+                      },
+                      "&:hover": {
+                        boxShadow: "inset 0 0 0 1.5px #64b5f6",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#64b5f6 !important",
+                      },
+                      "&.Mui-focused": {
+                        boxShadow: "inset 0 0 0 1.5px #64b5f6",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#64b5f6 !important",
+                        borderWidth: "1.5px !important",
+                      },
+                      "&.Mui-disabled": {
+                        opacity: 1,
+                        bgcolor: "rgba(255,255,255,0.06)",
+                        boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.4)",
+                      },
+                      "&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(255,255,255,0.4) !important",
+                      },
+                    }
+                  : {
+                      minHeight: 36,
+                      height: 36,
+                    }
+              }
+              SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}
+              MenuProps={{
+                disableScrollLock: true,
+                PaperProps: {
+                  sx: specStyles.materialMenuPaper(mode === "dark"),
+                },
+              }}
+              disabled={
+                loadingMaterials ||
+                (createLotMode && materialsForDropdown.length === 0)
+              }
+              startAdornment={
+                <InputAdornment position="start">
+                  <ScienceRoundedIcon
+                    sx={specStyles.materialSelectIcon(Boolean(selectedMaterial))}
+                  />
+                </InputAdornment>
+              }
+            >
+              {materialsForDropdown.map((material) => (
+                <MenuItem
+                  key={material.materialCode}
+                  value={material.materialCode}
+                  sx={specStyles.materialOption}
+                >
+                  {material.materialCode} - {material.materialName}
+                  <Typography
+                    component="span"
+                    sx={specStyles.materialOptionMeta}
+                  >
+                    ({material.specCount} {formStrings.SPEC_COUNT_SUFFIX})
+                  </Typography>
+                </MenuItem>
+              ))}
+            </AppDropdown>
+          </Box>
+        </WorkflowEntitySelectorRow>
       )}
 
       {createLotMode && allMaterialsAdded && (
@@ -290,15 +313,15 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
 
       <Stack spacing={2.5}>
         {!hasBlocks && (
-          <Box sx={theme.workflow.formElements.emptyStateBox}>
-            <ScienceRoundedIcon sx={specStyles.emptyStateIcon} />
-            <Typography sx={specStyles.emptyStateTitle}>
-              {formStrings.EMPTY_ADDED_TITLE}
-            </Typography>
-            <Typography sx={specStyles.emptyStateSubtitle}>
-              {formStrings.EMPTY_ADDED_SUBTITLE}
-            </Typography>
-          </Box>
+          <WorkflowEmptyState
+            icon={ScienceRoundedIcon}
+            title={formStrings.EMPTY_ADDED_TITLE}
+            subtitle={formStrings.EMPTY_ADDED_SUBTITLE}
+            sx={theme.workflow.formElements.emptyStateBox}
+            iconSx={specStyles.emptyStateIcon}
+            titleSx={specStyles.emptyStateTitle}
+            subtitleSx={specStyles.emptyStateSubtitle}
+          />
         )}
 
         {createLotMode
@@ -342,18 +365,16 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
       </Stack>
 
       {hasBlocks && (
-        <StackRow
-          gap={1}
+        <WorkflowInfoCallout
+          icon={InfoOutlinedIcon}
+          text={formStrings.READY_SUBTITLE}
           sx={{
             ...theme.workflow.formElements.infoFooterNote,
             ...specStyles.footerInfoContainer,
           }}
-        >
-          <InfoOutlinedIcon sx={specStyles.footerInfoIcon} />
-          <Typography sx={specStyles.footerInfoText}>
-            {formStrings.READY_SUBTITLE}
-          </Typography>
-        </StackRow>
+          iconSx={specStyles.footerInfoIcon}
+          textSx={specStyles.footerInfoText}
+        />
       )}
 
       <UserWorkflowActionBar

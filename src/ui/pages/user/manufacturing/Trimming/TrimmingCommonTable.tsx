@@ -33,6 +33,7 @@ import CasePrepTextField from "../CasePreparation/CasePrepTextField";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import type { ValidationErrors } from "@/data/validation/adapters/trimming.validation";
 import { fieldError } from "@/data/validation/adapters/trimming.validation";
+import { isStartAfterEnd } from "@/data/validation/dateRangeValidation";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import { NDT_EQUIPMENT_OPTIONS } from "../../../../../hooks/user/qualityControl/ndtFlowConfig";
 
@@ -609,7 +610,7 @@ export const TrimmingCommonTable = ({
                         </Stack>
                       )}
                     </TableCell>
-                    <TableCell sx={tdSx}>
+                    <TableCell sx={{ ...tdSx, minWidth: 220 }}>
                       {readOnly ? (
                         <DateTimeField value={row.startDate} readOnly />
                       ) : (
@@ -620,7 +621,13 @@ export const TrimmingCommonTable = ({
                             error={Boolean(err(`trimmingDetails.${rowIndex}.startDate`))}
                             onChange={(val) => {
                               const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                              nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                startDate: val,
+                                ...(isStartAfterEnd(val, row.completionDate)
+                                  ? { completionDate: "" }
+                                  : {}),
+                              };
                               onMotorSessionChange(activeMotorEntry.motorId, {
                                 ...activeMotorSession,
                                 trimmingDetails: nextRows,
@@ -632,7 +639,7 @@ export const TrimmingCommonTable = ({
                         </Box>
                       )}
                     </TableCell>
-                    <TableCell sx={tdSx}>
+                    <TableCell sx={{ ...tdSx, minWidth: 220 }}>
                       {readOnly ? (
                         <DateTimeField value={row.completionDate} readOnly />
                       ) : (
@@ -640,6 +647,7 @@ export const TrimmingCommonTable = ({
                           <DateTimeField
                             value={row.completionDate}
                             minDate={row.startDate}
+                            requiresMinDateTime
                             compact
                             error={Boolean(err(`trimmingDetails.${rowIndex}.completionDate`))}
                             onChange={(val) => {

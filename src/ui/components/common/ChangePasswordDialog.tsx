@@ -76,6 +76,10 @@ const ChangePasswordDialog = ({ open, onClose }: Props) => {
             onChange={(e) => form.setField("currentPassword", e.target.value)}
             disabled={form.submitting}
             size="small"
+            inputProps={{
+              maxLength: 20,
+              minLength: 8,
+            }}
           />
           <Input
             fullWidth
@@ -87,6 +91,10 @@ const ChangePasswordDialog = ({ open, onClose }: Props) => {
             onChange={(e) => form.setField("newPassword", e.target.value)}
             disabled={form.submitting}
             size="small"
+            inputProps={{
+              maxLength: 20,
+              minLength: 8,
+            }}
           />
           <Input
             fullWidth
@@ -98,6 +106,10 @@ const ChangePasswordDialog = ({ open, onClose }: Props) => {
             onChange={(e) => form.setField("confirmPassword", e.target.value)}
             disabled={form.submitting}
             size="small"
+            inputProps={{
+              maxLength: 20,
+              minLength: 8,
+            }}
           />
           <PasswordRulesList rules={form.rules} />
         </Stack>

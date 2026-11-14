@@ -5,7 +5,6 @@ import {
   emptyHtpbBlendingPreparationDetails,
   isAcemAdductMaterial,
   isAcemHtpbBlendingMaterial,
-  isReferenceRangeNotApplicable,
   type AdductPreparationDetails,
   type BlendingStylePreparationDetails,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
@@ -15,6 +14,10 @@ import {
   validateFieldState,
 } from "@data/validation/fieldValidators";
 import type { SubDeptValidationConfig } from "@data/validation/runValidation";
+import {
+  isReferenceRangeNotApplicable,
+  specResultRuleKey,
+} from "@data/validation/specResultValidation";
 import type { ValidationTier } from "@data/validation/submissionIntent";
 
 const M = STRINGS.SOURCING.SPECIFICATION_FORM.VALIDATION;
@@ -57,6 +60,20 @@ export const rawMaterialSourcingFieldRules = {
     messages: {
       required: M.analysedResultAlphanumeric.required,
       invalid: M.analysedResultAlphanumeric.invalid,
+    },
+  },
+  acemQcResult: {
+    valueType: "number" as const,
+    requiredIn: [] as ValidationTier[],
+    messages: { required: M.acemQcResult.required, invalid: M.acemQcResult.invalid },
+  },
+  acemQcResultAlphanumeric: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: [] as ValidationTier[],
+    messages: {
+      required: M.acemQcResultAlphanumeric.required,
+      invalid: M.acemQcResultAlphanumeric.invalid,
     },
   },
   certificates: {
@@ -177,9 +194,11 @@ export const rawMaterialSourcingFieldRules = {
 };
 
 export function analysedResultRuleKey(row: Pick<SpecRow, "referenceRange">): string {
-  return isReferenceRangeNotApplicable(row.referenceRange)
-    ? "analysedResultAlphanumeric"
-    : "analysedResult";
+  return specResultRuleKey("analysedResult", row.referenceRange);
+}
+
+export function acemQcResultRuleKey(row: Pick<SpecRow, "referenceRange">): string {
+  return specResultRuleKey("acemQcResult", row.referenceRange);
 }
 
 export function validateAnalysedResultState(
@@ -245,6 +264,11 @@ function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
         path: `blocks.${blockIndex}.lots.0.rows.${rowIndex}.analysedResult`,
         value: row.analysedResult,
         ruleKey: analysedResultRuleKey(row),
+      });
+      paths.push({
+        path: `blocks.${blockIndex}.lots.0.rows.${rowIndex}.acemQcResult`,
+        value: row.acemQcResult,
+        ruleKey: acemQcResultRuleKey(row),
       });
     });
 
@@ -454,31 +478,3 @@ export const rawMaterialSourcingValidationConfig: SubDeptValidationConfig<Materi
   resolveFieldPaths: resolveBlockFieldPaths,
   isUnitComplete: areBlocksUnitComplete,
 };
-
-/** @deprecated Use rawMaterialSourcingFieldRules — legacy shape for subdepartmentValidationRules */
-export const toLegacyRawMaterialSourcingRules = () => ({
-  supplyOrderNo: {
-    required: false,
-    valueType: "text" as const,
-    pattern: rawMaterialSourcingFieldRules.supplyOrderNo.pattern,
-  },
-  receiptDate: { required: false, valueType: "date" as const },
-  manufacturerName: {
-    required: true,
-    valueType: "text" as const,
-    pattern: rawMaterialSourcingFieldRules.manufacturerName.pattern,
-  },
-  lotNo: {
-    required: true,
-    valueType: "text" as const,
-    pattern: rawMaterialSourcingFieldRules.lotNo.pattern,
-  },
-  analysedResult: { required: true, valueType: "number" as const },
-  acemQcResult: { required: false, valueType: "text" as const },
-  certificates: { required: true, valueType: "file" as const },
-  certificateType: {
-    required: true,
-    valueType: "text" as const,
-    pattern: rawMaterialSourcingFieldRules.certificateType.pattern,
-  },
-});

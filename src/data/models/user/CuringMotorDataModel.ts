@@ -350,7 +350,9 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
       ),
     },
     DECORING_DETAILS: {
-      DECORING_DATE: toUiDateTime(pickField(decor, "decoringDate", "DECORING_DATE") ?? ""),
+      DECORING_DATE: toUiDateTime(
+        pickField(decor, "decoringDateTime", "decoringDate", "DECORING_DATE") ?? "",
+      ),
       BUILDING_NO: str(pickField(decor, "buildingNo", "BUILDING_NO") ?? ""),
       DECORING_LOAD: str(pickField(decor, "decoringLoad", "DECORING_LOAD") ?? ""),
       DECORING_REMARKS: str(pickField(decor, "decoringRemarks", "DECORING_REMARKS") ?? ""),

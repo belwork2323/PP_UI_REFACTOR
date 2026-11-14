@@ -35,6 +35,7 @@ import {
 } from "../../../../../data/models/user/CastingMotorDataModel";
 import { DateTimeField } from "../../../../components/common/DateField";
 import { toUiTime } from "../../../../../data/models/user/castingCuringFieldCodec";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import CasePrepTextField from "../CasePreparation/CasePrepTextField";
 import {
@@ -104,6 +105,8 @@ const BOWL_ID_PLACEHOLDER = "Select bowl id";
 const CompactDateTime = ({
   value,
   onChange,
+  minDate,
+  requiresMinDateTime = false,
   disabled,
   readOnly,
   fieldPath,
@@ -113,6 +116,8 @@ const CompactDateTime = ({
 }: {
   value: string;
   onChange: (value: string) => void;
+  minDate?: string;
+  requiresMinDateTime?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
   fieldPath?: string;
@@ -141,6 +146,8 @@ const CompactDateTime = ({
       ) : (
         <DateTimeField
           value={value}
+          minDate={minDate}
+          requiresMinDateTime={requiresMinDateTime}
           onChange={onChange}
           disabled={disabled}
           readOnly={readOnly}
@@ -393,9 +400,19 @@ const CastingMotorPanel = ({
   };
 
   const updateBowlDetail = (index: number, patch: Partial<CastingBowlDetailRow>) => {
-    const rows = value.CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.map((row, i) =>
-      i === index ? { ...row, ...patch } : row,
-    );
+    const rows = value.CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.map((row, i) => {
+      if (i !== index) return row;
+      const nextRow = { ...row, ...patch };
+      if (
+        patch.DC_OPEN_TIME !== undefined &&
+        (!nextRow.DC_OPEN_TIME.trim() ||
+          isStartAfterEnd(nextRow.DC_OPEN_TIME, nextRow.DC_CLOSE_TIME))
+      ) {
+        nextRow.DC_CLOSE_TIME = "";
+        clearFieldError?.(`CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`);
+      }
+      return nextRow;
+    });
     patchCastingProcess({ FINAL_MIX_BOWL_DETAILS: rows });
   };
 
@@ -835,45 +852,43 @@ const CastingMotorPanel = ({
           </FieldGrid>
         </Box>
         <FieldGrid columns={2}>
-          <CasePrepTextField
-            label="Weight of assembled empty motor casing (kg)"
-            value={casing.EMPTY_MOTOR_WEIGHT}
-            onChange={(v) => {
-              clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`);
-              updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v });
-            }}
-            disabled={disabled}
-            readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            placeholder="0"
-            required
-            dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`}
-            error={Boolean(
-              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
-            )}
-            helperText={
-              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`]
-            }
-          />
-          <CasePrepTextField
-            label="Vacuum Applied (overnight)"
-            value={casing.VACUUM_APPLIED}
-            onChange={(v) => {
-              clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`);
-              updateMotorCasing({ VACUUM_APPLIED: v });
-            }}
-            disabled={disabled}
-            readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            required
-            dataCcField={`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`}
-            error={Boolean(
-              validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`],
-            )}
-            helperText={validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`]}
-          />
+          <Box>
+            <FieldLabelWithAsterisk label="Weight of assembled empty motor casing (kg)" required />
+            <TableTextInput
+              value={casing.EMPTY_MOTOR_WEIGHT}
+              onChange={(v) => {
+                clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`);
+                updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v });
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="0"
+              required
+              error={Boolean(
+                validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
+              )}
+              helperText={
+                validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`]
+              }
+            />
+          </Box>
+          <Box>
+            <FieldLabelWithAsterisk label="Vacuum Applied (overnight)" required />
+            <TableTextInput
+              value={casing.VACUUM_APPLIED}
+              onChange={(v) => {
+                clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`);
+                updateMotorCasing({ VACUUM_APPLIED: v });
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              required
+              error={Boolean(
+                validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`],
+              )}
+              helperText={validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.VACUUM_APPLIED`]}
+            />
+          </Box>
         </FieldGrid>
       </SectionCard>
 
@@ -1077,6 +1092,8 @@ const CastingMotorPanel = ({
                       <TableCell sx={castingCuringTableCellSx}>
                         <CompactDateTime
                           value={row.DC_CLOSE_TIME}
+                          minDate={row.DC_OPEN_TIME}
+                          requiresMinDateTime
                           onChange={(v) => {
                             clearFieldError?.(
                               `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`,
@@ -1463,68 +1480,56 @@ const CastingMotorPanel = ({
         </Box>
 
         <FieldGrid columns={4}>
-          <CasePrepTextField
-            label={(<FieldLabelWithAsterisk label="Initial Vacuum" required />) as any}
-            value={value.CASTING_PROCESS.INITIAL_VACUUM}
-            onChange={(e: any) => {
-              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              patchCastingProcess({ INITIAL_VACUUM: val });
-              clearFieldError?.(`CASTING_PROCESS.INITIAL_VACUUM`);
-            }}
-            disabled={disabled}
-            readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            placeholder="Enter value"
-            dataCcField={`CASTING_PROCESS.INITIAL_VACUUM`}
-            error={Boolean(validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`])}
-            helperText={validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`]}
-          />
-          <CasePrepTextField
-            label={
-              (
-                <FieldLabelWithAsterisk label="Vacuum Pressure Created for Casting" required />
-              ) as any
-            }
-            value={value.CASTING_PROCESS.VACUUM_PRESSURE_CASTING}
-            onChange={(e: any) => {
-              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              patchCastingProcess({ VACUUM_PRESSURE_CASTING: val });
-              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`);
-            }}
-            disabled={disabled}
-            readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            placeholder="Enter value"
-            dataCcField={`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`}
-            error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`])}
-            helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`]}
-          />
-          <CasePrepTextField
-            label={
-              (
-                <FieldLabelWithAsterisk label="Vacuum Pressure Created for Soaking" required />
-              ) as any
-            }
-            value={value.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING}
-            onChange={(e: any) => {
-              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              patchCastingProcess({ VACUUM_PRESSURE_SOAKING: val });
-              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`);
-            }}
-            disabled={disabled}
-            readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            placeholder="Enter value"
-            dataCcField={`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`}
-            error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`])}
-            helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`]}
-          />
+          <Box>
+            <FieldLabelWithAsterisk label="Initial Vacuum" required />
+            <TableTextInput
+              value={value.CASTING_PROCESS.INITIAL_VACUUM}
+              onChange={(e: any) => {
+                const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+                patchCastingProcess({ INITIAL_VACUUM: val });
+                clearFieldError?.(`CASTING_PROCESS.INITIAL_VACUUM`);
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="Enter value"
+              error={Boolean(validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`])}
+              helperText={validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`]}
+            />
+          </Box>
+          <Box>
+            <FieldLabelWithAsterisk label="Vacuum Pressure Created for Casting" required />
+            <TableTextInput
+              value={value.CASTING_PROCESS.VACUUM_PRESSURE_CASTING}
+              onChange={(e: any) => {
+                const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+                patchCastingProcess({ VACUUM_PRESSURE_CASTING: val });
+                clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`);
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="Enter value"
+              error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`])}
+              helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`]}
+            />
+          </Box>
+          <Box>
+            <FieldLabelWithAsterisk label="Vacuum Pressure Created for Soaking" required />
+            <TableTextInput
+              value={value.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING}
+              onChange={(e: any) => {
+                const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+                patchCastingProcess({ VACUUM_PRESSURE_SOAKING: val });
+                clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`);
+              }}
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="Enter value"
+              error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`])}
+              helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`]}
+            />
+          </Box>
           <Box>
             <FieldLabelWithAsterisk label="TDI Clearance after Vacuum trial" required />
-
             <DateTimeField
               value={value.CASTING_PROCESS.TDI_CLEARANCE_AFTER_VACUUM}
               onChange={(e: any) => {

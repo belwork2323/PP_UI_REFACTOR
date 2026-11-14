@@ -1,7 +1,7 @@
 import { alpha, Box, Stack, Typography } from "@mui/material";
 import AppTextField from "@ui/components/common/AppTextField";
 import { STRINGS } from "@app/config/strings";
-import { DateTimeField } from "@ui/components/common/DateField";
+import DateField, { DateTimeField } from "@ui/components/common/DateField";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import type {
   AdductPreparationDetails,
@@ -10,7 +10,6 @@ import type {
 import MandatoryFormField, {
   mandatoryFieldInputSx,
 } from "@ui/components/validation/ValidatedFormField";
-import ReceiptDateField from "@ui/pages/user/sourcing/rms/components/ReceiptDateField";
 import type { ValidationErrors } from "@/data/validation/submissionIntent";
 import useValidationDisplay, {
   type ValidationAttemptFlags,
@@ -107,13 +106,23 @@ const AdductPreparationSection = ({
             )}
             theme={theme}
           >
-            <ReceiptDateField
+            <DateField
               value={details.adductBatchPrepDate}
               onChange={(value) => updateField("adductBatchPrepDate", value)}
-              theme={theme}
+              placeholder="DD-MM-YYYY"
               error={Boolean(
                 visibleError(
                   blockAdductPath(blockIndex, "adductBatchPrepDate"),
+                ),
+              )}
+              compact
+              sx={{ mb: 0, width: "100%" }}
+              inputSx={fieldSx(
+                "adductBatchPrepDate",
+                Boolean(
+                  visibleError(
+                    blockAdductPath(blockIndex, "adductBatchPrepDate"),
+                  ),
                 ),
               )}
             />
@@ -329,6 +338,7 @@ const AdductPreparationSection = ({
             <DateTimeField
               value={details.processEndTime}
               minDate={details.processStartTime}
+              requiresMinDateTime
               disabled={disabled}
               onChange={(value) => updateField("processEndTime", value)}
               error={Boolean(

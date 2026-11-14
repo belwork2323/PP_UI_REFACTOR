@@ -27,6 +27,13 @@ const BD = STRINGS.BATCH_MANAGEMENT.DETAILS;
 
 type ManufacturingTheme = ReturnType<typeof getManufacturingTheme>;
 
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-IN", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
 type IdentificationSheetCollapsibleProps = {
   batchId: string;
   identificationSheet?: IdentificationSheet | null;
@@ -36,11 +43,42 @@ type IdentificationSheetCollapsibleProps = {
 };
 
 const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  const iso = formatToIsoDateInput(String(value).trim()) || String(value).trim();
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+
+  const iso = formatToIsoDateInput(raw);
+  if (iso) {
+    const [year, month, day] = iso.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    if (
+      date.getFullYear() === year &&
+      date.getMonth() === month - 1 &&
+      date.getDate() === day
+    ) {
+      return DATE_FORMATTER.format(date);
+    }
+  }
+
+  const namedDate = raw.match(/^(\d{1,2})[\s-]+([A-Za-z]{3,})[\s-]+(\d{4})$/);
+  if (namedDate) {
+    const [, dayText, monthText, yearText] = namedDate;
+    const month = MONTHS.indexOf(monthText.slice(0, 3).toLowerCase());
+    const day = Number(dayText);
+    const year = Number(yearText);
+    if (month >= 0) {
+      const date = new Date(year, month, day);
+      if (
+        date.getFullYear() === year &&
+        date.getMonth() === month &&
+        date.getDate() === day
+      ) {
+        return DATE_FORMATTER.format(date);
+      }
+    }
+  }
+
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? raw : DATE_FORMATTER.format(date);
 };
 
 const displayValue = (value: unknown): string => {

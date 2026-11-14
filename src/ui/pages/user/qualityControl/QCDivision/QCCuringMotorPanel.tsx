@@ -42,6 +42,7 @@ import {
   type QcCuringCycleColumnId,
 } from "../../../../../hooks/user/qualityControl/qcCuringConfig";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 import {
   getCuringCycleRows,
   getCuringPostField,
@@ -176,9 +177,32 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
             ? ({ ...row, SR_NO: rowIndex + 1 } as T)
             : ({ ...row } as T);
         }
-        return showSerialNumber
+        const nextRow = showSerialNumber
           ? ({ ...row, [field]: value, SR_NO: rowIndex + 1 } as T)
           : ({ ...row, [field]: value } as T);
+        const nextRecord = nextRow as Record<string, unknown>;
+        if (
+          ["START_DATE", "START_TIME", "END_DATE", "END_TIME"].includes(field)
+        ) {
+          const startDate = formatToUiDate(String(nextRecord.START_DATE ?? ""));
+          const endDate = formatToUiDate(String(nextRecord.END_DATE ?? ""));
+          const startDateTime = startDate
+            ? `${startDate} ${normalizeTimeValue(nextRecord.START_TIME) || "00:00"}`
+            : "";
+          const endDateTime = endDate
+            ? `${endDate} ${normalizeTimeValue(nextRecord.END_TIME) || "00:00"}`
+            : "";
+
+          if (isStartAfterEnd(startDateTime, endDateTime)) {
+            if (startDate && startDate === endDate) {
+              nextRecord.END_TIME = "";
+            } else {
+              nextRecord.END_DATE = "";
+              nextRecord.END_TIME = "";
+            }
+          }
+        }
+        return nextRow;
       }),
     );
   };
@@ -230,12 +254,15 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
 
     if (column.fieldType === "date") {
       const startDate = formatToUiDate(String(row.START_DATE ?? ""));
+      const startDateTimeSelected =
+        Boolean(startDate) && Boolean(normalizeTimeValue(row.START_TIME));
       return (
         <Box data-qc-field={fieldPath}>
           <DateField
             compact
             value={value}
             minDate={column.id === "END_DATE" ? startDate : undefined}
+            blockedByDateTimeDependency={column.id === "END_DATE" && !startDateTimeSelected}
             onChange={(next) => updateRow(index, column.id, next)}
             placeholder="DD-MM-YYYY"
             inputSx={tableDateFieldSx}
@@ -248,11 +275,14 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
     if (column.fieldType === "time") {
       const startDate = formatToUiDate(String(row.START_DATE ?? ""));
       const endDate = formatToUiDate(String(row.END_DATE ?? ""));
+      const startDateTimeSelected =
+        Boolean(startDate) && Boolean(normalizeTimeValue(row.START_TIME));
       return (
         <Box data-qc-field={fieldPath}>
           <TimeField
             compact
             value={normalizeTimeValue(value)}
+            blockedByDateTimeDependency={column.id === "END_TIME" && !startDateTimeSelected}
             minTime={
               column.id === "END_TIME" && startDate && startDate === endDate
                 ? normalizeTimeValue(row.START_TIME)
@@ -752,6 +782,43 @@ const QCCuringMotorPanel = ({
     () => getCuringSubscaleField(values, "CYCLE_END_TIME"),
     [values],
   );
+  const curingStartDateTimeSelected =
+    Boolean(formatToUiDate(curingStartDate)) && Boolean(normalizeTimeValue(cycleStartTime));
+  const updateSubscaleDateTimeField = (
+    field:
+      | "CURING_START_DATE"
+      | "CYCLE_START_TIME"
+      | "CURING_COMPLETE_DATE"
+      | "CYCLE_END_TIME",
+    nextValue: string,
+  ) => {
+    let nextValues = setCuringSubscaleField(values, field, nextValue);
+    const startDate = formatToUiDate(
+      field === "CURING_START_DATE" ? nextValue : curingStartDate,
+    );
+    const startTime = normalizeTimeValue(
+      field === "CYCLE_START_TIME" ? nextValue : cycleStartTime,
+    );
+    const endDate = formatToUiDate(
+      field === "CURING_COMPLETE_DATE" ? nextValue : curingCompleteDate,
+    );
+    const endTime = normalizeTimeValue(
+      field === "CYCLE_END_TIME" ? nextValue : cycleEndTime,
+    );
+    const startDateTime = startDate ? `${startDate} ${startTime || "00:00"}` : "";
+    const endDateTime = endDate ? `${endDate} ${endTime || "00:00"}` : "";
+
+    if (isStartAfterEnd(startDateTime, endDateTime)) {
+      if (startDate && startDate === endDate) {
+        nextValues = setCuringSubscaleField(nextValues, "CYCLE_END_TIME", "");
+      } else {
+        nextValues = setCuringSubscaleField(nextValues, "CURING_COMPLETE_DATE", "");
+        nextValues = setCuringSubscaleField(nextValues, "CYCLE_END_TIME", "");
+      }
+    }
+
+    onChange(nextValues);
+  };
   const bemAverageShoreAHardness = useMemo(
     () => getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS"),
     [values],
@@ -988,7 +1055,7 @@ const QCCuringMotorPanel = ({
                     compact
                     value={curingStartDate}
                     onChange={(next) =>
-                      onChange(setCuringSubscaleField(values, "CURING_START_DATE", next))
+                      updateSubscaleDateTimeField("CURING_START_DATE", next)
                     }
                     placeholder="DD-MM-YYYY"
                     inputSx={tableDateFieldSx}
@@ -1009,7 +1076,7 @@ const QCCuringMotorPanel = ({
                     compact
                     value={normalizeTimeValue(cycleStartTime)}
                     onChange={(next) =>
-                      onChange(setCuringSubscaleField(values, "CYCLE_START_TIME", next))
+                      updateSubscaleDateTimeField("CYCLE_START_TIME", next)
                     }
                     placeholder="HH:mm"
                     inputSx={tableTimeFieldSx}
@@ -1030,8 +1097,9 @@ const QCCuringMotorPanel = ({
                     compact
                     value={curingCompleteDate}
                     minDate={curingStartDate}
+                    blockedByDateTimeDependency={!curingStartDateTimeSelected}
                     onChange={(next) =>
-                      onChange(setCuringSubscaleField(values, "CURING_COMPLETE_DATE", next))
+                      updateSubscaleDateTimeField("CURING_COMPLETE_DATE", next)
                     }
                     placeholder="DD-MM-YYYY"
                     inputSx={tableDateFieldSx}
@@ -1051,6 +1119,7 @@ const QCCuringMotorPanel = ({
                   <TimeField
                     compact
                     value={normalizeTimeValue(cycleEndTime)}
+                    blockedByDateTimeDependency={!curingStartDateTimeSelected}
                     minTime={
                       curingStartDate &&
                       formatToUiDate(curingStartDate) === formatToUiDate(curingCompleteDate)
@@ -1058,7 +1127,7 @@ const QCCuringMotorPanel = ({
                         : undefined
                     }
                     onChange={(next) =>
-                      onChange(setCuringSubscaleField(values, "CYCLE_END_TIME", next))
+                      updateSubscaleDateTimeField("CYCLE_END_TIME", next)
                     }
                     placeholder="HH:mm"
                     inputSx={tableTimeFieldSx}

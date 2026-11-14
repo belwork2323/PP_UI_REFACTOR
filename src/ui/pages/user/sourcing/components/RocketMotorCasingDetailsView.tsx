@@ -1,9 +1,7 @@
 import { useMemo } from "react";
 import {
   Box,
-  Button,
   Chip,
-  CircularProgress,
   Link,
   Stack,
   Table,
@@ -14,17 +12,19 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { icons } from "../../../../../app/theme/icons";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import { useAuthStore } from "../../../../../app/store/authStore";
 import { getRocketMotorCasingPageTheme } from "@app/theme/custom_themes/user/sourcing/rocketMotorCasing_theme";
 import { STRINGS } from "../../../../../app/config/strings";
-import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { getOperationStatusConfig } from "../../../../../hooks/operationStatus";
 import { formatDisplayDate, formatDisplayDateOrDateTime, formatDisplayDateTime } from "../../../../../utils/dateUtils";
 import { useFilePreview } from "../../../../../hooks/useFilePreview";
-import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
+import UserWorkflowDetailsShell from "../../../../components/custom/UserWorkflowDetailsShell";
+import WorkflowDetailsMetaSection from "../../../../components/custom/WorkflowDetailsMetaSection";
+import WorkflowDetailsSection from "../../../../components/custom/WorkflowDetailsSection";
+import useWorkflowDetailsStatusConfig from "../../../../components/custom/useWorkflowDetailsStatusConfig";
 import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import type {
   CasingDetailBlock,
@@ -105,22 +105,13 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
     );
   };
 
-  const statusConfig = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(STATUS_CONFIG).map(([status, cfg]) => [
-          status,
-          { ...cfg, ...dt.bannerStatusConfig[status] },
-        ])
-      ),
-    [dt]
-  );
+  const statusConfig = useWorkflowDetailsStatusConfig(STATUS_CONFIG, dt.bannerStatusConfig);
 
   const metaFields = [
     { label: BL.COL_MOTOR_CASING_ID, value: row.motorCasingId },
     { label: "Project ID", value: row.projectId || "—" },
     { label: BL.COL_MOTOR_ID, value: row.motorNo || "—" },
-    { label: BL.COL_MOTOR_TYPE, value: row.motorStage || "—" },
+    { label: BL.COL_MOTOR_STAGE, value: row.motorStage || "—" },
     { label: BL.COL_BATCH_TYPE, value: row.casingType || "—" },
     { label: "Insulation type", value: row.insulationType || "—" },
     { label: "Receiving date", value: formatDisplayDate(row.receivingDate) },
@@ -134,70 +125,34 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
   ];
 
   return (
-    <Box sx={dt.page}>
-      <Stack direction="row" alignItems="center" gap={1.5} mb={2}>
-        <Button
-          variant="text"
-          size="small"
-          startIcon={<ArrowBackRoundedIcon />}
-          onClick={onBack}
-          sx={theme.workflow.formHeader.backButton}
+    <>
+      <UserWorkflowDetailsShell
+        dt={dt}
+        theme={theme}
+        title={BL.CASING_DETAILS_TITLE}
+        subtitle={`${row.motorCasingId}${row.motorStage ? ` · Stage ${row.motorStage}` : ""}`}
+        icon={RocketLaunchRoundedIcon}
+        status={row.rmStatus}
+        statusConfig={statusConfig}
+        rejectionReason={row.rejectionReason ?? null}
+        onBack={onBack}
+        backLabel={FH.BACK_TO_LIST}
+        loading={loading}
+        loadingText={BL.CASING_DETAILS_LOADING}
+      >
+        <WorkflowDetailsMetaSection
+          dt={dt}
+          title={BL.CASING_DETAILS_IDENTIFICATION_SECTION}
+          icon={DescriptionRoundedIcon}
+          fields={metaFields}
+        />
+
+        <WorkflowDetailsSection
+          dt={dt}
+          title={BL.CASING_DETAILS_SECTIONS}
+          icon={VisibilityRoundedIcon}
+          sx={{ mb: 0 }}
         >
-          {FH.BACK_TO_LIST}
-        </Button>
-      </Stack>
-
-      <Box sx={dt.document}>
-        <Box sx={dt.banner}>
-          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} justifyContent="space-between" gap={2}>
-            <Stack direction="row" alignItems="flex-start" gap={1.5}>
-              <RocketLaunchRoundedIcon sx={dt.bannerIcon} />
-              <Box>
-                <Typography sx={dt.bannerTitle}>{BL.CASING_DETAILS_TITLE}</Typography>
-                <Typography sx={dt.bannerSubtitle}>
-                  {row.motorCasingId}
-                  {row.motorStage ? ` · Stage ${row.motorStage}` : ""}
-                </Typography>
-              </Box>
-            </Stack>
-            <UserWorkflowStatusCell
-              status={row.rmStatus}
-              statusConfig={statusConfig}
-              rejectedStatus={OPERATION_STATUS.REJECTED}
-              rejectionReason={row.rejectionReason ?? null}
-              theme={theme}
-            />
-          </Stack>
-        </Box>
-
-        <Box sx={dt.body}>
-          {loading ? (
-            <Box sx={dt.loadingBox}>
-              <CircularProgress size={36} sx={{ color: theme.palette.primaryLight }} />
-              <Typography sx={dt.emptyText}>{BL.CASING_DETAILS_LOADING}</Typography>
-            </Box>
-          ) : (
-            <>
-              <Box sx={dt.section}>
-                <Typography sx={dt.sectionTitle}>
-                  <DescriptionRoundedIcon sx={{ fontSize: 18 }} />
-                  {BL.CASING_DETAILS_IDENTIFICATION_SECTION}
-                </Typography>
-                <Box sx={dt.metaGrid}>
-                  {metaFields.map((field) => (
-                    <Box key={field.label} sx={dt.metaItem}>
-                      <Typography sx={dt.metaLabel}>{field.label}</Typography>
-                      <Typography sx={dt.metaValue}>{field.value}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-
-              <Box sx={{ ...dt.section, mb: 0 }}>
-                <Typography sx={dt.sectionTitle}>
-                  <VisibilityRoundedIcon sx={{ fontSize: 18 }} />
-                  {BL.CASING_DETAILS_SECTIONS}
-                </Typography>
                 {blocks.length ? (
                   blocks.map((block, bi) => {
                     const columns = block._columns ?? defaultColumns;
@@ -307,11 +262,8 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                 ) : (
                   <Typography sx={dt.emptyText}>{BL.CASING_DETAILS_EMPTY}</Typography>
                 )}
-              </Box>
-            </>
-          )}
-        </Box>
-      </Box>
+        </WorkflowDetailsSection>
+      </UserWorkflowDetailsShell>
 
       <FilePreviewDialog
         preview={preview}
@@ -320,7 +272,7 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
         themeColor={theme.palette.primary}
         themeColorLight={theme.palette.primaryLight}
       />
-    </Box>
+    </>
   );
 };
 

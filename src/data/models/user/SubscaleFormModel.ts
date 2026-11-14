@@ -1,4 +1,8 @@
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import type {
+  SchemaDocumentV2,
+  SchemaFormValues,
+  SchemaSectionSubmission,
+} from "@/data/models/shared/sectionFormTypes";
 import { STRINGS } from "../../../app/config/strings";
 import type { CasePrepDetailSection, CasePrepDetailTable } from "./CasePreparationFormModel";
 import {
@@ -37,8 +41,8 @@ const SUBSCALE_FIELD_LABELS: Record<string, string> = {
   BATCH_SIZE: "Batch Size (KG)",
   MIXER_BLDG_NO: "Bldg No.",
   MIXER_TYPE: "Mixer Type",
-  PREMIX_DATE: "Premix Date & Time",
-  FINAL_MIX_DATE: "Final Mix Date & Time",
+  PREMIX_DATE: "Premix Date",
+  FINAL_MIX_DATE: "Final Mix Date",
   HARDWARE_ARTICLE_SELECTIONS: "Selected Articles",
   NO_OF_40KG_BEMS: "No. of 40 kg BEMs",
   NO_OF_10KG_BEMS: "Number of 10 kg BEMs",
@@ -99,6 +103,7 @@ const SUBSCALE_COLUMN_LABELS: Record<string, string> = {
   GRAIN_SURFACE_OBSERVATIONS: "Grain Surface Obs.",
   BEM_NO: "Article No / BEM No",
   DATE_OF_NDT: "Date & Time Of NDT",
+  DATE_OF_APPLICATION: "Date & Time Of Application",
   HE_OD: "HE Side OD",
   HE_PORT_INNER: "HE Port Inner",
   HE_PORT_OUTER: "HE Port Outer",
@@ -112,7 +117,7 @@ const SUBSCALE_COLUMN_LABELS: Record<string, string> = {
   LENGTH_BEFORE_INHIBITION: "Length Before Inhib.",
   LINER_COATED_SLEEVE_WEIGHT: "Liner Coated Sleeve Wt (A)",
   WEIGHT_BEFORE_INHIBITION: "Wt Before Inhib. (B)",
-  WEIGHT_AFTER_INHIBITION: "Wt After Inhib.",
+  WEIGHT_AFTER_INHIBITION: "Wt After Inhib. (C)",
   IR_APPLIED_WEIGHT: "Wt Of IR Applied",
   PROPELLANT_WEIGHT: "Propellant Wt (C-B-A)",
   PROPELLANT_MASS: "Prop Mass",
@@ -286,6 +291,12 @@ export type SubscaleDetailView = {
   sections: CasePrepDetailSection[];
 };
 
+const normalizeSubscaleFieldLookupKey = (key: string): string =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[-\s]+/g, "_")
+    .toUpperCase();
+
 const parseSubscaleDisplaySections = (
   sections: unknown,
   payload?: Record<string, unknown>,
@@ -301,21 +312,21 @@ const parseSubscaleDisplaySections = (
         label: SUBSCALE_SECTION_LABELS[section.sectionId] ?? parsed.label,
         fields: parsed.fields.map((field) => {
           const leaf = field.key.split(".").pop() ?? "";
+          const normalizedLeaf = normalizeSubscaleFieldLookupKey(leaf);
           // Keep explicit BEM article count labels as-is.
           const label =
             leaf.startsWith("No. of Parts") || leaf.startsWith("No. of Articles")
               ? leaf
-              : (SUBSCALE_FIELD_LABELS[leaf] ?? field.label);
+              : (SUBSCALE_FIELD_LABELS[leaf] ??
+                SUBSCALE_FIELD_LABELS[normalizedLeaf] ??
+                field.label);
           return { ...field, label };
         }),
         // Hide article-selection table; BEM no-of-parts are shown on preparation fields.
         tables: parsed.tables
           .filter((table) => {
             const id = String(table.blockId ?? "").toUpperCase();
-            return (
-              !id.includes("HARDWARE_ARTICLE_SELECTIONS") &&
-              !id.includes("SELECTED_ARTICLES")
-            );
+            return !id.includes("HARDWARE_ARTICLE_SELECTIONS") && !id.includes("SELECTED_ARTICLES");
           })
           .map((table) => ensureSubscaleTableColumns(table)),
       };
@@ -332,7 +343,10 @@ export const mapSubscaleDetailsForDisplay = (
       ? (data as SubscaleDetailsResponse)
       : parseSubscaleDetailsApiResponse(data);
 
-  const sectionsInput = Array.isArray(payload.sections) ? undefined : payload.sections;
+  // parseSubscaleDetailsApiResponse has already rebuilt structured backend
+  // details into display sections. Preserve those sections here; rebuilding a
+  // second time can drop table values when a details response also has sections.
+  const sectionsInput = payload.sections;
 
   return {
     formId: String(payload.subscaleProcessingId ?? payload.formId ?? ""),
@@ -345,7 +359,10 @@ export const mapSubscaleDetailsForDisplay = (
     submittedAt: payload.submittedAt != null ? String(payload.submittedAt) : null,
     lastUpdatedBy: mapCastingCuringPersonLabel(payload.lastUpdatedBy),
     lastUpdatedAt: payload.lastUpdatedAt != null ? String(payload.lastUpdatedAt) : null,
-    sections: parseSubscaleDisplaySections(sectionsInput, payload as Record<string, unknown>),
+    sections: parseSubscaleDisplaySections(
+      sectionsInput,
+      Array.isArray(sectionsInput) ? undefined : (payload as Record<string, unknown>),
+    ),
   };
 };
 

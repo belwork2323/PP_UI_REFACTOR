@@ -79,11 +79,21 @@ export const getListFilterPanelTheme = (palette: ListFilterPanelPalette) => ({
         "& .MuiChip-label": { px: 1.5 },
       },
     },
-    closeButton: { textTransform: "none", fontWeight: 700 },
+    closeButton: {
+      textTransform: "none",
+      fontWeight: 700,
+      color: palette.text,
+      borderColor: alpha(palette.border, 0.8),
+      "&:hover": {
+        borderColor: palette.primaryLight,
+        bgcolor: alpha(palette.primaryLight, 0.08),
+      },
+    },
     applyButton: {
       textTransform: "none",
       fontWeight: 700,
       bgcolor: palette.primary,
+      color: "#fff",
       "&:hover": { bgcolor: palette.primaryLight },
     },
     fieldSpinner: { mt: 0.75, color: palette.primaryLight },

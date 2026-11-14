@@ -36,6 +36,8 @@ export type QcDivisionEntry = {
   premixDate?: string;
   motorId?: string;
   motorCount?: number;
+  motorReceivedDateTime?: string;
+  /** Legacy entry metadata alias. */
   motorReceivedDate?: string;
   inhibitorType?: string;
   weighscaleNo?: string;

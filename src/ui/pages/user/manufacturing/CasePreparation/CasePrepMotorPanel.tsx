@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Box,
   CircularProgress,
@@ -61,6 +61,7 @@ import {
 } from "./CasePrepFormPrimitives";
 import type { CasePrepValidationErrors } from "../../../../../data/models/user/casePrepValidation";
 import { casePrepFieldError } from "../../../../../data/models/user/casePrepValidation";
+import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 
 type Props = {
   value: CasePrepMotorData;
@@ -87,6 +88,11 @@ const BRAND = CASE_PREP_BRAND;
 const ABRADING_DUST_A = "Dust Weight (in gm) (A)";
 const ABRADING_DUST_B = "Dust Weight (in gm) (B)";
 const ABRADING_DUST_TOTAL = "Total Dust Weight (in gm) (A+B)";
+const CASE_PREP_END_PARAMETER_BY_START = {
+  "cycle start date & time": "cycle end date & time",
+  "start date & time": "end date & time",
+  "rotation start date & time": "rotation end date & time",
+} as const;
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
@@ -216,6 +222,7 @@ export const CompactDateTime = ({
         placeholder={placeholder}
         required={required}
         minDate={minDate}
+        requiresMinDateTime={minDate !== undefined}
         error={error}
         inputSx={casePrepTableInputSx}
       />
@@ -405,13 +412,10 @@ const ValueByFieldType = ({
   return <Box data-cp-field={dataCpField}>{control}</Box>;
 };
 
-const getCasePrepDateTimeMinValue = (
-  rows: CasePrepParameterRow[],
-  index: number,
-  ovenStartDateTime?: string,
-) => {
-  const endParameter = String(rows[index]?.parameter ?? "").trim().toLowerCase();
-  if (endParameter === "oven out date & time") return ovenStartDateTime || undefined;
+const getCasePrepDateTimeMinValue = (rows: CasePrepParameterRow[], index: number) => {
+  const endParameter = String(rows[index]?.parameter ?? "")
+    .trim()
+    .toLowerCase();
   const startParameter =
     endParameter === "cycle end date & time"
       ? "cycle start date & time"
@@ -421,9 +425,7 @@ const getCasePrepDateTimeMinValue = (
           ? "rotation start date & time"
           : "";
   if (!startParameter) return undefined;
-  return (
-    rows.find((row) => row.parameter.trim().toLowerCase() === startParameter)?.value || undefined
-  );
+  return rows.find((row) => row.parameter.trim().toLowerCase() === startParameter)?.value ?? "";
 };
 
 type MfgLotCellProps = {
@@ -674,16 +676,41 @@ const CasePrepMotorPanel = ({
     index: number,
     patch: Partial<Extract<CasePrepAbradingDetailsRow, { operation?: string }>>,
   ) => {
+    const rows = value.abradingOperation.abradingDetails;
     const next = value.abradingOperation.abradingDetails.map((row, i) => {
       if (i !== index || isAbradingHeader(row)) return row;
       return { ...row, ...patch };
     });
 
-    const operation = str(
-      !isAbradingHeader(value.abradingOperation.abradingDetails[index])
-        ? (value.abradingOperation.abradingDetails[index] as { operation?: string }).operation
-        : "",
-    ).trim();
+    const currentRow = rows[index];
+    const operation =
+      currentRow && !isAbradingHeader(currentRow) ? str(currentRow.operation).trim() : "";
+
+    if (
+      patch.value !== undefined &&
+      currentRow &&
+      !isAbradingHeader(currentRow) &&
+      isAbradingStartRow(currentRow)
+    ) {
+      const group = groupAbradingDetailsForRender(rows).find((candidate) =>
+        candidate.dataIndices.includes(index),
+      );
+      const endIndex = group?.dataIndices.find((rowIndex) => {
+        const row = rows[rowIndex];
+        return (
+          row && !isAbradingHeader(row) && /^End Date & Time$/i.test(str(row.operation).trim())
+        );
+      });
+      const endRow = endIndex === undefined ? undefined : next[endIndex];
+      if (
+        endIndex !== undefined &&
+        endRow &&
+        !isAbradingHeader(endRow) &&
+        isStartAfterEnd(patch.value, endRow.value)
+      ) {
+        next[endIndex] = { ...endRow, value: "" };
+      }
+    }
 
     if (
       patch.value !== undefined &&
@@ -744,14 +771,27 @@ const CasePrepMotorPanel = ({
     const rows = Array.isArray(section[listKey])
       ? ([...section[listKey]] as CasePrepParameterRow[])
       : [];
+    const parameter = String(rows[index]?.parameter ?? "")
+      .trim()
+      .toLowerCase();
     rows[index] = { ...rows[index], ...patch };
-    onChange({
+    const endParameter =
+      CASE_PREP_END_PARAMETER_BY_START[parameter as keyof typeof CASE_PREP_END_PARAMETER_BY_START];
+    if (patch.value !== undefined && endParameter) {
+      const endIndex = rows.findIndex((row) => row.parameter.trim().toLowerCase() === endParameter);
+      if (endIndex >= 0 && isStartAfterEnd(patch.value, rows[endIndex].value)) {
+        rows[endIndex] = { ...rows[endIndex], value: "" };
+      }
+    }
+
+    let nextValue: CasePrepMotorData = {
       ...value,
       [sectionKey]: {
         ...section,
         [listKey]: rows,
       },
-    });
+    };
+    onChange(nextValue);
   };
 
   const updateIngredientRow = (
@@ -917,8 +957,12 @@ const CasePrepMotorPanel = ({
       </Box>
     );
   };
-  console.log(value);
-
+  const durationOptions = useMemo(() => {
+    return Array.from({ length: 24 }, (_, i) => ({
+      value: String(i + 1),
+      label: String(i + 1),
+    }));
+  }, []);
   const prcClearanceDate = value;
   const abrading = value.abradingOperation;
   const bellow = value.bellowBonding;
@@ -926,7 +970,6 @@ const CasePrepMotorPanel = ({
   const preHeating = value.preHeating;
   const liner = value.linerCoatingOperation;
   const dispatch = value.dispatchToCasting;
-
   const showVacuumApplied = str(preHeating.vacuumBaggingApplied).toUpperCase() === "YES";
   const showOtherRecipe = str(preHeating.preHeatingRecipe).toUpperCase() === "OTHERS";
   const showOtherLiner = str(liner.linerType).toUpperCase() === "OTHERS";
@@ -1397,15 +1440,16 @@ const CasePrepMotorPanel = ({
                 <FieldErrorText message={err("preHeating.otherTemperature")} />
               </Box>
               <Box>
-                <CasePrepTextField
+                <CasePrepSelect
                   label="Other Duration (hrs)"
                   value={preHeating.otherDuration}
+                  placeholder="Select duration"
+                  options={durationOptions}
                   onChange={(v) => patchPreHeating({ otherDuration: v })}
                   disabled={disabled}
                   readOnly={readOnly}
                   theme={theme}
                   width="100%"
-                  placeholder="Hours"
                   required
                   dataCpField="preHeating.otherDuration"
                 />
@@ -1696,13 +1740,7 @@ const CasePrepMotorPanel = ({
                     value: v,
                   }),
                 `linerCoatingOperation.linerApplicationLog.${index}.value`,
-                  getCasePrepDateTimeMinValue(
-                    liner.linerApplicationLog,
-                    index,
-                    preHeating.preHeatingMonitoring.find(
-                      (row) => row.parameter.trim().toLowerCase() === "oven start date & time",
-                    )?.value,
-                  ),
+                getCasePrepDateTimeMinValue(liner.linerApplicationLog, index),
               )
             }
           />
@@ -1716,7 +1754,7 @@ const CasePrepMotorPanel = ({
           <ParameterTable
             columns={[
               { key: "parameter", label: "Parameter", width: "36%" },
-              { key: "observations", label: "Observations" },
+              { key: "observations", label: "Observations", required: true },
               { key: "remarks", label: "Remarks" },
             ]}
             rows={dispatch.dispatchVisualObservations}

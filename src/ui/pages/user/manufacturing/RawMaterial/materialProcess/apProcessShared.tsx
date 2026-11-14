@@ -11,6 +11,7 @@ import {
   type ApParticleSizeRow,
   type ApTimedOperationParameterRow,
 } from "../../../../../../data/models/user/rmp/apCoarseProcessForm";
+import { isStartAfterEnd } from "../../../../../../data/validation/dateRangeValidation";
 
 export const splitFieldErrors = (
   errors: Record<string, string> | undefined,
@@ -245,7 +246,11 @@ export const ApRvdTable = ({
           helperText={validationErrors?.[`dryingOperationRvd.${index}.startTime`] ?? null}
           onChange={(v) => {
             const next = [...rows];
-            next[index] = { ...row, startTime: v };
+            next[index] = {
+              ...row,
+              startTime: v,
+              ...(isStartAfterEnd(v, row.endTime) ? { endTime: "" } : {}),
+            };
             onChange(next);
           }}
         />

@@ -3,6 +3,7 @@ import { resetPasswordController } from "../../controllers/auth/authController";
 import { STRINGS } from "../../app/config/strings";
 import { useAlertStore } from "../../app/store/alertStore";
 import {
+  REASON_MAX_LENGTH,
   REASON_MIN_LENGTH,
   REASON_PATTERN,
   USER_ID_PATTERN,
@@ -21,7 +22,7 @@ export function useResetPasswordForm({ onBack }) {
   const { showAlert } = useAlertStore();
 
   const canSubmit =
-    values.userId.trim().length > 0 && values.reason.trim().length >= REASON_MIN_LENGTH;
+    values.userId.trim().length > 2 && values.reason.trim().length >= REASON_MIN_LENGTH;
 
   const setField = useCallback((field, value) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -48,6 +49,9 @@ export function useResetPasswordForm({ onBack }) {
       ok = false;
     } else if (reason.length < REASON_MIN_LENGTH) {
       next.reason = V.REASON_TOO_SHORT;
+      ok = false;
+    } else if (reason.length > REASON_MAX_LENGTH) {
+      next.reason = V.REASON_TOO_LONG;
       ok = false;
     } else if (!REASON_PATTERN.test(reason)) {
       next.reason = V.REASON_INVALID;

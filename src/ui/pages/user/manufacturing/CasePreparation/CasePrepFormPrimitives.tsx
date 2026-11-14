@@ -12,7 +12,10 @@ import {
   alpha,
 } from "@mui/material";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
-import { uniformTableHeaderCellSx, uniformTableBodyCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableHeaderCellSx,
+  uniformTableBodyCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
@@ -294,6 +297,7 @@ type ParameterTableColumn = {
   key: "parameter" | "value" | "remarks" | "observations";
   label: string;
   width?: string | number;
+  required?: boolean;
 };
 
 type ParameterTableRow = {
@@ -326,7 +330,7 @@ type ParameterTableProps = {
 
 const DEFAULT_PARAM_COLUMNS: ParameterTableColumn[] = [
   { key: "parameter", label: "Parameter", width: "32%" },
-  { key: "value", label: "Value" },
+  { key: "value", label: "Value", required: true },
   { key: "remarks", label: "Remarks" },
 ];
 
@@ -367,9 +371,15 @@ export const ParameterTable = ({
         <TableHead>
           <TableRow>
             {columns.map((col, idx) => (
-              <TableCell key={col.key} sx={{ ...casePrepTableHeaderCellSx(idx === 0), width: col.width }}>
-                {col.label}
-                {requiredValue && (col.key === "value" || col.key === "observations") ? " *" : ""}
+              <TableCell
+                key={col.key}
+                sx={{ ...casePrepTableHeaderCellSx(idx === 0), width: col.width }}
+              >
+                <FieldLabelWithAsterisk
+                  label={col.label}
+                  required={col.required}
+                  sx={{ ...casePrepTableHeaderCellSx(idx === 0), width: col.width }}
+                />
               </TableCell>
             ))}
           </TableRow>

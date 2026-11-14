@@ -24,9 +24,7 @@ const UserWorkflowStatusCell = ({
   theme,
 }: UserWorkflowStatusCellProps) => {
   const themeStatus = theme?.batchList?.statusConfig?.[status];
-  const cfg = statusConfig[status]
-    ? { ...themeStatus, ...statusConfig[status] }
-    : themeStatus;
+  const cfg = statusConfig[status] ? { ...themeStatus, ...statusConfig[status] } : themeStatus;
   const Icon = cfg?.Icon ?? statusConfig[status]?.Icon;
   const label = cfg?.label ?? status;
   const color = cfg?.color ?? theme?.palette?.textSub ?? "#5D6D7E";

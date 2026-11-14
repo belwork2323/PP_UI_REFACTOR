@@ -9,7 +9,21 @@ import type {
   RawMaterialTypeValue,
   PreparationTypeValue,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
+import {
+  computeIsOutOfRange,
+  isReferenceRangeNotApplicable,
+} from "@data/validation/specResultValidation";
 import { formatToUiDate } from "@utils/dateUtils";
+
+export {
+  computeIsOutOfRange,
+  isAcemQcOutOfRange,
+  isReferenceRangeNotApplicable,
+  isSpecResultField,
+  sanitizeNumericAnalysedResultInput,
+  sanitizeSpecResultInput,
+  type SpecResultField,
+} from "@data/validation/specResultValidation";
 
 export type AdductPreparationDetails = {
   adductBatchPrepDate: string;
@@ -428,14 +442,6 @@ export type ReferenceRangeShape = {
   unit: string | null;
 };
 
-/** True when both min and max are absent (N/A / unbound spec). Accepts any range shape with min/max. */
-export function isReferenceRangeNotApplicable(
-  referenceRange?: Pick<ReferenceRangeShape, "minValue" | "maxValue"> | null,
-): boolean {
-  if (!referenceRange) return true;
-  return referenceRange.minValue == null && referenceRange.maxValue == null;
-}
-
 /** Outbound API value: numeric specs send numbers; N/A specs send trimmed text. */
 export function mapAnalysedResultForApi(
   row: Pick<SpecRow, "analysedResult" | "referenceRange">,
@@ -447,49 +453,6 @@ export function mapAnalysedResultForApi(
   }
   const numeric = Number(trimmed.replace(/,/g, ""));
   return Number.isFinite(numeric) ? numeric : null;
-}
-
-/** Restrict numeric spec inputs to digits, one decimal point, and optional leading minus. */
-export function sanitizeNumericAnalysedResultInput(value: string): string {
-  const raw = String(value ?? "");
-  if (!raw) return "";
-
-  let result = "";
-  let hasDecimal = false;
-  let index = 0;
-
-  if (raw[0] === "-") {
-    result = "-";
-    index = 1;
-  }
-
-  for (; index < raw.length; index += 1) {
-    const char = raw[index];
-    if (char >= "0" && char <= "9") {
-      result += char;
-      continue;
-    }
-    if (char === "." && !hasDecimal) {
-      hasDecimal = true;
-      result += char;
-    }
-  }
-
-  return result;
-}
-
-export function computeIsOutOfRange(
-  analysedResult: string,
-  referenceRange?: ReferenceRangeShape,
-): boolean {
-  const trimmed = String(analysedResult ?? "").trim();
-  if (!trimmed || !referenceRange || isReferenceRangeNotApplicable(referenceRange)) return false;
-  const value = Number(trimmed);
-  if (Number.isNaN(value)) return false;
-  const { minValue, maxValue } = referenceRange;
-  if (minValue != null && value < minValue) return true;
-  if (maxValue != null && value > maxValue) return true;
-  return false;
 }
 
 /** Stable JSON for dirty-check / snapshots (File → name only; strips upload UI state). */

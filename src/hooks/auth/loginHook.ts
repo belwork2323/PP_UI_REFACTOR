@@ -167,7 +167,7 @@ export function useLoginForm({ navigate }) {
     const V = STRINGS.AUTH.VALIDATION;
     const next = { ...INITIAL_ERRORS };
     let valid = true;
-
+    const trimmedCaptcha = captchaValue.trim();
     if (rolesEmpty) {
       next.roleId = STRINGS.AUTH.NO_ROLES_AVAILABLE;
       valid = false;
@@ -194,8 +194,11 @@ export function useLoginForm({ navigate }) {
       next.password = V.PASSWORD_REQUIRED;
       valid = false;
     }
-    if (!captchaValue.trim()) {
+    if (!trimmedCaptcha) {
       next.captcha = V.CAPTCHA_REQUIRED;
+      valid = false;
+    } else if (trimmedCaptcha.length !== 6 || !/^[a-zA-Z0-9]{6}$/.test(trimmedCaptcha)) {
+      next.captcha = "Captcha must be exactly 6 alphanumeric characters";
       valid = false;
     } else if (!captchaId || String(captchaId).trim().length === 0) {
       next.captcha = V.CAPTCHA_INVALID;

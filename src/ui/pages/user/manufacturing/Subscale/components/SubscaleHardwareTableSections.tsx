@@ -392,6 +392,7 @@ export const CastingTableSection = memo(function CastingTableSection({
                       compact
                       value={toSubscaleUiDateTime(row.CASTING_END_TIME, fallbackDate)}
                       minDate={toSubscaleUiDateTime(row.CASTING_START_TIME, fallbackDate)}
+                      requiresMinDateTime
                       onChange={(next) => {
                         onCellChange("CASTING_TABLE", idx, "CASTING_END_TIME", next);
                       }}
@@ -677,6 +678,7 @@ export const CuringTableSection = memo(function CuringTableSection({
                       compact
                       value={toSubscaleUiDateTime(row.CURING_END_DATE)}
                       minDate={toSubscaleUiDateTime(row.CURING_START_DATE)}
+                      requiresMinDateTime
                       onChange={(next) => {
                         onCellChange("CURING_TABLE", idx, "CURING_END_DATE", next);
                       }}

@@ -74,7 +74,14 @@ const BatchTable = ({
 
   return (
     <TableContainer>
-      <Table aria-label={tableLabel}>
+      <Table
+        aria-label={tableLabel}
+        sx={{
+          // Separate borders so zebra fills cannot cover shared collapsed edges.
+          borderCollapse: "separate",
+          borderSpacing: 0,
+        }}
+      >
         <TableHead>
           <TableRow>
             <TableCell sx={{ ...headerCellSx, width: 40, textAlign: "center" }}>
@@ -117,27 +124,33 @@ const BatchTable = ({
           ) : (
             rows.map((row, idx) => {
               const isHighlighted = highlightRow?.(row) ?? false;
+              const rowBg = isHighlighted
+                ? alpha(highlightColor, 0.02)
+                : idx % 2 === 0
+                  ? stripedRowEven
+                  : stripedRowOdd;
+              // Background on the cell keeps grid borders above the stripe fill.
+              const cellSx = {
+                ...bodyCellSx,
+                backgroundColor: rowBg,
+                transition: "background 0.15s",
+                ".MuiTableRow-root:hover &": {
+                  backgroundColor: alpha(hoverColor, 0.04),
+                },
+              };
 
               return (
                 <TableRow
                   key={row.id ?? idx}
                   sx={{
-                    background: isHighlighted
-                      ? alpha(highlightColor, 0.02)
-                      : idx % 2 === 0
-                        ? stripedRowEven
-                        : stripedRowOdd,
                     borderLeft: isHighlighted
                       ? `3px solid ${highlightColor}`
                       : "3px solid transparent",
-                    "&:hover": { background: alpha(hoverColor, 0.04) },
-                    "&:last-child td": { borderBottom: "none" },
                     animation: `${fadeUp} 0.25s ease both`,
                     animationDelay: `${idx * 0.03}s`,
-                    transition: "background 0.15s",
                   }}
                 >
-                  <TableCell sx={{ ...bodyCellSx, textAlign: "center" }}>
+                  <TableCell sx={{ ...cellSx, textAlign: "center" }}>
                     <Typography
                       sx={{
                         fontSize: fonts.size.xs,
@@ -152,7 +165,7 @@ const BatchTable = ({
                   {columns.map((col) => {
                     const rawValue = getVal(row, col.key);
                     return (
-                      <TableCell key={col.key} sx={{ ...bodyCellSx, textAlign: col.align ?? "left" }}>
+                      <TableCell key={col.key} sx={{ ...cellSx, textAlign: col.align ?? "left" }}>
                         {col.render ? (
                           col.render(rawValue, row)
                         ) : (
@@ -164,7 +177,7 @@ const BatchTable = ({
 
                   {showActionCol && (
                     <TableCell
-                      sx={{ ...bodyCellSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}
+                      sx={{ ...cellSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}
                     >
                       <Box
                         sx={{
