@@ -1,4 +1,4 @@
-import { Chip, Tooltip, Typography } from "@mui/material";
+import { Box, Chip, Tooltip, Typography } from "@mui/material";
 
 type StatusConfig = {
   Icon: any;
@@ -32,7 +32,7 @@ const UserWorkflowStatusCell = ({
   const border = cfg?.border ?? color;
 
   return (
-    <>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.25 }}>
       <Chip
         {...(Icon
           ? { icon: <Icon sx={{ fontSize: "13px !important", color: `${color} !important` }} /> }
@@ -54,7 +54,7 @@ const UserWorkflowStatusCell = ({
           <Typography sx={theme.batchList.chips.reasonText}>View reason</Typography>
         </Tooltip>
       )}
-    </>
+    </Box>
   );
 };
 

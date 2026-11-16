@@ -49,7 +49,6 @@ import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import {
   firstValidationError,
-  formatValidationDetailsMessage,
   hasValidationErrors,
 } from "../../../data/validation/validationErrors";
 import {
@@ -59,6 +58,7 @@ import {
 } from "../../../data/validation/adapters/rocketMotorCasing.validation";
 import type { ValidationAttemptFlags } from "../../../ui/components/validation/useValidationDisplay";
 import { flushCasingPendingDrafts } from "../../../ui/pages/user/sourcing/components/casing/casingPendingDrafts";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 type FormEntryMode = "create" | "fill" | "edit";
@@ -332,19 +332,7 @@ export const useRocketMotorCasingHook = () => {
       return STRINGS.SOURCING.CASING_FORM.FORM_NOT_FOUND;
     }
 
-    const fieldSummary =
-      formatValidationDetailsMessage(response?.errorDetails) ||
-      formatValidationDetailsMessage(response?.error) ||
-      formatValidationDetailsMessage(response?.data);
-    if (fieldSummary) {
-      const base =
-        response?.message && String(response.message).toLowerCase() !== "validation failed"
-          ? String(response.message)
-          : STRINGS.SOURCING.CASING_FORM.VALIDATION_FAILED;
-      return `${base} (${fieldSummary})`;
-    }
-
-    return fromDetails || response?.message || fallback;
+    return resolveApiErrorMessage(response, fromDetails || fallback);
   };
 
   const loadDimensionalForStage = async (

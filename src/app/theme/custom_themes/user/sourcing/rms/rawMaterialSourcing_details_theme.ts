@@ -20,7 +20,6 @@ export const createRawMaterialSourcingDetailsTheme = (
     surface: palette.surface,
     pageBg: palette.pageBg,
   });
-  const passColor = palette.success ?? palette.accent ?? "#66bb6a";
   const failColor = palette.danger ?? "#ef5350";
   // Result values: light accent reads well on dark; deep primary on light.
   const resultColor = isDark ? (palette.primaryLight ?? "#64b5f6") : (palette.primary ?? "#1B4F72");
@@ -53,40 +52,27 @@ export const createRawMaterialSourcingDetailsTheme = (
       ...attachment.link,
       ...(isDark ? { color: palette.primaryLight ?? "#64b5f6" } : {}),
     },
-    specStatusChip: (failed: boolean) => {
-      if (isDark) {
-        return failed
-          ? {
-              height: 22,
-              fontSize: "0.65rem",
-              fontWeight: 800,
-              letterSpacing: "0.02em",
-              background: "#c62828",
-              color: "#fff",
-              border: "1px solid #ef9a9a",
-              "& .MuiChip-label": { color: "#fff", px: 0.9 },
-            }
-          : {
-              height: 22,
-              fontSize: "0.65rem",
-              fontWeight: 800,
-              letterSpacing: "0.02em",
-              background: "#69f0ae",
-              color: "#053016",
-              border: "1px solid #00e676",
-              "& .MuiChip-label": { color: "#053016", px: 0.9 },
-            };
-      }
-      const color = failed ? failColor : passColor;
-      return {
-        height: 22,
-        fontSize: "0.65rem",
-        fontWeight: 800,
-        letterSpacing: "0.02em",
-        background: alpha(color, 0.14),
-        color,
-        border: `1px solid ${alpha(color, 0.4)}`,
-      };
-    },
+    specStatusChip: (failed: boolean) =>
+      failed
+        ? {
+            height: 22,
+            fontSize: "0.65rem",
+            fontWeight: 800,
+            letterSpacing: "0.02em",
+            background: "#c62828",
+            color: "#fff",
+            border: "1px solid #ef9a9a",
+            "& .MuiChip-label": { color: "#fff", px: 0.9 },
+          }
+        : {
+            height: 22,
+            fontSize: "0.65rem",
+            fontWeight: 800,
+            letterSpacing: "0.02em",
+            background: "#69f0ae",
+            color: "#053016",
+            border: "1px solid #00e676",
+            "& .MuiChip-label": { color: "#053016", px: 0.9 },
+          },
   };
 };

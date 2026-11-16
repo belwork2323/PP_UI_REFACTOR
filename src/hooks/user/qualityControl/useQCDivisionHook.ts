@@ -363,6 +363,7 @@ import { focusFieldByPath } from "@/data/validation/utils/fieldPathResolver";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 
 import {
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
   collectTempFileIdsFromDivisionScope,
   entryMatchesDivisionTab,
   isDivisionSnapshotDirty,
@@ -1150,11 +1151,8 @@ export const useQCDivisionHook = () => {
     partialNavSeedKeyRef.current = "";
   }, [applyFullFormState, resetDivisionNavState]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const fetchQcSchemaDocumentCore = useCallback(
     async (

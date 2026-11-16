@@ -244,6 +244,8 @@ const SubscaleHardwareArticlePanel = ({
   const [draftNoOfArticles, setDraftNoOfArticles] = useState("");
   const [draftNoOfParts, setDraftNoOfParts] = useState("");
   const [addError, setAddError] = useState("");
+  const [noOfArticlesError, setNoOfArticlesError] = useState("");
+  const [articleError, setArticleError] = useState("");
   const valuesRef = useRef(values);
   const pendingValuesRef = useRef(values);
   valuesRef.current = values;
@@ -404,14 +406,29 @@ const SubscaleHardwareArticlePanel = ({
   const draftIsBem = draftOption?.isBem === true;
 
   const handleAddArticle = () => {
-    setAddError("");
+    // Clear previous errors
+    setArticleError("");
+    setNoOfArticlesError("");
+
     const option = draftOption;
     const noOfArticles = parseCount(draftNoOfArticles);
-    // No. of Parts applies only to BEM articles (isBem).
     const noOfParts = option?.isBem === true ? parseCount(draftNoOfParts) : 0;
 
-    if (!option || noOfArticles <= 0) {
-      setAddError(S.ARTICLE_ADD_REQUIRED);
+    let isValid = true;
+
+    // Validate article selection
+    if (!option) {
+      setArticleError("Please select an article type."); // Or your specific string constant
+      isValid = false;
+    }
+
+    // Validate number of articles
+    if (noOfArticles <= 0) {
+      setNoOfArticlesError("Please enter a valid no. of articles."); // Or your specific string constant
+      isValid = false;
+    }
+
+    if (!isValid) {
       return;
     }
 
@@ -421,7 +438,7 @@ const SubscaleHardwareArticlePanel = ({
         row.subscaleArticleName === option.subscaleArticleName,
     );
     if (alreadyAdded) {
-      setAddError(S.ARTICLE_ALREADY_ADDED);
+      setAddError(S.ARTICLE_ALREADY_ADDED); // Keep duplicate check global if needed
       return;
     }
 
@@ -733,34 +750,39 @@ const SubscaleHardwareArticlePanel = ({
               <Box data-ss-field={HARDWARE_ARTICLE_SELECTIONS_ID} sx={{ minWidth: 0 }}>
                 <AppDropdown
                   // Visual-only asterisk — do not set HTML `required` (blocks form submit).
-                  label={`${S.ARTICLE_TYPE_LABEL} *`}
+                  label={<FieldLabelWithAsterisk label={S.ARTICLE_TYPE_LABEL} required />}
                   value={draftArticleCode}
                   onChange={(value) => {
                     setDraftArticleCode(value);
                     setDraftNoOfParts("");
-                    setAddError("");
+                    setArticleError(""); // Clears only the article selection error
                   }}
                   options={dropdownOptions}
                   placeholder={S.ARTICLE_TYPE_PLACEHOLDER}
                   loading={optionsLoading}
-                  error={Boolean(errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || addError)}
-                  helperText={errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || addError || undefined}
+                  error={Boolean(errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || articleError)}
+                  helperText={errors?.[HARDWARE_ARTICLE_SELECTIONS_ID] || articleError || undefined}
                   sx={{ mb: 0 }}
                 />
               </Box>
+
               <AppTextField
                 fullWidth
-                label={`${S.NO_OF_ARTICLES_LABEL} *`}
+                label={<FieldLabelWithAsterisk label={S.NO_OF_ARTICLES_LABEL} required />}
+                // label={`${S.NO_OF_ARTICLES_LABEL} *`}
                 type="number"
                 inputProps={{ min: 1, step: 1 }}
                 value={draftNoOfArticles}
                 onChange={(e) => {
                   setDraftNoOfArticles(e.target.value);
-                  setAddError("");
+                  setNoOfArticlesError(""); // Clears only the number of articles error
                 }}
                 placeholder="0"
+                error={Boolean(noOfArticlesError)}
+                helperText={noOfArticlesError || undefined}
                 sx={{ mb: 0 }}
               />
+
               {draftIsBem ? (
                 <AppTextField
                   fullWidth

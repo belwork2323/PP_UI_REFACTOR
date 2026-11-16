@@ -5,6 +5,7 @@ import { getRouteByRole } from "../../utils/roleMapper";
 import { STRINGS } from "../../app/config/strings";
 import { useAlertStore } from "../../app/store/alertStore";
 import { fetchRoles, fetchSubDepartments } from "../../data/api/common/generalAPI";
+import { prefetchDestination } from "../../app/routes/routePrefetch";
 
 const DEPT_REQUIRED_ROLES = /User|Approver/i;
 
@@ -201,12 +202,11 @@ export function useLoginForm({ navigate }) {
       next.captcha = "Captcha must be exactly 6 alphanumeric characters";
       valid = false;
     } else if (!captchaId || String(captchaId).trim().length === 0) {
-      next.captcha = V.CAPTCHA_INVALID;
-      valid = false;
-    } else if (!captchaValid) {
-      next.captcha = V.CAPTCHA_INVALID;
+      // Id not ready yet (still loading / reload in flight) — not a "wrong captcha".
+      next.captcha = V.CAPTCHA_REQUIRED;
       valid = false;
     }
+    // Match is validated by the server; FE only checks format + id present.
 
     setErrors(next);
     return valid;
@@ -216,7 +216,6 @@ export function useLoginForm({ navigate }) {
     credentials.username,
     credentials.password,
     captchaValue,
-    captchaValid,
     captchaId,
     showDeptDropdown,
     rolesEmpty,
@@ -258,7 +257,8 @@ export function useLoginForm({ navigate }) {
       });
       setCaptchaValue("");
       setCaptchaValid(false);
-      setCaptchaId(null);
+      // Keep existing captchaId until the reload's onCaptchaId replaces it
+      // (nulling here races with the new image and causes false CAPTCHA_INVALID).
       setCaptchaReloadTrigger((prev) => prev + 1);
     } else {
       const user = response.data;
@@ -266,7 +266,6 @@ export function useLoginForm({ navigate }) {
         showAlert(STRINGS.AUTH.ACCESS_DENIED_DEPT, "error", { autoCloseMs: 2000 });
         setCaptchaValue("");
         setCaptchaValid(false);
-        setCaptchaId(null);
         setCaptchaReloadTrigger((prev) => prev + 1);
       } else {
         login(user);
@@ -276,11 +275,14 @@ export function useLoginForm({ navigate }) {
           } else {
             sessionStorage.removeItem("pendingSubDeptId");
           }
+          await prefetchDestination("/change-password");
           navigate("/change-password", { replace: true });
         } else {
           sessionStorage.removeItem("pendingSubDeptId");
           const selectedSubDept = user.getSubDepartment(credentials.subDepartmentId);
           const route = getRouteByRole(user.role, credentials.subDepartmentId, selectedSubDept);
+          // Keep FullPageLoader up until destination chunks are warm.
+          await prefetchDestination(route);
           navigate(route, { replace: true });
         }
       }
@@ -307,7 +309,8 @@ export function useLoginForm({ navigate }) {
     !showDeptDropdown ||
     (credentials.subDepartmentId !== "" && credentials.subDepartmentId != null);
   const captchaIdValid = captchaId != null && String(captchaId).trim().length > 0;
-  const captchaFilled = captchaValue.trim().length > 0;
+  const captchaFilled =
+    captchaValue.trim().length === 6 && /^[a-zA-Z0-9]{6}$/.test(captchaValue.trim());
 
   const loginBlocked =
     systemLookupsLoading ||

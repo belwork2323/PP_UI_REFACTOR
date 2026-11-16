@@ -25,6 +25,8 @@ import { useThemeStore } from "../../../app/store/themeStore";
 import { STRINGS } from "../../../app/config/strings";
 import { images } from "@app/assets/images";
 import { useAuthStore } from "../../../app/store/authStore";
+import { useAlertStore } from "../../../app/store/alertStore";
+import { prefetchDestination } from "../../../app/routes/routePrefetch";
 import AdminDrawer from "./AppDrawer";
 import ConfirmAlertDialog from "../common/ConfirmAlertDialog";
 import ProfileDialog from "../common/ProfileDialog";
@@ -106,22 +108,30 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
     setConfirmOpen(true);
   };
 
-  const handleConfirmSwitch = () => {
+  const handleConfirmSwitch = async () => {
     setConfirmOpen(false);
     if (!pendingOption) return;
 
     // Rebuild URL: /<role-segment>/<dept>/<subDept>
     const segments = location.pathname.split("/").filter(Boolean);
+    let nextPath: string;
     if (segments.length >= 3) {
       segments[1] = pendingOption.dept;
       segments[2] = pendingOption.value;
-      navigate("/" + segments.join("/"));
+      nextPath = "/" + segments.join("/");
     } else {
       const roleSegment = segments[0] ?? "user";
-      navigate(`/${roleSegment}/${pendingOption.dept}/${pendingOption.value}`);
+      nextPath = `/${roleSegment}/${pendingOption.dept}/${pendingOption.value}`;
     }
 
-    setPendingOption(null);
+    useAlertStore.setState({ loading: true });
+    try {
+      await prefetchDestination(nextPath);
+      navigate(nextPath);
+    } finally {
+      useAlertStore.setState({ loading: false });
+      setPendingOption(null);
+    }
   };
 
   const handleCancelSwitch = () => {

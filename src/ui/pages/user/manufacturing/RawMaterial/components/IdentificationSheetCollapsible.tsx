@@ -28,11 +28,8 @@ const BD = STRINGS.BATCH_MANAGEMENT.DETAILS;
 type ManufacturingTheme = ReturnType<typeof getManufacturingTheme>;
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-const DATE_FORMATTER = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+const formatDayMonthYear = (date: Date) =>
+  `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
 
 type IdentificationSheetCollapsibleProps = {
   batchId: string;
@@ -55,7 +52,7 @@ const formatDate = (value?: string | null) => {
       date.getMonth() === month - 1 &&
       date.getDate() === day
     ) {
-      return DATE_FORMATTER.format(date);
+      return formatDayMonthYear(date);
     }
   }
 
@@ -72,13 +69,13 @@ const formatDate = (value?: string | null) => {
         date.getMonth() === month &&
         date.getDate() === day
       ) {
-        return DATE_FORMATTER.format(date);
+        return formatDayMonthYear(date);
       }
     }
   }
 
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? raw : DATE_FORMATTER.format(date);
+  return Number.isNaN(date.getTime()) ? raw : formatDayMonthYear(date);
 };
 
 const displayValue = (value: unknown): string => {

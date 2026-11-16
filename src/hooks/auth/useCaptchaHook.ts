@@ -33,6 +33,8 @@ export const useCaptchaHook = ({
 
   const onCaptchaIdRef = useRef(onCaptchaId);
   const onChangeRef = useRef(onChange);
+  /** Ignore stale generate-captcha responses (StrictMode double-mount / fast reload). */
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
     onCaptchaIdRef.current = onCaptchaId;
@@ -43,15 +45,25 @@ export const useCaptchaHook = ({
   }, [onChange]);
 
   const load = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
     setFetchErr(null);
     setValue("");
     setTouched(false);
+    // Keep parent captchaId until the new one arrives; clear value/validity now.
+    onChangeRef.current?.("", false);
 
     const response = await fetchCaptchaController();
+
+    // A newer load() started — drop this result.
+    if (generation !== loadGenerationRef.current) {
+      return;
+    }
+
     if (response.success && response.data) {
       setCaptcha(response.data);
       onCaptchaIdRef.current?.(response.data.captchaId);
+      onChangeRef.current?.("", false);
     } else {
       console.error(S.CONSOLE_ERR, response.message);
       setFetchErr(S.FAILED_TO_LOAD);
@@ -61,14 +73,14 @@ export const useCaptchaHook = ({
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load, reloadKey]);
 
   const handleInputChange = useCallback((nextValue: string) => {
     setValue(nextValue);
     setTouched(true);
 
-    const isValid = nextValue.trim().length > 0 && nextValue.trim().length < 7;
+    const isValid = nextValue.trim().length === 6;
     onChangeRef.current?.(nextValue, isValid);
   }, []);
 
@@ -76,7 +88,7 @@ export const useCaptchaHook = ({
     setTouched(true);
   }, []);
 
-  const internalShowSuccess = touched && value.trim().length > 0;
+  const internalShowSuccess = touched && value.trim().length === 6;
   const resolvedError = error;
 
   const resolvedHelperText =

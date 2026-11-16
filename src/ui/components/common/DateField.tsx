@@ -207,6 +207,7 @@ export const DateTimeField = ({
   compact,
   placeholder,
   minDate,
+  maxDate,
   requiresMinDateTime = false,
   sx,
   inputSx,
@@ -217,6 +218,9 @@ export const DateTimeField = ({
 
   const minDateValue = minDate
     ? (parseUiDate(toUiDateTime(minDate) || minDate) ?? undefined)
+    : undefined;
+  const maxDateValue = maxDate
+    ? (parseUiDate(toUiDateTime(maxDate) || maxDate) ?? undefined)
     : undefined;
   const minDateTimeValue = parseUiDateTimeValue(minDate);
   const dateTimeValue = parseUiDateTimeValue(value);
@@ -238,6 +242,7 @@ export const DateTimeField = ({
       format={UI_DATETIME_SECONDS_FORMAT}
       value={dateTimeValue?.isValid() ? dateTimeValue : null}
       minDate={minDateValue}
+      maxDate={maxDateValue}
       minDateTime={minDateTimeValue?.isValid() ? minDateTimeValue : undefined}
       ampm={false}
       timeSteps={{ hours: 1, minutes: 1, seconds: 1 }}

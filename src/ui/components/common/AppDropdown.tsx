@@ -24,7 +24,7 @@ export type AppDropdownOption = {
 };
 
 export type AppDropdownProps = {
-  label?: string;
+  label?: string | React.ReactElement;
   value: string;
   onChange: (value: string) => void;
   options?: AppDropdownOption[];

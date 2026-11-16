@@ -9,34 +9,46 @@ import getQualityControlTheme from "@app/theme/custom_themes/user/qualityControl
 import { SUB_DEPT_LABELS as SOURCING_LABELS } from "@hooks/user/sourcing/shared/sourcingWorkflowData";
 import { SUB_DEPT_LABELS as MANUFACTURING_LABELS } from "@hooks/user/manufacturing/manufacturingWorkflowData";
 
-const RawMaterialSourcingMainPage = lazy(
-  () => import("@ui/pages/user/sourcing/rms/RawMaterialSourcingMainPage"),
-);
-const RocketMotorCasingPage = lazy(() => import("@ui/pages/user/sourcing/RocketMotorCasingPage"));
-
-const RawMaterialPreparationPage = lazy(
-  () => import("@ui/pages/user/manufacturing/RawMaterial/RawMaterialPreparationPage"),
-);
-const CasePreparationPage = lazy(
-  () => import("@ui/pages/user/manufacturing/CasePreparation/CasePreparationPage"),
-);
-const MixingPage = lazy(() => import("@ui/pages/user/manufacturing/Mixing/MixingPage"));
-const CastingCuringPage = lazy(
-  () => import("@ui/pages/user/manufacturing/CastingAndCuring/CastingAndCuringPage"),
-);
-const PostCurePage = lazy(() => import("@ui/pages/user/manufacturing/PostCure/PostCurePage"));
-const SubscalePage = lazy(() => import("@ui/pages/user/manufacturing/Subscale/SubscalePage"));
-const TrimmingPage = lazy(() => import("@ui/pages/user/manufacturing/Trimming/TrimmingPage"));
-
-const QCDivisionPage = lazy(() => import("@ui/pages/user/qualityControl/QCDivision/QCDivisionPage"));
-const NDTPage = lazy(() => import("@ui/pages/user/qualityControl/NDT/NDTPage"));
-const STFPage = lazy(
-  () => import("@ui/pages/user/qualityControl/StaticTestFacility/StaticTestFacilityPage"),
-);
-
-const DispatchPage = lazy(() => import("@ui/pages/user/dispatch/DispatchPage"));
-
 export type UserDepartment = "sourcing" | "manufacturing" | "quality" | "dispatch";
+
+/** Shared import factories — used by lazy() and by prefetchUserSection. */
+export const USER_SECTION_IMPORTS: Record<
+  UserDepartment,
+  Record<string, () => Promise<{ default: ComponentType }>>
+> = {
+  sourcing: {
+    "raw-material": () => import("@ui/pages/user/sourcing/rms/RawMaterialSourcingMainPage"),
+    "rocket-motor": () => import("@ui/pages/user/sourcing/RocketMotorCasingPage"),
+  },
+  manufacturing: {
+    "raw-material-prep": () =>
+      import("@ui/pages/user/manufacturing/RawMaterial/RawMaterialPreparationPage"),
+    "case-preparation": () =>
+      import("@ui/pages/user/manufacturing/CasePreparation/CasePreparationPage"),
+    mixing: () => import("@ui/pages/user/manufacturing/Mixing/MixingPage"),
+    "casting-and-curing": () =>
+      import("@ui/pages/user/manufacturing/CastingAndCuring/CastingAndCuringPage"),
+    "post-cure-operations": () => import("@ui/pages/user/manufacturing/PostCure/PostCurePage"),
+    subscale: () => import("@ui/pages/user/manufacturing/Subscale/SubscalePage"),
+    trimming: () => import("@ui/pages/user/manufacturing/Trimming/TrimmingPage"),
+  },
+  quality: {
+    "raw-material-revalidation": () =>
+      import("@ui/pages/user/qualityControl/QCDivision/QCDivisionPage"),
+    "qc-division": () => import("@ui/pages/user/qualityControl/QCDivision/QCDivisionPage"),
+    ndt: () => import("@ui/pages/user/qualityControl/NDT/NDTPage"),
+    "static-test-facility": () =>
+      import("@ui/pages/user/qualityControl/StaticTestFacility/StaticTestFacilityPage"),
+  },
+  dispatch: {
+    dispatch: () => import("@ui/pages/user/dispatch/DispatchPage"),
+  },
+};
+
+const lazySections = (dept: UserDepartment): Record<string, ComponentType> =>
+  Object.fromEntries(
+    Object.entries(USER_SECTION_IMPORTS[dept]).map(([slug, loader]) => [slug, lazy(loader)]),
+  );
 
 type DashboardLayout = {
   container: SxProps<Theme>;
@@ -56,25 +68,14 @@ export const USER_DASHBOARD_SECTIONS: Record<UserDepartment, DepartmentSections>
     name: "Sourcing Department",
     getLayout: (mode) => getSourcingTheme(mode).dashboard,
     labels: SOURCING_LABELS,
-    sections: {
-      "raw-material": RawMaterialSourcingMainPage,
-      "rocket-motor": RocketMotorCasingPage,
-    },
+    sections: lazySections("sourcing"),
   },
   manufacturing: {
     name: STRINGS.MANUFACTURING.DEPARTMENT_NAME,
     icon: icons.Factory || icons.Build,
     getLayout: (mode) => getOperationsTheme(mode).dashboard,
     labels: MANUFACTURING_LABELS,
-    sections: {
-      "raw-material-prep": RawMaterialPreparationPage,
-      "case-preparation": CasePreparationPage,
-      mixing: MixingPage,
-      "casting-and-curing": CastingCuringPage,
-      "post-cure-operations": PostCurePage,
-      subscale: SubscalePage,
-      trimming: TrimmingPage,
-    },
+    sections: lazySections("manufacturing"),
   },
   quality: {
     name: STRINGS.QUALITY_CONTROL.DEPARTMENT_NAME,
@@ -85,12 +86,7 @@ export const USER_DASHBOARD_SECTIONS: Record<UserDepartment, DepartmentSections>
       ndt: "NDT",
       "static-test-facility": "Static Test Facility",
     },
-    sections: {
-      "raw-material-revalidation": QCDivisionPage,
-      "qc-division": QCDivisionPage,
-      ndt: NDTPage,
-      "static-test-facility": STFPage,
-    },
+    sections: lazySections("quality"),
   },
   dispatch: {
     name: "Dispatch Department",
@@ -99,6 +95,25 @@ export const USER_DASHBOARD_SECTIONS: Record<UserDepartment, DepartmentSections>
       content: { mt: 2 },
     }),
     labels: { dispatch: "Dispatch" },
-    sections: { dispatch: DispatchPage },
+    sections: lazySections("dispatch"),
   },
+};
+
+/** Warm the lazy chunk for a user dept/subdept before navigating. */
+export const prefetchUserSection = async (
+  dept: string | null | undefined,
+  subDept: string | null | undefined,
+): Promise<void> => {
+  const deptKey = String(dept ?? "").trim() as UserDepartment;
+  const subKey = String(subDept ?? "").trim();
+  if (!deptKey || !subKey) return;
+
+  const loader = USER_SECTION_IMPORTS[deptKey]?.[subKey];
+  if (!loader) return;
+
+  try {
+    await loader();
+  } catch (error) {
+    console.warn("prefetchUserSection failed", deptKey, subKey, error);
+  }
 };

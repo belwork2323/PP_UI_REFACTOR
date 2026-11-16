@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { alpha } from "@mui/material";
 
 import { STRINGS } from "@app/config/strings";
 import { APPROVER_STATUS_META, APPROVER_PRIORITY_META } from "@app/theme/approver";
+import { useThemeStore } from "@app/store/themeStore";
+import getSourcingTheme from "@app/theme/custom_themes/user/sourcing/sourcing_theme";
 import {
   toMaterialCodeNameOptions,
   type MaterialsListItem,
 } from "@data/models/user/MaterialsListModel";
 import { RAW_MATERIAL_APPROVER_STATUS_TABS } from "@data/models/approver/sourcing/rms/RawMaterialSourcingApproverModel";
-import { OPERATION_STATUS } from "@hooks/operationStatus";
 import { operationsController } from "@controllers/user/operationsController";
 
 const FILTER_ALL = STRINGS.APPROVER.COMMON.STATUS_ALL;
@@ -33,21 +33,26 @@ type SubdeptMaterialOption = {
 const normalizeMaterialsList = (items: MaterialsListItem[]): SubdeptMaterialOption[] =>
   toMaterialCodeNameOptions(items);
 
-const RAW_MATERIAL_APPROVER_STATUS_META = {
-  ...APPROVER_STATUS_META,
-  [OPERATION_STATUS.TO_BE_INITIATED]: {
-    bg: alpha("#5D6D7E", 0.08),
-    color: "#2E4053",
-    border: alpha("#5D6D7E", 0.2),
-  },
-  [OPERATION_STATUS.IN_PROGRESS]: {
-    bg: alpha("#2E86C1", 0.1),
-    color: "#1A5276",
-    border: alpha("#2E86C1", 0.3),
-  },
-};
-
 export const useRawMaterialSourcingApproverList = () => {
+  const mode = useThemeStore((state) => state.mode);
+  const sourcingTheme = useMemo(() => getSourcingTheme(mode), [mode]);
+
+  /** Tab colors from shared operations statusConfig (same as user RMS lot list chips). */
+  const statusMeta = useMemo(() => {
+    const fromOps = Object.fromEntries(
+      Object.entries(sourcingTheme.batchList.statusConfig ?? {}).map(([status, cfg]) => [
+        status,
+        {
+          bg: cfg.bg,
+          color: cfg.color,
+          border: cfg.border,
+          label: cfg.label,
+        },
+      ]),
+    );
+    return { ...APPROVER_STATUS_META, ...fromOps };
+  }, [sourcingTheme]);
+
   const [appliedFilters, setAppliedFilters] =
     useState<RawMaterialApproverAppliedFilters>(emptyAppliedFilters);
   const [materialOptions, setMaterialOptions] = useState<SubdeptMaterialOption[]>([]);
@@ -125,7 +130,7 @@ export const useRawMaterialSourcingApproverList = () => {
   );
 
   return {
-    statusMeta: RAW_MATERIAL_APPROVER_STATUS_META,
+    statusMeta,
     priorityMeta: APPROVER_PRIORITY_META,
     appliedFilters,
     applyListFilters,

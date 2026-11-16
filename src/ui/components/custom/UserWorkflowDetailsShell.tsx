@@ -65,24 +65,34 @@ const UserWorkflowDetailsShell = ({
       <Box sx={dt.banner}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          alignItems={{ sm: "center" }}
+          alignItems={{ xs: "flex-start", sm: "center" }}
           justifyContent="space-between"
           gap={2}
+          width="100%"
         >
-          <Stack direction="row" alignItems="flex-start" gap={1.5}>
+          <Stack direction="row" alignItems="flex-start" gap={1.5} minWidth={0} flex={1}>
             <Icon sx={dt.bannerIcon} />
-            <Box>
+            <Box minWidth={0}>
               <Typography sx={dt.bannerTitle}>{title}</Typography>
               {subtitle ? <Typography sx={dt.bannerSubtitle}>{subtitle}</Typography> : null}
             </Box>
           </Stack>
-          <UserWorkflowStatusCell
-            status={status ?? undefined}
-            statusConfig={statusConfig}
-            rejectedStatus={OPERATION_STATUS.REJECTED}
-            rejectionReason={rejectionReason}
-            theme={theme}
-          />
+          {/* Wrapper keeps chip (+ optional reason) as one flex item, pinned to the right. */}
+          <Box
+            sx={{
+              ml: { sm: "auto" },
+              flexShrink: 0,
+              alignSelf: { xs: "flex-end", sm: "center" },
+            }}
+          >
+            <UserWorkflowStatusCell
+              status={status ?? undefined}
+              statusConfig={statusConfig}
+              rejectedStatus={OPERATION_STATUS.REJECTED}
+              rejectionReason={rejectionReason}
+              theme={theme}
+            />
+          </Box>
         </Stack>
       </Box>
 

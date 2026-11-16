@@ -34,6 +34,7 @@ import {
   type SlurryCastRow,
 } from "../../../../../data/models/user/CastingMotorDataModel";
 import { DateTimeField } from "../../../../components/common/DateField";
+import { getTodayInIstDate } from "../../../../../utils/dateUtils";
 import { toUiTime } from "../../../../../data/models/user/castingCuringFieldCodec";
 import { isStartAfterEnd } from "../../../../../data/validation/dateRangeValidation";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
@@ -106,6 +107,7 @@ const CompactDateTime = ({
   value,
   onChange,
   minDate,
+  maxDate,
   requiresMinDateTime = false,
   disabled,
   readOnly,
@@ -117,6 +119,7 @@ const CompactDateTime = ({
   value: string;
   onChange: (value: string) => void;
   minDate?: string;
+  maxDate?: string;
   requiresMinDateTime?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
@@ -147,6 +150,7 @@ const CompactDateTime = ({
         <DateTimeField
           value={value}
           minDate={minDate}
+          maxDate={maxDate}
           requiresMinDateTime={requiresMinDateTime}
           onChange={onChange}
           disabled={disabled}
@@ -968,6 +972,7 @@ const CastingMotorPanel = ({
                       <TableCell sx={castingCuringTableCellSx}>
                         <CompactDateTime
                           value={row.BOWL_RECEIPT_TIME}
+                          maxDate={getTodayInIstDate()}
                           onChange={(v) => {
                             clearFieldError?.(
                               `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`,

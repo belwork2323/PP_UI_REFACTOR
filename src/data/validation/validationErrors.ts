@@ -80,7 +80,15 @@ export const getTouchedFieldError = (
 ): string | undefined => {
   const message = getVisibleFieldError(errors, path, flags);
   if (!message) return undefined;
-  if (options.showWhenUntouched || options.touched) return message;
+  // Draft (unit) / submit attempts should highlight empty fields even if never focused.
+  if (
+    options.showWhenUntouched ||
+    options.touched ||
+    flags.showSubmit ||
+    flags.showUnit
+  ) {
+    return message;
+  }
   return undefined;
 };
 

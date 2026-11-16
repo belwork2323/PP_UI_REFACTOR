@@ -83,7 +83,7 @@ const SUBSCALE_COLUMN_LABELS: Record<string, string> = {
   RUBBER_MATERIAL: "Rubber Material (EPDM/NBR)",
   SLEEVE_NO: "Sleeve No.",
   MOULD_NO: "Mould No.",
-  SIZE_MM: "Size (mm)",
+  SIZE_MM: "Length",
   THICKNESS_MM: "Thickness (mm)",
   LINER_APPLIED: "Liner Applied Quantity (Gms)",
   OBSERVATIONS: "Observations",

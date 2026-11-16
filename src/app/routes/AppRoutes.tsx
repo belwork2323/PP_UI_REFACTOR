@@ -3,6 +3,7 @@ import { routes } from "./routeConfig";
 import ProtectedRoute from "./ProtectedRoute";
 import MainLayout from "../../ui/MainLayout";
 import { Suspense } from "react";
+import RouteLoadingFallback from "../../ui/components/common/RouteLoadingFallback";
 
 const AppRoutes = () => {
   const publicRoutes = routes.filter((r) => !r.isProtected);
@@ -14,7 +15,7 @@ const AppRoutes = () => {
   );
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
 

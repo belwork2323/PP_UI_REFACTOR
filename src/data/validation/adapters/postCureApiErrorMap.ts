@@ -277,12 +277,5 @@ export function mapPostCureApiErrorsToUi(
   return result;
 }
 
-/** Prefer structured `errorDetails`, then fall back to mapped AppError details. */
-export function extractApiErrorDetails(response: {
-  errorDetails?: unknown;
-  error?: unknown;
-  details?: unknown;
-} | null | undefined): unknown {
-  if (!response) return null;
-  return response.errorDetails ?? response.error ?? response.details ?? null;
-}
+/** Prefer structured field maps; includes `data` for AcemException VALIDATION_ERROR. */
+export { extractApiErrorDetails } from "@utils/resolveApiErrorMessage";

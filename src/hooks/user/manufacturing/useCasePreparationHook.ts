@@ -34,7 +34,6 @@ import {
   focusCasePrepField,
   type CasePrepValidationErrors,
 } from "../../../data/models/user/casePrepValidation";
-import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import {
   isMainMotorBatch,
@@ -63,6 +62,7 @@ import {
   usesParallelUnitLocks,
 } from "../../../utils/batchStageUtils";
 import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -264,22 +264,8 @@ export const useCasePreparationHook = () => {
     resetFlowDraft();
   }, [resetFlowDraft]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    const fieldSummary =
-      formatValidationDetailsMessage(response?.errorDetails) ||
-      formatValidationDetailsMessage(response?.error) ||
-      formatValidationDetailsMessage(response?.data);
-    if (fieldSummary) {
-      const base =
-        response?.message && String(response.message).toLowerCase() !== "validation failed"
-          ? String(response.message)
-          : STRINGS.MANUFACTURING.CASE_PREP.VALIDATION_FAILED;
-      return `${base} (${fieldSummary})`;
-    }
-    if (response?.error?.details) return String(response.error.details);
-    if (response?.message) return String(response.message);
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const emitCasePrepValidationFocus = (fieldErrors: CasePrepValidationErrors) => {
     const fieldPath = resolveFirstCasePrepValidationFocus(fieldErrors);

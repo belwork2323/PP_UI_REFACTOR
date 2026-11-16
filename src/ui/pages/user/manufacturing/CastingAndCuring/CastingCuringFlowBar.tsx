@@ -8,6 +8,7 @@ import {
 import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { getTodayInIstDate } from "@/utils/dateUtils";
 
 type CastingCuringFlowBarProps = {
   motorId: string;
@@ -130,6 +131,7 @@ const CastingCuringFlowBar = ({
               </Typography>
               <DateTimeField
                 value={motorReceivedAt}
+                maxDate={getTodayInIstDate()}
                 onChange={onMotorReceivedAtChange}
                 disabled={disabled}
                 placeholder={L.motorReceivedAtPlaceholder}

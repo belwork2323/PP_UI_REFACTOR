@@ -77,6 +77,7 @@ import {
   usesParallelUnitLocks,
 } from "../../../utils/batchStageUtils";
 import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 
@@ -627,11 +628,8 @@ export const useRawMaterialPrepHook = () => {
     );
   }, []);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const mergePremixSelectionsWithSheet = (
     selections: AddedPremixSelection[],

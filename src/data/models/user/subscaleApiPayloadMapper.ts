@@ -90,7 +90,7 @@ export type HardwarePreparationTableDTO = {
   mouldNo?: string;
   lengthMm?: string;
   thicknessMm?: string;
-  linerApplied?: boolean;
+  linerApplied?: string;
   observations?: string;
 };
 
@@ -584,8 +584,7 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
     }
 
     if (key === "LINER_APPLIED") {
-      const bool = parseBoolean(value);
-      if (bool !== undefined) mapped.linerApplied = bool;
+      mapped.linerApplied = value;
       return;
     }
 
@@ -727,7 +726,7 @@ const mapHardwarePreparationTable = (values: SchemaFormValues): HardwarePreparat
       const thicknessMm = String(row.THICKNESS_MM ?? "").trim();
       if (thicknessMm) mapped.thicknessMm = thicknessMm;
 
-      const linerApplied = parseBoolean(row.LINER_APPLIED);
+      const linerApplied = String(row.LINER_APPLIED);
       if (linerApplied !== undefined) mapped.linerApplied = linerApplied;
       if (row.OBSERVATIONS != null) mapped.observations = String(row.OBSERVATIONS);
 
@@ -824,9 +823,7 @@ export const mapSubscaleDetails = (values: SchemaFormValues): SubscaleDetailsDTO
   const premixDate = toApiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim());
   if (premixDate) payload.premixDate = premixDate;
 
-  const finalMixDate = toApiDate(
-    String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim(),
-  );
+  const finalMixDate = toApiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim());
   if (finalMixDate) payload.finalMixDate = finalMixDate;
 
   const mixingCycle = mapMixingCycleToApi(values);
@@ -1272,8 +1269,7 @@ export const mapSubscaleApiDetailsToFormValues = (
         MOULD_NO: String(source.mouldNo ?? ""),
         SIZE_MM: source.lengthMm != null ? String(source.lengthMm) : "",
         THICKNESS_MM: source.thicknessMm != null ? String(source.thicknessMm) : "",
-        LINER_APPLIED:
-          source.linerApplied === true ? "Yes" : source.linerApplied === false ? "No" : "",
+        LINER_APPLIED: source.linerApplied ?? "",
         OBSERVATIONS: String(source.observations ?? ""),
         ...(countField ? { _articleKey: countField, _articleIndex: articleIndex } : {}),
       };
@@ -1555,8 +1551,8 @@ const mapHardwareTableApiToDisplay = (rows: unknown): Record<string, unknown>[] 
       MOULD_NO: source.mouldNo ?? "",
       SIZE_MM: source.lengthMm != null ? String(source.lengthMm) : "",
       THICKNESS_MM: source.thicknessMm != null ? String(source.thicknessMm) : "",
-      LINER_APPLIED:
-        source.linerApplied === true ? "Yes" : source.linerApplied === false ? "No" : "",
+      LINER_APPLIED: source.linerApplied ?? "",
+
       OBSERVATIONS: source.observations ?? "",
       ...(countField ? { _articleKey: countField, _articleIndex: articleIndex } : {}),
     };

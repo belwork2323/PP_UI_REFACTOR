@@ -76,8 +76,12 @@ type UseRawMaterialSpecificationFormParams = {
   isEditMode?: boolean;
   /** Raw material Sourcing: Create Lot flow — API-oriented copy and labels */
   createLotMode?: boolean;
-  onSaveDraft?: (blocks: SpecificationBlock[]) => Promise<boolean | void> | boolean | void;
-  onSubmit?: (blocks: SpecificationBlock[]) => Promise<boolean | void> | boolean | void;
+  onSaveDraft?: (
+    blocks: SpecificationBlock[],
+  ) => Promise<boolean | ValidationErrors | void> | boolean | ValidationErrors | void;
+  onSubmit?: (
+    blocks: SpecificationBlock[],
+  ) => Promise<boolean | ValidationErrors | void> | boolean | ValidationErrors | void;
   onBlocksChange?: (blocks: SpecificationBlock[]) => void;
   actionLoading?: boolean;
   pdfMeta?: unknown;
@@ -818,15 +822,37 @@ export const useRawMaterialSpecificationForm = ({
     setSubmitConfirm(false);
   }, []);
 
+  const applyServerValidationErrors = useCallback((errors: ValidationErrors) => {
+    // Snackbar is already shown by the submit/API layer; only highlight + focus here.
+    setValidationAttempt({ format: true, unit: true, submit: true });
+    setValidationErrors(errors);
+    const focus = resolveFirstRmsValidationFocus(errors);
+    setValidationFocusRequest((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      target: focus,
+    }));
+  }, []);
+
+  const consumeSubmitResult = useCallback(
+    (result: boolean | ValidationErrors | void) => {
+      if (result && typeof result === "object" && hasValidationErrors(result)) {
+        applyServerValidationErrors(result);
+      }
+    },
+    [applyServerValidationErrors],
+  );
+
   const handleConfirmDraft = useCallback(async () => {
     setDraftConfirm(false);
-    await onSaveDraft?.(blocksRef.current);
-  }, [onSaveDraft]);
+    const result = await onSaveDraft?.(blocksRef.current);
+    consumeSubmitResult(result);
+  }, [consumeSubmitResult, onSaveDraft]);
 
   const handleConfirmSubmit = useCallback(async () => {
     setSubmitConfirm(false);
-    await onSubmit?.(blocksRef.current);
-  }, [onSubmit]);
+    const result = await onSubmit?.(blocksRef.current);
+    consumeSubmitResult(result);
+  }, [consumeSubmitResult, onSubmit]);
 
   return {
     actionHelperText,

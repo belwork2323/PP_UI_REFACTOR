@@ -12,7 +12,7 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <FullPageLoader open={loading} />
+      <FullPageLoader open={loading} message="Loading…" />
       <GlobalAlertDialog />
       <GlobalValidationSnackbar />
       <AppRoutes />

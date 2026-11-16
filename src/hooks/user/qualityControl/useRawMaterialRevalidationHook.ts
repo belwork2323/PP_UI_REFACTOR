@@ -15,6 +15,7 @@ import {
 } from "../../../data/models/user/QCRawMaterialRevalidationModel";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form";
 
@@ -83,11 +84,8 @@ export const useRawMaterialRevalidationHook = () => {
     setHasSavedDraft(false);
   };
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const openFormWithResolvedData = async (batch: RawMaterialRevalidationBatch, editMode: boolean) => {
     const shouldFetchDetails =

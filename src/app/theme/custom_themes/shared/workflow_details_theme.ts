@@ -21,58 +21,30 @@ export type WorkflowDetailsBannerStatusStyle = {
 };
 
 /**
- * Mode-aware status chip colors for details banners.
- * Matches `operations_theme` `batchList.statusConfig` tint rules.
+ * Solid status chip colors for details banners (light + dark).
+ * Soft tints vanish on blue banner gradients — always use opaque fills.
  */
 export const createBannerStatusConfig = (
-  palette: DetailsPalette = {},
-  mode: string = "light",
+  _palette: DetailsPalette = {},
+  _mode: string = "light",
 ): Record<string, WorkflowDetailsBannerStatusStyle> => {
-  const isDark = mode === "dark";
-  const primaryLight = palette.primaryLight ?? "#2E86C1";
-  const success = palette.success ?? palette.accent ?? "#148F77";
-  const danger = palette.danger ?? "#C0392B";
-  const warn = palette.warn ?? "#D4AC0D";
-  const initiated = isDark ? "#b0bec5" : "#475569";
-
-  // Light: soft tint. Dark: solid chips — translucent green/yellow vanishes on blue banners.
-  const tint = (c: string) => ({
-    color: c,
-    bg: alpha(c, 0.1),
-    border: alpha(c, 0.28),
-  });
   const solid = (bg: string, color = "#fff", border?: string) => ({
     color,
     bg,
     border: border ?? alpha(color === "#fff" ? "#fff" : bg, 0.55),
   });
 
-  if (isDark) {
-    return {
-      ["To Be Initiated"]: solid("#455a64", "#eceff1"),
-      ["In Progress"]: solid("#0d47a1", "#e3f2fd", "#64b5f6"),
-      ["Waiting for Partial Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-      ["Waiting for Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-      ["Approved"]: solid("#1b5e20", "#fff", "#81c784"),
-      ["Completely Approved"]: solid("#1b5e20", "#fff", "#81c784"),
-      ["Final Approval Completed"]: solid("#1b5e20", "#fff", "#81c784"),
-      ["Waiting For Complete Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-      ["Rejected"]: solid("#b71c1c", "#fff", "#ef9a9a"),
-      ["Discarded"]: solid("#b71c1c", "#fff", "#ef9a9a"),
-    };
-  }
-
   return {
-    ["To Be Initiated"]: tint(initiated),
-    ["In Progress"]: tint(primaryLight),
-    ["Waiting for Partial Approval"]: tint(warn),
-    ["Waiting for Approval"]: tint(warn),
-    ["Approved"]: tint(success),
-    ["Completely Approved"]: tint(success),
-    ["Final Approval Completed"]: tint(success),
-    ["Waiting For Complete Approval"]: tint(warn),
-    ["Rejected"]: tint(danger),
-    ["Discarded"]: tint(danger),
+    ["To Be Initiated"]: solid("#455a64", "#eceff1"),
+    ["In Progress"]: solid("#0d47a1", "#e3f2fd", "#64b5f6"),
+    ["Waiting for Partial Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
+    ["Waiting for Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
+    ["Approved"]: solid("#1b5e20", "#fff", "#81c784"),
+    ["Completely Approved"]: solid("#1b5e20", "#fff", "#81c784"),
+    ["Final Approval Completed"]: solid("#1b5e20", "#fff", "#81c784"),
+    ["Waiting For Complete Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
+    ["Rejected"]: solid("#b71c1c", "#fff", "#ef9a9a"),
+    ["Discarded"]: solid("#b71c1c", "#fff", "#ef9a9a"),
   };
 };
 

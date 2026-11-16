@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material";
 import { createDataTableTheme } from "../../shared/data_table_theme";
+import { createBannerStatusConfig } from "../../shared/workflow_details_theme";
 
 export const SOLID_PREP_BRAND = {
 	primary: "#1B4F72",
@@ -351,31 +352,7 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 			emptyStateSubtitle: { fontSize: "0.75rem", color: alpha(palette.textSub, 0.65), mt: 0.5 },
 		},
 		details: {
-			bannerStatusConfig: (() => {
-				const primary = palette.primary ?? "#1B4F72";
-				const primaryLight = palette.primaryLight ?? "#2E86C1";
-				const success = palette.accent ?? "#148F77";
-				const danger = palette.danger ?? "#C0392B";
-				const warnBase = palette.warn ?? "#D4AC0D";
-				return {
-					["To Be Initiated"]: {
-						color: primary,
-						bg: alpha(primary, 0.1),
-						border: alpha(primaryLight, 0.35),
-					},
-					["In Progress"]: { color: primary, bg: alpha(primaryLight, 0.12), border: alpha(primaryLight, 0.45) },
-					["Waiting for Partial Approval"]: {
-						color: primary,
-						bg: alpha(primaryLight, 0.12),
-						border: alpha(primaryLight, 0.45),
-					},
-					["Waiting for Approval"]: { color: "#7D6608", bg: alpha(warnBase, 0.14), border: alpha(warnBase, 0.55) },
-					["Approved"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
-					["Rejected"]: { color: danger, bg: alpha(danger, 0.1), border: alpha(danger, 0.45) },
-					["Discarded"]: { color: danger, bg: alpha(danger, 0.1), border: alpha(danger, 0.45) },
-					["Completely Approved"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
-				} as Record<string, { color: string; bg: string; border: string }>;
-			})(),
+			bannerStatusConfig: createBannerStatusConfig(palette, baseTheme?.mode ?? "light"),
 			page: { animation: "fadeIn 0.35s ease both" },
 			document: {
 				borderRadius: 3,

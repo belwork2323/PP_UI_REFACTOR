@@ -83,9 +83,7 @@ export const shouldSeedStfMainMotors = (
   if (isStfMainMotorBatch(batchType)) return true;
   if (!isStfSubscaleBatch(batchType)) return false;
   if (isStfExperimentalSubBatch(subBatchType)) return false;
-  return (
-    isStfQualificationSubBatch(subBatchType) || !normalizeStfSubBatchType(subBatchType)
-  );
+  return isStfQualificationSubBatch(subBatchType) || !normalizeStfSubBatchType(subBatchType);
 };
 
 /**
@@ -168,7 +166,8 @@ export const STF_FLOW_LABELS = {
     "Main and BEM motors from this batch are listed below. Open a tab to fill static testing details.",
   setupHintMainMotor: "Select approved motor ID(s), then load or add main motors.",
   setupHintMainMotorLoaded: "Select more main motor IDs below to add additional motors.",
-  setupHintBem: "Batch BEM motors are listed in navigation. Use Add Motor for any extra BEM numbers.",
+  setupHintBem:
+    "Batch BEM motors are listed in navigation. Use Add Motor for any extra BEM numbers.",
   setupHintBemLoaded: "Select another BEM number to add more motors.",
   setupHintBemEmpty: "No BEM motors found on this batch identification sheet.",
   motorNavTitle: "Motor navigation",
@@ -551,7 +550,11 @@ export const canAddStfMainMotors = ({
 };
 
 /** @deprecated ACEM BEM flow uses Add Motor for first and subsequent motors. */
-export const canLoadStfBemForm = (bemNo: string, usedMotorIds: string[], _hasBemMotors?: boolean) => {
+export const canLoadStfBemForm = (
+  bemNo: string,
+  usedMotorIds: string[],
+  _hasBemMotors?: boolean,
+) => {
   const trimmed = String(bemNo ?? "").trim();
   if (!trimmed) return false;
   return !usedMotorIds.includes(trimmed);
@@ -727,10 +730,7 @@ export const buildStfMotorNavGateHelpers = (
       if (mainIndex < 0) return undefined;
       return mainMotorGate.getMotorTabTooltip(mainIndex);
     },
-    isStfMotorWorkflowEnabled: (
-      motorId: string,
-      subType?: StfSubType | string | null,
-    ) =>
+    isStfMotorWorkflowEnabled: (motorId: string, subType?: StfSubType | string | null) =>
       isStfMotorEnabledForWorkflow(motorId, motorCards, previousStageGate, resolveMotorStatus, {
         facilityType,
         subType,

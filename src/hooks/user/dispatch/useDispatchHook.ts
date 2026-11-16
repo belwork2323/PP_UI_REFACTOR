@@ -57,6 +57,7 @@ import {
   SUB_DEPT,
 } from "../../../utils/batchStageUtils";
 import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -281,11 +282,8 @@ export const useDispatchHook = () => {
     resetFlowDraft();
   }, [resetFlowDraft]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const appendMotorToForm = useCallback(
     (motorId: string, dispatchDetails?: Record<string, unknown>) => {

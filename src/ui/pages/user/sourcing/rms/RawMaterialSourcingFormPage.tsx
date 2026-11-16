@@ -4,7 +4,10 @@ import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
 import { getRawMaterialSourcingPageTheme } from "@app/theme/custom_themes/user/sourcing/rms/rawMaterialSourcing_theme";
 import type { MaterialBlock, RawMaterialFormBatch } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
-import type { RawMaterialSourcingFormEntryMode } from "@hooks/user/sourcing/rms/useRawMaterialSourcingForm";
+import type {
+  RawMaterialSourcingFormEntryMode,
+  RawMaterialSourcingSubmitResult,
+} from "@hooks/user/sourcing/rms/useRawMaterialSourcingForm";
 import UserWorkflowFormHeader from "@ui/components/custom/UserWorkflowFormHeader";
 import { resolveWorkflowFormHeaderStatus } from "@ui/components/custom/workflowFormHeaderStatus";
 import SpecificationFormBuilder from "@ui/pages/user/sourcing/rms/components/SpecificationFormBuilder";
@@ -19,8 +22,8 @@ type RawMaterialSourcingFormPageProps = {
   deleteLoading: boolean;
   onBack: () => void;
   onBlocksChange: (blocks: MaterialBlock[]) => void;
-  onSaveDraft: (blocks: MaterialBlock[]) => Promise<boolean>;
-  onSubmit: (blocks: MaterialBlock[]) => Promise<boolean>;
+  onSaveDraft: (blocks: MaterialBlock[]) => Promise<RawMaterialSourcingSubmitResult>;
+  onSubmit: (blocks: MaterialBlock[]) => Promise<RawMaterialSourcingSubmitResult>;
   onDeleteLot: () => void;
 };
 

@@ -113,7 +113,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     [allLabel]: items.length,
   });
   const [remoteBatches, setRemoteBatches] = useState<ApproverBatchSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Start true so first paint shows loader instead of a false empty list.
+  const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
 
@@ -163,6 +164,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
 
   useEffect(() => {
     hasLoadedOnceRef.current = false;
+    // Keep chrome in loading state across subdept switch until the next fetch starts.
+    setLoading(true);
   }, [subDepartment, selectedSubDepartment?.subDepartmentId]);
 
   const loadBatches = useCallback(async () => {

@@ -54,6 +54,7 @@ import {
   mapPostCureApiErrorsToUi,
 } from "../../../data/validation/adapters/postCureApiErrorMap";
 import type { ValidationErrors } from "../../../data/validation/submissionIntent";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -148,11 +149,8 @@ export const usePostCureHook = () => {
     clearSetupDrafts();
   }, [clearSetupDrafts]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const refreshBatchLocks = useCallback(
     async (batchId: string) => {

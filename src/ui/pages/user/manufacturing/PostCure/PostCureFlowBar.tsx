@@ -2,6 +2,7 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { DateTimeField } from "../../../../components/common/DateField";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { getTodayInIstDate } from "@/utils/dateUtils";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 
@@ -64,6 +65,7 @@ const PostCureFlowBar = ({
             </Typography>
             <DateTimeField
               value={draftMotorReceiptDate}
+              maxDate={getTodayInIstDate()}
               onChange={onDraftMotorReceiptDateChange}
               placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
               compact

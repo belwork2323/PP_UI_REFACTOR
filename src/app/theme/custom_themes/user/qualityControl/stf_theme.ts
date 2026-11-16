@@ -1,6 +1,7 @@
 import { alpha } from "@mui/material/styles";
 import { createDataTableTheme } from "../../shared/data_table_theme";
 import { STATIC_TEST_FACILITY_BRAND } from "./tokens";
+import { createBannerStatusConfig } from "../../shared/workflow_details_theme";
 
 export { STATIC_TEST_FACILITY_BRAND as STF_BRAND };
 
@@ -22,21 +23,7 @@ export const getStfTheme = (baseTheme: any) => {
       textSub: palette.textSub ?? STATIC_TEST_FACILITY_BRAND.textSub,
     },
     details: {
-      bannerStatusConfig: (() => {
-        const primary = palette.primary ?? STATIC_TEST_FACILITY_BRAND.primary;
-        const primaryLight = palette.primaryLight ?? STATIC_TEST_FACILITY_BRAND.primaryLight;
-        const success = palette.accent ?? STATIC_TEST_FACILITY_BRAND.accent;
-        const danger = palette.danger ?? STATIC_TEST_FACILITY_BRAND.danger;
-        const warnBase = palette.warn ?? STATIC_TEST_FACILITY_BRAND.warn;
-        return {
-          ["To Be Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
-          ["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
-          ["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
-          ["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
-          ["Completely Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
-          ["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
-        } as Record<string, { color: string; bg: string; border: string }>;
-      })(),
+      bannerStatusConfig: createBannerStatusConfig(palette, baseTheme?.mode ?? "light"),
       page: { animation: "fadeIn 0.35s ease both" },
       document: {
         borderRadius: 3,

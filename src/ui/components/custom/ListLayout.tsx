@@ -64,10 +64,7 @@ export type ListLayoutTheme = {
   };
   statusTab: {
     button: (isActive: boolean, meta?: ListLayoutStatusMeta[string]) => Record<string, unknown>;
-    countChip: (
-      isActive: boolean,
-      meta?: ListLayoutStatusMeta[string],
-    ) => Record<string, unknown>;
+    countChip: (isActive: boolean, meta?: ListLayoutStatusMeta[string]) => Record<string, unknown>;
   };
 };
 

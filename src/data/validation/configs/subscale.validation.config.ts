@@ -25,7 +25,18 @@ const numberRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   pattern: S.PATTERNS.FLOAT,
 });
-
+const decimalRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "number",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  pattern: S.PATTERNS.SIGNED_FLOAT_WITH_2_DECIMAL,
+});
+const negativeFloat = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
+  valueType: "number",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  pattern: S.PATTERNS.SIGNED_FLOAT_WITH_5_DECIMAL,
+});
 const dateRule = (requiredIn: ValidationTier[] = []): FieldRuleConfig => ({
   valueType: "date",
   requiredIn,
@@ -104,7 +115,7 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   WEIGHT_BEFORE_INHIBITION: numberRule(),
   WEIGHT_AFTER_INHIBITION: numberRule(),
   IR_APPLIED_WEIGHT: numberRule(),
-  PROPELLANT_WEIGHT: numberRule(),
+  PROPELLANT_WEIGHT: negativeFloat(),
   // Trimming Measurements (Length before inhibition as numeric; others as text with special chars)
   HE_OD: textRule([], S.LENGTH.MAX_STANDARD),
   HE_PORT_INNER: textRule([], S.LENGTH.MAX_STANDARD),
@@ -137,10 +148,13 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   DENSITY: textRule([], S.LENGTH.MAX_STANDARD),
 
   // Mixing Cycle Particulars Fields
-  rpm: numberRule(["SUBMIT"]),
-  time: numberRule(["SUBMIT"]),
-  temp: numberRule(["SUBMIT"]),
-  vacuum: numberRule(["SUBMIT"]),
+  rpm: {
+    ...numberRule(["UNIT", "SUBMIT"]),
+    pattern: S.PATTERNS.ONLY_DIGITS,
+  },
+  time: decimalRule(["UNIT", "SUBMIT"]),
+  temp: decimalRule(["UNIT", "SUBMIT"]),
+  vacuum: decimalRule(["UNIT", "SUBMIT"]),
   stage: textRule(["SUBMIT"]),
   mixingCycleCode: textRule(["SUBMIT"], 50),
 };
@@ -203,21 +217,21 @@ function resolveFieldPaths(data: any) {
   ["LINER_TYPE", "LINER_BATCH_NO", "LINER_BATCH_DATE"].forEach((field) => {
     paths.push({ path: field, value: data[field], ruleKey: field });
   });
+  paths.push({ path: "IR_BATCH_NO", value: data.IR_BATCH_NO, ruleKey: "IR_BATCH_NO" });
+  paths.push({ path: "DATE_OF_MFG", value: data.DATE_OF_MFG, ruleKey: "DATE_OF_MFG" });
+
+  paths.push({
+    path: "DATE_OF_CASTING",
+    value: data.DATE_OF_CASTING,
+    ruleKey: "DATE_OF_CASTING",
+  });
 
   if (!isMain) {
     // 2. Subscale Conditional Fields
-    paths.push({ path: "BATCH_SIZE", value: data.BATCH_SIZE, ruleKey: "BATCH_SIZE" });
+    // paths.push({ path: "BATCH_SIZE", value: data.BATCH_SIZE, ruleKey: "BATCH_SIZE" });
     paths.push({ path: "MIXER_BLDG_NO", value: data.MIXER_BLDG_NO, ruleKey: "MIXER_BLDG_NO" });
     paths.push({ path: "PREMIX_DATE", value: data.PREMIX_DATE, ruleKey: "PREMIX_DATE" });
     paths.push({ path: "FINAL_MIX_DATE", value: data.FINAL_MIX_DATE, ruleKey: "FINAL_MIX_DATE" });
-
-    paths.push({
-      path: "DATE_OF_CASTING",
-      value: data.DATE_OF_CASTING,
-      ruleKey: "DATE_OF_CASTING",
-    });
-    paths.push({ path: "IR_BATCH_NO", value: data.IR_BATCH_NO, ruleKey: "IR_BATCH_NO" });
-    paths.push({ path: "DATE_OF_MFG", value: data.DATE_OF_MFG, ruleKey: "DATE_OF_MFG" });
 
     // 3. Mixing Cycles & Particulars
     if (Array.isArray(data.SUBSCALE_MIXING_CYCLES)) {
@@ -234,6 +248,7 @@ function resolveFieldPaths(data: any) {
             ruleKey: "mixingCycleCode",
           });
         }
+        console.log(cycle);
 
         if (Array.isArray(cycle.premixParticulars)) {
           cycle.premixParticulars.forEach((row: any, rIndex: number) => {

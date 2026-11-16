@@ -29,10 +29,15 @@ import {
 } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
 import { hasValidationErrors } from "@data/validation/validationErrors";
 import type { ValidationErrors, ValidationTier } from "@data/validation/submissionIntent";
+import { mapRmsApiErrorsToUi } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcingApiErrorMap";
+import { extractApiErrorDetails, resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 import { getRawMaterialSourcingErrorMessage as getErrorMessage } from "@hooks/user/sourcing/rms/rawMaterialSourcingErrors";
 import { resolveLotDetailsFetchErrorFallback } from "@hooks/user/sourcing/rms/rawMaterialSourcingDetailsHelpers";
 
 export type RawMaterialSourcingFormEntryMode = "create" | "fill" | "edit";
+
+/** `true` success; `false` failure already alerted; `ValidationErrors` → highlight fields in the form. */
+export type RawMaterialSourcingSubmitResult = boolean | ValidationErrors;
 
 const SUCCESS_ALERT_MS = 2200;
 
@@ -66,8 +71,28 @@ export const useRawMaterialSourcingForm = ({
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
+
+  const handleApiValidationFailure = useCallback(
+    (
+      response: unknown,
+      fallbackMessage: string,
+      mode: "create" | "update",
+    ): RawMaterialSourcingSubmitResult => {
+      const details = extractApiErrorDetails(response as any);
+      const fieldErrors = mapRmsApiErrorsToUi(details, { mode });
+      const message = resolveApiErrorMessage(response as any, fallbackMessage);
+      if (hasValidationErrors(fieldErrors)) {
+        showValidationAlert(message);
+        return fieldErrors;
+      }
+      showAlert(message, "error");
+      return false;
+    },
+    [showAlert, showValidationAlert],
+  );
 
   const formBlocksRef = useRef(formBlocks);
   formBlocksRef.current = formBlocks;
@@ -306,7 +331,10 @@ export const useRawMaterialSourcingForm = ({
     return errors;
   }, []);
 
-  const submitForm = async (blocks: MaterialBlock[], intent: "draft" | "submit") => {
+  const submitForm = async (
+    blocks: MaterialBlock[],
+    intent: "draft" | "submit",
+  ): Promise<RawMaterialSourcingSubmitResult> => {
     if (!activeBatch) {
       return false;
     }
@@ -368,11 +396,11 @@ export const useRawMaterialSourcingForm = ({
         });
 
         if (!response?.success) {
-          showAlert(
-            getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.CREATE_FAILED),
-            "error",
+          return handleApiValidationFailure(
+            response,
+            STRINGS.SOURCING.SPECIFICATION_FORM.CREATE_FAILED,
+            "create",
           );
-          return false;
         }
 
         setFormBlocks(blocks);
@@ -450,11 +478,11 @@ export const useRawMaterialSourcingForm = ({
       const response = await rawMaterialSourcingController.updateForm(updatePayload);
 
       if (!response?.success) {
-        showAlert(
-          getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.UPDATE_FAILED),
-          "error",
+        return handleApiValidationFailure(
+          response,
+          STRINGS.SOURCING.SPECIFICATION_FORM.UPDATE_FAILED,
+          "update",
         );
-        return false;
       }
 
       const successMessage =
@@ -491,11 +519,15 @@ export const useRawMaterialSourcingForm = ({
     }
   };
 
-  const handleSaveDraft = async (blocks: MaterialBlock[]) => {
+  const handleSaveDraft = async (
+    blocks: MaterialBlock[],
+  ): Promise<RawMaterialSourcingSubmitResult> => {
     return await submitForm(blocks, "draft");
   };
 
-  const handleSubmit = async (blocks: MaterialBlock[]) => {
+  const handleSubmit = async (
+    blocks: MaterialBlock[],
+  ): Promise<RawMaterialSourcingSubmitResult> => {
     return await submitForm(blocks, "submit");
   };
 

@@ -70,6 +70,7 @@ import {
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -218,11 +219,8 @@ export const useCastingAndCuringHook = () => {
     );
   }, [resetFlowDraft]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const openFormWithResolvedData = useCallback(
     async (

@@ -37,7 +37,6 @@ export const APPROVER_ENDPOINTS = {
   QC_DIVISIONS: `${API_BASE}/user/qc-division/divisions`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
   RAW_MATERIAL_SOURCING_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
-  RAW_MATERIAL_SOURCING_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   ROCKET_MOTOR_CASING_LIST: `${API_BASE}/approver/rocket-motor-casing/list`,
   ROCKET_MOTOR_CASING_CHANGE_STATUS: `${API_BASE}/approver/rocket-motor-casing/change-status`,
 };

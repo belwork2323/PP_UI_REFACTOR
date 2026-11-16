@@ -50,6 +50,12 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     emptySubdepartmentBatchAdvancedFilters(),
   );
 
+  // New subdept slug → treat as initial load (full loader, not silent refresh).
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+    setLoading(true);
+  }, [targetSlug, selectedSubDepartment?.subDepartmentId]);
+
   const setStatusFilter = useCallback((value: string) => {
     setStatusFilterState(value);
     setPage(0);
@@ -163,32 +169,23 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     [advancedFilters, targetSlug],
   );
 
+  /** Sync map from the list response — never block first paint on a 5000-row recount. */
   const resolveStatusCounts = useCallback(
-    async (
+    (
       rows: Record<string, unknown>[],
       serverCounts: Record<string, number> | undefined,
       total: number,
-      subDepartmentId: number,
-      userId: string,
-    ) => {
-      const mapped = mapSubdepartmentBatchStatusCounts(serverCounts, total, rows);
+    ) => mapSubdepartmentBatchStatusCounts(serverCounts, total, rows),
+    [],
+  );
 
-      // Status-tab counts must reflect the full list, not the active status slice.
-      if (statusFilter !== FILTER_ALL) {
-        const globalCounts = await fetchGlobalStatusCounts(subDepartmentId, userId);
-        return globalCounts ?? mapped;
-      }
-
-      const hasNonZeroStatusCounts = Object.entries(mapped).some(
-        ([key, value]) => key !== FILTER_ALL && value > 0,
-      );
-
-      if (hasNonZeroStatusCounts) {
-        return mapped;
-      }
-
-      const globalCounts = await fetchGlobalStatusCounts(subDepartmentId, userId);
-      return globalCounts ?? mapped;
+  /** Optional background refresh when a status tab is active (counts must be global). */
+  const refreshGlobalStatusCountsInBackground = useCallback(
+    (subDepartmentId: number, userId: string) => {
+      if (statusFilter === FILTER_ALL) return;
+      void fetchGlobalStatusCounts(subDepartmentId, userId).then((globalCounts) => {
+        if (globalCounts) setStatusCounts(globalCounts);
+      });
     },
     [fetchGlobalStatusCounts, statusFilter],
   );
@@ -237,9 +234,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
         setBatches(rows);
         setTotalRecords(total);
-        setStatusCounts(
-          await resolveStatusCounts(rows, res.data.statusCounts, total, subDepartmentId, userId),
-        );
+        setStatusCounts(resolveStatusCounts(rows, res.data.statusCounts, total));
+        refreshGlobalStatusCountsInBackground(subDepartmentId, userId);
       } else {
         setBatches([]);
         setTotalRecords(0);
@@ -265,6 +261,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     advancedFilters,
     targetSlug,
     resolveStatusCounts,
+    refreshGlobalStatusCountsInBackground,
   ]);
 
   useEffect(() => {

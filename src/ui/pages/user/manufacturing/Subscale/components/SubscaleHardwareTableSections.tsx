@@ -81,8 +81,8 @@ export const ArticleTypeTableSection = memo(function ArticleTypeTableSection({
               <FieldLabelWithAsterisk label="Mould No" required sx={tableHeaderCellSx} />
             </TableCell>
             <TableCell sx={tableHeaderCellSx}>Length</TableCell>
-            <TableCell sx={tableHeaderCellSx}>Thickness</TableCell>
-            <TableCell sx={tableHeaderCellSx}>Liner Applied</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Thickness (MM)</TableCell>
+            <TableCell sx={tableHeaderCellSx}>Liner Applied (GMS)</TableCell>
             <TableCell sx={tableHeaderCellSx}>Observations</TableCell>
           </TableRow>
         </TableHead>
@@ -564,49 +564,49 @@ export const MechanicalPropertiesTableSection = memo(function MechanicalProperti
           {rows.map((row, idx) => {
             const bemError = errors?.[`MECHANICAL_PROPERTIES_TABLE.${idx}.BEM_NO`];
             return (
-            <TableRow key={idx}>
-              <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
-              <TableCell sx={articleTypeCellSx}>
-                {formatArticleTypeLabel(row.ARTICLE_TYPE)}
-              </TableCell>
-              <TableCell
-                sx={{
-                  ...bemNoTextSx,
-                  ...(bemError
-                    ? { color: "error.main", outline: "1px solid", outlineColor: "error.main" }
-                    : null),
-                }}
-              >
-                <Box data-ss-field={`MECHANICAL_PROPERTIES_TABLE.${idx}.BEM_NO`}>
-                  {getSyncedBemNo(idx) || "—"}
-                </Box>
-              </TableCell>
-              {(
-                [
-                  ["TS", true],
-                  ["ELONGATION", true],
-                  ["MODULUS", true],
-                  ["SBS", true],
-                  ["TBS", true],
-                  ["PEEL_STRENGTH", true],
-                  ["DENSITY", true],
-                  ["ACTOR", false],
-                ] as const
-              ).map(([fieldId, isNumber]) => (
-                <TableCell key={fieldId} sx={tableBodyCellSx}>
-                  <SubscaleTableTextCell
-                    compact
-                    type={isNumber ? "number" : undefined}
-                    tableId="MECHANICAL_PROPERTIES_TABLE"
-                    rowIndex={idx}
-                    fieldId={fieldId}
-                    value={row[fieldId] ?? ""}
-                    onCellChange={onCellChange}
-                    errorMessage={errors?.[`MECHANICAL_PROPERTIES_TABLE.${idx}.${fieldId}`]}
-                  />
+              <TableRow key={idx}>
+                <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
+                <TableCell sx={articleTypeCellSx}>
+                  {formatArticleTypeLabel(row.ARTICLE_TYPE)}
                 </TableCell>
-              ))}
-            </TableRow>
+                <TableCell
+                  sx={{
+                    ...bemNoTextSx,
+                    ...(bemError
+                      ? { color: "error.main", outline: "1px solid", outlineColor: "error.main" }
+                      : null),
+                  }}
+                >
+                  <Box data-ss-field={`MECHANICAL_PROPERTIES_TABLE.${idx}.BEM_NO`}>
+                    {getSyncedBemNo(idx) || "—"}
+                  </Box>
+                </TableCell>
+                {(
+                  [
+                    ["TS", true],
+                    ["ELONGATION", true],
+                    ["MODULUS", true],
+                    ["SBS", true],
+                    ["TBS", true],
+                    ["PEEL_STRENGTH", true],
+                    ["DENSITY", true],
+                    ["ACTOR", false],
+                  ] as const
+                ).map(([fieldId, isNumber]) => (
+                  <TableCell key={fieldId} sx={tableBodyCellSx}>
+                    <SubscaleTableTextCell
+                      compact
+                      type={isNumber ? "number" : undefined}
+                      tableId="MECHANICAL_PROPERTIES_TABLE"
+                      rowIndex={idx}
+                      fieldId={fieldId}
+                      value={row[fieldId] ?? ""}
+                      onCellChange={onCellChange}
+                      errorMessage={errors?.[`MECHANICAL_PROPERTIES_TABLE.${idx}.${fieldId}`]}
+                    />
+                  </TableCell>
+                ))}
+              </TableRow>
             );
           })}
         </TableBody>

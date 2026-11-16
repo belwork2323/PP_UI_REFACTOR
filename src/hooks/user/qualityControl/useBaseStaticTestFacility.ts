@@ -82,6 +82,7 @@ import {
 } from "./stfFlowConfig";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -130,6 +131,7 @@ const normalizeBemMotor = (motor: any) => ({
   motorId: motor?.motorId ?? "",
   motorCode: motor?.motorCode ?? "",
   stfTestNo: motor?.stfTestNo ?? "",
+  formId: motor.formId ?? "",
   status: normalizeSubdepartmentBatchStatus(
     motor?.status ?? motor?.operationStatus ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
   ),
@@ -150,10 +152,7 @@ const getErrorMessage = (response: any, fallbackMessage: string): string => {
     if (detailMessages.length > 0) return detailMessages.join("\n");
   }
 
-  if (typeof details === "string" && details.trim()) return details;
-  if (response?.message) return response.message;
-
-  return fallbackMessage;
+  return resolveApiErrorMessage(response, fallbackMessage);
 };
 
 const mergeMotorsFromBatchAndForm = (
@@ -426,19 +425,22 @@ export const useBaseStaticTestFacility = ({
     [messages.DRAFT_VALIDATION_FAILED, messages.SUBMIT_VALIDATION_FAILED, showValidationAlert],
   );
 
-  const emitStfValidationFocus = useCallback((motorId: string, fieldErrors: StfValidationErrors) => {
-    const fieldPath = resolveFirstStfValidationFocus(fieldErrors);
-    if (!fieldPath) return;
-    setValidationFocusRequest((prev) => ({
-      id: (prev?.id ?? 0) + 1,
-      motorId: String(motorId ?? "").trim(),
-      fieldPath,
-    }));
-    // Immediate attempt for OTHER_BEM / already-visible panels; form also retries after tab switch.
-    requestAnimationFrame(() => {
-      focusStfField(fieldPath);
-    });
-  }, []);
+  const emitStfValidationFocus = useCallback(
+    (motorId: string, fieldErrors: StfValidationErrors) => {
+      const fieldPath = resolveFirstStfValidationFocus(fieldErrors);
+      if (!fieldPath) return;
+      setValidationFocusRequest((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        motorId: String(motorId ?? "").trim(),
+        fieldPath,
+      }));
+      // Immediate attempt for OTHER_BEM / already-visible panels; form also retries after tab switch.
+      requestAnimationFrame(() => {
+        focusStfField(fieldPath);
+      });
+    },
+    [],
+  );
 
   /** Keep submit/required highlights until fixed; always surface live FORMAT errors (NDT/Case Prep parity). */
   const mergeLiveMotorValidation = useCallback((key: string, motor: StfMotorSession) => {
@@ -1379,7 +1381,7 @@ export const useBaseStaticTestFacility = ({
           return false;
         }
 
-        const isBemUpdate = Boolean(activeBemMotor?.motorId || formData?.motorId);
+        const isBemUpdate = Boolean(activeBemMotor?.bemNo || formData?.motorId);
         const bemSession = formData.motors?.[0] ?? createEmptyStfMotorSession(String(bemNo), "BEM");
         const staticTestingDetails = buildStfMotorStaticTestingDetails(bemSession.stfData);
 
@@ -1391,6 +1393,7 @@ export const useBaseStaticTestFacility = ({
           stfTestNo: stfNo,
           staticTestingDetails,
         };
+        console.log(activeBemMotor?.bemNo);
 
         if (isBemUpdate) {
           response = await stfController.updateBemMotor({

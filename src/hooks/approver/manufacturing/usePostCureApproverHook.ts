@@ -237,6 +237,7 @@ export const usePostCureApproverHook = () => {
     const enrichedDetailView = detailView
       ? {
           ...detailView,
+          batchType: detailView.batchType || String(row.batchType ?? ""),
           status: detailView.status || String(nextStatus),
           formSubmissionType:
             detailView.formSubmissionType ||

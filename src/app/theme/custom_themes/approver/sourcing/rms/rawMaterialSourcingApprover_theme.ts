@@ -4,7 +4,12 @@ import { keyframes } from "@mui/material/styles";
 import fonts from "@app/theme/fonts";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { uniformTableBodyCellSx, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
-import { detailsBannerGradientColors } from "@app/theme/custom_themes/shared/workflow_details_theme";
+import {
+  createBannerStatusConfig,
+  createWorkflowDetailsTheme,
+  detailsBannerGradientColors,
+} from "@app/theme/custom_themes/shared/workflow_details_theme";
+import getSourcingTheme from "@app/theme/custom_themes/user/sourcing/sourcing_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -13,6 +18,7 @@ const slideUp = keyframes`
 
 export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
   const shared = getSharedTheme(mode);
+  const sourcingTheme = getSourcingTheme(mode);
   const isDark = mode === "dark";
 
   const palette = {
@@ -35,8 +41,28 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
   const headerPrimary = fill.from;
   const headerPrimaryLight = fill.to;
 
+  const details = createWorkflowDetailsTheme(palette, mode);
+
   return {
     palette,
+    workflow: sourcingTheme.workflow,
+    details,
+    /** Alias for UserWorkflowDetailsShell / status cell consumers. */
+    batchList: {
+      statusConfig: createBannerStatusConfig(palette, mode),
+      chips: {
+        reasonText: {
+          fontSize: "0.68rem",
+          fontWeight: 600,
+          color: palette.primaryLight,
+          cursor: "pointer",
+          textDecoration: "underline",
+          mt: 0.35,
+        },
+      },
+      filterPanelField: sourcingTheme.batchList.filterPanelField,
+      filterPanelMenuItem: sourcingTheme.batchList.filterPanelMenuItem,
+    },
     animation: {
       row: (index: number) => `${slideUp} 0.3s ease ${index * 0.04}s both`,
     },

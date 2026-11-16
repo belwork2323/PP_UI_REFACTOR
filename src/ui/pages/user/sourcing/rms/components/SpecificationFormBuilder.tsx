@@ -23,6 +23,7 @@ import useRawMaterialSpecificationForm, {
   SpecificationBlock,
 } from "@hooks/user/sourcing/rms/useRawMaterialSpecificationForm";
 import { focusRmsField } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
+import type { ValidationErrors } from "@data/validation/submissionIntent";
 
 const {
   add: AddRoundedIcon,
@@ -32,6 +33,10 @@ const {
   warning: WarningAmberRoundedIcon,
 } = icons.user.sourcing.specificationFormBuilder;
 
+type RmsSubmitHandler = (
+  blocks: SpecificationBlock[],
+) => Promise<boolean | ValidationErrors | void> | boolean | ValidationErrors | void;
+
 type SpecificationFormBuilderProps = {
   initialBlocks?: SpecificationBlock[];
   isEditMode?: boolean;
@@ -39,12 +44,8 @@ type SpecificationFormBuilderProps = {
   createLotMode?: boolean;
   /** When true (fill/edit existing lot), lot ID cannot be changed */
   lockLotNo?: boolean;
-  onSaveDraft?: (
-    blocks: SpecificationBlock[],
-  ) => Promise<boolean | void> | boolean | void;
-  onSubmit?: (
-    blocks: SpecificationBlock[],
-  ) => Promise<boolean | void> | boolean | void;
+  onSaveDraft?: RmsSubmitHandler;
+  onSubmit?: RmsSubmitHandler;
   onBlocksChange?: (blocks: SpecificationBlock[]) => void;
   actionLoading?: boolean;
   showDeleteLot?: boolean;

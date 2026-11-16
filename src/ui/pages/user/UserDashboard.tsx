@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 
 import { useThemeStore } from "@app/store/themeStore";
 import DepartmentHeader from "@ui/components/custom/DepartmentHeader";
+import RouteLoadingFallback from "@ui/components/common/RouteLoadingFallback";
 import useDepartmentHeader from "@hooks/user/useDepartmentHeader";
 import { USER_DASHBOARD_SECTIONS, type UserDepartment } from "./userDashboardSections";
 
@@ -34,7 +35,9 @@ export default function UserDashboard({ dept }: UserDashboardProps) {
       />
 
       <Box sx={layout.content}>
-        <Suspense fallback={null}>{Section ? <Section /> : null}</Suspense>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          {Section ? <Section /> : null}
+        </Suspense>
       </Box>
     </Box>
   );

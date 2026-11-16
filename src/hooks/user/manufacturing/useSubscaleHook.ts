@@ -33,6 +33,7 @@ import validateSubscale, {
 } from "../../../data/validation/adapters/subscale.validation";
 import type { ValidationErrors } from "../../../data/validation/submissionIntent";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -131,11 +132,8 @@ export const useSubscaleHook = () => {
     syncBaselineFromFormState(defaults);
   }, [syncBaselineFromFormState]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const buildValidationPayload = useCallback(
     (schemaValues?: SchemaFormValues) => {
@@ -186,7 +184,7 @@ export const useSubscaleHook = () => {
   }, []);
 
   const validateAndPrepareDraft = useCallback(() => {
-    const errors = validateSubscale(buildValidationPayload(), "FORMAT");
+    const errors = validateSubscale(buildValidationPayload(), "UNIT");
     if (errors && Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       notifySubscaleValidationErrors(errors, "draft");

@@ -2,22 +2,47 @@ import { Chip, Typography } from "@mui/material";
 
 import { STRINGS } from "@app/config/strings";
 import { icons } from "@app/theme/icons";
-import type { getRawMaterialSourcingPageTheme } from "@app/theme/custom_themes/user/sourcing/rms/rawMaterialSourcing_theme";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
 import { formatDisplayDate, formatDisplayDateTime } from "@utils/dateUtils";
 import IconText from "@ui/components/common/IconText";
+import type { BatchTableColumn } from "@ui/components/custom/BatchTable";
 import UserWorkflowStatusCell from "@ui/components/custom/UserWorkflowStatusCell";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const { person: PersonRoundedIcon, calendar: CalendarMonthRoundedIcon } =
   icons.user.sourcing.rawMaterialBatchList;
 
-/** `BatchList` column config for the raw material lot list. */
+/** Minimal theme shape shared by user page theme and approver list (batchList tokens). */
+export type RawMaterialLotListColumnTheme = {
+  palette?: Record<string, unknown>;
+  batchList: {
+    icon?: object;
+    subtleText?: object;
+    normalText?: object;
+    batchIdText?: object;
+    batchTypeChip?: object;
+    statusConfig?: Record<string, unknown>;
+    chips?: { reasonText?: object };
+  };
+};
+
+export type RawMaterialLotListColumnOptions = {
+  /** Row field for status chips — user: `rmStatus`, approver: `status`. */
+  statusField?: string;
+  /** Dot path for created-by display — user: `createdBy.fullName`, approver: `submittedBy`. */
+  createdByKey?: string;
+};
+
+/** `BatchList` / `BatchTable` column config for the raw material lot list (user + approver). */
 export const getRawMaterialLotListColumns = (
-  theme: ReturnType<typeof getRawMaterialSourcingPageTheme>,
+  theme: RawMaterialLotListColumnTheme,
   statusConfig: Record<string, any>,
-) => {
+  options: RawMaterialLotListColumnOptions = {},
+): BatchTableColumn[] => {
   const { batchList } = theme;
+  const statusField = options.statusField ?? "rmStatus";
+  const createdByKey = options.createdByKey ?? "createdBy.fullName";
+
   const dateCell = (text: string) => (
     <IconText
       icon={<CalendarMonthRoundedIcon sx={batchList.icon} />}
@@ -64,7 +89,7 @@ export const getRawMaterialLotListColumns = (
       render: (v: string) => <Typography sx={batchList.subtleText}>{v}</Typography>,
     },
     {
-      key: "createdBy.fullName",
+      key: createdByKey,
       label: BL.COL_CREATED_BY,
       render: (v: string) => (
         <IconText
@@ -80,7 +105,7 @@ export const getRawMaterialLotListColumns = (
       render: (v: string) => dateCell(formatDisplayDateTime(v)),
     },
     {
-      key: "rmStatus",
+      key: statusField,
       label: BL.COL_RM_STATUS,
       align: "center",
       render: (v: string, row: any) => (

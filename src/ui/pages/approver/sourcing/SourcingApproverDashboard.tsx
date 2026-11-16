@@ -1,38 +1,38 @@
+import { Suspense, useMemo } from "react";
 import { Box } from "@mui/material";
-import { useMemo } from "react";
+
+import { useThemeStore } from "@app/store/themeStore";
 import useSourcingDashboardHook from "@hooks/user/sourcing/shared/useSourcingDashboardHook";
-import useApproverDepartmentHeaderHook from "../../../../hooks/approver/useApproverDepartmentHeaderHook";
-import DepartmentHeader from "../../../components/custom/DepartmentHeader";
-import { STRINGS } from "../../../../app/config/strings";
-import { useThemeStore } from "../../../../app/store/themeStore";
-import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
-
-import RawMaterialSourcingApproverMainPage from "@ui/pages/approver/sourcing/rms/RawMaterialSourcingApproverMainPage";
-import RocketMotorApproverPage from "./RocketMotorCasingApproverPage";
-
-const S = STRINGS.APPROVER.DASHBOARD.SOURCING;
+import useApproverDepartmentHeaderHook from "@hooks/approver/useApproverDepartmentHeaderHook";
+import DepartmentHeader from "@ui/components/custom/DepartmentHeader";
+import RouteLoadingFallback from "@ui/components/common/RouteLoadingFallback";
+import { APPROVER_DASHBOARD_SECTIONS } from "@ui/pages/approver/approverDashboardSections";
 
 const SourcingApproverDashboard = () => {
   const mode = useThemeStore((state) => state.mode);
-  const theme = useMemo(() => getSourcingTheme(mode), [mode]);
-  const { subDept, subDeptLabel, isRawMaterialFlow, isRocketMotorFlow } = useSourcingDashboardHook();
+  const department = APPROVER_DASHBOARD_SECTIONS.sourcing;
+  const layout = useMemo(() => department.getLayout(mode), [department, mode]);
+  const { subDept, subDeptLabel } = useSourcingDashboardHook();
   const { statItems, userName, userRole } = useApproverDepartmentHeaderHook({
     department: "sourcing",
     subDeptSlug: subDept,
   });
 
+  const Section = department.sections[subDept ?? ""];
+
   return (
-    <Box sx={theme.dashboard.container}>
+    <Box sx={layout.container}>
       <DepartmentHeader
-        deptName={S.DEPARTMENT_NAME}
-        subDeptName={subDeptLabel}
+        deptName={department.name}
+        subDeptName={subDeptLabel || department.labels[subDept ?? ""] || subDept}
         userName={userName}
         userRole={userRole}
         statItems={statItems}
       />
-      <Box sx={theme.dashboard.content}>
-        {isRawMaterialFlow && <RawMaterialSourcingApproverMainPage />}
-        {isRocketMotorFlow && <RocketMotorApproverPage />}
+      <Box sx={layout.content}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          {Section ? <Section /> : null}
+        </Suspense>
       </Box>
     </Box>
   );

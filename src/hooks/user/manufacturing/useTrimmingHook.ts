@@ -50,6 +50,7 @@ import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 import {
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
   fetchEnrichedBatchStageFields,
   mergeBatchStageFields,
   SUB_DEPT,
@@ -344,11 +345,8 @@ export const useTrimmingHook = () => {
     );
   }, [resetFlowDraft]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const refreshBatchLocks = useCallback(
     async (batchId: string) => {

@@ -120,26 +120,45 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
 
   const [internalActiveStatus, setInternalActiveStatus] = useState<string>(FILTER_ALL);
   const currentStatus = externalActiveStatus ?? internalActiveStatus;
+  const statusCount = useMemo(() => {
+    const raw = statusCounts || {}; // replace rawCounts with your actual counts object variable
+    return {
+      [FILTER_ALL]: raw.All ?? raw.all ?? 0,
+      "In Progress": raw.inProgress ?? 0,
+      "Waiting for Approval": raw.waitingForApproval ?? 0,
+      Approved: raw.approved ?? 0,
+      Rejected: raw.rejected ?? 0,
+    };
+  }, [statusCounts]);
 
+  // 2. Build statusConfig including an entry for FILTER_ALL so statusMeta[tab] is never undefined
   const statusConfig = useMemo(() => {
     if (statusConfigOverride) return statusConfigOverride;
-    return Object.fromEntries(
-      Object.entries(BEM_STATUS_CONFIG).map(([status, config]) => [
-        status,
-        {
-          ...config,
-          ...(t.statusConfig?.[status] ?? {}),
-          label: getOperationStatusFilterLabel(status, { isSourcingLotSubdepartment: false }),
-        },
-      ]),
+
+    const allowedStatuses = ["In Progress", "Waiting for Approval", "Approved", "Rejected"];
+
+    const filteredStatuses = Object.fromEntries(
+      Object.entries(BEM_STATUS_CONFIG)
+        .filter(([status]) => allowedStatuses.includes(status))
+        .map(([status, config]) => [
+          status,
+          {
+            ...config,
+            ...(t.statusConfig?.[status] ?? {}),
+            label: getOperationStatusFilterLabel(status, { isSourcingLotSubdepartment: false }),
+          },
+        ]),
     );
+
+    // Prepend FILTER_ALL configuration so its metadata exists for the UI buttons
+    return {
+      [FILTER_ALL]: { label: "All", color: "#475569" },
+      ...filteredStatuses,
+    };
   }, [statusConfigOverride, t.statusConfig]);
 
-  const statusTabs = useMemo(
-    () => (statusTabsOverride?.length ? statusTabsOverride : [FILTER_ALL]),
-    [statusTabsOverride],
-  );
-
+  // 3. Status tabs automatically pick up FILTER_ALL first, followed by the filtered statuses
+  const statusTabs = useMemo(() => Object.keys(statusConfig), [statusConfig]);
   const resolvedStatusMeta = useMemo(() => {
     if (statusMetaOverride) return statusMetaOverride;
     return Object.fromEntries(
@@ -230,6 +249,15 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
           render: (row) => row.motorId ?? "—",
         },
         {
+          id: "formId",
+          label: "Form ID",
+          cellSx: {
+            fontWeight: fonts.weight.bold,
+            fontSize: t?.batchIdText?.fontSize ?? "0.84rem",
+          },
+          render: (row) => row.formId ?? "—",
+        },
+        {
           id: "subType",
           label: "Sub Type",
           render: (row) => row.subType ?? "—",
@@ -270,17 +298,16 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
       ],
     [customColumns, renderAction, statusConfig, t, theme],
   );
-
   return (
     <ListLayout
       activeStatus={currentStatus}
       statusTabs={statusTabs}
       statusMeta={resolvedStatusMeta}
-      statusCounts={statusCounts}
+      statusCounts={statusCount}
       onStatusChange={handleStatusTabClick}
       searchValue={search}
       onSearchChange={(val) => onSearchChange?.(val)}
-      searchPlaceholder={STRINGS.USER_BATCH_LIST.SEARCH_PLACEHOLDER}
+      searchPlaceholder="Search by BEM Motor ID or Form ID or STF Test No."
       filterFields={filterFields}
       filterValues={filterValues}
       onFilterChange={onFilterChange}
@@ -369,8 +396,6 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
 
                   {columns.map((col) => {
                     const rawValue = row[col.id];
-                    console.log(rawValue);
-
                     return (
                       <TableCell
                         key={col.id}

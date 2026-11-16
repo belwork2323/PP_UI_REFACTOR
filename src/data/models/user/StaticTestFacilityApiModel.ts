@@ -18,10 +18,7 @@ import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
 } from "./CastingCuringFormModel";
-import {
-  formatCasePrepSectionLabel,
-  type CasePrepDetailSection,
-} from "./CasePreparationFormModel";
+import { formatCasePrepSectionLabel, type CasePrepDetailSection } from "./CasePreparationFormModel";
 import { isMotorWorkflowTabDisabled } from "@data/models/common/motorWorkflowGuards";
 
 type LegacySectionSubmission = { sectionId?: string; sectionData?: unknown };
@@ -214,6 +211,7 @@ export class BEMMotorDetailsModel implements BemMotorDetailsResponse {
   subDepartmentId: number;
   subType: string;
   status: string;
+  formId?: string;
   sections: LegacySectionSubmission[];
   staticTestingDetails?: {
     [FORM_SECTIONS_KEY]?: LegacySectionSubmission[];
@@ -235,6 +233,7 @@ export class BEMMotorDetailsModel implements BemMotorDetailsResponse {
     this.bemNo = payload?.bemNo ?? payload?.motorCode ?? payload?.motorId ?? "";
     this.motorCode = payload?.motorCode;
     this.stfTestNo = payload?.stfTestNo;
+    this.formId = payload?.formId;
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.subType = payload?.subType ?? "BEM";
     this.status = payload?.status ?? payload?.formStatus ?? "";
@@ -400,10 +399,7 @@ export const canApproverActionEntireStfForm = (params: {
     return false;
   }
 
-  if (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  ) {
+  if (statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL) {
     return true;
   }
 
@@ -422,9 +418,7 @@ export const canApproverActionEntireStfForm = (params: {
   return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
-const normalizeStfDetailSections = (
-  sections: CasePrepDetailSection[],
-): CasePrepDetailSection[] =>
+const normalizeStfDetailSections = (sections: CasePrepDetailSection[]): CasePrepDetailSection[] =>
   // Preserve first-row / API key order (avoid A–Z sort from shared parser).
   sections.map((section) => ({
     ...section,
@@ -449,9 +443,7 @@ const normalizeStfDetailSections = (
     }),
   }));
 
-const parseStfDisplaySections = (
-  sections: unknown[] | undefined,
-): CasePrepDetailSection[] => {
+const parseStfDisplaySections = (sections: unknown[] | undefined): CasePrepDetailSection[] => {
   const parsed = (sections ?? [])
     .map((section) => {
       const block = section as LegacySectionSubmission;
@@ -462,9 +454,7 @@ const parseStfDisplaySections = (
   return normalizeStfDetailSections(parsed);
 };
 
-const parseStfStructuredDetails = (
-  details: Record<string, unknown>,
-): CasePrepDetailSection[] => {
+const parseStfStructuredDetails = (details: Record<string, unknown>): CasePrepDetailSection[] => {
   const parsed = Object.entries(details)
     .filter(([key]) => key !== FORM_SECTIONS_KEY)
     .map(([key, value]) => {
@@ -544,9 +534,7 @@ export const mapStfDetailsForDisplay = (
     const subType = String(statusEntry?.subType ?? dataEntry?.subType ?? root.subType ?? "").trim();
     const schemaSubType = mapStfSubType(subType);
     const stfData = parseStfMotorDataFromApi(dataEntry ?? null, schemaSubType);
-    const sections = dataEntry
-      ? resolveStfMotorSections(dataEntry, legacySectionsForMotor)
-      : [];
+    const sections = dataEntry ? resolveStfMotorSections(dataEntry, legacySectionsForMotor) : [];
     const stfTestNo =
       String(
         dataEntry?.stfTestNo ?? statusEntry?.stfTestNo ?? stfTestNoById[motorId] ?? "",

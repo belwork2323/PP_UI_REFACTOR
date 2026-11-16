@@ -1,8 +1,15 @@
-import { OPERATION_STATUS, toOperationStatusApiValue } from "@hooks/operationStatus";
+import {
+  OPERATION_STATUS,
+  SOURCING_LOT_STATUS_FILTER_VALUES,
+  toOperationStatusApiValue,
+} from "@hooks/operationStatus";
 import { normalizeRawMaterialStatus } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
-/** Status tabs for approver raw material lot list (matches API status labels). */
-export const RAW_MATERIAL_APPROVER_STATUS_TABS = Object.values(OPERATION_STATUS);
+/**
+ * Status tabs for approver raw material lot list — same sourcing-lot set as user RMS
+ * (hides To Be Initiated / Partial / Completely Approved manufacturing tabs).
+ */
+export const RAW_MATERIAL_APPROVER_STATUS_TABS = SOURCING_LOT_STATUS_FILTER_VALUES;
 
 /** Map UI status tab label to API request value (e.g. Approved → APPROVED). */
 export function toRawMaterialApproverListApiStatus(

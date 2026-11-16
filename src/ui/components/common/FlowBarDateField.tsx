@@ -56,6 +56,7 @@ export interface FlowBarDateFieldProps {
   error?: boolean;
   helperText?: string;
   required?: boolean;
+  maxDate?: string;
 }
 
 export const FlowBarDateField = ({
@@ -72,6 +73,7 @@ export const FlowBarDateField = ({
   error = false,
   helperText,
   required = false,
+  maxDate,
 }: FlowBarDateFieldProps) => {
   const hasValue = Boolean(String(value ?? "").trim());
 
@@ -121,6 +123,7 @@ export const FlowBarDateField = ({
           format={UI_DATE_FORMAT}
           disabled={disabled}
           value={parseUiDate(value)}
+          maxDate={maxDate ? (parseUiDate(maxDate) ?? undefined) : undefined}
           onChange={(picked) => onChange(picked?.format(UI_DATE_FORMAT) || "")}
           slotProps={slotProps}
           sx={{ width: "100%" }}

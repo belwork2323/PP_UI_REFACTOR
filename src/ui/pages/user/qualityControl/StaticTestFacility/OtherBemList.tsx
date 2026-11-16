@@ -24,6 +24,7 @@ import UserWorkflowFormHeader from "@/ui/components/custom/UserWorkflowFormHeade
 import { resolveWorkflowFormHeaderStatus } from "@/ui/components/custom/workflowFormHeaderStatus";
 import AppTextField from "@/ui/components/common/AppTextField";
 import { focusStfField } from "@/data/validation/adapters/stf.validation";
+import { SectionCard } from "./STFFormPrimitives";
 
 const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 const S = STRINGS.QUALITY_CONTROL;
@@ -255,47 +256,53 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
               label={isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
             />
           </Stack>
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", sm: "row" },
-              gap: 2.5,
-              alignItems: "stretch",
-              width: "100%",
-            }}
-          >
-            <Box sx={{ flex: 1 }} data-stf-field="motorId">
-              <AppTextField
-                label={strings.OTHER_BEM_MOTOR_NO_LABEL}
-                value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
-                placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
-                required
-                disabled={isExistingRecord}
-                error={Boolean(activeValidationErrors.motorId || activeValidationErrors.bemMotorNo)}
-                helperText={
-                  activeValidationErrors.motorId || activeValidationErrors.bemMotorNo || " "
-                }
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  handleDraftBemNoChange?.(e.target.value);
-                }}
-              />
+          <SectionCard theme={theme}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                gap: 2.5,
+                alignItems: "stretch",
+                width: "100%",
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }} data-stf-field="motorId">
+                <AppTextField
+                  fullWidth
+                  label={strings.OTHER_BEM_MOTOR_NO_LABEL}
+                  value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
+                  placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
+                  required
+                  disabled={isExistingRecord || stfTestNoLocked}
+                  error={Boolean(
+                    activeValidationErrors.motorId || activeValidationErrors.bemMotorNo,
+                  )}
+                  helperText={
+                    activeValidationErrors.motorId || activeValidationErrors.bemMotorNo || " "
+                  }
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    handleDraftBemNoChange?.(e.target.value);
+                  }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }} data-stf-field="stfTestNo">
+                <AppTextField
+                  fullWidth
+                  label={strings.STF_TEST_NO_LABEL}
+                  value={stfTestNoValue}
+                  placeholder={strings.STF_TEST_NO_PLACEHOLDER}
+                  required
+                  disabled={stfTestNoLocked || actionLoading}
+                  error={Boolean(activeValidationErrors.stfTestNo)}
+                  helperText={activeValidationErrors.stfTestNo || " "}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    if (stfTestNoLocked) return;
+                    handleStfTestNoChange?.(bemMotorId, e.target.value);
+                  }}
+                />
+              </Box>
             </Box>
-            <Box sx={{ flex: 1 }} data-stf-field="stfTestNo">
-              <AppTextField
-                label={strings.STF_TEST_NO_LABEL}
-                value={stfTestNoValue}
-                placeholder={strings.STF_TEST_NO_PLACEHOLDER}
-                required
-                disabled={stfTestNoLocked || actionLoading}
-                error={Boolean(activeValidationErrors.stfTestNo)}
-                helperText={activeValidationErrors.stfTestNo || " "}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  if (stfTestNoLocked) return;
-                  handleStfTestNoChange?.(bemMotorId, e.target.value);
-                }}
-              />
-            </Box>
-          </Box>
+          </SectionCard>
           <StfMotorPanel
             value={bemMotorSession.stfData}
             onChange={(next) => onFormValuesChange?.(bemMotorId, next)}

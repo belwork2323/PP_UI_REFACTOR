@@ -1,7 +1,5 @@
 import {
-  changeRawMaterialSourcingApproverStatusApi,
   fetchRawMaterialSourcingApproverListApi,
-  type RawMaterialSourcingApproverChangeStatusPayload,
   type RawMaterialSourcingApproverListPayload,
 } from "@data/api/approver/sourcing/rms/rawMaterialSourcingApproverApi";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
@@ -18,15 +16,6 @@ const rawMaterialSourcingApproverController = {
       return new ApiResponseModel(response, (res) =>
         RawMaterialSourcingApproverListModel.fromApi(res),
       );
-    } catch (error) {
-      return new ApiResponseModel(error);
-    }
-  },
-
-  changeStatus: async (payload: RawMaterialSourcingApproverChangeStatusPayload) => {
-    try {
-      const response = await changeRawMaterialSourcingApproverStatusApi(payload);
-      return new ApiResponseModel(response);
     } catch (error) {
       return new ApiResponseModel(error);
     }

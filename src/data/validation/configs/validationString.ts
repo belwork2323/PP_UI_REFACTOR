@@ -32,6 +32,8 @@ export const VALIDATIONSTRING = {
     /** Remarks/observations + science symbols; # & + @ not allowed */
     ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,\-_()/:%°±≤≥µμ²³⁻]+$/,
     SPECIFICATION_WITH_TOLERANCE: /^[A-Za-z0-9\s.,_()#/:+±%\-@°≤≥µμ²³⁻]+$/, // e.g. 28 - 34%, ≤0.5%, @25°C
+    SIGNED_FLOAT_WITH_2_DECIMAL: /^-?\d+(\.\d{1,2})?$/,
+    SIGNED_FLOAT_WITH_5_DECIMAL: /^-?\d+(\.\d{1,5})?$/,
   },
 
   LENGTH: {

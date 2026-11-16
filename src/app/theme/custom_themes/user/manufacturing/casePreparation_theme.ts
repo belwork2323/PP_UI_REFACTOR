@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material/styles";
 import { createDataTableTheme } from "../../shared/data_table_theme";
+import { createBannerStatusConfig } from "../../shared/workflow_details_theme";
 
 export const CASE_PREP_BRAND = {
 	primary: "#1B4F72",
@@ -128,22 +129,7 @@ export const getCasePreparationTheme = (baseTheme: any) => {
 			},
 		},
 		details: {
-			bannerStatusConfig: (() => {
-				const primary = palette.primary ?? CASE_PREP_BRAND.primary;
-				const primaryLight = palette.primaryLight ?? CASE_PREP_BRAND.primaryLight;
-				const success = palette.accent ?? CASE_PREP_BRAND.accent;
-				const danger = palette.danger ?? CASE_PREP_BRAND.danger;
-				const warnBase = palette.warn ?? CASE_PREP_BRAND.warn;
-				return {
-					["To Be Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
-					["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
-					["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
-					["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
-					["Completely Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
-					["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
-          ["Discarded"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
-				} as Record<string, { color: string; bg: string; border: string }>;
-			})(),
+			bannerStatusConfig: createBannerStatusConfig(palette, baseTheme?.mode ?? "light"),
 			page: { animation: "fadeIn 0.35s ease both" },
 			document: {
 				borderRadius: 3,

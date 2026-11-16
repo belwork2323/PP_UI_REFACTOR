@@ -40,7 +40,6 @@ import {
   focusNdtField,
   type ValidationErrors as NDTValidationErrors,
 } from "../../../data/validation/adapters/ndt.validation";
-import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
@@ -58,6 +57,7 @@ import {
 } from "../../../utils/batchStageUtils";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
 import {
+import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
   resolveNDTMotorCountLimit,
   resolveNDTMotorOptions,
   type NDTAddedMotor,
@@ -287,29 +287,8 @@ export const useNDTHook = () => {
     resetFlowDraft();
   }, [resetFlowDraft]);
 
-  const getErrorMessage = (response: any, fallbackMessage: string) => {
-    const fieldSummary =
-      formatValidationDetailsMessage(response?.errorDetails) ||
-      formatValidationDetailsMessage(response?.error) ||
-      formatValidationDetailsMessage(response?.data);
-    if (fieldSummary) {
-      const base =
-        response?.message && String(response.message).toLowerCase() !== "validation failed"
-          ? String(response.message)
-          : messages.VALIDATION_FAILED;
-      return `${base} (${fieldSummary})`;
-    }
-    const details = response?.error?.details;
-    if (Array.isArray(details)) {
-      const detailMessages = details
-        .map((item: any) => (typeof item === "string" ? item : item?.message))
-        .filter(Boolean);
-      if (detailMessages.length > 0) return detailMessages.join("\n");
-    }
-    if (typeof details === "string" && details.trim()) return details;
-    if (response?.message) return response.message;
-    return fallbackMessage;
-  };
+  const getErrorMessage = (response: any, fallbackMessage: string) =>
+    resolveApiErrorMessage(response, fallbackMessage);
 
   const notifyNdtValidationErrors = (
     fieldErrors: NDTValidationErrors,
