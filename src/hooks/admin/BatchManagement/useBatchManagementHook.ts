@@ -1174,6 +1174,7 @@ function useBatchDeleteSection(onRefresh: () => void) {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [deleteReasonError, setDeleteReasonError] = useState("");
 
   const openDelete = (batch: any) => {
     if (!canDeleteAdminBatch(batch)) {
@@ -1183,6 +1184,7 @@ function useBatchDeleteSection(onRefresh: () => void) {
     setDeleteTarget(batch);
     setDeleteReason("");
     setDeleteOpen(true);
+    setDeleteReasonError("");
   };
 
   const handleDelete = async () => {
@@ -1208,16 +1210,41 @@ function useBatchDeleteSection(onRefresh: () => void) {
       setDeleting(false);
     }
   };
+  const DELETE_REASON_REGEX = /^(?=.*[a-zA-Z0-9])[a-zA-Z0-9\s.,;:()_/-]{5,500}$/;
 
+  const validateDeleteReason = (reason) => {
+    const trimmedReason = reason.trim();
+
+    if (!trimmedReason) {
+      return "Reason is required.";
+    }
+
+    if (!DELETE_REASON_REGEX.test(trimmedReason)) {
+      return "Enter 5–500 characters using letters, numbers and valid punctuation.";
+    }
+
+    return "";
+  };
+
+  const handleDeleteReasonChange = (e) => {
+    const value = e.target.value;
+
+    setDeleteReason(value);
+    setDeleteReasonError(validateDeleteReason(value));
+  };
   return {
     deleteOpen,
     setDeleteOpen,
     deleteTarget,
     deleteReason,
     setDeleteReason,
+    deleteReasonError,
+    setDeleteReasonError,
     deleting,
     openDelete,
     handleDelete,
+    validateDeleteReason,
+    handleDeleteReasonChange,
   };
 }
 

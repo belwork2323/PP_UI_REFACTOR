@@ -91,13 +91,7 @@ const displayValue = (value: unknown) => {
   return text || "—";
 };
 
-const ReadOnlyValue = ({
-  value,
-  muted = false,
-}: {
-  value: unknown;
-  muted?: boolean;
-}) => (
+const ReadOnlyValue = ({ value, muted = false }: { value: unknown; muted?: boolean }) => (
   <Typography
     sx={{
       fontSize: "0.72rem",
@@ -452,7 +446,7 @@ const QCRawMaterialRevalidationTable = ({
                                 <DateField
                                   value={String(row.VALIDITY ?? "")}
                                   onChange={(next) => updateRow(rowIndex, { VALIDITY: next })}
-                                  placeholder="Validity"
+                                  placeholder="DD-MM-YYYY"
                                   compact
                                   inputSx={uniformInputSx}
                                   error={Boolean(err(`rows.${rowIndex}.VALIDITY`))}

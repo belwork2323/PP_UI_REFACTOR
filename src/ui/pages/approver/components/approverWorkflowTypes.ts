@@ -1,22 +1,18 @@
 import type { ComponentProps, ComponentType, ReactNode } from "react";
+import type { SxProps, Theme } from "@mui/material";
 
 import type { ApproverDepartmentKey, ApproverStatusMeta } from "@app/theme/approver";
 import type { ListFilterPanelPalette } from "@app/theme/custom_themes/shared/listFilterPanel_theme";
 import type { DataTableColumn } from "@ui/components/common/DataTable";
 import type { BatchTableColumn } from "@ui/components/custom/BatchTable";
-import type { FilterField, FilterFieldsTheme } from "@ui/components/custom/FilterFields";
+import type { FilterField, FilterFieldOption, FilterFieldsTheme } from "@ui/components/custom/FilterFields";
 import type ApproverActionDialog from "@ui/components/custom/ApproverActionDialog";
+import type { LotFilterDraft } from "@ui/pages/user/sourcing/rms/components/lotFilterFields";
 
 type ApproverActionDialogProps = ComponentProps<typeof ApproverActionDialog>;
 
-/** Shared filter draft shape used by ApproverWorkflowListPage + FilterFields. */
-export type ApproverWorkflowFilterDraft = {
-  material: string;
-  status: string;
-  from: string;
-  to: string;
-  [key: string]: string;
-};
+/** Shared filter draft — same shape as User RMS lot filters. */
+export type ApproverWorkflowFilterDraft = LotFilterDraft & { [key: string]: string };
 
 export type ApproverWorkflowListState = {
   statusMeta: ApproverStatusMeta;
@@ -29,13 +25,16 @@ export type ApproverWorkflowListState = {
   materialOptions: { materialCode: string; materialName: string }[];
   materialsLoading: boolean;
   statusDropdownValues: string[];
+  statusOptions: FilterFieldOption[];
   appliedFilters: {
     materialCode: string;
+    manufacturer: string;
     fromDate: string;
     toDate: string;
   };
   applyPanelFilters: (next: {
     materialCode: string;
+    manufacturer: string;
     fromDate: string;
     toDate: string;
     status: string;
@@ -52,14 +51,18 @@ export type ApproverWorkflowListConfig<T extends Record<string, unknown> = Recor
   filterTitle: string;
   filterPalette: ListFilterPanelPalette;
   filterFieldsTheme: FilterFieldsTheme;
+  /** Match User RMS ListFilterPanel field row layout. */
+  filterFieldRowProps?: Record<string, unknown>;
+  /** Match User RMS lotList.applyButton. */
+  filterApplyButtonSx?: SxProps<Theme>;
   useListState: () => ApproverWorkflowListState;
   getFilterFields: (args: {
     filterAllLabel: string;
     materialOptions: { materialCode: string; materialName: string }[];
     materialsLoading: boolean;
-    statusValues: string[];
+    statusOptions: FilterFieldOption[];
     dateErrors?: { from?: string; to?: string } | null;
-  }) => FilterField<ApproverWorkflowFilterDraft>[];
+  }) => FilterField<LotFilterDraft>[];
   getColumns: (args: {
     statusMeta: ApproverStatusMeta;
     onViewDetails: (row: T) => void;

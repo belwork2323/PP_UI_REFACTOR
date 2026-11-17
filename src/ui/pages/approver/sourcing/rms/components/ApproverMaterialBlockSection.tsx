@@ -11,12 +11,16 @@ import SpecificationResultTable, {
   type SpecificationResultRow,
   type SpecificationResultTableStyles,
 } from "@ui/components/custom/SpecificationResultTable";
+import WorkflowDetailsSection from "@ui/components/custom/WorkflowDetailsSection";
 import { toLotCertificateAttachments } from "@ui/pages/user/sourcing/rms/components/lotCertificateAttachments";
 import LotPreparationDetails from "./LotPreparationDetails";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
-const { insertDriveFile: InsertDriveFileOutlinedIcon } = icons.user.sourcing.rawMaterialBatchList;
+const {
+  insertDriveFile: InsertDriveFileOutlinedIcon,
+  visibility: VisibilityRoundedIcon,
+} = icons.user.sourcing.rawMaterialBatchList;
 
 type ApproverMaterialBlockSectionProps = {
   block: MaterialBlock;
@@ -26,7 +30,7 @@ type ApproverMaterialBlockSectionProps = {
   openFile: (fileId: string, subDepartmentId: number, fileName?: string) => unknown;
 };
 
-/** One material lot inside the approver details dialog: meta line, preparation, specs, certificates. */
+/** One material lot inside Approver details: meta, preparation, specs, certificates. */
 const ApproverMaterialBlockSection = ({
   block,
   isLast,
@@ -34,22 +38,26 @@ const ApproverMaterialBlockSection = ({
   subDepartmentId,
   openFile,
 }: ApproverMaterialBlockSectionProps) => {
-  const { dialog, chips } = theme;
+  const rmTheme = theme.lotDetails;
+  const { dialog, chips, palette } = theme;
 
   const styles = useMemo<SpecificationResultTableStyles>(
     () => ({
-      container: dialog.innerTableContainer,
-      headerCell: (columnIndex) => dialog.innerHeaderCell(columnIndex === 0),
-      row: (index) => dialog.innerRow(index),
-      refChip: chips.refRange,
+      container: rmTheme.tableContainer,
+      headerCell: rmTheme.tableHeaderCell,
+      row: (index, failed) => rmTheme.tableRow(index, failed),
+      refChip: rmTheme.refChip,
       cells: {
-        specification: dialog.innerSpecText,
-        refRange: dialog.innerCell,
-        analysedResult: () => dialog.innerResultText,
-        acemQcResult: dialog.innerRemarksText,
+        specification: { ...rmTheme.tableCell, ...rmTheme.specText },
+        refRange: rmTheme.tableCell,
+        analysedResult: (failed) => ({
+          ...rmTheme.tableCell,
+          ...(failed ? rmTheme.failedResult : rmTheme.resultText),
+        }),
+        acemQcResult: { ...rmTheme.tableCell, ...rmTheme.remarksText },
       },
     }),
-    [dialog, chips],
+    [rmTheme],
   );
 
   const leadingColumns = useMemo(
@@ -57,7 +65,7 @@ const ApproverMaterialBlockSection = ({
       {
         key: "material",
         header: "Material",
-        cellSx: dialog.innerCell,
+        cellSx: rmTheme.tableCell,
         render: (_row: SpecificationResultRow, index: number) =>
           index === 0 ? (
             <Chip label={block.material} size="small" sx={chips.inlineMaterial} />
@@ -66,12 +74,12 @@ const ApproverMaterialBlockSection = ({
       {
         key: "lotNo",
         header: "Man. Lot/Batch No.",
-        cellSx: dialog.innerLotText,
+        cellSx: { ...rmTheme.tableCell, color: palette.textSub },
         render: (_row: SpecificationResultRow, index: number) =>
           index === 0 ? block.lotNo || "—" : "",
       },
     ],
-    [block.material, block.lotNo, dialog, chips],
+    [block.material, block.lotNo, rmTheme, chips, palette.textSub],
   );
 
   const rows = useMemo<SpecificationResultRow[]>(
@@ -82,6 +90,7 @@ const ApproverMaterialBlockSection = ({
         refRange: row.refRange,
         analysedResult: row.analysedResult,
         acemQcResult: row.acemQcResult,
+        failed: Boolean(row.isOutOfRange),
       })),
     [block.rows],
   );
@@ -124,7 +133,18 @@ const ApproverMaterialBlockSection = ({
         ))}
       </Stack>
       <LotPreparationDetails block={block} palette={theme.palette} />
-      <SpecificationResultTable rows={rows} styles={styles} leadingColumns={leadingColumns} />
+
+      <WorkflowDetailsSection
+        dt={rmTheme}
+        title={BL.LOT_DETAILS_SPEC_SECTION}
+        icon={VisibilityRoundedIcon}
+      >
+        {rows.length ? (
+          <SpecificationResultTable rows={rows} styles={styles} leadingColumns={leadingColumns} />
+        ) : (
+          <Typography sx={rmTheme.emptyText}>{BL.LOT_DETAILS_EMPTY}</Typography>
+        )}
+      </WorkflowDetailsSection>
 
       {attachments.length ? (
         <Box sx={dialog.certificatesSection}>

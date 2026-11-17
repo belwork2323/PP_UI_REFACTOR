@@ -100,7 +100,7 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
 
   HARDNESS: textRule([]),
   DECORING_DATE: dateTimeRule(),
-  DECORING_LOAD: numberRule(),
+  DECORING_LOAD: textRule([], S.LENGTH.MAX_STANDARD),
   CURING_START_DATE: dateTimeRule(),
   CURING_END_DATE: dateTimeRule(),
   GRAIN_SURFACE_OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),

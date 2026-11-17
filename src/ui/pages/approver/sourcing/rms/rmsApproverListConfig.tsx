@@ -10,11 +10,11 @@ import {
 } from "@app/theme/custom_themes/shared/data_table_theme";
 import { getListLayoutTheme } from "@app/theme/custom_themes/shared/listLayout_theme";
 import { getRawMaterialSourcingApproverTheme } from "@app/theme/custom_themes/approver/sourcing/rms/rawMaterialSourcingApprover_theme";
-import getSourcingTheme from "@app/theme/custom_themes/user/sourcing/sourcing_theme";
+import { getRawMaterialSourcingPageTheme } from "@app/theme/custom_themes/user/sourcing/rms/rawMaterialSourcing_theme";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
 import { useRawMaterialSourcingApproverList } from "@hooks/approver/sourcing/rms/useRawMaterialSourcingApproverList";
 import type { ApproverWorkflowListConfig } from "@ui/pages/approver/components/approverWorkflowTypes";
-import { getRmsApproverFilterFields } from "./rmsApproverFilterFields";
+import { getLotFilterFields } from "@ui/pages/user/sourcing/rms/components/lotFilterFields";
 import {
   buildRmsApproverStatusConfig,
   getRmsApproverListColumns,
@@ -31,25 +31,34 @@ const SEARCH_KEYS = [
   "submittedBy",
 ];
 
+/** Same field-row layout as User RMS lot list filter panel. */
+const FILTER_FIELD_ROW_PROPS = {
+  direction: "row",
+  spacing: 1.25,
+  alignItems: "flex-end",
+  flexWrap: { xs: "wrap", lg: "nowrap" },
+  useFlexGap: true,
+};
+
 /** Builds the RMS Approver list config against shared ApproverWorkflowListPage + BatchTable. */
 export const useRmsApproverListConfig = (): ApproverWorkflowListConfig => {
   const mode = useThemeStore((state) => state.mode);
   const approverTheme = useMemo(() => getRawMaterialSourcingApproverTheme(mode), [mode]);
-  const sourcingTheme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const pageTheme = useMemo(() => getRawMaterialSourcingPageTheme(mode), [mode]);
 
   /** Same batchList tokens as user RMS lot list (columns + stripes + status chips). */
   const listTheme = useMemo(
     () => ({
-      palette: sourcingTheme.palette,
+      palette: pageTheme.palette,
       batchList: {
-        ...sourcingTheme.batchList,
+        ...pageTheme.batchList,
         chips: {
-          ...sourcingTheme.batchList.chips,
+          ...pageTheme.batchList.chips,
           reasonText: approverTheme.batchList.chips.reasonText,
         },
       },
     }),
-    [sourcingTheme, approverTheme],
+    [pageTheme, approverTheme],
   );
 
   return useMemo(() => {
@@ -103,15 +112,11 @@ export const useRmsApproverListConfig = (): ApproverWorkflowListConfig => {
       ]),
       filterTitle: STRINGS.SOURCING.BATCH_LIST.FILTERS_TITLE,
       filterPalette: listTheme.palette,
-      filterFieldsTheme: {
-        palette: listTheme.palette,
-        batchList: {
-          filterPanelField: sourcingTheme.batchList.filterPanelField,
-          filterPanelMenuItem: sourcingTheme.batchList.filterPanelMenuItem,
-        },
-      },
+      filterFieldsTheme: pageTheme,
+      filterFieldRowProps: FILTER_FIELD_ROW_PROPS,
+      filterApplyButtonSx: pageTheme.sourcing.rawMaterial.lotList.applyButton,
       useListState: useRawMaterialSourcingApproverList,
-      getFilterFields: getRmsApproverFilterFields,
+      getFilterFields: getLotFilterFields,
       getColumns: () => {
         const statusConfig = buildRmsApproverStatusConfig(listTheme);
         return getRmsApproverListColumns({ theme: listTheme, statusConfig });
@@ -155,7 +160,7 @@ export const useRmsApproverListConfig = (): ApproverWorkflowListConfig => {
         </Paper>
       ),
     };
-  }, [listTheme, sourcingTheme, approverTheme]);
+  }, [listTheme, pageTheme, approverTheme]);
 };
 
 export default useRmsApproverListConfig;

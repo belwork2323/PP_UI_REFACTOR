@@ -31,6 +31,8 @@ export type DataTableProps<T> = {
   headerCellSx?: SxObject | ((columnIndex: number) => SxObject);
   bodyCellSx?: SxObject;
   rowSx?: (row: T, index: number) => SxProps<Theme>;
+  /** Applied to the MUI `Table` (e.g. borderCollapse for uniform grid borders). */
+  tableSx?: SxProps<Theme>;
 };
 
 const resolve = <A extends unknown[]>(
@@ -48,10 +50,11 @@ function DataTable<T>({
   headerCellSx,
   bodyCellSx,
   rowSx,
+  tableSx,
 }: DataTableProps<T>) {
   return (
     <TableContainer sx={containerSx}>
-      <Table size={size}>
+      <Table size={size} sx={tableSx}>
         <TableHead>
           <TableRow>
             {columns.map((column, columnIndex) => (

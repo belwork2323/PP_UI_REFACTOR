@@ -775,7 +775,6 @@ export const MotorDetailPanel = ({
           title={CC.DETAILS_CASTING_SETUP}
           dt={dt}
           fields={[
-            { label: CC.FLOW_CASTING_TYPE, value: motor.setup.castingType },
             { label: CC.FLOW_CASTING_STATION, value: motor.setup.castingStation },
           ]}
         />

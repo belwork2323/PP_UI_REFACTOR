@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { alpha } from "@mui/material/styles";
 import {
   Dialog,
@@ -26,6 +26,8 @@ import AppTextField from "@ui/components/common/AppTextField";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import MultiSelect from "@/ui/components/common/MultiSelectCheckbox";
+import { validateBatchCreation } from "@/data/validation/adapters/BatchCreation.validation";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
@@ -68,7 +70,8 @@ const BatchFormModal = ({
   const { modal, input } = t;
   const isAppendOnlyEdit = Boolean(editTarget) && editMode === "append_only";
   const appendOnlyLocked = isAppendOnlyEdit;
-
+  const [errors, setErrors] = useState<Record<string, any>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const isMain = form.batchType === "MAIN";
   const isSubscale = form.batchType === "SUBSCALE";
   const isQualification = form.subBatchType === "QUALIFICATION";
@@ -266,7 +269,35 @@ const BatchFormModal = ({
     onFormChange("articles")({
       target: { value: buildArticlesFromSelection(selectedCodes, articleOptions) },
     });
+  const handleFormSubmit = () => {
+    const tier = isIdentificationComplete || openImplementationSheetClicked ? "SUBMIT" : "UNIT";
 
+    const validationErrors = validateBatchCreation(form, tier);
+    console.log(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setErrors({});
+    onSave();
+  };
+
+  const [openImplementationSheetClicked, setOpenImplementationSheetClicked] = useState(false);
+
+  const handleOpenImplementationSheet = (opts: any) => {
+    setOpenImplementationSheetClicked(true);
+    onOpenImplementation?.(opts);
+  };
+
+  useEffect(() => {
+    if (!hasSubmitted) return;
+
+    const tier = "SUBMIT";
+    const liveErrors = validateBatchCreation(form, tier);
+    setErrors(liveErrors);
+  }, [form, hasSubmitted, isIdentificationComplete]);
   return (
     <Dialog
       open={open}
@@ -301,7 +332,7 @@ const BatchFormModal = ({
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
               <AppDropdown
-                label="Batch Type"
+                label={<FieldLabelWithAsterisk label="Batch Type" required />}
                 value={form.batchType}
                 onChange={handleBatchTypeChange}
                 placeholder={S.SELECT_BATCH_TYPE}
@@ -309,11 +340,13 @@ const BatchFormModal = ({
                 options={BATCH_TYPE_OPTIONS}
                 sx={{ mb: 0, ...input }}
                 MenuProps={t.menuPaper}
+                error={Boolean(errors.batchType)}
+                helperText={errors.batchType}
               />
 
               {form.batchType === "SUBSCALE" && (
                 <AppDropdown
-                  label="Sub-Batch Type"
+                  label={<FieldLabelWithAsterisk label="Sub-Batch Type" required />}
                   value={form.subBatchType}
                   onChange={(value) => onFormChange("subBatchType")({ target: { value } })}
                   placeholder={S.SELECT_SUB_BATCH_TYPE}
@@ -324,6 +357,8 @@ const BatchFormModal = ({
                   }))}
                   sx={{ mb: 0, ...input }}
                   MenuProps={t.menuPaper}
+                  error={Boolean(errors.subBatchType)}
+                  helperText={errors.subBatchType}
                 />
               )}
             </Stack>
@@ -354,7 +389,7 @@ const BatchFormModal = ({
                   {/* Project Name Dropdown */}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <AppDropdown
-                      label="Project Name"
+                      label={<FieldLabelWithAsterisk label="Project Name" required />}
                       value={form.projectId}
                       onChange={handleProjectChange}
                       placeholder={projectsLoading ? "Loading projects..." : S.SELECT_PROJECT}
@@ -363,6 +398,8 @@ const BatchFormModal = ({
                       renderValue={renderProjectValue}
                       sx={{ mb: 0, width: "100%", ...input }}
                       MenuProps={t.menuPaper}
+                      error={Boolean(errors.projectId)}
+                      helperText={errors.projectId}
                     >
                       {projectOptions.map((project: { projectId: string; projectName: string }) => (
                         <MenuItem key={project.projectId} value={project.projectId}>
@@ -381,7 +418,7 @@ const BatchFormModal = ({
                   {(!isSubscale || isQualification) && (
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <AppDropdown
-                        label="Motor Type / Stage"
+                        label={<FieldLabelWithAsterisk label="Motor Type / Stage" required />}
                         value={form.motorStage}
                         onChange={handleMotorStageChange}
                         placeholder={
@@ -392,6 +429,8 @@ const BatchFormModal = ({
                         renderValue={renderMotorStageValue}
                         sx={{ mb: 0, width: "100%", ...input }}
                         MenuProps={t.menuPaper}
+                        error={Boolean(errors.motorStage)}
+                        helperText={errors.motorStage}
                       >
                         {motorStageOptions.map(
                           (stage: {
@@ -414,7 +453,7 @@ const BatchFormModal = ({
                   {!isSubscale && (
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <AppDropdown
-                        label="System Manager"
+                        label={<FieldLabelWithAsterisk label="System Manager" required />}
                         value={form.systemManagerId}
                         onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
                         placeholder={S.SELECT_SYSTEM_MANAGER}
@@ -422,6 +461,8 @@ const BatchFormModal = ({
                         disabled={appendOnlyLocked}
                         sx={{ mb: 0, width: "100%", ...input }}
                         MenuProps={t.menuPaper}
+                        error={Boolean(errors.systemManagerId)}
+                        helperText={errors.systemManagerId}
                       >
                         {(userOptions || []).map((u: any) => (
                           <MenuItem key={u.id} value={u.id}>
@@ -440,12 +481,14 @@ const BatchFormModal = ({
                   <Typography sx={modal.fieldLabel}>Experiment Details</Typography>
                   <AppTextField
                     fullWidth
-                    label="Objective of Experiment"
+                    label={<FieldLabelWithAsterisk label="Objective of Experiment" required />}
                     value={form.objective}
                     onChange={onFormChange("objective")}
                     placeholder="Enter objective"
                     disabled={appendOnlyLocked}
                     sx={{ mb: 0, ...input }}
+                    error={Boolean(errors.objective)}
+                    helperText={errors.objective}
                   />
                 </Box>
               )}
@@ -455,7 +498,7 @@ const BatchFormModal = ({
                   <Typography sx={modal.fieldLabel}>Subscale Articles</Typography>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
                     <MultiSelect
-                      label="Articles"
+                      label={<FieldLabelWithAsterisk label="Articles" required />}
                       placeholder={
                         articlesLoading
                           ? "Loading articles..."
@@ -469,6 +512,8 @@ const BatchFormModal = ({
                       disabled={articlesLoading || articleOptions.length === 0 || appendOnlyLocked}
                       sx={{ mb: 0, flex: 1, ...input }}
                       MenuProps={t.menuPaper}
+                      error={Boolean(errors.articles)}
+                      helperText={errors.articles}
                     />
                     {/* Spacer keeps Articles the same width as Project Name */}
                     <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
@@ -533,13 +578,19 @@ const BatchFormModal = ({
                       {(form.motorIds ?? []).map((motorId: string, index: number) => {
                         const slotOptions = getMotorOptionsForSlot(index);
                         const isBaselineMotor = appendOnlyLocked && index < baselineMotorIds.length;
+                        const slotError = errors.motorIds?.[index];
                         return (
                           <Box
                             key={`motor-slot-${index}`}
                             sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
                           >
                             <AppDropdown
-                              label={`${S.MOTOR_ID_LABEL} ${index + 1}`}
+                              label={
+                                <FieldLabelWithAsterisk
+                                  label={`${S.MOTOR_ID_LABEL} ${index + 1}`}
+                                  required
+                                />
+                              }
                               value={motorId}
                               onChange={(value) => handleMotorIdChange(index, value)}
                               placeholder={motorsEmptyHint}
@@ -555,6 +606,8 @@ const BatchFormModal = ({
                                 );
                                 return match ? renderMotorOptionLabel(match) : value;
                               }}
+                              error={Boolean(slotError)}
+                              helperText={slotError}
                               sx={{ mb: 0, flex: 1, ...input }}
                               MenuProps={t.menuPaper}
                             >
@@ -654,14 +707,14 @@ const BatchFormModal = ({
                         <Button
                           size="small"
                           variant="outlined"
-                          onClick={() => onOpenImplementation?.({ viewOnly: true })}
+                          onClick={() => handleOpenImplementationSheet({ viewOnly: true })}
                         >
                           {S.VIEW_IDENTIFICATION_SHEET}
                         </Button>
                         <Button
                           size="small"
                           variant="contained"
-                          onClick={() => onOpenImplementation?.({ viewOnly: false })}
+                          onClick={() => handleOpenImplementationSheet({ viewOnly: false })}
                         >
                           {S.EDIT_IDENTIFICATION_SHEET}
                         </Button>
@@ -670,11 +723,22 @@ const BatchFormModal = ({
                       <Button
                         size="small"
                         variant="outlined"
-                        onClick={() => onOpenImplementation?.({ viewOnly: false })}
-                        disabled={!basicFormValid}
+                        onClick={() => handleOpenImplementationSheet({ viewOnly: false })}
                       >
                         {S.COMPLETE_IDENTIFICATION_NOW}
                       </Button>
+                    )}
+
+                    {/* ── Render Identification Sheet Validation Errors Here ──────────────── */}
+                    {Object.keys(errors).some((key) => key.startsWith("identificationSheet")) && (
+                      <Typography
+                        color="error.main"
+                        variant="caption"
+                        sx={{ display: "block", mt: 1, fontWeight: 700 }}
+                      >
+                        ⚠️ Please complete all required fields and add at least one material inside
+                        the Identification Sheet.
+                      </Typography>
                     )}
                   </Box>
                 </Box>
@@ -691,7 +755,7 @@ const BatchFormModal = ({
         </Button>
         <Button
           variant="contained"
-          onClick={onSave}
+          onClick={handleFormSubmit}
           disabled={!formValid || saving || (editTarget && !canSaveBatchChanges)}
           sx={modal.saveButton}
         >

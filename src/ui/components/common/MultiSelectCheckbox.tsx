@@ -25,7 +25,7 @@ export interface MultiSelectWithSearchProps {
   value: string[];
   onChange: (values: string[]) => void;
   showCheckbox?: boolean;
-  label?: string;
+  label?: string | React.ReactNode;
   placeholder?: string;
   disabled?: boolean;
   InputLabelProps?: object;

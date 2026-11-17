@@ -167,6 +167,17 @@ export const TimeField = ({
 
   const parsedMinTime = minTime ? dayjs(toUiTime(minTime) || minTime, "HH:mm") : null;
 
+  // Fixed: Passed error and helperText into buildAppDatePickerSlotProps
+  const pickerSlotProps = buildAppDatePickerSlotProps({
+    required,
+    error,
+    helperText,
+    compact,
+    placeholder: placeholder ?? UI_TIME_PLACEHOLDER,
+    sx,
+    inputSx,
+  });
+
   const picker = (
     <TimePicker
       {...appDatePickerFieldSlots}
@@ -175,15 +186,7 @@ export const TimeField = ({
       minTime={parsedMinTime?.isValid() ? parsedMinTime : undefined}
       disabled={disabled || blockedByDateTimeDependency}
       onChange={(next) => onChange(next ? next.format("HH:mm") : "")}
-      slotProps={buildAppDatePickerSlotProps({
-        required,
-        error,
-        helperText,
-        compact,
-        placeholder: placeholder ?? UI_TIME_PLACEHOLDER,
-        sx,
-        inputSx,
-      })}
+      slotProps={pickerSlotProps}
       sx={{ width: "100%" }}
     />
   );
@@ -225,6 +228,8 @@ export const DateTimeField = ({
   const minDateTimeValue = parseUiDateTimeValue(minDate);
   const dateTimeValue = parseUiDateTimeValue(value);
   const waitingForStartDateTime = requiresMinDateTime && !minDateTimeValue?.isValid();
+
+  // Fixed: Pass error and helperText correctly through slotProps for DateTimeField
   const pickerSlotProps = buildAppDatePickerSlotProps({
     required,
     error,

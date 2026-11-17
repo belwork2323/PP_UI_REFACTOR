@@ -10,17 +10,20 @@ import {
 } from "@data/models/user/MaterialsListModel";
 import { RAW_MATERIAL_APPROVER_STATUS_TABS } from "@data/models/approver/sourcing/rms/RawMaterialSourcingApproverModel";
 import { operationsController } from "@controllers/user/operationsController";
+import type { FilterFieldOption } from "@ui/components/custom/FilterFields";
 
 const FILTER_ALL = STRINGS.APPROVER.COMMON.STATUS_ALL;
 
 export type RawMaterialApproverAppliedFilters = {
   materialCode: string;
+  manufacturer: string;
   fromDate: string;
   toDate: string;
 };
 
 const emptyAppliedFilters: RawMaterialApproverAppliedFilters = {
   materialCode: "",
+  manufacturer: "",
   fromDate: "",
   toDate: "",
 };
@@ -89,6 +92,7 @@ export const useRawMaterialSourcingApproverList = () => {
   const listFiltersRecord = useMemo(
     () => ({
       materialCode: appliedFilters.materialCode || FILTER_ALL,
+      manufacturer: appliedFilters.manufacturer,
       fromDate: appliedFilters.fromDate,
       toDate: appliedFilters.toDate,
     }),
@@ -98,6 +102,7 @@ export const useRawMaterialSourcingApproverList = () => {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (appliedFilters.materialCode) count += 1;
+    if (appliedFilters.manufacturer) count += 1;
     if (appliedFilters.fromDate) count += 1;
     if (appliedFilters.toDate) count += 1;
     if (statusFilter !== FILTER_ALL) count += 1;
@@ -111,6 +116,7 @@ export const useRawMaterialSourcingApproverList = () => {
   const applyPanelFilters = (next: RawMaterialApproverAppliedFilters & { status: string }) => {
     setAppliedFilters({
       materialCode: next.materialCode,
+      manufacturer: next.manufacturer,
       fromDate: next.fromDate,
       toDate: next.toDate,
     });
@@ -129,6 +135,15 @@ export const useRawMaterialSourcingApproverList = () => {
     [],
   );
 
+  const statusOptions = useMemo<FilterFieldOption[]>(
+    () =>
+      statusDropdownValues.map((status) => ({
+        value: status,
+        label: status === FILTER_ALL ? FILTER_ALL : (statusMeta[status]?.label ?? status),
+      })),
+    [statusDropdownValues, statusMeta],
+  );
+
   return {
     statusMeta,
     priorityMeta: APPROVER_PRIORITY_META,
@@ -144,6 +159,7 @@ export const useRawMaterialSourcingApproverList = () => {
     setStatusFilter,
     statusTabs,
     statusDropdownValues,
+    statusOptions,
     filterAllLabel: FILTER_ALL,
   };
 };

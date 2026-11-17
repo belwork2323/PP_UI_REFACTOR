@@ -5,6 +5,7 @@ import {
   type IdentificationSheet,
 } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { formatToUiDate } from "../../../utils/dateUtils";
+import { toUiDateTime } from "../../../data/models/user/castingCuringFieldCodec";
 import { QC_CASTING_SECTION_IDS, QC_CASTING_TYPE_OPTIONS } from "./qcCastingConfig";
 import {
   calcWeightmentTotalWeight,
@@ -461,12 +462,13 @@ const mapCastingTableFromManufacturing = (sections: ManufacturingSection[]): QcC
           "viscosity",
           "VISCOSITY",
         ),
-        CASTING_START_TIME: normalizeTimeValue(
-          pickField(rec, "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
+        CASTING_START_TIME: toUiDateTime(
+          pickField(rec, "castingStartDateTime", "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
         ),
-        CASTING_COMPLETION_TIME: normalizeTimeValue(
+        CASTING_COMPLETION_TIME: toUiDateTime(
           pickField(
             rec,
+            "castingCompletionDateTime",
             "castingCompletionTime",
             "CASTING_COMPLETION_TIME",
             "dcCloseTime",
@@ -529,11 +531,11 @@ const mapCastingTableFromManufacturing = (sections: ManufacturingSection[]): QcC
           "PROPELLANT_QTY",
         ),
         INITIAL_UNLOADING_VISCOSITY: pickField(fromBowl, "viscosity", "VISCOSITY"),
-        CASTING_START_TIME: normalizeTimeValue(
-          pickField(bowl, "bowlReceiptTime", "BOWL_RECEIPT_TIME", "dcOpenTime", "DC_OPEN_TIME"),
+        CASTING_START_TIME: toUiDateTime(
+          pickField(bowl, "castingStartDateTime", "bowlReceiptTime", "BOWL_RECEIPT_TIME", "dcOpenTime", "DC_OPEN_TIME"),
         ),
-        CASTING_COMPLETION_TIME: normalizeTimeValue(
-          pickField(bowl, "dcCloseTime", "DC_CLOSE_TIME", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"),
+        CASTING_COMPLETION_TIME: toUiDateTime(
+          pickField(bowl, "castingCompletionDateTime", "dcCloseTime", "DC_CLOSE_TIME", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"),
         ),
         SLURRY_CAST_FROM_EACH_BOWL:
           pickField(fromBowl, "slurryCast", "SLURRY_CAST") || slurryByLabel.get(bowlId) || "",

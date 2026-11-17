@@ -1,5 +1,6 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
+import { toApiDateTime, toUiDateTime } from "../../../data/models/user/castingCuringFieldCodec";
 import { QC_CASTING_SECTION_IDS } from "./qcCastingConfig";
 
 export type QcCastingMandrelRow = {
@@ -414,8 +415,8 @@ const sanitizeCastingRows = (rows: QcCastingTableRow[]) =>
     FINAL_MIX_BOWL_NO: String(row.FINAL_MIX_BOWL_NO ?? "").trim(),
     PROPELLANT_QTY: String(row.PROPELLANT_QTY ?? "").trim(),
     INITIAL_UNLOADING_VISCOSITY: String(row.INITIAL_UNLOADING_VISCOSITY ?? "").trim(),
-    CASTING_START_TIME: String(row.CASTING_START_TIME ?? "").trim(),
-    CASTING_COMPLETION_TIME: String(row.CASTING_COMPLETION_TIME ?? "").trim(),
+    CASTING_START_TIME: toApiDateTime(row.CASTING_START_TIME) ?? "",
+    CASTING_COMPLETION_TIME: toApiDateTime(row.CASTING_COMPLETION_TIME) ?? "",
     SLURRY_CAST_FROM_EACH_BOWL: String(row.SLURRY_CAST_FROM_EACH_BOWL ?? "").trim(),
     QA_REMARKS: castingRowQaRemarks(row),
   }));
@@ -433,8 +434,8 @@ const sanitizeWeightmentRow = (rows: QcCastingWeightmentRow[]): QcCastingWeightm
 const sanitizePressurePlateRows = (rows: QcCastingPressurePlateRow[]) =>
   normalizeRows(rows.filter(pressurePlateRowHasData)).map((row, index) => ({
     SR_NO: index + 1,
-    START_TIME: String(row.START_TIME ?? "").trim(),
-    END_TIME: String(row.END_TIME ?? "").trim(),
+    START_TIME: toApiDateTime(row.START_TIME) ?? "",
+    END_TIME: toApiDateTime(row.END_TIME) ?? "",
     PRESSURE_SENSOR_USED: String(row.PRESSURE_SENSOR_USED ?? "").trim(),
     INITIAL_PRESSURE_READING: String(row.INITIAL_PRESSURE_READING ?? "").trim(),
     OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim(),
@@ -916,12 +917,13 @@ const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
           "viscosity",
           "VISCOSITY",
         ),
-        CASTING_START_TIME: normalizeTimeValue(
-          pickRowField(rec, "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
+        CASTING_START_TIME: toUiDateTime(
+          pickRowField(rec, "castingStartDateTime", "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
         ),
-        CASTING_COMPLETION_TIME: normalizeTimeValue(
+        CASTING_COMPLETION_TIME: toUiDateTime(
           pickRowField(
             rec,
+            "castingCompletionDateTime",
             "castingCompletionTime",
             "CASTING_COMPLETION_TIME",
             "dcCloseTime",
@@ -980,8 +982,8 @@ const mapApiPressurePlateRows = (rows: unknown[]): QcCastingPressurePlateRow[] =
       if (!rec) return null;
       return {
         SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
-        START_TIME: String(pickRowField(rec, "startTime", "START_TIME")),
-        END_TIME: String(pickRowField(rec, "endTime", "END_TIME")),
+        START_TIME: toUiDateTime(pickRowField(rec, "startDateTime", "START_DATE_TIME", "startTime", "START_TIME")),
+        END_TIME: toUiDateTime(pickRowField(rec, "endDateTime", "END_DATE_TIME", "endTime", "END_TIME")),
         PRESSURE_SENSOR_USED: String(
           pickRowField(rec, "pressureSensorUsed", "PRESSURE_SENSOR_USED"),
         ),

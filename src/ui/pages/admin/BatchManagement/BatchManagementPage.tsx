@@ -352,12 +352,16 @@ const BatchManagementPage = () => {
           fullWidth
           multiline
           minRows={2}
+          inputProps={{ maxLength: 500 }}
           label={S.DELETE_DIALOG.REASON_LABEL}
           placeholder={S.DELETE_DIALOG.REASON_PLACEHOLDER}
           value={deleteSection.deleteReason}
-          onChange={(e) => deleteSection.setDeleteReason(e.target.value)}
+          onChange={deleteSection.handleDeleteReasonChange}
+          error={!!deleteSection.deleteReasonError}
           sx={{ ...t.deleteDialog.deleteReasonInput, mt: 2 }}
-          helperText={!canDelete ? S.DELETE_DIALOG.REASON_HELPER : undefined}
+          helperText={
+            deleteSection.deleteReasonError || `${deleteSection.deleteReason.length}/500 characters`
+          }
         />
       </ConfirmAlertDialog>
       <ConfirmAlertDialog

@@ -130,9 +130,7 @@ export const parseTrimmingSectionData = (
                 : row[key];
           if (value != null) {
             next[key] =
-              key === "startDate" || key === "completionDate"
-                ? toUiDateTime(value)
-                : value;
+              key === "startDate" || key === "completionDate" ? toUiDateTime(value) : value;
           }
         });
         return next;
@@ -951,10 +949,7 @@ export const mapTrimmingDetailsFromSavedForm = (
           motorStage: motor?.motorStage ?? payload?.motorStage,
         }),
         motorReceivedDateTime: String(
-          motor?.motorReceivedDateTime ??
-            motor?.motorReceivedAt ??
-            motor?.motorReceivedDate ??
-            "",
+          motor?.motorReceivedDateTime ?? motor?.motorReceivedAt ?? motor?.motorReceivedDate ?? "",
         ).trim(),
         sections: Array.isArray(motor?.sections)
           ? motor.sections

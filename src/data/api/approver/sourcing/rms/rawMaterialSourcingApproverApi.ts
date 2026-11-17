@@ -7,6 +7,7 @@ export type RawMaterialSourcingApproverListPayload = {
   limit: number;
   status?: string[];
   materialCode?: string[];
+  manufacturerName?: string;
   search?: string;
   fromDate?: string;
   toDate?: string;

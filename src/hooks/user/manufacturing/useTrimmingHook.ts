@@ -28,9 +28,7 @@ import {
   type ValidationErrors as TrimmingValidationErrors,
 } from "../../../data/validation/adapters/trimming.validation";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
-import {
-  isManufacturingContinueFillingStatus,
-} from "../../operationStatus";
+import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import {
   mergeTrimmingMotorOptions,
   resolveTrimmingMotorCountLimit,
@@ -49,8 +47,8 @@ import {
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
-import {
 import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
+import {
   fetchEnrichedBatchStageFields,
   mergeBatchStageFields,
   SUB_DEPT,
@@ -239,8 +237,9 @@ export const useTrimmingHook = () => {
   const [motorStatusById, setMotorStatusById] = useState<Record<string, TrimmingMotorStatusMeta>>(
     {},
   );
-  const [previousStageGate, setPreviousStageGate] =
-    useState<PreviousStageApprovedUnits | null>(null);
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
+  );
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, TrimmingValidationErrors>
   >({});
@@ -362,11 +361,7 @@ export const useTrimmingHook = () => {
   );
 
   const openFormWithResolvedData = useCallback(
-    async (
-      batch: TrimmingBatch,
-      editMode: boolean,
-      options?: { silent?: boolean },
-    ) => {
+    async (batch: TrimmingBatch, editMode: boolean, options?: { silent?: boolean }) => {
       const silent = Boolean(options?.silent);
       const formId = resolveTrimmingFormId(batch);
       const shouldFetchDetails =
@@ -773,10 +768,11 @@ export const useTrimmingHook = () => {
               if (!id) return;
               updated[id] = {
                 ...updated[id],
-                motorSubmissionType:
-                  entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
+                motorSubmissionType: entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
                 motorSubmissionStatus:
-                  (String(entry.motorSubmissionStatus ?? "").toUpperCase() as TrimmingMotorSubmissionStatus) ||
+                  (String(
+                    entry.motorSubmissionStatus ?? "",
+                  ).toUpperCase() as TrimmingMotorSubmissionStatus) ||
                   updated[id]?.motorSubmissionStatus ||
                   "TO_BE_INITIATED",
               };
@@ -802,7 +798,9 @@ export const useTrimmingHook = () => {
         );
 
         showAlert(
-          intent === "draft" ? S.MOTOR_SAVE_DRAFT_SUCCESS(motorId) : S.MOTOR_SUBMIT_SUCCESS(motorId),
+          intent === "draft"
+            ? S.MOTOR_SAVE_DRAFT_SUCCESS(motorId)
+            : S.MOTOR_SUBMIT_SUCCESS(motorId),
           "success",
           { autoCloseMs: 2200 },
         );

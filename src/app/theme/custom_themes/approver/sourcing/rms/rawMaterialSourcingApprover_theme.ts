@@ -3,13 +3,14 @@ import { keyframes } from "@mui/material/styles";
 
 import fonts from "@app/theme/fonts";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { uniformTableBodyCellSx, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { uniformTableBodyCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 import {
   createBannerStatusConfig,
   createWorkflowDetailsTheme,
   detailsBannerGradientColors,
 } from "@app/theme/custom_themes/shared/workflow_details_theme";
 import getSourcingTheme from "@app/theme/custom_themes/user/sourcing/sourcing_theme";
+import { getRawMaterialSourcingPageTheme } from "@app/theme/custom_themes/user/sourcing/rms/rawMaterialSourcing_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -19,6 +20,7 @@ const slideUp = keyframes`
 export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
   const shared = getSharedTheme(mode);
   const sourcingTheme = getSourcingTheme(mode);
+  const pageTheme = getRawMaterialSourcingPageTheme(mode);
   const isDark = mode === "dark";
 
   const palette = {
@@ -42,11 +44,14 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
   const headerPrimaryLight = fill.to;
 
   const details = createWorkflowDetailsTheme(palette, mode);
+  /** User RMS details/table tokens (createDataTableTheme) — shared with Approver specs table. */
+  const lotDetails = pageTheme.sourcing.rawMaterial.lotDetails;
 
   return {
     palette,
     workflow: sourcingTheme.workflow,
     details,
+    lotDetails,
     /** Alias for UserWorkflowDetailsShell / status cell consumers. */
     batchList: {
       statusConfig: createBannerStatusConfig(palette, mode),
@@ -294,67 +299,6 @@ export const getRawMaterialSourcingApproverTheme = (mode = "light") => {
         color: palette.textSub,
       },
       blockMetaStrong: { color: palette.text },
-      innerTableContainer: {
-        borderRadius: "6px",
-        border: `1px solid ${palette.border}`,
-        boxShadow: `0 1px 6px ${alpha(palette.primary, 0.05)}`,
-      },
-      innerHeaderCell: (_isLead = false) =>
-        uniformTableHeaderCellSx(headerPrimary, headerPrimaryLight, {
-          headerFontSize: "0.63rem",
-          headerLetterSpacing: "0.05em",
-          headerPaddingY: "7px",
-          headerPaddingX: "10px",
-        }),
-      innerRow: (index: number) => ({
-        background:
-          index % 2 === 0
-            ? isDark
-              ? alpha("#fff", 0.03)
-              : "#fff"
-            : isDark
-              ? alpha(headerPrimary, 0.12)
-              : alpha(palette.surface, 0.7),
-        "&:last-child td": { borderBottom: "none" },
-      }),
-      innerCell: { padding: "6px 10px" },
-      innerLotText: {
-        padding: "6px 10px",
-        fontSize: "0.78rem",
-        color: palette.textSub,
-      },
-      innerSpecText: {
-        ...uniformTableBodyCellSx(
-          { border: palette.border, text: palette.text },
-          {
-            bodyFontSize: "0.78rem",
-            bodyPaddingY: "6px",
-            bodyPaddingX: "10px",
-          },
-        ),
-        fontWeight: 500,
-      },
-      innerResultText: {
-        ...uniformTableBodyCellSx(
-          { border: palette.border, text: palette.accent },
-          {
-            bodyFontSize: "0.78rem",
-            bodyPaddingY: "6px",
-            bodyPaddingX: "10px",
-          },
-        ),
-        fontWeight: 700,
-      },
-      innerRemarksText: {
-        ...uniformTableBodyCellSx(
-          { border: palette.border, text: palette.textSub },
-          {
-            bodyFontSize: "0.78rem",
-            bodyPaddingY: "6px",
-            bodyPaddingX: "10px",
-          },
-        ),
-      },
       footer: {
         p: "12px 20px",
         background: isDark ? "#1e1e1e" : "#fff",

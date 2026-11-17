@@ -192,13 +192,7 @@ const FieldsTable = ({
   );
 };
 
-const DataTable = ({
-  table,
-  dt,
-}: {
-  table: CasePrepDetailTable;
-  dt: TrimmingDetailsTheme;
-}) => {
+const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: TrimmingDetailsTheme }) => {
   const preferredOrder = Object.keys(table.columnLabels);
   const rowKeys = Array.from(
     table.rows.reduce((keys, row) => {
@@ -215,7 +209,9 @@ const DataTable = ({
   return (
     <Box sx={{ mb: 1.5 }}>
       {table.label ? (
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
+        <Typography
+          sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}
+        >
           {table.label}
         </Typography>
       ) : null}
@@ -236,7 +232,10 @@ const DataTable = ({
               if (row.type === "header" && headerLabel) {
                 return (
                   <TableRow key={rowIndex} sx={{ background: "rgba(21,101,192,0.06)" }}>
-                    <TableCell colSpan={columns.length} sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}>
+                    <TableCell
+                      colSpan={columns.length}
+                      sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
+                    >
                       {headerLabel}
                     </TableCell>
                   </TableRow>
@@ -275,7 +274,12 @@ const SectionPanel = ({
     <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
-    <FieldsTable fields={section.fields} dt={dt} subDepartmentId={subDepartmentId} onOpen={onOpen} />
+    <FieldsTable
+      fields={section.fields}
+      dt={dt}
+      subDepartmentId={subDepartmentId}
+      onOpen={onOpen}
+    />
     {section.tables.map((table) => (
       <DataTable key={table.blockId} table={table} dt={dt} />
     ))}
@@ -296,18 +300,30 @@ export const MotorDetailPanel = ({
   onOpen: (fileId: string, fileName: string) => void;
 }) => (
   <Box>
-    <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
-      <Chip label={TR.MOTOR_CARD_TITLE} size="small" sx={dt.materialChip} />
-      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
-        {motor.motorId}
-      </Typography>
+    <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
+      <Chip label={motor.motorId} size="small" sx={dt.materialChip} />
+    </Stack>
+    <Stack direction="row" alignItems="center" gap={1.5} mb={1.5} flexWrap="wrap">
       {motor.motorStageLabel ? (
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+        <Typography
+          sx={{
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            color: palette.text,
+          }}
+        >
           {TR.MOTOR_STAGE_LABEL}: {motor.motorStageLabel}
         </Typography>
       ) : null}
+
       {motor.motorReceivedAt ? (
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+        <Typography
+          sx={{
+            fontSize: "0.85rem",
+            fontWeight: 700,
+            color: palette.text,
+          }}
+        >
           {TR.MOTOR_RECEIVED_AT_LABEL}: {motor.motorReceivedAt}
         </Typography>
       ) : null}
@@ -347,7 +363,8 @@ const TrimmingDetailsContent = ({
   const dt = getTrimmingTheme(theme).details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const subDepartmentId = useAuthStore(
-    (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "trimming")?.subDepartmentId,
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "trimming")?.subDepartmentId,
   );
   const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
   const onOpenFile = (fileId: string, fileName: string) => {
@@ -356,7 +373,8 @@ const TrimmingDetailsContent = ({
   };
 
   const motors = detailView?.motors ?? [];
-  const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
+  const activeMotorIndexSafe =
+    motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
   const activeMotor = motors[activeMotorIndexSafe] ?? null;
 
   useEffect(() => {
@@ -449,7 +467,14 @@ const TrimmingDetailsContent = ({
                 background: theme.palette.surface,
               }}
             >
-              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: "0.76rem",
+                  fontWeight: 700,
+                  color: theme.palette.primary,
+                  mb: 0.75,
+                }}
+              >
                 {TR.MOTOR_NAV_TITLE}
               </Typography>
               <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1 }}>
@@ -462,7 +487,12 @@ const TrimmingDetailsContent = ({
                     size="small"
                     variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
                     onClick={() => setActiveMotorIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
+                    sx={{
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
                   >
                     {motor.motorId}
                   </Button>
@@ -485,11 +515,7 @@ const TrimmingDetailsContent = ({
         <Typography sx={dt.emptyText}>{TR.DETAILS_NO_FORM_DATA}</Typography>
       )}
 
-      <FilePreviewDialog
-        preview={preview}
-        onClose={closePreview}
-        onDownload={downloadCurrent}
-      />
+      <FilePreviewDialog preview={preview} onClose={closePreview} onDownload={downloadCurrent} />
     </>
   );
 };

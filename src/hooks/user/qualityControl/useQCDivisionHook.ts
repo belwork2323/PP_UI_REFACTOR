@@ -362,8 +362,8 @@ import {
 import { focusFieldByPath } from "@/data/validation/utils/fieldPathResolver";
 import { reconcileLiveValidationErrors } from "../../../data/validation/utils/reconcileLiveValidationErrors";
 
-import {
 import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
+import {
   collectTempFileIdsFromDivisionScope,
   entryMatchesDivisionTab,
   isDivisionSnapshotDirty,
@@ -545,9 +545,7 @@ export const useQCDivisionHook = () => {
         String(entryErrors[k] ?? "").trim(),
       );
       if (!keys.length) continue;
-      const looksLikeRevalidation = keys.some(
-        (k) => k === "materials" || k.startsWith("rows."),
-      );
+      const looksLikeRevalidation = keys.some((k) => k === "materials" || k.startsWith("rows."));
       const looksLikeCasting = keys.some(
         (k) =>
           k === "ASSEMBLY_DATE" ||
@@ -794,9 +792,7 @@ export const useQCDivisionHook = () => {
       const root =
         response && typeof response === "object" ? (response as Record<string, unknown>) : null;
       const data =
-        root?.data && typeof root.data === "object"
-          ? (root.data as Record<string, unknown>)
-          : root;
+        root?.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
       if (Array.isArray(data)) return data;
       if (Array.isArray((data as { items?: unknown[] } | null)?.items)) {
         return (data as { items: unknown[] }).items;
@@ -819,8 +815,7 @@ export const useQCDivisionHook = () => {
         const cycles = unwrapList(response);
         const codes = cycles
           .map((item) => {
-            const rec =
-              item && typeof item === "object" ? (item as Record<string, unknown>) : null;
+            const rec = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
             return String(rec?.mixingCycleCode ?? rec?.code ?? "").trim();
           })
           .filter(Boolean);
@@ -868,15 +863,13 @@ export const useQCDivisionHook = () => {
 
         const toDefs = (response: unknown): QcMixingQualityCheckDefinition[] => {
           const root =
-            response && typeof response === "object"
-              ? (response as Record<string, unknown>)
-              : null;
+            response && typeof response === "object" ? (response as Record<string, unknown>) : null;
           const data =
             root?.data && typeof root.data === "object"
               ? (root.data as Record<string, unknown>)
               : root;
           const checks = Array.isArray((data as { qualityChecks?: unknown } | null)?.qualityChecks)
-            ? ((data as { qualityChecks: unknown[] }).qualityChecks)
+            ? (data as { qualityChecks: unknown[] }).qualityChecks
             : Array.isArray(root?.qualityChecks)
               ? (root.qualityChecks as unknown[])
               : [];
@@ -2123,8 +2116,7 @@ export const useQCDivisionHook = () => {
         premixNo,
         motorId,
         motorCount: motorMeta?.motorCount,
-        motorReceivedDateTime:
-          motorMeta?.motorReceivedDateTime ?? motorMeta?.motorReceivedDate,
+        motorReceivedDateTime: motorMeta?.motorReceivedDateTime ?? motorMeta?.motorReceivedDate,
         motorReceivedDate: motorMeta?.motorReceivedDate,
         weighscaleNo: motorMeta?.weighscaleNo,
         calibrationDueDate: motorMeta?.calibrationDueDate,
@@ -2200,8 +2192,7 @@ export const useQCDivisionHook = () => {
       let autoPopulatePayload: unknown = null;
       if (shouldUseQcFormDetailsData(divisionStatus)) {
         // Prefer payload already fetched on Fill Details / tab load.
-        const formDetails =
-          latestQcFormDetailsRef.current ?? (await ensureQcFormDetailsPayload());
+        const formDetails = latestQcFormDetailsRef.current ?? (await ensureQcFormDetailsPayload());
         if (requestId !== revalidationLoadRequestIdRef.current) return;
         const matchingDetail = findQcFormDivisionDetail(formDetails, {
           flowKey: selectedDivision,
@@ -4688,8 +4679,7 @@ export const useQCDivisionHook = () => {
       if (entry) {
         try {
           const isRevalidation = entry.kind === "REVALIDATION";
-          const isMixing =
-            entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX";
+          const isMixing = entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX";
           const isHardware = entry.kind === "HARDWARE_PROCESS";
           const isPostCure = entry.kind === "POST_CURE_MOTOR";
           if (isRevalidation) {
@@ -4782,11 +4772,7 @@ export const useQCDivisionHook = () => {
               viscosityValues: nextValuesResolved,
             });
             setEntryValidationErrors((prev) => {
-              const merged = reconcileLiveValidationErrors(
-                prev[entryId],
-                formatErrors,
-                fullErrors,
-              );
+              const merged = reconcileLiveValidationErrors(prev[entryId], formatErrors, fullErrors);
               if (Object.keys(merged).length === 0) {
                 if (!prev[entryId]) return prev;
                 const { [entryId]: _removed, ...rest } = prev;
@@ -4956,9 +4942,7 @@ export const useQCDivisionHook = () => {
         resolvedSheet,
         selections,
         identificationMaterials,
-        weightmentValidationAttemptRef.current.submit
-          ? { submit: true }
-          : { submit: false },
+        weightmentValidationAttemptRef.current.submit ? { submit: true } : { submit: false },
       );
       setWeightmentErrors((prev) =>
         JSON.stringify(prev) === JSON.stringify(nextErrors) ? prev : nextErrors,
@@ -5183,12 +5167,7 @@ export const useQCDivisionHook = () => {
                     processingType: "",
                   },
                 );
-                resolvedData = appendDivisionEntryToForm(
-                  resolvedData,
-                  entry,
-                  { schemaValues },
-                  [],
-                );
+                resolvedData = appendDivisionEntryToForm(resolvedData, entry, { schemaValues }, []);
                 initialDivision = "RAW_MATERIAL";
                 initialRawMaterialType = "RAW_MATERIAL_REVALIDATION";
                 markSetupLoaded("RAW_MATERIAL", "RAW_MATERIAL_REVALIDATION");
@@ -5505,20 +5484,14 @@ export const useQCDivisionHook = () => {
                           premixNo,
                           autoPopulatePayload: divisionAutoPopulateDataRef.current,
                           batchPayload: activeBatchRef.current,
-                          qualityCheckDefinitions:
-                            mixingQualityChecksByStageRef.current.PREMIX,
+                          qualityCheckDefinitions: mixingQualityChecksByStageRef.current.PREMIX,
                         },
                         { onlyIfEmpty: true },
                       ),
                     };
                   });
                   hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
-                    const { entryId } = makeEntry(
-                      "MIXING_FINAL_MIX",
-                      "FINAL_MIX",
-                      [],
-                      premixNo,
-                    );
+                    const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", [], premixNo);
                     const detailsPart = pickFinalMixDetailsSchemaValues(values);
                     const seededDetails = detailsPart
                       ? applyMixingDivisionEntryToValues(
@@ -5541,10 +5514,7 @@ export const useQCDivisionHook = () => {
                       ),
                     };
                   });
-                  if (
-                    hydratedMixing.finalMixDetailsValues &&
-                    !domainMixingFinalMixDetailsValues
-                  ) {
+                  if (hydratedMixing.finalMixDetailsValues && !domainMixingFinalMixDetailsValues) {
                     domainMixingFinalMixDetailsValues = applyMixingDivisionEntryToValues(
                       hydratedMixing.finalMixDetailsValues,
                       {
@@ -5552,8 +5522,7 @@ export const useQCDivisionHook = () => {
                         premixNo: 1,
                         autoPopulatePayload: divisionAutoPopulateDataRef.current,
                         batchPayload: activeBatchRef.current,
-                        qualityCheckDefinitions:
-                          mixingQualityChecksByStageRef.current.FINAL_MIX,
+                        qualityCheckDefinitions: mixingQualityChecksByStageRef.current.FINAL_MIX,
                       },
                       { onlyIfEmpty: true },
                     );
@@ -5694,18 +5663,9 @@ export const useQCDivisionHook = () => {
                 const entrySubType = (
                   subTypeRaw === "MAIN_MOTOR" ? "MAIN_MOTOR" : subTypeRaw === "BEM" ? "BEM" : null
                 ) as QcApiSubType;
-                const { entryId } = makeEntry(
-                  "STF",
-                  entrySubType,
-                  [],
-                  undefined,
-                  motorId,
-                );
+                const { entryId } = makeEntry("STF", entrySubType, [], undefined, motorId);
                 entryValues[entryId] = {
-                  schemaValues: buildInitialStfValuesForMotor(
-                    { data: dataRec, motors },
-                    motorId,
-                  ),
+                  schemaValues: buildInitialStfValuesForMotor({ data: dataRec, motors }, motorId),
                 };
                 createdFromNested = true;
               }
@@ -6156,8 +6116,7 @@ export const useQCDivisionHook = () => {
 
               if (sectionsToHydrate.length > 0) {
                 let schemaValues = hydrateTrimmingValuesFromSections(sectionsToHydrate, {
-                  motorReceivedAt:
-                    entry.motorReceivedDateTime ?? entry.motorReceivedDate ?? "",
+                  motorReceivedAt: entry.motorReceivedDateTime ?? entry.motorReceivedDate ?? "",
                 });
                 if (awaitingInitiation) {
                   const manufacturingPayload = resolveManufacturingDivisionDetailsPayload(
@@ -6931,51 +6890,51 @@ export const useQCDivisionHook = () => {
       validationOk = true;
       errorsByEntryId = {};
     } else {
-    try {
-      const result = validateQcDivisionEntries(
-        entriesToValidate,
-        valuesForValidation,
-        validationTier,
-        {
-          mixingFinalMixDetailsValues:
-            submitFormState.mixingFinalMixDetailsValues ?? liveForm.mixingFinalMixDetailsValues,
-        },
-      );
-      validationOk = result.ok;
-      errorsByEntryId = result.errorsByEntryId;
-      // Draft must never block on mandatory/required — strip if any slip through.
-      if (intent === "draft") {
-        const stripped: typeof errorsByEntryId = {};
-        for (const [entryId, errs] of Object.entries(errorsByEntryId)) {
-          const kept: ValidationErrors = {};
-          for (const [path, msg] of Object.entries(errs ?? {})) {
-            const text = String(msg ?? "")
-              .trim()
-              .toLowerCase();
-            if (!text) continue;
-            if (text.includes("required")) continue;
-            kept[path] = msg;
+      try {
+        const result = validateQcDivisionEntries(
+          entriesToValidate,
+          valuesForValidation,
+          validationTier,
+          {
+            mixingFinalMixDetailsValues:
+              submitFormState.mixingFinalMixDetailsValues ?? liveForm.mixingFinalMixDetailsValues,
+          },
+        );
+        validationOk = result.ok;
+        errorsByEntryId = result.errorsByEntryId;
+        // Draft must never block on mandatory/required — strip if any slip through.
+        if (intent === "draft") {
+          const stripped: typeof errorsByEntryId = {};
+          for (const [entryId, errs] of Object.entries(errorsByEntryId)) {
+            const kept: ValidationErrors = {};
+            for (const [path, msg] of Object.entries(errs ?? {})) {
+              const text = String(msg ?? "")
+                .trim()
+                .toLowerCase();
+              if (!text) continue;
+              if (text.includes("required")) continue;
+              kept[path] = msg;
+            }
+            if (Object.keys(kept).length) stripped[entryId] = kept;
           }
-          if (Object.keys(kept).length) stripped[entryId] = kept;
+          errorsByEntryId = stripped;
+          validationOk = Object.keys(errorsByEntryId).length === 0;
         }
-        errorsByEntryId = stripped;
-        validationOk = Object.keys(errorsByEntryId).length === 0;
+        console.info(
+          "[QC validation]",
+          intent,
+          validationTier,
+          "entries",
+          entriesToValidate.map((e) => e.kind + ":" + e.entryId),
+          "ok",
+          validationOk,
+          "errorKeys",
+          Object.keys(errorsByEntryId),
+        );
+      } catch (error) {
+        console.error("QC submit validation failed", error);
+        return false;
       }
-      console.info(
-        "[QC validation]",
-        intent,
-        validationTier,
-        "entries",
-        entriesToValidate.map((e) => e.kind + ":" + e.entryId),
-        "ok",
-        validationOk,
-        "errorKeys",
-        Object.keys(errorsByEntryId),
-      );
-    } catch (error) {
-      console.error("QC submit validation failed", error);
-      return false;
-    }
     }
     if (!validationOk) {
       const hasMixingErrors = entriesToValidate.some(
@@ -7058,9 +7017,7 @@ export const useQCDivisionHook = () => {
     );
     if (processingEntriesForWeightment.length > 0) {
       const weightmentSheet =
-        submitFormState.processingWeightmentSheet ??
-        liveForm.processingWeightmentSheet ??
-        null;
+        submitFormState.processingWeightmentSheet ?? liveForm.processingWeightmentSheet ?? null;
       const premixNos = new Set(
         processingEntriesForWeightment
           .map((e) => Number(e.premixNo))
@@ -7668,8 +7625,7 @@ export const useQCDivisionHook = () => {
           currentStage: batchStageArrays.currentStage,
           batchType: batchContext?.batchType,
           subBatchType: batchContext?.subBatchType,
-        }).reason ??
-        "Waiting for manufacturing to unlock this division."
+        }).reason ?? "Waiting for manufacturing to unlock this division."
       );
     },
     [

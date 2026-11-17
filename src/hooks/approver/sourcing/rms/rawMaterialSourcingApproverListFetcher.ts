@@ -18,6 +18,7 @@ export const fetchRawMaterialSourcingApproverList: SubDepartmentListFetcher = as
   const apiStatus =
     status !== allLabel ? toRawMaterialApproverListApiStatus(status, allLabel) : null;
   const materialCode = String(extraFilters.materialCode ?? "").trim();
+  const manufacturerName = String(extraFilters.manufacturer ?? "").trim();
   const fromDate = String(extraFilters.fromDate ?? "").trim();
   const toDate = String(extraFilters.toDate ?? "").trim();
 
@@ -27,6 +28,7 @@ export const fetchRawMaterialSourcingApproverList: SubDepartmentListFetcher = as
     limit,
     ...(apiStatus ? { status: [apiStatus] } : {}),
     ...(materialCode && materialCode !== allLabel ? { materialCode: [materialCode] } : {}),
+    ...(manufacturerName ? { manufacturerName } : {}),
     ...(search ? { search } : {}),
     ...(fromDate ? { fromDate } : {}),
     ...(toDate ? { toDate } : {}),

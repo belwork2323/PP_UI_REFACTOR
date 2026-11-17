@@ -36,6 +36,8 @@ import { formatToUiDate } from "@utils/dateUtils";
 import { isStartAfterEnd } from "@data/validation/dateRangeValidation";
 import { appDenseControlSx } from "@ui/components/common/fieldStyles";
 import MultiSelectWithSearch from "@/ui/components/common/MultiSelectCheckbox";
+import { validateBatchCreation } from "@/data/validation/adapters/BatchCreation.validation";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
@@ -45,12 +47,15 @@ const materialTrackingKey = (material: Material) =>
 
 const materialGradeSelectionKey = (materialCode: string, grade?: string | null) => {
   const code = normalizeMaterialCodeKey(materialCode);
-  const gradeKey = String(grade ?? "").trim().toLowerCase();
+  const gradeKey = String(grade ?? "")
+    .trim()
+    .toLowerCase();
   return gradeKey ? `${code}__${gradeKey}` : code;
 };
 
 const sheetGradeTokens = (material: Material): string[] => {
-  const nested = (material as Material & { grade?: { gradeCode?: string; gradeName?: string } }).grade;
+  const nested = (material as Material & { grade?: { gradeCode?: string; gradeName?: string } })
+    .grade;
   return [material.gradeCode, material.gradeName, nested?.gradeCode, nested?.gradeName]
     .map((value) => String(value ?? "").trim())
     .filter(Boolean);
@@ -146,7 +151,8 @@ export default function BatchImplementationForm({
   const [selectedMaterialCode, setSelectedMaterialCode] = useState("");
   const [selectedGradeCode, setSelectedGradeCode] = useState("");
   const [compositionDrafts, setCompositionDrafts] = useState<Record<string, string>>({});
-
+  const [errors, setErrors] = useState<Record<string, any>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const fieldDisabled = readOnly || saving;
   const isAppendOnlyEdit = editMode === "append_only" && Boolean(baselineImplForm);
   const baselinePremix = Number(baselineImplForm?.identificationSheet?.numberOfPremix) || 1;
@@ -171,17 +177,24 @@ export default function BatchImplementationForm({
     () => withCurrentMasterOption(mixerOptions as SystemMasterOption[], currentMixerValue),
     [mixerOptions, currentMixerValue],
   );
+  useEffect(() => {
+    if (!open || !hasSubmitted) return;
+
+    const liveErrors = validateBatchCreation(form, "SUBMIT");
+    setErrors(liveErrors);
+  }, [form, hasSubmitted, open]);
 
   useEffect(() => {
     if (!open) {
       setSelectedMaterialCode("");
       setSelectedGradeCode("");
       setCompositionDrafts({});
+      setErrors({});
+      setHasSubmitted(false);
     }
   }, [open]);
 
   const normalizedMaterials = (form.identificationSheet?.materials ?? []).map((material: any) => {
-    // If lotIds is missing or empty, but a legacy single lotId exists, convert it to an array
     let lotIds = material.lotIds;
     if (!Array.isArray(lotIds)) {
       if (material.lotId) {
@@ -243,7 +256,9 @@ export default function BatchImplementationForm({
   }, [form.identificationSheet?.materials]);
 
   const isGradeAlreadyAdded = (materialCode: string, gradeCode?: string, gradeName?: string) =>
-    Boolean(gradeCode && addedMaterialKeys.has(materialGradeSelectionKey(materialCode, gradeCode))) ||
+    Boolean(
+      gradeCode && addedMaterialKeys.has(materialGradeSelectionKey(materialCode, gradeCode)),
+    ) ||
     Boolean(gradeName && addedMaterialKeys.has(materialGradeSelectionKey(materialCode, gradeName)));
 
   const selectableMaterials = useMemo(() => {
@@ -345,7 +360,9 @@ export default function BatchImplementationForm({
       ) {
         return;
       }
-    } else if (addedMaterialKeys.has(materialGradeSelectionKey(selectedMaterialOption.materialCode))) {
+    } else if (
+      addedMaterialKeys.has(materialGradeSelectionKey(selectedMaterialOption.materialCode))
+    ) {
       return;
     }
 
@@ -383,8 +400,7 @@ export default function BatchImplementationForm({
     newMaterials[index] = {
       ...material,
       [field]: value,
-      ...(field === "revalidationFromDate" &&
-      isStartAfterEnd(value, material.revalidationToDate)
+      ...(field === "revalidationFromDate" && isStartAfterEnd(value, material.revalidationToDate)
         ? { revalidationToDate: "" }
         : {}),
     };
@@ -411,9 +427,7 @@ export default function BatchImplementationForm({
     // Map directly based on the order of lotIdsArray to preserve selection order
     const manufacturerNames = lotIdsArray
       .map((lotId) => {
-        const foundLot = matchedLots.find(
-          (lot) => String(lot.lotId ?? "").trim() === lotId,
-        );
+        const foundLot = matchedLots.find((lot) => String(lot.lotId ?? "").trim() === lotId);
         return foundLot?.manufacturerName;
       })
       .filter((name): name is string => Boolean(name && String(name).trim() !== ""))
@@ -497,7 +511,26 @@ export default function BatchImplementationForm({
 
     onMaterialsChange(newMaterials);
   };
+  const handleFormSubmit = () => {
+    setHasSubmitted(true);
+    const tier = "SUBMIT";
 
+    const validationErrors = validateBatchCreation(form, tier);
+    console.log(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setErrors({});
+    if (roundedTotal !== 100) {
+      setConfirmOpen(true);
+      return;
+    }
+
+    onSave();
+  };
   return (
     <Dialog
       open={open}
@@ -562,7 +595,7 @@ export default function BatchImplementationForm({
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
               <DateField
-                label="Date"
+                label={<FieldLabelWithAsterisk label="Date" required />}
                 value={formatToUiDate(form.identificationSheet?.date ?? "")}
                 onChange={(date) => {
                   const newIdent = { ...form.identificationSheet, date };
@@ -570,10 +603,12 @@ export default function BatchImplementationForm({
                 }}
                 disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
+                error={Boolean(errors["identificationSheet.date"])}
+                helperText={errors["identificationSheet.date"]}
               />
               <FormInput
                 fullWidth
-                label="Batch Size (KG)"
+                label={<FieldLabelWithAsterisk label="Batch Size (KG)" required />}
                 type="number"
                 value={displayNumberValue(form.identificationSheet?.batchSize, true)}
                 onChange={(e) => {
@@ -590,7 +625,6 @@ export default function BatchImplementationForm({
                     e.preventDefault();
                   }
                 }}
-                required
                 inputProps={{ min: 0, step: "any" }}
                 disabled={headerFieldDisabled}
                 sx={{
@@ -603,6 +637,8 @@ export default function BatchImplementationForm({
                       margin: 0,
                     },
                 }}
+                error={Boolean(errors["identificationSheet.batchSize"])}
+                helperText={errors["identificationSheet.batchSize"]}
               />
             </Stack>
           </Box>
@@ -611,7 +647,7 @@ export default function BatchImplementationForm({
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
               <FormInput
                 fullWidth
-                label="Bonding Sheet No"
+                label={<FieldLabelWithAsterisk label="Bonding Sheet No" required />}
                 value={form.identificationSheet?.bondingSheetNo ?? ""}
                 onChange={(e) => {
                   const newIdent = { ...form.identificationSheet, bondingSheetNo: e.target.value };
@@ -619,9 +655,11 @@ export default function BatchImplementationForm({
                 }}
                 disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
+                error={Boolean(errors["identificationSheet.bondingSheetNo"])}
+                helperText={errors["identificationSheet.bondingSheetNo"]}
               />
               <AppDropdown
-                label={S.MIXER_TYPE}
+                label={<FieldLabelWithAsterisk label="Mixer Type" required />}
                 value={currentMixerValue}
                 onChange={(value) => {
                   onFormChange("identificationSheet", {
@@ -649,6 +687,8 @@ export default function BatchImplementationForm({
                 }}
                 sx={{ mb: 0, ...input }}
                 MenuProps={t.menuPaper}
+                error={Boolean(errors["identificationSheet.mixerType"])}
+                helperText={errors["identificationSheet.mixerType"]}
               />
             </Stack>
           </Box>
@@ -657,7 +697,7 @@ export default function BatchImplementationForm({
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
               <FormInput
                 fullWidth
-                label="Number of Premix"
+                label={<FieldLabelWithAsterisk label="Number of Premix" required />}
                 type="number"
                 value={form.identificationSheet?.numberOfPremix ?? ""}
                 onChange={(e) => {
@@ -683,10 +723,12 @@ export default function BatchImplementationForm({
                 inputProps={{ min: isAppendOnlyEdit ? baselinePremix : 1 }}
                 disabled={fieldDisabled}
                 sx={{ mb: 0, ...input }}
+                error={Boolean(errors["identificationSheet.numberOfPremix"])}
+                helperText={errors["identificationSheet.numberOfPremix"]}
               />
               <FormInput
                 fullWidth
-                label="Remarks"
+                label={<FieldLabelWithAsterisk label="Remarks" required />}
                 value={form.identificationSheet?.remarks ?? ""}
                 onChange={(e) => {
                   const newIdent = { ...form.identificationSheet, remarks: e.target.value };
@@ -694,6 +736,8 @@ export default function BatchImplementationForm({
                 }}
                 disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
+                error={Boolean(errors["identificationSheet.remarks"])}
+                helperText={errors["identificationSheet.remarks"]}
               />
             </Stack>
           </Box>
@@ -725,7 +769,7 @@ export default function BatchImplementationForm({
                 >
                   <Box sx={{ flex: 1, minWidth: 200 }}>
                     <AppDropdown
-                      label={S.SELECT_MATERIAL_LABEL}
+                      label={<FieldLabelWithAsterisk label={S.SELECT_MATERIAL_LABEL} required />}
                       value={selectedMaterialCode}
                       onChange={handleMaterialSelectChange}
                       disabled={loadingMaterials || selectableMaterials.length === 0}
@@ -735,6 +779,7 @@ export default function BatchImplementationForm({
                         value: item.materialCode,
                         label: item.materialName || item.materialCode,
                       }))}
+
                       renderValue={(selected) => {
                         const item = selectableMaterials.find((m) => m.materialCode === selected);
                         if (!item) return selected;
@@ -779,7 +824,7 @@ export default function BatchImplementationForm({
                   {showGradeSelect ? (
                     <Box sx={{ flex: 1, minWidth: 160 }}>
                       <AppDropdown
-                        label={S.SELECT_GRADE_LABEL}
+                        label={<FieldLabelWithAsterisk label={S.SELECT_GRADE_LABEL} required />}
                         value={selectedGradeCode}
                         onChange={setSelectedGradeCode}
                         disabled={loadingMaterials || selectableGrades.length === 0}
@@ -815,20 +860,24 @@ export default function BatchImplementationForm({
                     <TableHead>
                       <TableRow sx={materialsTable?.headerRow}>
                         {[
-                          "Sr. No",
-                          "Material Code",
-                          "Material Name",
-                          "Grade",
-                          "Lot ID",
-                          "Manufacturer",
-                          "Composition %",
-                          "Qty/Premix",
-                          "Revalidation From",
-                          "Revalidation To",
-                          ...(!readOnly ? ["Action"] : []),
-                        ].map((header) => (
-                          <TableCell key={header} sx={materialsTable?.headerCell}>
-                            {header}
+                          { label: "Sr. No", req: false },
+                          { label: "Material Code", req: false },
+                          { label: "Material Name", req: false },
+                          { label: "Grade", req: false },
+                          { label: "Lot ID", req: true },
+                          { label: "Manufacturer", req: false },
+                          { label: "Composition %", req: true },
+                          { label: "Qty/Premix", req: false },
+                          { label: "Revalidation From", req: false },
+                          { label: "Revalidation To", req: false },
+                          ...(!readOnly ? [{ label: "Action", req: false }] : []),
+                        ].map((col) => (
+                          <TableCell key={col.label} sx={materialsTable?.headerCell}>
+                            {col.req ? (
+                              <FieldLabelWithAsterisk label={col.label} required />
+                            ) : (
+                              col.label
+                            )}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -856,7 +905,9 @@ export default function BatchImplementationForm({
                           );
                           const cellSx = materialsTable?.bodyCell;
                           const textSx = materialsTable?.textCell;
-
+                          const rowErrors = Array.isArray(errors.identificationSheet?.materials)
+                            ? (errors.identificationSheet.materials[idx] ?? {})
+                            : {};
                           return (
                             <TableRow
                               key={`${material.materialCode}-${material.gradeCode ?? ""}-${idx}`}
@@ -901,6 +952,10 @@ export default function BatchImplementationForm({
                                     loadingLots ||
                                     !material.materialCode
                                   }
+                                  error={Boolean(
+                                    errors[`identificationSheet.materials.${idx}.lotIds`],
+                                  )}
+                                  helperText={errors[`identificationSheet.materials.${idx}.lotIds`]}
                                 />
                               </TableCell>
                               <TableCell sx={{ ...cellSx, minWidth: 110 }}>
@@ -928,6 +983,16 @@ export default function BatchImplementationForm({
                                   disabled={fieldDisabled || rowLocked}
                                   compact
                                   sx={materialsTable?.compositionControl}
+                                  error={Boolean(
+                                    errors[
+                                      `identificationSheet.materials.${idx}.requiredComposition`
+                                    ],
+                                  )}
+                                  helperText={
+                                    errors[
+                                      `identificationSheet.materials.${idx}.requiredComposition`
+                                    ]
+                                  }
                                 />
                               </TableCell>
                               <TableCell sx={{ ...cellSx, width: 90 }}>
@@ -1030,7 +1095,14 @@ export default function BatchImplementationForm({
                 </Box>
               </>
             ) : (
-              <Typography color="textSecondary">{S.NO_MATERIALS_ADDED}</Typography>
+              <Box>
+                {typeof errors.identificationSheet?.materials === "string" && (
+                  <Typography color="error.main" variant="caption" sx={{ display: "block", mb: 1 }}>
+                    {errors.identificationSheet.materials}
+                  </Typography>
+                )}
+                {/* <Typography color="textSecondary">{S.NO_MATERIALS_ADDED}</Typography> */}
+              </Box>
             )}
           </Box>
         </Stack>
@@ -1044,14 +1116,7 @@ export default function BatchImplementationForm({
         {!readOnly && (
           <Button
             variant="contained"
-            onClick={() => {
-              if (roundedTotal !== 100) {
-                setConfirmOpen(true);
-                return;
-              }
-
-              onSave();
-            }}
+            onClick={handleFormSubmit}
             disabled={saving}
             sx={modal.saveButton}
           >

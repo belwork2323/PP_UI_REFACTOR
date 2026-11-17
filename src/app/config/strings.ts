@@ -2332,7 +2332,7 @@ export const STRINGS = {
       FORM_TITLE: "Trimming Operations",
       FORM_SUBTITLE:
         "Select a motor tab, fill trimming details, then save draft or submit per motor",
-      MOTOR_STAGE_LABEL: "Motor Stage",
+      MOTOR_STAGE_LABEL: "Stage",
       MOTOR_STAGE_PLACEHOLDER: "Select motor stage",
       MOTOR_COUNT_LABEL: "No. of Motor(s)",
       MOTOR_COUNT_PLACEHOLDER: "Select count",

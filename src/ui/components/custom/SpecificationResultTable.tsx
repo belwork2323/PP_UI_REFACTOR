@@ -110,6 +110,8 @@ const SpecificationResultTable = ({
       containerSx={styles.container}
       headerCellSx={styles.headerCell}
       rowSx={(row, index) => styles.row(index, Boolean(row.failed))}
+      /** Match BatchTable grid: separate collapse so uniform cell borders stay visible. */
+      tableSx={{ borderCollapse: "separate", borderSpacing: 0 }}
     />
   );
 };

@@ -34,6 +34,12 @@ const time = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
+
 export type QcCastingValidationTarget = {
   entryId?: string;
   values: SchemaFormValues | Record<string, unknown>;
@@ -52,8 +58,8 @@ export const qcCastingValidationFields: Record<string, FieldRuleConfig> = {
   finalMixBowlNo: text(["SUBMIT"], S.PATTERNS.CASTING_BOWL_LABEL),
   propellantQty: number(["SUBMIT"]),
   initialUnloadingViscosity: number(["SUBMIT"]),
-  castingStartTime: time(["SUBMIT"]),
-  castingCompletionTime: time(["SUBMIT"]),
+  castingStartTime: dateTime(["SUBMIT"]),
+  castingCompletionTime: dateTime(["SUBMIT"]),
   slurryCastFromBowl: number(["SUBMIT"]),
   castingRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
@@ -63,8 +69,8 @@ export const qcCastingValidationFields: Record<string, FieldRuleConfig> = {
 
   soakingDuration: time(["SUBMIT"]),
   pressurePlateApplicable: text(["SUBMIT"]),
-  pressureStartTime: time(["SUBMIT"]),
-  pressureEndTime: time(["SUBMIT"]),
+  pressureStartTime: dateTime(["SUBMIT"]),
+  pressureEndTime: dateTime(["SUBMIT"]),
   pressureSensorId: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   initialPressureReading: number(["SUBMIT"]),
   pressureObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),

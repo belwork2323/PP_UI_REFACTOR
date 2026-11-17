@@ -34,7 +34,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
     statusFilter,
     setStatusFilter,
     statusTabs,
-    statusDropdownValues,
+    statusOptions,
     filterAllLabel,
   } = list;
   const bumpListVersion = useApproverListRefreshStore((state) => state.bumpVersion);
@@ -42,6 +42,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
   const emptyDraft = useMemo<ApproverWorkflowFilterDraft>(
     () => ({
       material: filterAllLabel,
+      manufacturer: "",
       status: filterAllLabel,
       from: "",
       to: "",
@@ -53,6 +54,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
     empty: emptyDraft,
     fromApplied: () => ({
       material: appliedFilters.materialCode || filterAllLabel,
+      manufacturer: appliedFilters.manufacturer || "",
       status: statusFilter,
       from: appliedFilters.fromDate,
       to: appliedFilters.toDate,
@@ -67,7 +69,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
     filterAllLabel,
     materialOptions,
     materialsLoading,
-    statusValues: statusDropdownValues,
+    statusOptions,
     dateErrors: draftDateRangeErrors,
   });
 
@@ -80,6 +82,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
     if (draftDateRangeErrors) return;
     applyPanelFilters({
       materialCode: draft.material === filterAllLabel ? "" : draft.material,
+      manufacturer: draft.manufacturer?.trim() ?? "",
       fromDate: draft.from,
       toDate: draft.to,
       status: draft.status,
@@ -110,6 +113,8 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
       onClear={handleClearAllFilters}
       onClose={filterPanel.close}
       onApply={handleApplyPanelFilters}
+      fieldRowProps={config.filterFieldRowProps}
+      applyButtonSx={config.filterApplyButtonSx}
     >
       <FilterFields
         fields={filterFields}

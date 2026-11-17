@@ -21,7 +21,7 @@ import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/q
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
-import DateField, { TimeField } from "../../../../components/common/DateField";
+import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import {
   QC_CASTING_SECTION_IDS,
@@ -64,6 +64,7 @@ import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_t
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import { fieldError } from "@/data/validation/adapters/qcCasting.validation";
+import { toUiDateTime } from "@/data/models/user/castingCuringFieldCodec";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -126,7 +127,7 @@ const normalizeTimeValue = (value: unknown) => {
 type ColumnDef<T> = {
   id: keyof T & string;
   label: string;
-  fieldType?: "text" | "number" | "date" | "time" | "textarea" | "select" | "computed";
+  fieldType?: "text" | "number" | "date" | "time" | "dateTime" | "textarea" | "select" | "computed";
   options?: readonly { value: string; label: string }[];
   required?: boolean;
 };
@@ -173,7 +174,24 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
           );
           return { ...updated, SR_NO: rowIndex + 1 } as unknown as T;
         }
-        return { ...row, [field]: value, SR_NO: rowIndex + 1 } as unknown as T;
+        const updated = { ...row, [field]: value, SR_NO: rowIndex + 1 } as unknown as T;
+        const record = updated as Record<string, unknown>;
+        const pair = field === "CASTING_START_TIME" ? "CASTING_COMPLETION_TIME"
+          : field === "CASTING_COMPLETION_TIME" ? "CASTING_START_TIME"
+          : field === "START_TIME" ? "END_TIME"
+          : field === "END_TIME" ? "START_TIME" : null;
+        if (pair && String(record[pair] ?? "")) {
+          const start = field.endsWith("START_TIME") ? value : String(record[pair] ?? "");
+          const end = field.endsWith("COMPLETION_TIME") || field === "END_TIME" ? value : String(record[pair] ?? "");
+          const parse = (v: string) => {
+            const [date, time = "00:00"] = v.split(" ");
+            const [day, month, year] = date.split("-").map(Number);
+            const [hour, minute, second = 0] = time.split(":").map(Number);
+            return new Date(year, month - 1, day, hour, minute, second).getTime();
+          };
+          if (start && end && parse(start) > parse(end)) record[pair] = "";
+        }
+        return updated;
       }),
     );
   };
@@ -201,7 +219,9 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
     const value = String(row[column.id] ?? "");
     if (readOnly) {
       const display =
-        column.fieldType === "time"
+        column.fieldType === "dateTime"
+          ? toUiDateTime(value)
+          : column.fieldType === "time"
           ? normalizeTimeValue(value)
           : column.fieldType === "select"
             ? column.options?.find((option) => option.value === value)?.label ?? value
@@ -219,6 +239,29 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
             value={value}
             onChange={(next) => updateRow(index, column.id, next)}
             placeholder="DD-MM-YYYY"
+            inputSx={tableDateFieldSx}
+            error={hasError}
+          />
+        </Box>
+      );
+    }
+
+    if (column.fieldType === "dateTime") {
+      return (
+        <Box data-qc-field={fieldPath}>
+          <DateTimeField
+            compact
+            value={value}
+            minDate={
+              column.id === "CASTING_COMPLETION_TIME"
+                ? String(row.CASTING_START_TIME ?? "")
+                : column.id === "END_TIME"
+                  ? String(row.START_TIME ?? "")
+                  : undefined
+            }
+            requiresMinDateTime={column.id === "CASTING_COMPLETION_TIME" || column.id === "END_TIME"}
+            onChange={(next) => updateRow(index, column.id, next)}
+            placeholder="DD-MM-YYYY HH:mm:ss"
             inputSx={tableDateFieldSx}
             error={hasError}
           />
@@ -540,11 +583,11 @@ const CASTING_TABLE_COLUMNS: ColumnDef<QcCastingTableRow>[] = [
     fieldType: "number",
     required: true,
   },
-  { id: "CASTING_START_TIME", label: "Time of start of casting", fieldType: "time", required: true },
+  { id: "CASTING_START_TIME", label: "Start of casting (Date & Time)", fieldType: "dateTime", required: true },
   {
     id: "CASTING_COMPLETION_TIME",
-    label: "Time of completion of casting",
-    fieldType: "time",
+    label: "Completion of casting (Date & Time)",
+    fieldType: "dateTime",
     required: true,
   },
   {
@@ -564,8 +607,8 @@ const WEIGHTMENT_COLUMNS: ColumnDef<QcCastingWeightmentRow>[] = [
 ];
 
 const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
-  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
-  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "START_TIME", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  { id: "END_TIME", label: "End Date & Time", fieldType: "dateTime", required: true },
   { id: "PRESSURE_SENSOR_USED", label: "Pressure Sensor Id", fieldType: "text", required: true },
   {
     id: "INITIAL_PRESSURE_READING",
