@@ -34,17 +34,35 @@ export const createBannerStatusConfig = (
     border: border ?? alpha(color === "#fff" ? "#fff" : bg, 0.55),
   });
 
+  const rejected = solid("#b71c1c", "#fff", "#ef9a9a");
+  const waiting = solid("#f9a825", "#1a1a1a", "#fdd835");
+  const approved = solid("#1b5e20", "#fff", "#81c784");
+  const initiated = solid("#455a64", "#eceff1");
+  const inProgress = solid("#0d47a1", "#e3f2fd", "#64b5f6");
+
   return {
-    ["To Be Initiated"]: solid("#455a64", "#eceff1"),
-    ["In Progress"]: solid("#0d47a1", "#e3f2fd", "#64b5f6"),
-    ["Waiting for Partial Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-    ["Waiting for Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-    ["Approved"]: solid("#1b5e20", "#fff", "#81c784"),
-    ["Completely Approved"]: solid("#1b5e20", "#fff", "#81c784"),
-    ["Final Approval Completed"]: solid("#1b5e20", "#fff", "#81c784"),
-    ["Waiting For Complete Approval"]: solid("#f9a825", "#1a1a1a", "#fdd835"),
-    ["Rejected"]: solid("#b71c1c", "#fff", "#ef9a9a"),
-    ["Discarded"]: solid("#b71c1c", "#fff", "#ef9a9a"),
+    // UI display labels (OPERATION_STATUS values)
+    ["To Be Initiated"]: initiated,
+    ["In Progress"]: inProgress,
+    ["Waiting for Partial Approval"]: waiting,
+    ["Waiting for Approval"]: waiting,
+    ["Approved"]: approved,
+    ["Completely Approved"]: approved,
+    ["Final Approval Completed"]: approved,
+    ["Waiting For Complete Approval"]: waiting,
+    ["Rejected"]: rejected,
+    ["Discarded"]: rejected,
+    // API enum aliases (LotDetails / change-status often return these)
+    TO_BE_INITIATED: initiated,
+    IN_PROGRESS: inProgress,
+    WAITING_FOR_PARTIAL_APPROVAL: waiting,
+    WAITING_FOR_APPROVAL: waiting,
+    APPROVED: approved,
+    COMPLETELY_APPROVED: approved,
+    FINAL_APPROVAL_COMPLETED: approved,
+    WAITING_FOR_COMPLETE_APPROVAL: waiting,
+    REJECTED: rejected,
+    DISCARDED: rejected,
   };
 };
 

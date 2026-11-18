@@ -136,6 +136,7 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
           backgroundColor: isDark ? palette.pageBg : "#fff",
           background: isDark ? palette.pageBg : "#fff",
           fontSize: "0.78rem",
+          color: isDark ? "#f0f2f8" : palette.text,
           "& fieldset": { borderColor: alpha(palette.border, 0.6) },
           "&:hover fieldset": { borderColor: palette.primaryLight },
           "&.Mui-focused fieldset": { borderColor: palette.primaryLight, borderWidth: 1.5 },
@@ -144,12 +145,27 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
             background: isDark ? palette.pageBg : "#fff",
           },
         },
-        "& .MuiInputBase-input": {
+        // MUI ThemeProvider is often light; force fill so values stay readable on dark surfaces.
+        "& .MuiInputBase-input, & .MuiOutlinedInput-input, & input": {
           fontWeight: 500,
-          color: palette.text,
+          color: `${isDark ? "#f0f2f8" : palette.text} !important`,
+          WebkitTextFillColor: `${isDark ? "#f0f2f8" : palette.text} !important`,
+          caretColor: isDark ? "#f0f2f8" : palette.text,
           padding: "5px 7px",
           backgroundColor: isDark ? palette.pageBg : "#fff",
+          "&::placeholder, &::-webkit-input-placeholder": {
+            color: `${isDark ? "rgba(240,242,248,0.65)" : palette.textSub} !important`,
+            WebkitTextFillColor: `${isDark ? "rgba(240,242,248,0.65)" : palette.textSub} !important`,
+            opacity: 1,
+          },
         },
+        "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
+          {
+            WebkitTextFillColor: `${isDark ? "#f0f2f8" : palette.text} !important`,
+            caretColor: isDark ? "#f0f2f8" : palette.text,
+            transition: "background-color 99999s ease-in-out 0s",
+            boxShadow: `0 0 0 1000px ${isDark ? palette.pageBg : "#fff"} inset`,
+          },
       },
       sectionRow: { display: "flex", alignItems: "center", gap: 1, marginBottom: "10px" },
       sectionBlock: (borderColor: string) => ({

@@ -113,6 +113,7 @@ const toUiDeCoringDateTime = (value: string): string => {
   if (/^\d{1,2}-\d{1,2}-\d{4}/.test(raw)) return raw;
   const parsed = dayjs(raw);
   if (!parsed.isValid()) return raw;
+  if (/[T\s]\d{1,2}:\d{2}:\d{2}/.test(raw)) return parsed.format(`${UI_DATETIME_FORMAT}:ss`);
   if (/[T\s]\d{1,2}:\d{2}/.test(raw)) return parsed.format(UI_DATETIME_FORMAT);
   return parsed.format("DD-MM-YYYY");
 };
@@ -200,7 +201,7 @@ const toDeCoringApiDateTime = (value: string): string | undefined => {
   }
 
   const dmyTime = raw.match(
-    /^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::\d{2})?)?$/,
+    /^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
   );
   if (dmyTime) {
     const day = dmyTime[1].padStart(2, "0");
@@ -208,7 +209,8 @@ const toDeCoringApiDateTime = (value: string): string | undefined => {
     const year = dmyTime[3];
     const hour = (dmyTime[4] ?? "0").padStart(2, "0");
     const minute = (dmyTime[5] ?? "0").padStart(2, "0");
-    return `${year}-${month}-${day}T${hour}:${minute}:00`;
+    const second = (dmyTime[6] ?? "0").padStart(2, "0");
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
   }
 
   return raw;
@@ -241,7 +243,7 @@ export const buildDeCoringMotorDetailPayload = (
     decoringDetails: omitEmpty({
       decoringLoad: load,
       // Full datetime (YYYY-MM-DDTHH:mm:ss) — same for create and update.
-      decoringDate: dateTime,
+      decoringDateTime: dateTime,
       decoringRemarks: observations || undefined,
       qaRemarks: qaRemarks || undefined,
     }),

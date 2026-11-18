@@ -255,7 +255,7 @@ export const useSubscaleHook = () => {
         if (batch.batchId) {
           try {
             const response = await batchManagementController.getBatchById(batch.batchId);
-            batchDetailsResponse = (response ?? null) as Record<string, unknown> | null;
+            batchDetailsResponse = (response ?? null) as unknown as Record<string, unknown> | null;
             setBatchDetails(response);
           } catch (error) {
             console.error("Unable to resolve subscale batch details", error);

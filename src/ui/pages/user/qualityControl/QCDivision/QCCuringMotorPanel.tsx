@@ -129,10 +129,16 @@ const normalizeTimeValue = (value: unknown) => {
   return `${match[1].padStart(2, "0")}:${match[2]}`;
 };
 
+const normalizeDateTimeClock = (value: unknown) => {
+  const trimmed = String(value ?? "").trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}${match[3] ? `:${match[3]}` : ""}` : trimmed;
+};
+
 type ColumnDef<T> = {
   id: keyof T & string;
   label: string;
-  fieldType?: "text" | "number" | "date" | "time" | "textarea" | "select";
+  fieldType?: "text" | "number" | "date" | "time" | "dateTime" | "textarea" | "select";
   options?: readonly { value: string; label: string }[];
   placeholder?: string;
   readOnlyColumn?: boolean;
@@ -177,9 +183,15 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
             ? ({ ...row, SR_NO: rowIndex + 1 } as T)
             : ({ ...row } as T);
         }
+        const patch: Record<string, unknown> = {};
+        if ((field === "START_DATE" || field === "END_DATE") && value.includes(" ")) {
+          const [date = "", time = ""] = value.split(" ");
+          patch[field] = date;
+          patch[field === "START_DATE" ? "START_TIME" : "END_TIME"] = time;
+        } else patch[field] = value;
         const nextRow = showSerialNumber
-          ? ({ ...row, [field]: value, SR_NO: rowIndex + 1 } as T)
-          : ({ ...row, [field]: value } as T);
+          ? ({ ...row, ...patch, SR_NO: rowIndex + 1 } as T)
+          : ({ ...row, ...patch } as T);
         const nextRecord = nextRow as Record<string, unknown>;
         if (
           ["START_DATE", "START_TIME", "END_DATE", "END_TIME"].includes(field)
@@ -270,6 +282,14 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
           />
         </Box>
       );
+    }
+
+    if (column.fieldType === "dateTime") {
+      const isEnd = column.id === "END_DATE";
+      const date = formatToUiDate(String(row[column.id] ?? ""));
+      const time = normalizeDateTimeClock(row[isEnd ? "END_TIME" as keyof T & string : "START_TIME" as keyof T & string]);
+      const startValue = `${formatToUiDate(String(row.START_DATE ?? ""))} ${normalizeDateTimeClock(row.START_TIME)}`.trim();
+      return <Box data-qc-field={fieldPath}><DateTimeField compact value={date ? `${date} ${time || "00:00"}` : ""} minDate={isEnd ? startValue : undefined} requiresMinDateTime={isEnd} onChange={(next) => updateRow(index, column.id, next)} placeholder="DD-MM-YYYY HH:mm:ss" inputSx={tableDateFieldSx} error={hasError} /></Box>;
     }
 
     if (column.fieldType === "time") {
@@ -618,10 +638,10 @@ const CYCLE_COLUMN_DEFS: Record<
 > = {
   TEMPERATURE: { id: "TEMPERATURE", label: "Temp (°C)", fieldType: "text", required: true },
   DURATION: { id: "DURATION", label: "Duration (Min.)", fieldType: "number", required: true },
-  START_DATE: { id: "START_DATE", label: "Start Date", fieldType: "date", required: true },
-  START_TIME: { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
-  END_DATE: { id: "END_DATE", label: "End Date", fieldType: "date", required: true },
-  END_TIME: { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  START_DATE: { id: "START_DATE", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  START_TIME: { id: "START_TIME", label: "Start Date & Time", fieldType: "dateTime", required: true },
+  END_DATE: { id: "END_DATE", label: "End Date & Time", fieldType: "dateTime", required: true },
+  END_TIME: { id: "END_TIME", label: "End Date & Time", fieldType: "dateTime", required: true },
   ACTUAL_DURATION: {
     id: "ACTUAL_DURATION",
     label: "Actual Duration (Min.)",
@@ -648,7 +668,9 @@ const CYCLE_COLUMN_DEFS: Record<
 };
 
 const buildCycleColumns = (subType: string | null | undefined) =>
-  resolveCuringCycleColumnIds(subType).map((id) => CYCLE_COLUMN_DEFS[id]);
+  resolveCuringCycleColumnIds(subType)
+    .filter((id) => id !== "START_TIME" && id !== "END_TIME")
+    .map((id) => CYCLE_COLUMN_DEFS[id]);
 
 const createEmptyCycleRow = (srNo: number): QcCuringCycleRow => ({
   SR_NO: srNo,
@@ -782,42 +804,19 @@ const QCCuringMotorPanel = ({
     () => getCuringSubscaleField(values, "CYCLE_END_TIME"),
     [values],
   );
-  const curingStartDateTimeSelected =
-    Boolean(formatToUiDate(curingStartDate)) && Boolean(normalizeTimeValue(cycleStartTime));
-  const updateSubscaleDateTimeField = (
-    field:
-      | "CURING_START_DATE"
-      | "CYCLE_START_TIME"
-      | "CURING_COMPLETE_DATE"
-      | "CYCLE_END_TIME",
-    nextValue: string,
-  ) => {
-    let nextValues = setCuringSubscaleField(values, field, nextValue);
-    const startDate = formatToUiDate(
-      field === "CURING_START_DATE" ? nextValue : curingStartDate,
-    );
-    const startTime = normalizeTimeValue(
-      field === "CYCLE_START_TIME" ? nextValue : cycleStartTime,
-    );
-    const endDate = formatToUiDate(
-      field === "CURING_COMPLETE_DATE" ? nextValue : curingCompleteDate,
-    );
-    const endTime = normalizeTimeValue(
-      field === "CYCLE_END_TIME" ? nextValue : cycleEndTime,
-    );
-    const startDateTime = startDate ? `${startDate} ${startTime || "00:00"}` : "";
-    const endDateTime = endDate ? `${endDate} ${endTime || "00:00"}` : "";
-
-    if (isStartAfterEnd(startDateTime, endDateTime)) {
-      if (startDate && startDate === endDate) {
-        nextValues = setCuringSubscaleField(nextValues, "CYCLE_END_TIME", "");
-      } else {
-        nextValues = setCuringSubscaleField(nextValues, "CURING_COMPLETE_DATE", "");
-        nextValues = setCuringSubscaleField(nextValues, "CYCLE_END_TIME", "");
-      }
+  const updateSubscaleCombinedDateTime = (start: boolean, value: string) => {
+    const [date = "", time = ""] = value.split(" ");
+    const dateField = start ? "CURING_START_DATE" : "CURING_COMPLETE_DATE";
+    const timeField = start ? "CYCLE_START_TIME" : "CYCLE_END_TIME";
+    let next = setCuringSubscaleField(values, dateField, date);
+    next = setCuringSubscaleField(next, timeField, time);
+    const startValue = start ? value : `${formatToUiDate(curingStartDate)} ${normalizeTimeValue(cycleStartTime)}`;
+    const endValue = start ? `${formatToUiDate(curingCompleteDate)} ${normalizeTimeValue(cycleEndTime)}` : value;
+    if (isStartAfterEnd(startValue, endValue)) {
+      next = setCuringSubscaleField(next, "CURING_COMPLETE_DATE", "");
+      next = setCuringSubscaleField(next, "CYCLE_END_TIME", "");
     }
-
-    onChange(nextValues);
+    onChange(next);
   };
   const bemAverageShoreAHardness = useMemo(
     () => getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS"),
@@ -1043,96 +1042,27 @@ const QCCuringMotorPanel = ({
               validationErrors={validationErrors}
               errorPrefix="CURING_PARAMETER_TABLE"
             />
-            <FieldRow label="Curing Start Date" readOnly={readOnly} required error={err("CURING_START_DATE")}>
+    <FieldRow label="Curing Start Date & Time" readOnly={readOnly} required error={err("CURING_START_DATE")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
-                  value={curingStartDate}
-                  muted={!curingStartDate.trim()}
+                  value={curingStartDate ? `${formatToUiDate(curingStartDate)} ${normalizeDateTimeClock(cycleStartTime)}` : ""}
+                  muted={!curingStartDate.trim() && !cycleStartTime.trim()}
                 />
               ) : (
                 <Box data-qc-field="CURING_START_DATE">
-                  <DateField
-                    compact
-                    value={curingStartDate}
-                    onChange={(next) =>
-                      updateSubscaleDateTimeField("CURING_START_DATE", next)
-                    }
-                    placeholder="DD-MM-YYYY"
-                    inputSx={tableDateFieldSx}
-                    error={Boolean(err("CURING_START_DATE"))}
-                  />
+                  <DateTimeField compact value={curingStartDate ? `${formatToUiDate(curingStartDate)} ${normalizeDateTimeClock(cycleStartTime) || "00:00:00"}` : ""} onChange={(next) => updateSubscaleCombinedDateTime(true, next)} placeholder="DD-MM-YYYY HH:mm:ss" inputSx={tableDateFieldSx} error={Boolean(err("CURING_START_DATE") || err("CYCLE_START_TIME"))} />
                 </Box>
               )}
             </FieldRow>
-            <FieldRow label="Cycle Start Time" readOnly={readOnly} required error={err("CYCLE_START_TIME")}>
+            <FieldRow label="Curing Complete Date & Time" readOnly={readOnly} required error={err("CURING_COMPLETE_DATE")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
-                  value={normalizeTimeValue(cycleStartTime)}
-                  muted={!cycleStartTime.trim()}
-                />
-              ) : (
-                <Box data-qc-field="CYCLE_START_TIME">
-                  <TimeField
-                    compact
-                    value={normalizeTimeValue(cycleStartTime)}
-                    onChange={(next) =>
-                      updateSubscaleDateTimeField("CYCLE_START_TIME", next)
-                    }
-                    placeholder="HH:mm"
-                    inputSx={tableTimeFieldSx}
-                    error={Boolean(err("CYCLE_START_TIME"))}
-                  />
-                </Box>
-              )}
-            </FieldRow>
-            <FieldRow label="Curing Complete Date" readOnly={readOnly} required error={err("CURING_COMPLETE_DATE")}>
-              {readOnly ? (
-                <QCDivisionReadOnlyValue
-                  value={curingCompleteDate}
-                  muted={!curingCompleteDate.trim()}
+                  value={curingCompleteDate ? `${formatToUiDate(curingCompleteDate)} ${normalizeDateTimeClock(cycleEndTime)}` : ""}
+                  muted={!curingCompleteDate.trim() && !cycleEndTime.trim()}
                 />
               ) : (
                 <Box data-qc-field="CURING_COMPLETE_DATE">
-                  <DateField
-                    compact
-                    value={curingCompleteDate}
-                    minDate={curingStartDate}
-                    blockedByDateTimeDependency={!curingStartDateTimeSelected}
-                    onChange={(next) =>
-                      updateSubscaleDateTimeField("CURING_COMPLETE_DATE", next)
-                    }
-                    placeholder="DD-MM-YYYY"
-                    inputSx={tableDateFieldSx}
-                    error={Boolean(err("CURING_COMPLETE_DATE"))}
-                  />
-                </Box>
-              )}
-            </FieldRow>
-            <FieldRow label="Cycle End Time" readOnly={readOnly} required error={err("CYCLE_END_TIME")}>
-              {readOnly ? (
-                <QCDivisionReadOnlyValue
-                  value={normalizeTimeValue(cycleEndTime)}
-                  muted={!cycleEndTime.trim()}
-                />
-              ) : (
-                <Box data-qc-field="CYCLE_END_TIME">
-                  <TimeField
-                    compact
-                    value={normalizeTimeValue(cycleEndTime)}
-                    blockedByDateTimeDependency={!curingStartDateTimeSelected}
-                    minTime={
-                      curingStartDate &&
-                      formatToUiDate(curingStartDate) === formatToUiDate(curingCompleteDate)
-                        ? normalizeTimeValue(cycleStartTime)
-                        : undefined
-                    }
-                    onChange={(next) =>
-                      updateSubscaleDateTimeField("CYCLE_END_TIME", next)
-                    }
-                    placeholder="HH:mm"
-                    inputSx={tableTimeFieldSx}
-                    error={Boolean(err("CYCLE_END_TIME"))}
-                  />
+                  <DateTimeField compact value={curingCompleteDate ? `${formatToUiDate(curingCompleteDate)} ${normalizeDateTimeClock(cycleEndTime) || "00:00:00"}` : ""} minDate={`${formatToUiDate(curingStartDate)} ${normalizeDateTimeClock(cycleStartTime)}`} requiresMinDateTime onChange={(next) => updateSubscaleCombinedDateTime(false, next)} placeholder="DD-MM-YYYY HH:mm:ss" inputSx={tableDateFieldSx} error={Boolean(err("CURING_COMPLETE_DATE") || err("CYCLE_END_TIME"))} />
                 </Box>
               )}
             </FieldRow>

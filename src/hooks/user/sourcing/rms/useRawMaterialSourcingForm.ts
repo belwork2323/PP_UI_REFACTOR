@@ -181,6 +181,7 @@ export const useRawMaterialSourcingForm = ({
     void refreshList();
   };
 
+  /** Quiet refresh after draft save — do not toggle loadingFormDetails (that opens the fullscreen form loader and unmounts the form). */
   const reloadLotFormDetails = async (lotId: string): Promise<boolean> => {
     const id = String(lotId ?? "").trim();
     if (!id) {
@@ -188,36 +189,36 @@ export const useRawMaterialSourcingForm = ({
       return false;
     }
 
-    setLoadingFormDetails(true);
-    try {
-      const detailsResponse = await rawMaterialSourcingController.fetchLotDetails({ lotId: id });
-      if (!detailsResponse?.success || !detailsResponse.data) {
-        const fallback = resolveLotDetailsFetchErrorFallback(detailsResponse?.statusCode);
-        showAlert(getErrorMessage(detailsResponse, fallback), "error");
-        return false;
-      }
-
-      const blocks = RawMaterialLotDetailsModel.toMaterialBlocks(detailsResponse.data);
-      const wf = detailsResponse.data.workflowInsights;
-
-      setFormBlocks(blocks);
-      captureLotDetailsBaseline(blocks);
-      setActiveBatch((prev) =>
-        prev
-          ? {
-              ...prev,
-              formId: detailsResponse.data.formId ?? prev.formId,
-              lotId: id,
-              batchId: id,
-              rmStatus: normalizeRawMaterialLotListStatus(wf?.currentStatus || prev.rmStatus),
-              rejectionReason: wf?.rejectionReason ?? null,
-            }
-          : prev,
-      );
-      return true;
-    } finally {
-      setLoadingFormDetails(false);
+    const detailsResponse = await rawMaterialSourcingController.fetchLotDetails({ lotId: id });
+    if (!detailsResponse?.success || !detailsResponse.data) {
+      const fallback = resolveLotDetailsFetchErrorFallback(detailsResponse?.statusCode);
+      showAlert(getErrorMessage(detailsResponse, fallback), "error");
+      return false;
     }
+
+    const blocks = RawMaterialLotDetailsModel.toMaterialBlocks(detailsResponse.data);
+    const wf = detailsResponse.data.workflowInsights;
+
+    setFormBlocks(blocks);
+    captureLotDetailsBaseline(blocks);
+    setActiveBatch((prev) =>
+      prev
+        ? {
+            ...prev,
+            formId: detailsResponse.data.formId ?? prev.formId,
+            lotId: id,
+            batchId: id,
+            rmStatus: normalizeRawMaterialLotListStatus(wf?.currentStatus || prev.rmStatus),
+            // Prefer top-level lot rejectionReason (same as openLotFromList); keep prior if API omits it.
+            rejectionReason:
+              detailsResponse.data?.rejectionReason ??
+              wf?.rejectionReason ??
+              prev.rejectionReason ??
+              null,
+          }
+        : prev,
+    );
+    return true;
   };
 
   const handleCreateLot = () => {

@@ -12,6 +12,7 @@ type LotDetailsModel = {
   supplyOrderNo?: string;
   receiptDate?: string;
   manufacturerName?: string;
+  rejectionReason?: string | null;
   workflowInsights?: {
     currentStatus?: string;
     rejectionReason?: string | null;
@@ -58,7 +59,7 @@ export const buildDetailsRowFromLotModel = (
     rmStatus: normalizeRawMaterialLotListStatus(wf?.currentStatus || row.rmStatus),
     createdBy: row.createdBy,
     createdOn: row.createdOn,
-    rejectionReason: wf?.rejectionReason ?? null,
+    rejectionReason: model.rejectionReason ?? wf?.rejectionReason ?? row?.rejectionReason ?? null,
   };
 };
 

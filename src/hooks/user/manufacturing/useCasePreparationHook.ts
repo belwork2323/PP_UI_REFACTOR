@@ -161,7 +161,7 @@ const enrichBatchFromDetails = (
           : batch.motorId,
       identificationSheet: batchDetails.identificationSheet,
     },
-    batchDetails as Record<string, unknown>,
+    batchDetails,
   );
 };
 

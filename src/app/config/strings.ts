@@ -421,6 +421,8 @@ export const STRINGS = {
     BATCH_LIST: {
       RM_TITLE: "Raw material lots",
       MOTOR_TITLE: "Rocket Motor batch list",
+      SEARCH_PLACEHOLDER:
+        "Search lot ID, sourcing ID, material, manufacturer, status, created by…",
       COL_BATCH_ID: "Batch ID",
       COL_MOTOR_CASING_ID: "Motor casing ID",
       COL_PROJECT_ID: "Project ID",
@@ -776,7 +778,7 @@ export const STRINGS = {
       TABLE_HEADERS: {
         MATERIAL: "Material",
         LOT_ID: "Lot ID",
-        LOT_BATCH_NO: "Man. Lot/Batch No.",
+        LOT_BATCH_NO: "Lot ID / Lot No.",
         SPECIFICATION: "Qualification Parameter",
         REF_RANGE: "Specification",
         ANALYZED_RESULT: "Analyze Result @ Source",

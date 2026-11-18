@@ -7,7 +7,10 @@ import { useApproverListRefreshStore } from "@app/store/approverListRefreshStore
 import { isApproverActionableStatus } from "@app/theme/approver";
 import rawMaterialSourcingController from "@controllers/user/sourcing/rms/rawMaterialSourcingController";
 import type { ApproverFormActionType } from "@data/api/approver/approverApi";
-import { RawMaterialLotDetailsModel } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
+import {
+  normalizeRawMaterialStatus,
+  RawMaterialLotDetailsModel,
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import { submitApproverFormStatusChange } from "@controllers/approver/approverController";
 
 const DEPARTMENT_SLUG = "sourcing";
@@ -109,9 +112,12 @@ export const useRawMaterialSourcingApproverDetails = () => {
     setSubmitting(false);
 
     if (response.success) {
-      const nextStatus =
-        (response.data as { status?: string })?.status ??
-        (actionType === "APPROVED" ? "Approved" : "Rejected");
+      const nextStatus = normalizeRawMaterialStatus(
+        String(
+          (response.data as { status?: string })?.status ??
+            (actionType === "APPROVED" ? "Approved" : "Rejected"),
+        ),
+      );
 
       closeDialog();
 
@@ -128,7 +134,7 @@ export const useRawMaterialSourcingApproverDetails = () => {
           current
             ? {
                 ...current,
-                status: nextStatus,
+                status: normalizeRawMaterialStatus(String(model.status ?? nextStatus)),
                 rejectionReason: model?.rejectionReason,
                 lotId: model.lotId || lotIdForRefresh,
                 batchId: lotIdForRefresh,
@@ -188,6 +194,7 @@ export const useRawMaterialSourcingApproverDetails = () => {
       formId: row.lotId,
       materialCode: model.materialCode || row.materialCode,
       materialName: row.materialName,
+      status: normalizeRawMaterialStatus(String(model.status ?? row.status ?? "")),
       rejectionReason: model?.rejectionReason,
       qcBlocks: RawMaterialLotDetailsModel.toMaterialBlocks(model),
     });

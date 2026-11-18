@@ -95,10 +95,10 @@ export const resolveWorkflowFormHeaderStatus = (
   }
 
   const isRejected = status === "REJECTED";
-  const rejectionReason = isRejected
-    ? String((batch as { rejectionReason?: unknown } | null | undefined)?.rejectionReason ?? "").trim() ||
-      null
-    : null;
+  // Keep reason visible during rework drafts (status may become IN_PROGRESS after Save as Draft).
+  const rejectionReason =
+    String((batch as { rejectionReason?: unknown } | null | undefined)?.rejectionReason ?? "").trim() ||
+    null;
 
   return {
     status,

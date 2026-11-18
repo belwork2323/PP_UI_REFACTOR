@@ -1011,13 +1011,33 @@ const mapLocationRowsForApi = (
     }),
   );
 
+const specificationForApi = (value: string) => {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/^(?:≥|>=|>|≤|<=|<)?\s*(-?\d+(?:\.\d+)?)\s*(.*)$/);
+  if (!match) return undefined;
+  const operator = raw.match(/^(≥|>=|>|≤|<=|<)/)?.[1] ?? ">=";
+  const number = Number(match[1]);
+  const isUpperBound = operator === "≤" || operator === "<" || operator === "<=";
+  return { min: isUpperBound ? null : number, max: isUpperBound ? number : null, unit: match[2].trim() };
+};
+
+const specificationForDisplay = (value: unknown): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  const spec = asRecord(value);
+  if (!spec) return "";
+  const min = spec.min;
+  const max = spec.max;
+  const range = min != null && max != null ? `${min} - ${max}` : min != null ? `≥${min}` : max != null ? `≤${max}` : "";
+  return [range, String(spec.unit ?? "").trim()].filter(Boolean).join(" ");
+};
+
 const mapQualificationRowsForApi = (rows: QcPostCureQualificationRow[], withQcReport = false) =>
   rows.map((row) => {
     const reportPayload = withQcReport ? toFileIdListPayload(row.QC_REPORT) : [];
     return omitEmpty({
       srNo: row.SR_NO,
       parameter: row.PARAMETER || undefined,
-      specification: row.SPECIFICATION || undefined,
+      specification: specificationForApi(row.SPECIFICATION),
       result: String(row.RESULT ?? "").trim() || undefined,
       qaRemarks: String(row.QA_REMARKS ?? "").trim() || undefined,
       ...(withQcReport && reportPayload.length ? { qcReport: reportPayload } : null),
@@ -1079,7 +1099,7 @@ const mapQualificationRowsFromApi = (value: unknown, withQcReport = false): unkn
     return {
       SR_NO: Number(row.srNo ?? row.SR_NO) || index + 1,
       PARAMETER: pickString(row.parameter, row.PARAMETER),
-      SPECIFICATION: pickString(row.specification, row.SPECIFICATION),
+      SPECIFICATION: specificationForDisplay(row.specification ?? row.SPECIFICATION),
       RESULT: pickEditableString(row.result, row.RESULT),
       QA_REMARKS: pickEditableString(
         row.qaRemarks,

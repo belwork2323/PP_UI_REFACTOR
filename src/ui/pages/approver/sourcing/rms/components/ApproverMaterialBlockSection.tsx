@@ -73,7 +73,7 @@ const ApproverMaterialBlockSection = ({
       },
       {
         key: "lotNo",
-        header: "Man. Lot/Batch No.",
+        header: "Lot ID / Lot No.",
         cellSx: { ...rmTheme.tableCell, color: palette.textSub },
         render: (_row: SpecificationResultRow, index: number) =>
           index === 0 ? block.lotNo || "—" : "",
@@ -116,7 +116,7 @@ const ApproverMaterialBlockSection = ({
       <Stack direction="row" alignItems="center" gap={1} mb={1}>
         <Chip label={block.material} size="small" sx={chips.material} />
         <Typography sx={dialog.blockMeta}>
-          Man. Lot/Batch No.:{" "}
+          Lot ID / Lot No.:{" "}
           <Box component="span" sx={dialog.blockMetaStrong}>
             {block.lotNo || "—"}
           </Box>

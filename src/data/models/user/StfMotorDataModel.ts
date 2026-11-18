@@ -179,7 +179,7 @@ export type StfMotorData = StfMainMotorData | StfBemMotorData;
 
 /** MAIN-only nested staticTestingDetails shape. */
 export type StfMainTestHeaderApi = {
-  firingDate?: string;
+  firingDateTime?: string;
   ambientTemperature?: number;
   qaRemarks?: string;
 };
@@ -227,7 +227,7 @@ export type StfMainStaticTestingDetailsApi = {
 export type StfBemTestHeaderApi = {
   loadingNo?: string;
   firingNo?: string;
-  firingDate?: string;
+  firingDateTime?: string;
   temperature?: number;
   rh?: number;
   wtOfGrain?: string;
@@ -432,7 +432,7 @@ const numOrOmit = (value: unknown): number | undefined => toApiNumber(value);
 
 const buildMainTestHeader = (row: StfMainTestHeader): StfMainTestHeaderApi =>
   omitEmpty({
-    firingDate: toApiDateTime(row.FIRING_DATE) || undefined,
+    firingDateTime: toApiDateTime(row.FIRING_DATE) || undefined,
     ambientTemperature: numOrOmit(row.AMBIENT_TEMPERATURE),
     qaRemarks: row.QA_REMARKS.trim() || undefined,
   });
@@ -482,7 +482,7 @@ const buildBemTestHeader = (row: StfBemTestHeader): StfBemTestHeaderApi =>
   omitEmpty({
     loadingNo: row.LOADING_NO.trim() || undefined,
     firingNo: row.FIRING_NO.trim() || undefined,
-    firingDate: toApiDateTime(row.FIRING_DATE) || undefined,
+    firingDateTime: toApiDateTime(row.FIRING_DATE) || undefined,
     temperature: numOrOmit(row.TEMPERATURE),
     rh: numOrOmit(row.RH),
     wtOfGrain: row.WT_OF_GRAIN.trim() || undefined,
@@ -569,8 +569,8 @@ const parseMainTestHeader = (
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   }),
   FIRING_DATE:
-    toUiDateTime(pickField(source ?? {}, "firingDate", "FIRING_DATE")) ||
-    str(pickField(source ?? {}, "firingDate", "FIRING_DATE")),
+    toUiDateTime(pickField(source ?? {}, "firingDateTime", "firingDate", "FIRING_DATE")) ||
+    str(pickField(source ?? {}, "firingDateTime", "firingDate", "FIRING_DATE")),
 });
 
 const parseMainNozzleDetails = (
@@ -655,8 +655,8 @@ const parseBemTestHeader = (
     QA_REMARKS: pickField(source ?? {}, "qaRemarks", "QA_REMARKS"),
   }),
   FIRING_DATE:
-    toUiDateTime(pickField(source ?? {}, "firingDate", "FIRING_DATE")) ||
-    str(pickField(source ?? {}, "firingDate", "FIRING_DATE")),
+    toUiDateTime(pickField(source ?? {}, "firingDateTime", "firingDate", "FIRING_DATE")) ||
+    str(pickField(source ?? {}, "firingDateTime", "firingDate", "FIRING_DATE")),
 });
 
 const parseBemIgniterDetails = (
@@ -749,9 +749,10 @@ const parseBemBurnRate = (
 
 const parseBemFromNestedDto = (details: Record<string, unknown>): StfBemMotorData => {
   const empty = createEmptyStfBemMotorData();
+  const testHeader = { ...details, ...(asRecord(details.testHeader) ?? {}) };
   return {
     variant: "BEM",
-    TEST_HEADER: parseBemTestHeader(empty.TEST_HEADER, asRecord(details.testHeader) ?? undefined),
+    TEST_HEADER: parseBemTestHeader(empty.TEST_HEADER, testHeader),
     IGNITER_DETAILS: parseBemIgniterDetails(
       empty.IGNITER_DETAILS,
       asRecord(details.igniterDetails) ?? undefined,
@@ -771,9 +772,10 @@ const parseBemFromNestedDto = (details: Record<string, unknown>): StfBemMotorDat
 
 const parseMainFromNestedDto = (details: Record<string, unknown>): StfMainMotorData => {
   const empty = createEmptyStfMainMotorData();
+  const testHeader = { ...details, ...(asRecord(details.testHeader) ?? {}) };
   return {
     variant: "MAIN_MOTOR",
-    TEST_HEADER: parseMainTestHeader(empty.TEST_HEADER, asRecord(details.testHeader) ?? undefined),
+    TEST_HEADER: parseMainTestHeader(empty.TEST_HEADER, testHeader),
     NOZZLE_DETAILS: parseMainNozzleDetails(
       empty.NOZZLE_DETAILS,
       asRecord(details.nozzleDetails) ?? undefined,

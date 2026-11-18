@@ -20,6 +20,8 @@ type CastingCuringFlowBarProps = {
   schemaLoading?: boolean;
   disabled?: boolean;
   theme: any;
+  stationOptions: Array<{ value: string; label: string }>;
+  stationLoadError?: string | null;
 };
 
 const CastingCuringFlowBar = ({
@@ -32,47 +34,12 @@ const CastingCuringFlowBar = ({
   schemaLoading = false,
   disabled = false,
   theme,
+  stationOptions,
+  stationLoadError,
 }: CastingCuringFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const L = CASTING_CURING_FLOW_LABELS;
   const primary = theme.palette.primary;
-  const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [stationLoadError, setStationLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setStationLoadError(null);
-    void fetchCastingStationsApi()
-      .then((response: any) => {
-        if (!active) return;
-        const list = Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response)
-            ? response
-            : [];
-        const mapped = list
-          .map((item: Record<string, unknown>) => {
-            const value = String(
-              item.stationCode ?? item.stationId ?? item.stationName ?? item.code ?? "",
-            );
-            const label = String(item.stationName ?? item.stationCode ?? value);
-            return { value, label };
-          })
-          .filter((item) => item.value);
-        setStationOptions(mapped);
-        if (mapped.length === 0) {
-          setStationLoadError("Casting stations could not be loaded from the server.");
-        }
-      })
-      .catch(() => {
-        if (!active) return;
-        setStationOptions([]);
-        setStationLoadError("Casting stations could not be loaded from the server.");
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const canLoad = useMemo(
     () =>

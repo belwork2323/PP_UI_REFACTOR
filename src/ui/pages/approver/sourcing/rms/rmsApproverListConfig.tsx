@@ -28,7 +28,9 @@ const SEARCH_KEYS = [
   "materialName",
   "supplyOrderNo",
   "manufacturerName",
+  "status",
   "submittedBy",
+  "createdBy",
 ];
 
 /** Same field-row layout as User RMS lot list filter panel. */
@@ -107,8 +109,10 @@ export const useRmsApproverListConfig = (): ApproverWorkflowListConfig => {
       searchPlaceholder: STRINGS.APPROVER.LIST.SEARCH_PLACEHOLDER([
         "lot ID",
         "sourcing ID",
-        "material code",
+        "material",
         "manufacturer",
+        "status",
+        "created by",
       ]),
       filterTitle: STRINGS.SOURCING.BATCH_LIST.FILTERS_TITLE,
       filterPalette: listTheme.palette,

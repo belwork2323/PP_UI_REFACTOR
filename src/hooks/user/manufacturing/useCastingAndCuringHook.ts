@@ -244,7 +244,7 @@ export const useCastingAndCuringHook = () => {
             const batchDetails = await batchManagementController.getBatchById(batch.batchId);
             nextBatch = mergeBatchStageFields(
               enrichCastingCuringBatchFromDetails(batch, batchDetails),
-              batchDetails as Record<string, unknown>,
+              batchDetails,
             );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);

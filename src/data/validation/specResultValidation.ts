@@ -66,6 +66,8 @@ export function computeIsOutOfRange(
 ): boolean {
   const trimmed = String(value ?? "").trim();
   if (!trimmed || !referenceRange || isReferenceRangeNotApplicable(referenceRange)) return false;
+  // Don't flag incomplete decimal entry (e.g. typing "1." on the way to "1.008").
+  if (trimmed === "-" || trimmed === "-." || trimmed.endsWith(".")) return false;
   const num = Number(trimmed);
   if (Number.isNaN(num)) return false;
   const { minValue, maxValue } = referenceRange;

@@ -1,4 +1,4 @@
-import { TextField, type SxProps, type TextFieldProps, type Theme } from "@mui/material";
+import { TextField, useTheme, type SxProps, type TextFieldProps, type Theme } from "@mui/material";
 import {
   appDenseControlSx,
   appDropdownInputProps,
@@ -28,37 +28,72 @@ const AppTextField = ({
   filterPanel = false,
   type,
   ...props
-}: AppTextFieldProps) => (
-  <TextField
-    fullWidth={filterPanel !== false}
-    size="small"
-    variant="outlined"
-    type={type}
-    InputLabelProps={
-      filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
-    }
-    inputProps={
-      filterPanel
-        ? { style: { fontSize: "0.72rem" }, ...inputProps }
-        : { ...appDropdownInputProps, ...inputProps }
-    }
-    sx={
-      [
-        filterPanel ? { mb: 0 } : compact ? appDenseControlSx : appDropdownSx,
-        type === "number" && {
-          "& input[type=number]": { MozAppearance: "textfield" },
-          "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button":
-            {
-              WebkitAppearance: "none",
-              margin: 0,
-            },
+}: AppTextFieldProps) => {
+  const muiTheme = useTheme();
+  const isDark = muiTheme.palette.mode === "dark";
+  const textColor = isDark ? "#f0f2f8" : undefined;
+  const placeholderColor = isDark ? "rgba(240,242,248,0.65)" : undefined;
+
+  const baseInputStyle = filterPanel
+    ? { fontSize: "0.72rem" }
+    : { ...(appDropdownInputProps.style ?? {}) };
+
+  const darkInputStyle = textColor
+    ? {
+        color: textColor,
+        WebkitTextFillColor: textColor,
+        caretColor: textColor,
+      }
+    : {};
+
+  return (
+    <TextField
+      fullWidth={filterPanel !== false}
+      size="small"
+      variant="outlined"
+      type={type}
+      InputLabelProps={
+        filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
+      }
+      inputProps={{
+        ...(!filterPanel ? appDropdownInputProps : {}),
+        ...inputProps,
+        style: {
+          ...baseInputStyle,
+          ...darkInputStyle,
+          ...(inputProps?.style ?? {}),
         },
-        inputSx,
-        sx,
-      ] as SxProps<Theme>
-    }
-    {...props}
-  />
-);
+      }}
+      sx={
+        [
+          filterPanel ? { mb: 0 } : compact ? appDenseControlSx : appDropdownSx,
+          type === "number" && {
+            "& input[type=number]": { MozAppearance: "textfield" },
+            "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button":
+              {
+                WebkitAppearance: "none",
+                margin: 0,
+              },
+          },
+          isDark && {
+            "& .MuiInputBase-input, & .MuiOutlinedInput-input": {
+              color: `${textColor} !important`,
+              WebkitTextFillColor: `${textColor} !important`,
+              caretColor: textColor,
+              "&::placeholder, &::-webkit-input-placeholder": {
+                color: `${placeholderColor} !important`,
+                WebkitTextFillColor: `${placeholderColor} !important`,
+                opacity: 1,
+              },
+            },
+          },
+          inputSx,
+          sx,
+        ] as SxProps<Theme>
+      }
+      {...props}
+    />
+  );
+};
 
 export default AppTextField;

@@ -27,7 +27,7 @@ const extractErrorShape = (error: unknown): ApiErrorShape => {
 
 export async function handleBatchInvalidState(
   error: unknown,
-  refetch: () => Promise<void>,
+  refetch: () => Promise<unknown>,
   showAlert: (message: string, severity: "error" | "warning" | "success" | "info") => void,
 ): Promise<boolean> {
   const parsed = extractErrorShape(error);

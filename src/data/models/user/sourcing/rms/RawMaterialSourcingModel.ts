@@ -442,7 +442,11 @@ export type ReferenceRangeShape = {
   unit: string | null;
 };
 
-/** Outbound API value: numeric specs send numbers; N/A specs send trimmed text. */
+/**
+ * Outbound API value for analysed / ACEM QC results.
+ * Keep numeric values as exact decimal text (e.g. "1.008", "1.010") so JSON number
+ * serialization cannot drop trailing zeros or alter precision before Jackson reads them.
+ */
 export function mapAnalysedResultForApi(
   row: Pick<SpecRow, "analysedResult" | "referenceRange">,
 ): string | number | null {
@@ -451,8 +455,21 @@ export function mapAnalysedResultForApi(
   if (isReferenceRangeNotApplicable(row.referenceRange)) {
     return trimmed;
   }
-  const numeric = Number(trimmed.replace(/,/g, ""));
-  return Number.isFinite(numeric) ? numeric : null;
+  const normalized = trimmed.replace(/,/g, "");
+  return Number.isFinite(Number(normalized)) ? normalized : null;
+}
+
+/** Same decimal-preserving rules as analysedResult for ACEM QC Result. */
+export function mapAcemQcResultForApi(
+  row: Pick<SpecRow, "acemQcResult" | "referenceRange">,
+): string | number | null {
+  const trimmed = String(row.acemQcResult ?? "").trim();
+  if (!trimmed) return null;
+  if (isReferenceRangeNotApplicable(row.referenceRange)) {
+    return trimmed;
+  }
+  const normalized = trimmed.replace(/,/g, "");
+  return Number.isFinite(Number(normalized)) ? normalized : null;
 }
 
 /** Stable JSON for dirty-check / snapshots (File → name only; strips upload UI state). */
@@ -1048,6 +1065,9 @@ export class RawMaterialSourcingDetailsModel {
         const analysedResult = parseApiAnalysedResultDisplay(
           spec.analysedResult as ApiNumericValue,
         );
+        const acemQcResult = parseApiAnalysedResultDisplay(
+          spec.acemQcResult as ApiNumericValue,
+        );
         const status = spec.status ?? null;
         return normalizeSpecRowQualityState({
           specificationCode: spec.specificationCode,
@@ -1055,7 +1075,7 @@ export class RawMaterialSourcingDetailsModel {
           specificationName: spec.specificationName,
           refRange: formatReferenceRangeLabel(referenceRange),
           analysedResult,
-          acemQcResult: String(spec.acemQcResult ?? "").trim(),
+          acemQcResult,
           status,
           isOutOfRange:
             String(status ?? "")
@@ -1168,6 +1188,9 @@ export class RawMaterialLotDetailsModel {
           const analysedResult = parseApiAnalysedResultDisplay(
             spec.analysedResult as ApiNumericValue,
           );
+          const acemQcResult = parseApiAnalysedResultDisplay(
+            spec.acemQcResult as ApiNumericValue,
+          );
           const status = spec.status ?? null;
           return normalizeSpecRowQualityState({
             specificationCode: spec.specificationCode,
@@ -1175,7 +1198,7 @@ export class RawMaterialLotDetailsModel {
             specificationName: spec.specificationName,
             refRange: formatReferenceRangeLabel(referenceRange),
             analysedResult,
-            acemQcResult: String(spec.acemQcResult ?? "").trim(),
+            acemQcResult,
             status,
             isOutOfRange:
               String(status ?? "")
@@ -1407,7 +1430,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
         specificationCode: (row.specificationCode ?? "").trim(),
         analysedResult: mapAnalysedResultForApi(row),
         isOutOfRange: Boolean(row.isOutOfRange),
-        acemQcResult: row.acemQcResult ?? "",
+        acemQcResult: mapAcemQcResultForApi(row) ?? "",
       })),
     certificates: mapCertificatesForApi(lot.certificates),
   };
@@ -1472,7 +1495,7 @@ export function mapFirstBlockToLotUpdatePayload(
           unit: row.referenceRange?.unit ?? null,
         },
         analysedResult: mapAnalysedResultForApi(row),
-        acemQcResult: row.acemQcResult ?? "",
+        acemQcResult: mapAcemQcResultForApi(row) ?? "",
         status: null,
       })),
     certificates: mapCertificatesForApi(block.certificates),
@@ -1497,7 +1520,7 @@ export const mapBlocksToMaterialsPayload = (blocks: MaterialBlock[]) => {
     specifications: (block.rows ?? []).map((row) => ({
       specificationCode: row.specificationCode ?? "",
       analysedResult: mapAnalysedResultForApi(row),
-      acemQcResult: row.acemQcResult ?? "",
+      acemQcResult: mapAcemQcResultForApi(row) ?? "",
     })),
   }));
 };

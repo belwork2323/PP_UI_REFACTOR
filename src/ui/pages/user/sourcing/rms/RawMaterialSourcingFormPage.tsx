@@ -61,8 +61,10 @@ const RawMaterialSourcingFormPage = ({
           subtitle: isCreateLot ? strings.FORM_HEADER_CREATE_LOT_SUBTITLE : undefined,
           statusLabel: headerStatus.statusLabel,
           statusVariant: headerStatus.statusVariant,
-          rejectionReason: headerStatus.rejectionReason,
+          rejectionReason:
+            headerStatus.rejectionReason ?? activeBatch.rejectionReason ?? null,
         }}
+        isEdit={isEditMode}
         onBack={onBack}
         theme={theme}
       />

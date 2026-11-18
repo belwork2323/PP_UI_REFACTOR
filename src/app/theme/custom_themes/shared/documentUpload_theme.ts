@@ -6,6 +6,8 @@ export type DocumentUploadPalette = {
   textSub?: string;
   border?: string;
   danger?: string;
+  surface?: string;
+  pageBg?: string;
 };
 
 export const getDocumentUploadTheme = (
@@ -16,15 +18,18 @@ export const getDocumentUploadTheme = (
   const danger = palette.danger ?? "#C0392B";
   const textSub = palette.textSub ?? "#5D6D7E";
   const border = palette.border ?? "#ccc";
+  /** Match form/page surfaces in light + dark (never force #fff). */
+  const surfaceBg = palette.surface ?? palette.pageBg ?? "#fff";
+  const fieldBg = palette.pageBg ?? palette.surface ?? "#fff";
   const dashedTarget = {
     border: `1.5px dashed ${alpha(primaryLight, 0.35)}`,
     borderRadius: 1,
     cursor: "pointer",
     transition: "all 0.18s",
-    background: "#fff",
+    background: surfaceBg,
     "&:hover": {
       borderColor: alpha(primaryLight, 0.65),
-      background: alpha(primaryLight, 0.03),
+      background: alpha(primaryLight, 0.06),
     },
   };
   const metaChip = {
@@ -100,7 +105,7 @@ export const getDocumentUploadTheme = (
         px: 1,
         py: 0.75,
         borderRadius: 1,
-        background: "#fff",
+        background: surfaceBg,
         border: `1px solid ${alpha(border, 0.85)}`,
       },
       fileIconBox: {
@@ -151,23 +156,41 @@ export const getDocumentUploadTheme = (
       },
       progressLabel: { fontSize: "0.58rem", color: textSub, mt: 0.2 },
       typeFieldBox: { width: { xs: "100%", sm: 160 }, flexShrink: 0 },
-      typeField: {
-        ...typeFieldBaseSx,
-        "& .MuiOutlinedInput-root": {
-          backgroundColor: "#fff",
-          background: "#fff",
-          minHeight: 32,
-          borderRadius: 1,
-          fontSize: "0.72rem",
-          "&.Mui-focused": { backgroundColor: "#fff", background: "#fff" },
-        },
-        "& .MuiInputBase-input": {
-          fontSize: "0.72rem",
-          fontWeight: 500,
-          padding: "4px 8px",
-          backgroundColor: "#fff",
-        },
-      },
+      typeField: (() => {
+        const base = typeFieldBaseSx as Record<string, any>;
+        const baseRoot = (base["& .MuiOutlinedInput-root"] ?? {}) as Record<string, any>;
+        const baseInput = (base["& .MuiInputBase-input"] ?? {}) as Record<string, any>;
+        return {
+          ...base,
+          "& .MuiOutlinedInput-root": {
+            ...baseRoot,
+            backgroundColor: fieldBg,
+            background: fieldBg,
+            minHeight: 32,
+            borderRadius: 1,
+            fontSize: "0.72rem",
+            "&.Mui-focused": {
+              ...(baseRoot["&.Mui-focused"] ?? {}),
+              backgroundColor: fieldBg,
+              background: fieldBg,
+            },
+            "&:hover": {
+              ...(baseRoot["&:hover"] ?? {}),
+              backgroundColor: fieldBg,
+              background: fieldBg,
+            },
+          },
+          "& .MuiInputBase-input": {
+            ...baseInput,
+            fontSize: "0.72rem",
+            fontWeight: 500,
+            padding: "4px 8px",
+            backgroundColor: fieldBg,
+            color: palette.text,
+            WebkitTextFillColor: palette.text,
+          },
+        };
+      })(),
       typeError: { mx: 0, mt: 0.25, fontSize: "0.6rem", fontWeight: 500 },
       removeButton: {
         ...rowIconButton,

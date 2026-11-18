@@ -1703,6 +1703,9 @@ export const formatPrepSectionLabel = (sectionId: string): string => {
   const raw = String(sectionId ?? "").trim();
   if (!raw) return "";
 
+  const normalizeDateTimeLabel = (label: string) =>
+    label.replace(/\bdate\s*(?:and\s*)?time\b/gi, "Date & Time");
+
   const knownLabels: Record<string, string> = {
     srNo: "Sr No.",
     lotDetails: "Lot Details",
@@ -1720,7 +1723,7 @@ export const formatPrepSectionLabel = (sectionId: string): string => {
     doa: "DOA",
     tdi: "TDI",
   };
-  if (knownLabels[raw]) return knownLabels[raw];
+  if (knownLabels[raw]) return normalizeDateTimeLabel(knownLabels[raw]);
 
   const words = raw
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -1728,7 +1731,7 @@ export const formatPrepSectionLabel = (sectionId: string): string => {
     .split(/\s+/)
     .filter(Boolean);
 
-  return words.map(titleCasePrepToken).join(" ");
+  return normalizeDateTimeLabel(words.map(titleCasePrepToken).join(" "));
 };
 
 export const formatPrepSectionCellValue = (value: unknown): string => {

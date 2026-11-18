@@ -212,7 +212,7 @@ const QCDeCoringMotorPanel = ({
                 value={dateTime}
                 disabled={inputsDisabled}
                 onChange={(next) => onChange(setDeCoringField(values, "DE_CORING_DATE_TIME", next))}
-                placeholder="DD-MM-YYYY HH:mm"
+                placeholder="DD-MM-YYYY HH:mm:ss"
                 inputSx={setupDateTimeFieldSx}
               />
             )}

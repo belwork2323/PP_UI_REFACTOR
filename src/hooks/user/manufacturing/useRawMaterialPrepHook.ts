@@ -122,7 +122,7 @@ const enrichRmpBatchFromDetails = (
       material: batch.material ?? batchDetails.material ?? batch.material,
       identificationSheet: batchDetails.identificationSheet ?? batch.identificationSheet,
     },
-    batchDetails as Record<string, unknown>,
+    batchDetails,
   );
 };
 

@@ -82,6 +82,7 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
+import { fetchCastingStationsApi } from "@/data/api/users/operationsApi";
 
 const S = STRINGS.MANUFACTURING.CASTING_CURING;
 const { thermostat: ThermostatRoundedIcon } = icons.user.manufacturing.castingAndCuring.form;
@@ -223,6 +224,8 @@ const CastingAndCuringForm = ({
   const [ovensLoading, setOvensLoading] = useState(false);
   const batchMotorCount = useMemo(() => resolveCastingCuringBatchMotorCount(batch), [batch]);
   const bowlSeedRows = useMemo(() => getCastingBowlSeedRowsFromBatch(batch), [batch]);
+  const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [stationLoadError, setStationLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveMotorIndex(0);
@@ -384,6 +387,8 @@ const CastingAndCuringForm = ({
   const headerMotorId = activeMotorEntry?.motorId ?? "";
   const headerReceivedAt = activeMotorEntry?.motorReceivedAt ?? "";
   const activeMotorMeta = useMemo(() => {
+    console.log(formData);
+
     if (!activeMotorSession) {
       return {
         castingType: formData.castingType,
@@ -393,6 +398,13 @@ const CastingAndCuringForm = ({
     return resolveCastingMotorProcessMeta(activeMotorSession, formData);
   }, [activeMotorSession, formData]);
   const headerCastingStation = activeMotorMeta.castingStation;
+  console.log(activeMotorMeta);
+
+  const headerCastingStationLabel = useMemo(() => {
+    const code = activeMotorMeta.castingStation;
+    if (!code) return "";
+    return stationOptions.find((opt) => opt.value === code)?.label ?? code;
+  }, [activeMotorMeta.castingStation, stationOptions]);
 
   const navPalette = useMemo(
     () => ({
@@ -521,6 +533,41 @@ const CastingAndCuringForm = ({
     ? (getCrossMotorExcludedBowlSelections?.(activeMotorSession.motorId) ?? [])
     : [];
 
+  useEffect(() => {
+    let active = true;
+    setStationLoadError(null);
+    void fetchCastingStationsApi()
+      .then((response: any) => {
+        if (!active) return;
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response)
+            ? response
+            : [];
+        const mapped = list
+          .map((item: Record<string, unknown>) => {
+            const value = String(
+              item.stationCode ?? item.stationId ?? item.stationName ?? item.code ?? "",
+            );
+            const label = String(item.stationName ?? item.stationCode ?? value);
+            return { value, label };
+          })
+          .filter((item) => item.value);
+        setStationOptions(mapped);
+        if (mapped.length === 0) {
+          setStationLoadError("Casting stations could not be loaded from the server.");
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setStationOptions([]);
+        setStationLoadError("Casting stations could not be loaded from the server.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
       <Stack
@@ -598,7 +645,22 @@ const CastingAndCuringForm = ({
                   disabled={actionLoading || activeMotorLocked}
                   onClick={() => {
                     if (!activeMotorEntry) return;
-                    if (!activeMotorSession) return;
+                    const motor = activeMotorSession;
+                    if (!motor) return;
+
+                    // Validate using "DRAFT" intent to catch format/pattern errors without blocking on missing required fields
+                    const castingErrors = validateCastingMotor(motor.castingData, "UNIT");
+                    const curingErrors = validateCuringMotor(
+                      motor.curingData ?? createEmptyCuringMotorData(),
+                      "UNIT",
+                    );
+                    const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
+
+                    if (hasValidationErrors(errors)) {
+                      setValidationErrors(errors); // Display format errors in the UI
+                      return; // Stop draft saving if format errors exist
+                    }
+
                     setValidationErrors({});
                     onSaveMotorDraft?.(activeMotorEntry.motorId);
                   }}
@@ -684,10 +746,11 @@ const CastingAndCuringForm = ({
                 schemaLoading={false}
                 disabled={!activeMotorPriorEnabled || activeMotorLocked}
                 theme={theme}
+                stationOptions={stationOptions}
+                stationLoadError={stationLoadError}
               />
             </>
           ) : null}
-
           {showMotorWorkspace ? (
             <Box
               sx={{
@@ -816,7 +879,7 @@ const CastingAndCuringForm = ({
                     {S.CASTING_SECTION_TITLE} — {activeMotorEntry.motorId}
                   </Typography> */}
                   <CastingCuringSetupHeaderCard
-                    castingStation={headerCastingStation}
+                    castingStation={headerCastingStationLabel}
                     motorId={headerMotorId}
                     motorReceivedAt={headerReceivedAt}
                     theme={theme}

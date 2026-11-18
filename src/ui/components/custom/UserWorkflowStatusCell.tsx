@@ -1,4 +1,5 @@
 import { Box, Chip, Tooltip, Typography } from "@mui/material";
+import { formatApiStatusForDisplay, toApiStatusEnum } from "@hooks/operationStatus";
 
 type StatusConfig = {
   Icon: any;
@@ -16,6 +17,35 @@ type UserWorkflowStatusCellProps = {
   theme: any;
 };
 
+/** Resolve chip styles for either UI labels ("Rejected") or API enums ("REJECTED"). */
+const resolveStatusConfig = (
+  status: string | undefined,
+  statusConfig: Record<string, StatusConfig>,
+  theme: any,
+): StatusConfig | undefined => {
+  const raw = String(status ?? "").trim();
+  if (!raw) return undefined;
+
+  const display = formatApiStatusForDisplay(raw);
+  const api = toApiStatusEnum(raw);
+  const themeBatch = theme?.batchList?.statusConfig ?? {};
+
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      if (!key) continue;
+      if (statusConfig[key] || themeBatch[key]) {
+        return {
+          ...(themeBatch[key] ?? {}),
+          ...(statusConfig[key] ?? {}),
+        } as StatusConfig;
+      }
+    }
+    return undefined;
+  };
+
+  return pick(raw, display, api);
+};
+
 const UserWorkflowStatusCell = ({
   status,
   statusConfig,
@@ -23,13 +53,15 @@ const UserWorkflowStatusCell = ({
   rejectionReason,
   theme,
 }: UserWorkflowStatusCellProps) => {
-  const themeStatus = theme?.batchList?.statusConfig?.[status];
-  const cfg = statusConfig[status] ? { ...themeStatus, ...statusConfig[status] } : themeStatus;
-  const Icon = cfg?.Icon ?? statusConfig[status]?.Icon;
-  const label = cfg?.label ?? status;
+  const cfg = resolveStatusConfig(status, statusConfig, theme);
+  const Icon = cfg?.Icon ?? statusConfig[formatApiStatusForDisplay(status)]?.Icon;
+  const label = cfg?.label ?? formatApiStatusForDisplay(status) ?? status;
   const color = cfg?.color ?? theme?.palette?.textSub ?? "#5D6D7E";
   const bg = cfg?.bg ?? "transparent";
   const border = cfg?.border ?? color;
+  const isRejected =
+    toApiStatusEnum(status) === toApiStatusEnum(rejectedStatus) ||
+    formatApiStatusForDisplay(status) === rejectedStatus;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.25 }}>
@@ -49,7 +81,7 @@ const UserWorkflowStatusCell = ({
           maxWidth: 220,
         }}
       />
-      {status === rejectedStatus && rejectionReason && (
+      {isRejected && rejectionReason && (
         <Tooltip title={`Reason: ${rejectionReason}`} arrow placement="top">
           <Typography sx={theme.batchList.chips.reasonText}>View reason</Typography>
         </Tooltip>

@@ -1055,7 +1055,7 @@ export const useBaseStaticTestFacility = ({
                 numberOfMotors: batchDetails?.numberOfMotors ?? stfBatchObj.numberOfMotors,
                 subType: seedMainMotors ? "MAIN_MOTOR" : "BEM",
               },
-              batchDetails as unknown as Record<string, unknown>,
+              batchDetails,
             ) as STFBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);

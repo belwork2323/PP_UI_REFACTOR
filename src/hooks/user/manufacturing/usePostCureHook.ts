@@ -195,7 +195,7 @@ export const usePostCureHook = () => {
           const batchDetails = await batchManagementController.getBatchById(batch.batchId);
           nextBatch = mergeBatchStageFields(
             enrichPostCureBatchFromDetails(batch, batchDetails),
-            batchDetails as Record<string, unknown>,
+            batchDetails,
           );
         } catch (error) {
           console.error("Unable to resolve post-cure batch motor details", error);

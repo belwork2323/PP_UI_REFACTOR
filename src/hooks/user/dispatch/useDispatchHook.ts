@@ -432,7 +432,7 @@ export const useDispatchHook = () => {
                     ? batchDetails.motorIds.join(", ")
                     : batch.motorId,
               },
-              batchDetails as Record<string, unknown>,
+              batchDetails,
             );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);

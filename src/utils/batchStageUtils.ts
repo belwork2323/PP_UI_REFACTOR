@@ -229,9 +229,16 @@ export function parseParallelFlowEnabled(raw: unknown): boolean | null {
   return null;
 }
 
+/** Stage fields read from batch details. Kept narrow so class models can be passed without an index signature. */
+type BatchStageFieldSource = {
+  parallelFlowEnabled?: unknown;
+  currentStage?: unknown;
+  stageProgress?: unknown;
+};
+
 export function mergeBatchStageFields<T extends Record<string, unknown>>(
   existing: T,
-  details: Record<string, unknown> | null | undefined,
+  details: BatchStageFieldSource | null | undefined,
 ): T {
   if (!details) return existing;
   return {

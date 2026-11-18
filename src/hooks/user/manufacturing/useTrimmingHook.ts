@@ -398,7 +398,7 @@ export const useTrimmingHook = () => {
                 stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
                 currentStage: batchDetails?.currentStage ?? batch.currentStage,
               },
-              batchDetails as Record<string, unknown>,
+              batchDetails,
             );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);

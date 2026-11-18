@@ -9,6 +9,33 @@ export const createRawMaterialSourcingFormTheme = (
 ) => {
 	const isDark = mode === "dark";
 	const fieldBg = isDark ? (palette.pageBg ?? "#0f1117") : "#fff";
+	// Hard-code dark text — MUI light ThemeProvider keeps near-black fill otherwise.
+	const fieldText = isDark ? "#f0f2f8" : (palette.text ?? "#111111");
+	const fieldPlaceholder = isDark
+		? "rgba(240,242,248,0.65)"
+		: (palette.textSub ?? "rgba(0,0,0,0.5)");
+	const resultInputTextSx = {
+		color: `${fieldText} !important`,
+		WebkitTextFillColor: `${fieldText} !important`,
+		caretColor: fieldText,
+		"&::placeholder": {
+			color: `${fieldPlaceholder} !important`,
+			WebkitTextFillColor: `${fieldPlaceholder} !important`,
+			opacity: 1,
+		},
+		"&::-webkit-input-placeholder": {
+			color: `${fieldPlaceholder} !important`,
+			WebkitTextFillColor: `${fieldPlaceholder} !important`,
+			opacity: 1,
+		},
+	};
+	const resultAutofillSx = {
+		WebkitTextFillColor: `${fieldText} !important`,
+		caretColor: fieldText,
+		// Keep autofill from painting a light yellow box + black text over dark inputs.
+		transition: "background-color 99999s ease-in-out 0s",
+		boxShadow: `0 0 0 1000px ${fieldBg} inset`,
+	};
 
 	return ({
 			animatedBlockCard: (idx: number) => ({ animation: "fadeIn 0.3s ease both", animationDelay: `${idx * 0.06}s` }),
@@ -78,12 +105,16 @@ export const createRawMaterialSourcingFormTheme = (
 					minWidth: 0,
 					backgroundColor: fieldBg,
 					background: fieldBg,
+					color: fieldText,
 					"&.Mui-focused": { backgroundColor: fieldBg, background: fieldBg },
 					"&:hover": { backgroundColor: fieldBg, background: fieldBg },
 				},
-				"& .MuiInputBase-input": {
+				"& .MuiInputBase-input, & .MuiOutlinedInput-input, & input": {
 					backgroundColor: fieldBg,
+					...resultInputTextSx,
 				},
+				"& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
+					resultAutofillSx,
 				"& input[type=number]": {
 					MozAppearance: "textfield",
 				},
@@ -117,12 +148,16 @@ export const createRawMaterialSourcingFormTheme = (
 					minWidth: 0,
 					backgroundColor: fieldBg,
 					background: fieldBg,
+					color: fieldText,
 					"&.Mui-focused": { backgroundColor: fieldBg, background: fieldBg },
 					"&:hover": { backgroundColor: fieldBg, background: fieldBg },
 				},
-				"& .MuiInputBase-input": {
+				"& .MuiInputBase-input, & .MuiOutlinedInput-input, & input": {
 					backgroundColor: fieldBg,
+					...resultInputTextSx,
 				},
+				"& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus, & input:-webkit-autofill:active":
+					resultAutofillSx,
 			},
 			tableCellCompact: {
 				padding: "8px 10px",

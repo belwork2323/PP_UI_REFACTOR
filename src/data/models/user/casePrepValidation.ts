@@ -263,19 +263,34 @@ const validateQualificationRows = (
   });
 };
 
-const validateAbradingDetails = (rows: CasePrepAbradingDetailsRow[], helpers: AddHelpers) => {
+const validateAbradingDetails = (
+  rows: CasePrepAbradingDetailsRow[],
+  helpers: AddHelpers,
+  errors: CasePrepValidationErrors, // <-- Must be received here
+) => {
   (rows ?? []).forEach((row, index) => {
     if (isAbradingHeader(row)) return;
     const operation = str(row.operation);
     const path = `abradingOperation.abradingDetails.${index}.value`;
     const type = String(row.valueFieldType ?? "text").toLowerCase();
     const isTotal = /total dust/i.test(operation);
+    const isDustWeight = /dust weight/i.test(operation);
     const mandatory = !isTotal;
 
-    if (type === "number") helpers.addNumber(path, row.value, operation || "Value", mandatory);
-    else if (type === "datetime" || type === "date" || type === "time")
+    const valueText = str(row.value);
+
+    // Now 'errors' is defined, so this won't crash
+    if (isDustWeight && valueText.length > 10) {
+      errors[path] = "Dust weight cannot exceed 10 characters.";
+    }
+
+    if (type === "number" || isDustWeight) {
+      helpers.addNumber(path, row.value, operation || "Value", mandatory);
+    } else if (type === "datetime" || type === "date" || type === "time") {
       helpers.addDateTime(path, row.value, operation || "Value", mandatory);
-    else helpers.addText(path, row.value, operation || "Value", mandatory);
+    } else {
+      helpers.addText(path, row.value, operation || "Value", mandatory);
+    }
   });
 };
 
@@ -384,7 +399,7 @@ export function validateCasePrepMotorData(
     true,
     true,
   );
-  validateAbradingDetails(abrading.abradingDetails ?? [], h);
+  validateAbradingDetails(abrading.abradingDetails ?? [], h, errors);
   validateAbradingDateTimeOrder(abrading.abradingDetails ?? [], errors);
 
   h.addText("bellowBonding.adhesiveDetails", bellow.adhesiveDetails, "Adhesive Details", false);

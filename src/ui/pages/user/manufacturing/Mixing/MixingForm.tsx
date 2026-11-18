@@ -1554,33 +1554,61 @@ const MixingForm = ({
     stageType: "PREMIX" | "FINAL_MIX",
     cardNo: string | number,
   ) => {
-    // RMP parity: draft save does not enforce required fields (lots / QC / process optional).
-    // Format issues are still surfaced live after the user has interacted with fields.
     setValidationAttempt((flags) => ({ ...flags, format: true, unit: false, submit: false }));
-    setValidationErrors({});
+
     if (stageType === "PREMIX") {
       const activeIndex = premixCards.findIndex((p) => p.premixNo === String(cardNo));
       if (activeIndex < 0) return;
+
+      const payload = { premixes: [premixCards[activeIndex]] };
+      // Validate using "DRAFT" intent (checks format/patterns, ignores missing required fields)
+      const errs = validateMixing(payload, "UNIT");
+
+      if (hasValidationErrors(errs)) {
+        const mapped = mapAndSetErrors(errs, remapPremixErrorPath(activeIndex));
+        setValidationErrors(mapped); // Show format errors in the UI
+        return; // Stops draft saving if format errors exist
+      }
+
+      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     } else {
       const activeIndex = finalMixCards.findIndex((f) => f.mixNo === String(cardNo));
       if (activeIndex < 0) return;
+
+      const payload = { finalMixes: [finalMixCards[activeIndex]] };
+      // Validate using "DRAFT" intent
+      const errs = validateMixing(payload, "UNIT");
+
+      if (hasValidationErrors(errs)) {
+        const mapped = mapAndSetErrors(errs, remapFinalMixErrorPath(activeIndex));
+        setValidationErrors(mapped); // Show format errors in the UI
+        return; // Stops draft saving if format errors exist
+      }
+
+      setValidationErrors({});
       onSaveMixCardDraft?.(stageType, String(cardNo));
     }
   };
 
   const handleSubmitClick = async (stageType: "PREMIX" | "FINAL_MIX", cardNo: string | number) => {
     setValidationAttempt({ format: true, unit: true, submit: true });
+
+    let errs = {}; // or your mixing error type
+
     if (stageType === "PREMIX") {
       const activeIndex = premixCards.findIndex((p) => p.premixNo === String(cardNo));
       if (activeIndex < 0) return;
       const payload = { premixes: [premixCards[activeIndex]] };
-      const errs = validateMixing(payload, "SUBMIT");
+      errs = validateMixing(payload, "SUBMIT");
+
       if (hasValidationErrors(errs)) {
         const mapped = mapAndSetErrors(errs, remapPremixErrorPath(activeIndex));
+        setValidationErrors(mapped); // Ensure errors are stored in state so UI displays them
         emitMixingValidationFailure(mapped, "submit", combinedNavItems);
-        return;
+        return; // <-- Stops submission entirely
       }
+
       setValidationErrors({});
       setValidationAttempt({ format: false, unit: false, submit: false });
       onSubmitMixCard?.(stageType, String(cardNo));
@@ -1588,12 +1616,15 @@ const MixingForm = ({
       const activeIndex = finalMixCards.findIndex((f) => f.mixNo === String(cardNo));
       if (activeIndex < 0) return;
       const payload = { finalMixes: [finalMixCards[activeIndex]] };
-      const errs = validateMixing(payload, "SUBMIT");
+      errs = validateMixing(payload, "SUBMIT");
+
       if (hasValidationErrors(errs)) {
         const mapped = mapAndSetErrors(errs, remapFinalMixErrorPath(activeIndex));
+        setValidationErrors(mapped); // Ensure errors are stored in state
         emitMixingValidationFailure(mapped, "submit", combinedNavItems);
-        return;
+        return; // <-- Stops submission entirely
       }
+
       setValidationErrors({});
       setValidationAttempt({ format: false, unit: false, submit: false });
       onSubmitMixCard?.(stageType, String(cardNo));

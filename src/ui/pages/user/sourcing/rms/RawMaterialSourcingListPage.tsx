@@ -199,6 +199,7 @@ const RawMaterialSourcingListPage = ({
         statusTabs={statusTabs}
         filters={[]}
         searchFields={[...RAW_MATERIAL_LOT_SEARCH_FIELDS]}
+        searchPlaceholder={BL.SEARCH_PLACEHOLDER}
         highlightRow={(row: any) => row.rmStatus === OPERATION_STATUS.REJECTED}
         highlightColor={theme.palette.danger}
         rowsPerPageOptions={rowsPerPageOptions}

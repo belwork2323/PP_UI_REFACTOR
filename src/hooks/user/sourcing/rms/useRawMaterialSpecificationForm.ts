@@ -240,7 +240,8 @@ export const useRawMaterialSpecificationForm = ({
   const showAlert = useAlertStore((state) => state.showAlert);
   const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const mode = useThemeStore((state) => state.mode);
-  const theme = useMemo(() => getRawMaterialSourcingPageTheme(mode), [mode]);
+  // Build each render so theme-token HMR (dark input colors, etc.) is not stuck behind useMemo.
+  const theme = getRawMaterialSourcingPageTheme(mode);
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
   const onBlocksChangeRef = useRef(onBlocksChange);

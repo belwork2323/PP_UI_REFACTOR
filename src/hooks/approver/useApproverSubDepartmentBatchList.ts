@@ -143,6 +143,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     extraFilters.insulationType,
     extraFilters.motorType,
     extraFilters.materialCode,
+    extraFilters.manufacturer,
+    extraFilters.manufacturerName,
     extraFilters.fromDate,
     extraFilters.toDate,
     subDepartment,

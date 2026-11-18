@@ -77,10 +77,10 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
     maxLength: S.LENGTH.MAX_STANDARD,
     pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
   },
-  RUBBER_MATERIAL: textRule(["UNIT", "SUBMIT"]),
-  SLEEVE_NO: textRule(["UNIT", "SUBMIT"], 50),
-  MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
-  BEM_MOULD_NO: textRule(["UNIT", "SUBMIT"], 50),
+  RUBBER_MATERIAL: textRule(["SUBMIT"]),
+  SLEEVE_NO: textRule(["SUBMIT"], 50),
+  MOULD_NO: textRule(["SUBMIT"], 50),
+  BEM_MOULD_NO: textRule(["SUBMIT"], 50),
   BEM_NO: textRule(["UNIT", "SUBMIT"], 50),
 
   // Article Type Table (Length & Thickness as numeric)
@@ -105,8 +105,8 @@ export const subscaleHardwareFieldRules: Record<string, FieldRuleConfig> = {
   CURING_END_DATE: dateTimeRule(),
   GRAIN_SURFACE_OBSERVATIONS: textRule([], S.LENGTH.MAX_LONG_TEXT),
   ACTOR: textRule([], S.LENGTH.MAX_STANDARD),
-  DATE_OF_NDT: dateTimeRule(["UNIT", "SUBMIT"]),
-  DATE_OF_APPLICATION: dateTimeRule(["UNIT", "SUBMIT"]),
+  DATE_OF_NDT: dateTimeRule(["SUBMIT"]),
+  DATE_OF_APPLICATION: dateTimeRule(["SUBMIT"]),
   VACUUM_LEVEL: textRule(["SUBMIT"]),
   BATCH_SIZE: numberRule(["UNIT", "SUBMIT"]),
 

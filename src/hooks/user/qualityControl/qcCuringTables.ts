@@ -151,9 +151,21 @@ const defaultCycleRows = (): QcCuringCycleRow[] =>
     emptyCycleRow(index + 1),
   );
 
-const normalizeCycleTimeValue = (value: unknown): string => toUiTime(value);
+const normalizeCycleTimeValue = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return toUiTime(value);
+  return `${String(match[1]).padStart(2, "0")}:${match[2]}${match[3] ? `:${match[3]}` : ""}`;
+};
 
 const normalizeUiDateTimeValue = (value: unknown): string => toUiDateTime(value);
+
+const splitCycleDateTime = (value: unknown) => {
+  const ui = toUiDateTime(value);
+  const [date = "", time = ""] = ui.split(" ");
+  return { date, time: normalizeCycleTimeValue(time) };
+};
 
 const emptyPressureRow = (): QcCuringPressureRow => ({
   PEAK_PRESSURE: "",
@@ -619,12 +631,16 @@ const buildSubscaleDetailsPayload = (values: SchemaFormValues | null | undefined
     getCuringSetupField(values, "OVEN_NUMBER");
   const curingTable = mapSubscaleRowsForApi(sanitizeSubscaleRows(getCuringSubscaleParameterRows(values)));
   const qaRemarks = getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.SUBSCALE).trim();
+  const curingStartDateTime = toApiDateTime(
+    `${getCuringSubscaleField(values, "CURING_START_DATE")} ${getCuringSubscaleField(values, "CYCLE_START_TIME")}`.trim(),
+  ) ?? null;
+  const curingEndDateTime = toApiDateTime(
+    `${getCuringSubscaleField(values, "CURING_COMPLETE_DATE")} ${getCuringSubscaleField(values, "CYCLE_END_TIME")}`.trim(),
+  ) ?? null;
   const subscale = {
     ovenNumber: ovenNumber || null,
-    curingStartDate: toApiDate(getCuringSubscaleField(values, "CURING_START_DATE")) ?? null,
-    cycleStartTime: toApiTime(getCuringSubscaleField(values, "CYCLE_START_TIME")) ?? null,
-    curingCompleteDate: toApiDate(getCuringSubscaleField(values, "CURING_COMPLETE_DATE")) ?? null,
-    cycleEndTime: toApiTime(getCuringSubscaleField(values, "CYCLE_END_TIME")) ?? null,
+    curingStartDateTime,
+    curingEndDateTime,
     bemAverageShoreAHardness:
       toApiScalar(getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS")) ?? null,
     cartonAverageShoreAHardness:
@@ -635,10 +651,8 @@ const buildSubscaleDetailsPayload = (values: SchemaFormValues | null | undefined
   };
   const hasScalar = [
     subscale.ovenNumber,
-    subscale.curingStartDate,
-    subscale.cycleStartTime,
-    subscale.curingCompleteDate,
-    subscale.cycleEndTime,
+    subscale.curingStartDateTime,
+    subscale.curingEndDateTime,
     subscale.bemAverageShoreAHardness,
     subscale.cartonAverageShoreAHardness,
     subscale.visualObservations,
@@ -712,20 +726,23 @@ export const isCuringNestedMotorDetail = (rec: Record<string, unknown>) => {
 export const mapApiCuringCycleRowToForm = (
   row: Record<string, unknown>,
   index: number,
-): QcCuringCycleRow => ({
+): QcCuringCycleRow => {
+  const startDateTime = splitCycleDateTime(row.startDateTime ?? row.START_DATE_TIME);
+  const endDateTime = splitCycleDateTime(row.endDateTime ?? row.END_DATE_TIME);
+  const startDate = row.startDate ?? row.START_DATE;
+  const endDate = row.endDate ?? row.END_DATE;
+  const startTime = row.startTime ?? row.START_TIME;
+  const endTime = row.endTime ?? row.END_TIME;
+  return ({
   SR_NO: Number(row.srNo ?? row.SR_NO ?? index + 1),
   TEMPERATURE: String(row.temperature ?? row.TEMPERATURE ?? "").trim(),
   DURATION: String(
     row.durationMinutes ?? row.time ?? row.DURATION ?? row.TIME ?? "",
   ).trim(),
-  START_DATE:
-    formatToUiDate(String(row.startDate ?? row.START_DATE ?? "")) ||
-    String(row.startDate ?? row.START_DATE ?? "").trim(),
-  START_TIME: normalizeCycleTimeValue(row.startTime ?? row.START_TIME),
-  END_DATE:
-    formatToUiDate(String(row.endDate ?? row.END_DATE ?? "")) ||
-    String(row.endDate ?? row.END_DATE ?? "").trim(),
-  END_TIME: normalizeCycleTimeValue(row.endTime ?? row.END_TIME),
+  START_DATE: startDateTime.date || formatToUiDate(String(startDate ?? "")) || String(startDate ?? "").trim(),
+  START_TIME: startDateTime.time || normalizeCycleTimeValue(startTime),
+  END_DATE: endDateTime.date || formatToUiDate(String(endDate ?? "")) || String(endDate ?? "").trim(),
+  END_TIME: endDateTime.time || normalizeCycleTimeValue(endTime),
   ACTUAL_DURATION: String(row.actualDurationMinutes ?? row.ACTUAL_DURATION ?? "").trim(),
   PROPELLANT_PRESSURE: String(row.propellantPressure ?? row.PROPELLANT_PRESSURE ?? "").trim(),
   PEAK_PRESSURE_ACHIEVED: String(
@@ -735,7 +752,8 @@ export const mapApiCuringCycleRowToForm = (
     row.hotWaterStatus ?? row.hotWaterCirculation ?? row.HOT_WATER_STATUS ?? "",
   ).trim(),
   QA_REMARKS: pickQaRemarks(row.qaRemarks, row.QA_REMARKS, row.remarks, row.REMARKS),
-});
+  });
+};
 
 /** Flatten nested create/update curing motor into form sections for hydrate. */
 export const curingMotorDetailToSections = (
@@ -819,14 +837,16 @@ export const curingMotorDetailToSections = (
       asArray(subscale.hardwareArticles),
     );
     const subscaleQaRemarks = pickQaRemarks(subscale.qaRemarks, subscale.QA_REMARKS);
+    const startDateTime = splitCycleDateTime(subscale.curingStartDateTime ?? "");
+    const endDateTime = splitCycleDateTime(subscale.curingEndDateTime ?? "");
     const subscaleSection = omitEmpty({
       NUMBER_OF_OVENS: String(
         subscale.ovenNumber ?? subscale.numberOfOvens ?? rec.ovenNumber ?? "",
       ),
-      CURING_START_DATE: String(subscale.curingStartDate ?? ""),
-      CYCLE_START_TIME: normalizeCycleTimeValue(subscale.cycleStartTime ?? ""),
-      CURING_COMPLETE_DATE: String(subscale.curingCompleteDate ?? ""),
-      CYCLE_END_TIME: normalizeCycleTimeValue(subscale.cycleEndTime ?? ""),
+      CURING_START_DATE: startDateTime.date || String(subscale.curingStartDate ?? ""),
+      CYCLE_START_TIME: startDateTime.time || normalizeCycleTimeValue(subscale.cycleStartTime ?? ""),
+      CURING_COMPLETE_DATE: endDateTime.date || String(subscale.curingCompleteDate ?? ""),
+      CYCLE_END_TIME: endDateTime.time || normalizeCycleTimeValue(subscale.cycleEndTime ?? ""),
       BEM_AVERAGE_SHORE_A_HARDNESS: String(subscale.bemAverageShoreAHardness ?? ""),
       CARTON_AVERAGE_SHORE_A_HARDNESS: String(subscale.cartonAverageShoreAHardness ?? ""),
       SUBSCALE_VISUAL_OBSERVATIONS: normalizeVisualObservations(subscale.visualObservations ?? ""),
@@ -915,22 +935,18 @@ export const curingMotorDetailToSections = (
 
     if (sectionId === QC_CURING_API_SECTION_IDS.SUBSCALE) {
       const subscale = asRecord(sectionData[0]) ?? {};
+      const startDateTime = splitCycleDateTime(subscale.curingStartDateTime ?? subscale.CURING_START_DATE_TIME ?? "");
+      const endDateTime = splitCycleDateTime(subscale.curingEndDateTime ?? subscale.CURING_END_DATE_TIME ?? "");
       const table = asArray(subscale.curingParameterTable ?? subscale.CURING_PARAMETER_TABLE);
       sections.push({
         sectionId: QC_CURING_SECTION_IDS.SUBSCALE,
         sectionData: [
           {
             NUMBER_OF_OVENS: String(subscale.numberOfOvens ?? subscale.NUMBER_OF_OVENS ?? ""),
-            CURING_START_DATE: String(subscale.curingStartDate ?? subscale.CURING_START_DATE ?? ""),
-            CYCLE_START_TIME: normalizeCycleTimeValue(
-              subscale.cycleStartTime ?? subscale.CYCLE_START_TIME ?? "",
-            ),
-            CURING_COMPLETE_DATE: String(
-              subscale.curingCompleteDate ?? subscale.CURING_COMPLETE_DATE ?? "",
-            ),
-            CYCLE_END_TIME: normalizeCycleTimeValue(
-              subscale.cycleEndTime ?? subscale.CYCLE_END_TIME ?? "",
-            ),
+            CURING_START_DATE: startDateTime.date || String(subscale.curingStartDate ?? subscale.CURING_START_DATE ?? ""),
+            CYCLE_START_TIME: startDateTime.time || normalizeCycleTimeValue(subscale.cycleStartTime ?? subscale.CYCLE_START_TIME ?? ""),
+            CURING_COMPLETE_DATE: endDateTime.date || String(subscale.curingCompleteDate ?? subscale.CURING_COMPLETE_DATE ?? ""),
+            CYCLE_END_TIME: endDateTime.time || normalizeCycleTimeValue(subscale.cycleEndTime ?? subscale.CYCLE_END_TIME ?? ""),
             BEM_AVERAGE_SHORE_A_HARDNESS: String(
               subscale.bemAverageShoreAHardness ?? subscale.BEM_AVERAGE_SHORE_A_HARDNESS ?? "",
             ),

@@ -56,8 +56,8 @@ import {
   usesParallelUnitLocks,
 } from "../../../utils/batchStageUtils";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
-import {
 import { resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
+import {
   resolveNDTMotorCountLimit,
   resolveNDTMotorOptions,
   type NDTAddedMotor,
@@ -424,7 +424,7 @@ export const useNDTHook = () => {
                 stageProgress: batchDetails?.stageProgress ?? (batch as any).stageProgress,
                 currentStage: batchDetails?.currentStage ?? (batch as any).currentStage,
               },
-              batchDetails as Record<string, unknown>,
+              batchDetails,
             ) as NDTBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);

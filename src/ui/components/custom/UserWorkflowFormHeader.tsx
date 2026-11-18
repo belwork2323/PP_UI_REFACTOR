@@ -149,7 +149,8 @@ const UserWorkflowFormHeader = ({
   });
 
   const isEditStatus = resolved.statusVariant === "edit" || isEdit;
-  const showRejection = Boolean(isEditStatus && resolved.rejectionReason);
+  // Show whenever a reason is present (e.g. rejected lot saved as draft → status Draft, reason retained).
+  const showRejection = Boolean(resolved.rejectionReason);
 
   const statusChip = resolved.statusNode ? (
     resolved.statusNode

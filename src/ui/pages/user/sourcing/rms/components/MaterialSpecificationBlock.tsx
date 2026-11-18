@@ -478,9 +478,7 @@ const MaterialSpecificationBlock = ({
                     ...specStyles.tableHeader.lotBatch,
                   }}
                 >
-                  {createLotMode
-                    ? formStrings.TABLE_HEADERS.LOT_ID
-                    : formStrings.TABLE_HEADERS.LOT_BATCH_NO}
+                  {formStrings.TABLE_HEADERS.LOT_BATCH_NO}
                   <Box component="span" sx={mandatoryAsteriskSx(theme)}>
                     {" "}
                     *
@@ -569,68 +567,62 @@ const MaterialSpecificationBlock = ({
                     >
                       {rowIndex === 0 && (
                         <Box data-rms-field={blockLotPath(index, "lotNo")}>
-                          <AppTextField
-                            compact
-                            size="small"
-                            fullWidth
-                            value={block.lotNo}
-                            onChange={(event) =>
-                              handleLotNoChange(event.target.value)
-                            }
-                            placeholder={formStrings.LOT_PLACEHOLDER}
-                            disabled={lockLotNo}
-                            error={Boolean(lotNoError)}
-                            sx={{
-                              ...mandatoryFieldInputSx(
-                                {
-                                  ...theme.workflow.formElements.cellField,
-                                  ...specStyles.lotField,
-                                },
-                                Boolean(lotNoError),
-                                theme,
-                              ),
-                              ...(lockLotNo
-                                ? {
-                                    "& .MuiOutlinedInput-root.Mui-disabled": {
-                                      background: alpha(
-                                        theme.palette.textSub,
-                                        0.06,
-                                      ),
-                                      "& fieldset": {
-                                        borderColor: alpha(
-                                          theme.palette.border,
-                                          0.8,
-                                        ),
-                                      },
-                                    },
-                                    "& .MuiInputBase-input.Mui-disabled": {
-                                      WebkitTextFillColor: theme.palette.text,
-                                      color: theme.palette.text,
-                                      fontWeight: 600,
-                                    },
-                                  }
-                                : {}),
-                            }}
-                          />
-                          {lotNoError ? (
-                            <FormHelperText
-                              error
-                              sx={{ mx: 0, mt: 0.5, fontSize: "0.68rem" }}
-                            >
-                              {lotNoError}
-                            </FormHelperText>
-                          ) : lockLotNo ? (
-                            <FormHelperText
-                              sx={{
-                                mx: 0,
-                                mt: 0.5,
-                                fontSize: "0.68rem",
-                                color: theme.palette.textSub,
-                              }}
-                            >
-                              {formStrings.LOT_ID_LOCKED_HINT}
-                            </FormHelperText>
-                          ) : null}
+                          {lockLotNo ? (
+                            <>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.78rem",
+                                  fontWeight: 600,
+                                  color: theme.palette.text,
+                                  lineHeight: 1.35,
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {block.lotNo || "—"}
+                              </Typography>
+                              <FormHelperText
+                                sx={{
+                                  mx: 0,
+                                  mt: 0.5,
+                                  fontSize: "0.68rem",
+                                  color: theme.palette.textSub,
+                                }}
+                              >
+                                {formStrings.LOT_ID_LOCKED_HINT}
+                              </FormHelperText>
+                            </>
+                          ) : (
+                            <>
+                              <AppTextField
+                                compact
+                                size="small"
+                                fullWidth
+                                value={block.lotNo}
+                                onChange={(event) =>
+                                  handleLotNoChange(event.target.value)
+                                }
+                                placeholder={formStrings.LOT_PLACEHOLDER}
+                                error={Boolean(lotNoError)}
+                                sx={mandatoryFieldInputSx(
+                                  {
+                                    ...theme.workflow.formElements.cellField,
+                                    ...specStyles.lotField,
+                                    ...specStyles.analyzedField,
+                                  },
+                                  Boolean(lotNoError),
+                                  theme,
+                                )}
+                              />
+                              {lotNoError ? (
+                                <FormHelperText
+                                  error
+                                  sx={{ mx: 0, mt: 0.5, fontSize: "0.68rem" }}
+                                >
+                                  {lotNoError}
+                                </FormHelperText>
+                              ) : null}
+                            </>
+                          )}
                         </Box>
                       )}
                     </TableCell>

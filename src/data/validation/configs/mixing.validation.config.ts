@@ -61,7 +61,7 @@ export const mixingFieldRules = {
   },
   rpm: {
     valueType: "number" as const,
-    pattern: M.PATTERNS.FLOAT,
+    pattern: M.PATTERNS.ONLY_DIGITS,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
@@ -239,8 +239,7 @@ export const mixingValidationConfig: SubDeptValidationConfig<MixingData> = {
             mixingFieldRules.operation.messages.required;
         }
         if (!qRows || !qRows.length) {
-          errors[`${prefix}.qualityChecks.root`] =
-            mixingFieldRules.qualityChecks.messages.required;
+          errors[`${prefix}.qualityChecks.root`] = mixingFieldRules.qualityChecks.messages.required;
         }
       };
 

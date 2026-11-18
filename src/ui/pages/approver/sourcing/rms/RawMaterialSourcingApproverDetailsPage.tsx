@@ -9,7 +9,10 @@ import { icons } from "@app/theme/icons";
 import { getRawMaterialSourcingApproverTheme } from "@app/theme/custom_themes/approver/sourcing/rms/rawMaterialSourcingApprover_theme";
 import { getOperationStatusConfig } from "@hooks/operationStatus";
 import { useFilePreview } from "@hooks/useFilePreview";
-import type { MaterialBlock } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
+import {
+  normalizeRawMaterialStatus,
+  type MaterialBlock,
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import AppButton from "@ui/components/common/Button";
 import FilePreviewDialog from "@ui/components/common/FilePreviewDialog";
 import UserWorkflowDetailsShell from "@ui/components/custom/UserWorkflowDetailsShell";
@@ -64,7 +67,8 @@ const RawMaterialSourcingApproverDetailsPage = ({
     theme.details.bannerStatusConfig,
   );
 
-  const canApproveOrReject = isApproverActionableStatus(item.status);
+  const displayStatus = normalizeRawMaterialStatus(String(item.status ?? ""));
+  const canApproveOrReject = isApproverActionableStatus(displayStatus);
   const blocks: MaterialBlock[] = item.qcBlocks ?? [];
   const subtitle = `${item.lotId ?? item.batchId}${
     item.materialName || item.materialCode
@@ -80,7 +84,7 @@ const RawMaterialSourcingApproverDetailsPage = ({
         title={BL.LOT_DETAILS_TITLE}
         subtitle={subtitle}
         icon={InventoryRoundedIcon}
-        status={item.status}
+        status={displayStatus}
         statusConfig={statusConfig}
         rejectionReason={item.rejectionReason ?? item.remarks ?? null}
         onBack={onBack}
