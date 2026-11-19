@@ -15,6 +15,16 @@ import useValidationDisplay, {
   type ValidationAttemptFlags,
 } from "@/ui/components/validation/useValidationDisplay";
 import { blockBlendingStylePreparationPath } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
+import {
+  CODE_REF_MAX,
+  DECIMAL_MAX_LENGTH,
+  DECIMAL_MAX_LENGTH_SIGNED,
+  REMARKS_MAX,
+} from "@data/validation/inputLimits";
+import {
+  sanitizeNumericAnalysedResultInput,
+  sanitizePositiveNumericInput,
+} from "@data/validation/specResultValidation";
 
 const FORM_STRINGS = STRINGS.SOURCING.SPECIFICATION_FORM;
 
@@ -78,12 +88,14 @@ const BlendingStylePreparationSection = ({
     onChange({ ...details, [field]: value });
   };
 
-  const parseNumericInput = (value: string): number | null => {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
+  /** Keep exact digit string — never coerce through JS Number (precision loss). */
+  const parseNumericInput = (
+    value: string,
+    options?: { positiveOnly?: boolean },
+  ): string =>
+    options?.positiveOnly
+      ? sanitizePositiveNumericInput(value)
+      : sanitizeNumericAnalysedResultInput(value);
 
   const mfgLotPlaceholder = loadingLots
     ? FORM_STRINGS.LOADING_APPROVED_LOTS
@@ -129,13 +141,18 @@ const BlendingStylePreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={details.totalQty ?? ""}
               disabled={disabled}
               onChange={(e) =>
-                updateField("totalQty", parseNumericInput(e.target.value))
+                updateField(
+                  "totalQty",
+                  parseNumericInput(e.target.value, { positiveOnly: true }),
+                )
               }
               error={Boolean(visibleError(fieldPath("totalQty")))}
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH }}
               sx={fieldSx(
                 "totalQty",
                 Boolean(visibleError(fieldPath("totalQty"))),
@@ -155,6 +172,7 @@ const BlendingStylePreparationSection = ({
               disabled={disabled}
               onChange={(e) => updateField("equipmentId", e.target.value)}
               error={Boolean(visibleError(fieldPath("equipmentId")))}
+              inputProps={{ maxLength: CODE_REF_MAX }}
               sx={fieldSx(
                 "equipmentId",
                 Boolean(visibleError(fieldPath("equipmentId"))),
@@ -173,13 +191,15 @@ const BlendingStylePreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={details.agitatorRpm ?? ""}
               disabled={disabled}
               onChange={(e) =>
                 updateField("agitatorRpm", parseNumericInput(e.target.value))
               }
               error={Boolean(visibleError(fieldPath("agitatorRpm")))}
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               sx={fieldSx(
                 "agitatorRpm",
                 Boolean(visibleError(fieldPath("agitatorRpm"))),
@@ -195,13 +215,15 @@ const BlendingStylePreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={details.processTemp ?? ""}
               disabled={disabled}
               onChange={(e) =>
                 updateField("processTemp", parseNumericInput(e.target.value))
               }
               error={Boolean(visibleError(fieldPath("processTemp")))}
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               sx={fieldSx(
                 "processTemp",
                 Boolean(visibleError(fieldPath("processTemp"))),
@@ -217,13 +239,15 @@ const BlendingStylePreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={details.jacketTemp ?? ""}
               disabled={disabled}
               onChange={(e) =>
                 updateField("jacketTemp", parseNumericInput(e.target.value))
               }
               error={Boolean(visibleError(fieldPath("jacketTemp")))}
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               sx={fieldSx(
                 "jacketTemp",
                 Boolean(visibleError(fieldPath("jacketTemp"))),
@@ -269,17 +293,44 @@ const BlendingStylePreparationSection = ({
           </MandatoryFormField>
         </Stack>
 
-        <MandatoryFormField label={labels.OTHER_OBSERVATIONS} theme={theme}>
+        <MandatoryFormField
+          label={labels.OTHER_OBSERVATIONS}
+          error={visibleError(fieldPath("otherObservations"))}
+          theme={theme}
+          required={false}
+        >
           <AppTextField
-            compact
             size="small"
             fullWidth
             multiline
-            minRows={2}
+            minRows={4}
+            maxRows={8}
             value={details.otherObservations}
             disabled={disabled}
             onChange={(e) => updateField("otherObservations", e.target.value)}
-            sx={fieldSx("otherObservations", false)}
+            inputProps={{ maxLength: REMARKS_MAX }}
+            error={Boolean(visibleError(fieldPath("otherObservations")))}
+            sx={{
+              ...fieldSx(
+                "otherObservations",
+                Boolean(visibleError(fieldPath("otherObservations"))),
+              ),
+              // Override metaRowTextField's fixed 32px height so multiline text stays inside.
+              "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
+                height: "auto",
+                minHeight: 96,
+                maxHeight: "none",
+                alignItems: "flex-start",
+                py: 1,
+              },
+              "& .MuiInputBase-inputMultiline": {
+                py: 0.5,
+                px: 0.25,
+                lineHeight: 1.45,
+                overflow: "auto",
+                resize: "vertical",
+              },
+            }}
           />
         </MandatoryFormField>
       </Stack>

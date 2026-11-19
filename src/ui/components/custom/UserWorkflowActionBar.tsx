@@ -57,7 +57,7 @@ const UserWorkflowActionBar = ({
         </Box>
 
         <Stack direction="row" gap={1.5} flexShrink={0}>
-          <Tooltip title={!saveEnabled ? pendingText : saveTooltip} arrow placement="top">
+          <Tooltip title={saveTooltip} arrow placement="top">
             <span>
               <Button
                 variant="outlined"

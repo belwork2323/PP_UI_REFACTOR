@@ -445,7 +445,7 @@ const mapDispatchValues = (
   const he = findLogEntry(details, /Puncturing at HE/i);
   const ne = findLogEntry(details, /Puncturing at NE/i);
   const lf = findLogEntry(details, /LF Extension/i);
-  const dispatchTime = findLogEntry(details, /Dispatch Time/i);
+  const dispatchTime = findLogEntry(details, /Dispatch Date & Time/i);
 
   const visualRows = asArray(section.dispatchVisualObservations).map((row, index) => {
     const rec = asRecord(row);

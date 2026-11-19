@@ -179,13 +179,30 @@ export type IdentificationSheetMixingStage = {
 export type IdentificationSheetMixingMetadata = {
   stages: IdentificationSheetMixingStage[];
 };
+export interface CuringStepItem {
+  stepId?: number;
+  sequenceNo?: number;
+  temperature?: number;
+  durationMinutes?: number;
+  startDateTime?: string | null;
+  endDateTime?: string | null;
+  hotWaterCirculation?: boolean | null;
+  isActive?: boolean | null;
+}
 
+export interface CuringMetadata {
+  masterId?: number;
+  curingCycleCode?: string;
+  curingType?: string;
+  cycles?: CuringStepItem[];
+}
 export type IdentificationSheetMetadata = {
   rawMaterialPreparation?: IdentificationSheetRawMaterialPreparationMetadata | null;
   rocketMotorCasing?: { motors: BatchMotorMetadataItem[] } | null;
   mixing?: IdentificationSheetMixingMetadata | null;
   /** BEM motor numbers attached on the batch identification sheet. */
   bemMotors?: string[] | null;
+  curingCycleMaster?: CuringMetadata;
 };
 
 const parseNumOrNull = (v: unknown): number | null => {
@@ -346,7 +363,26 @@ const parseIdentificationSheetMetadataFromApi = (
       subScaleBemMotors ??
       subScaleRaw,
   );
-
+  const curingRaw = meta.curingCycleMaster ?? meta.curing;
+  let curingCycleMaster: CuringMetadata | null = null;
+  if (curingRaw && typeof curingRaw === "object") {
+    const c = curingRaw as Record<string, unknown>;
+    curingCycleMaster = {
+      masterId: typeof c.masterId === "number" ? c.masterId : Number(c.masterId) || undefined,
+      curingCycleCode: String(c.curingCycleCode ?? "").trim() || undefined,
+      curingType: String(c.curingType ?? "").trim() || undefined,
+      cycles: Array.isArray(c.cycles)
+        ? (c.cycles as Array<Record<string, unknown>>).map((step) => ({
+            stepId:
+              typeof step.stepId === "number" ? step.stepId : Number(step.stepId) || undefined,
+            sequenceNo: Number(step.sequenceNo) || 0,
+            temperature: Number(step.temperature) || 0,
+            durationMinutes: Number(step.durationMinutes) || 0,
+            isActive: Boolean(step.isActive),
+          }))
+        : [],
+    };
+  }
   let rawMaterialPreparation: IdentificationSheetRawMaterialPreparationMetadata | null = null;
   if (rmpRaw && typeof rmpRaw === "object") {
     const rmp = rmpRaw as Record<string, unknown>;
@@ -368,6 +404,7 @@ const parseIdentificationSheetMetadataFromApi = (
     rocketMotorCasing,
     mixing,
     bemMotors: bemMotors.length > 0 ? bemMotors : null,
+    curingCycleMaster,
   };
 };
 

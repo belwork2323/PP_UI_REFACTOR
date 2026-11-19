@@ -119,6 +119,7 @@ const MaterialLotSection = ({
     handleRetry,
     handleRemove,
     handleOpen,
+    certificateFieldError,
     filePreview,
     closeFilePreview,
     downloadFilePreview,
@@ -230,6 +231,7 @@ const MaterialLotSection = ({
               onChange={(event) => handleLotNoChange(event.target.value)}
               placeholder={formStrings.LOT_PLACEHOLDER}
               error={Boolean(lotNoError)}
+              inputProps={{ maxLength: 50 }}
               sx={mandatoryFieldInputSx(
                 theme.workflow.formElements.textField,
                 Boolean(lotNoError),
@@ -352,23 +354,9 @@ const MaterialLotSection = ({
                         ...specStyles.specCell,
                       }}
                     >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        gap={0.75}
-                        flexWrap="wrap"
-                      >
-                        <Typography sx={specStyles.specText}>
-                          {row.specification}
-                        </Typography>
-                        {rowFailed && (
-                          <Chip
-                            label={formStrings.SPEC_STATUS_OUT_OF_RANGE}
-                            size="small"
-                            sx={specStyles.failedSpecChip}
-                          />
-                        )}
-                      </Stack>
+                      <Typography sx={specStyles.specText}>
+                        {row.specification}
+                      </Typography>
                     </TableCell>
                     <TableCell
                       sx={{
@@ -413,10 +401,25 @@ const MaterialLotSection = ({
                               ? "text"
                               : "decimal"
                           }
+                          inputProps={{
+                            maxLength: isReferenceRangeNotApplicable(
+                              row.referenceRange,
+                            )
+                              ? 50
+                              : 21,
+                          }}
                           error={Boolean(analyzedError)}
-                          helperText={analyzedError}
+                          helperText={
+                            analyzedError ??
+                            (rowFailed
+                              ? formStrings.SPEC_STATUS_OUT_OF_RANGE
+                              : undefined)
+                          }
                           FormHelperTextProps={{
-                            sx: specStyles.cellHelperText,
+                            sx:
+                              rowFailed && !analyzedError
+                                ? specStyles.cellHelperTextWarning
+                                : specStyles.cellHelperText,
                           }}
                           sx={[
                             theme.workflow.formElements.cellField,
@@ -459,6 +462,13 @@ const MaterialLotSection = ({
                               ? "text"
                               : "decimal"
                           }
+                          inputProps={{
+                            maxLength: isReferenceRangeNotApplicable(
+                              row.referenceRange,
+                            )
+                              ? 50
+                              : 21,
+                          }}
                           error={Boolean(acemError)}
                           helperText={
                             acemError ??
@@ -501,7 +511,7 @@ const MaterialLotSection = ({
         onRemove={handleRemove}
         onRetry={handleRetry}
         onOpen={handleOpen}
-        error={certificateError}
+        error={certificateError || certificateFieldError}
         fieldPath={blockLotPath(blockIndex, "certificates")}
         typeFieldPath={(ci) => blockCertTypePath(blockIndex, ci)}
         typeError={(ci) => visibleError(blockCertTypePath(blockIndex, ci))}

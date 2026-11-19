@@ -97,7 +97,13 @@ const DetailsFixedColumnsTable = ({
           <TableHead>
             <TableRow>
               {columns.map((column, columnIndex) => (
-                <TableCell key={column.key} sx={dt.tableHeaderCell(columnIndex === 0)}>
+                <TableCell
+                  key={column.key}
+                  sx={{
+                    ...dt.tableHeaderCell(columnIndex === 0),
+                    ...(column.key === "timeInterval" ? { minWidth: 240, width: 240 } : {}),
+                  }}
+                >
                   {column.label}
                 </TableCell>
               ))}
@@ -113,6 +119,7 @@ const DetailsFixedColumnsTable = ({
                       key={column.key}
                       sx={{
                         ...dt.tableCell,
+                        ...(column.key === "timeInterval" ? { minWidth: 240, width: 240 } : {}),
                         ...(column.emphasize === "result" ? (dt.resultText ?? {}) : {}),
                         ...(column.emphasize === "spec" ? (dt.specText ?? {}) : {}),
                         ...(column.emphasize === "remarks" ? (dt.remarksText ?? {}) : {}),

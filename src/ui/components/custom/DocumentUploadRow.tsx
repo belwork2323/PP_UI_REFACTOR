@@ -129,6 +129,7 @@ const DocumentUploadRow = ({
             onChange={(event) => onTypeChange(event.target.value)}
             placeholder={strings.CERT_TYPE}
             error={Boolean(typeError)}
+            inputProps={{ maxLength: 50 }}
             sx={mandatoryFieldInputSx(row.typeField, Boolean(typeError), styles.validationTheme)}
           />
           {typeError ? (

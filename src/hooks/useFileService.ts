@@ -40,15 +40,27 @@ export const useFileService = () => {
       }
 
       const response = await fileController.uploadFile(file, subDepartmentId, onProgress);
-      const fileId = String(response.data?.fileId ?? "").trim();
-      if (!response.success || !fileId) {
-        showAlert(response.message || "File upload failed.", "error");
+      const data = response.data as
+        | { fileId?: string; status?: string; errorMessage?: string; originalFileName?: string; fileName?: string }
+        | null
+        | undefined;
+      const status = String(data?.status ?? "").toUpperCase();
+      const failedStatus = status === "FAILED" || status === "TEMP_FAILED";
+      const fileId = String(data?.fileId ?? "").trim();
+      if (!response.success || failedStatus || !fileId) {
+        const message =
+          String(data?.errorMessage ?? "").trim() ||
+          (response.message && !/uploaded successfully/i.test(response.message)
+            ? response.message
+            : "") ||
+          "Unsupported file format for upload.";
+        showAlert(message, "error", { display: "snackbar", autoCloseMs: 4000 });
         return null;
       }
 
       return {
         fileId,
-        fileName: response.data?.originalFileName || response.data?.fileName || file.name,
+        fileName: data?.originalFileName || data?.fileName || file.name,
       };
     },
     [showAlert],

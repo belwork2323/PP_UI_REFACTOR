@@ -77,7 +77,6 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     createLotMode,
     disableActionBar,
     draftConfirm,
-    filledRows,
     formStrings,
     handleAdd,
     handleAddLot,
@@ -109,7 +108,6 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     specStyles,
     submitConfirm,
     theme,
-    totalRows,
     approvedPreparationLots,
   } = useRawMaterialSpecificationForm(formProps);
 
@@ -179,13 +177,6 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
               sx={specStyles.summaryPrimaryChip}
             />
           )}
-          <Chip
-            label={`${filledRows} / ${totalRows} ${formStrings.RESULTS_FILLED_SUFFIX}`}
-            size="small"
-            sx={specStyles.resultSummaryChip(
-              filledRows === totalRows && totalRows > 0,
-            )}
-          />
         </Stack>
       )}
 
@@ -356,7 +347,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
         resubmitLabel={formStrings.RESUBMIT_APPROVAL}
         saveTooltip={
           !canSaveDraft
-            ? formStrings.MANDATORY_FIELDS_PENDING
+            ? formStrings.DRAFT_FIELDS_PENDING
             : formStrings.SAVE_CONTINUE
         }
         disableActions={disableActionBar || deleteLoading}

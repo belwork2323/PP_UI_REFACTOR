@@ -245,7 +245,7 @@ const DISPATCH_DETAILS_PRESETS: Array<{ parameter: string; valueFieldType: strin
   { parameter: "Puncturing at HE (Nos)", valueFieldType: "number" },
   { parameter: "Puncturing at NE (Nos)", valueFieldType: "number" },
   { parameter: "Puncturing at LF Extension (Nos)", valueFieldType: "number" },
-  { parameter: "Dispatch Time", valueFieldType: "datetime" },
+  { parameter: "Dispatch Date & Time", valueFieldType: "datetime" },
 ];
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>

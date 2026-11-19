@@ -28,30 +28,31 @@ export {
 export type AdductPreparationDetails = {
   adductBatchPrepDate: string;
   tmpMfgLotNo: string;
-  tmpTotalQtyGm: number | null;
+  /** Exact decimal digits as string (avoids JS Number precision loss). */
+  tmpTotalQtyGm: string;
   nbdMfgLotNo: string;
-  nbdTotalQtyGm: number | null;
-  rpm: number | null;
-  processTemp: number | null;
-  jacketTemp: number | null;
+  nbdTotalQtyGm: string;
+  rpm: string;
+  processTemp: string;
+  jacketTemp: string;
   processStartTime: string;
   processEndTime: string;
-  finalAdductQty: number | null;
+  finalAdductQty: string;
   dispatchDateTime: string;
 };
 
 export const emptyAdductPreparationDetails = (): AdductPreparationDetails => ({
   adductBatchPrepDate: "",
   tmpMfgLotNo: "",
-  tmpTotalQtyGm: null,
+  tmpTotalQtyGm: "",
   nbdMfgLotNo: "",
-  nbdTotalQtyGm: null,
-  rpm: null,
-  processTemp: null,
-  jacketTemp: null,
+  nbdTotalQtyGm: "",
+  rpm: "",
+  processTemp: "",
+  jacketTemp: "",
   processStartTime: "",
   processEndTime: "",
-  finalAdductQty: null,
+  finalAdductQty: "",
   dispatchDateTime: "",
 });
 
@@ -71,11 +72,12 @@ export const isAcemAdductMaterial = (
 
 export type BlendingStylePreparationDetails = {
   mfgBatchLotNo: string;
-  totalQty: number | null;
+  /** Exact decimal digits as string (avoids JS Number precision loss). */
+  totalQty: string;
   equipmentId: string;
-  agitatorRpm: number | null;
-  processTemp: number | null;
-  jacketTemp: number | null;
+  agitatorRpm: string;
+  processTemp: string;
+  jacketTemp: string;
   processStartTime: string;
   processEndTime: string;
   otherObservations: string;
@@ -85,11 +87,11 @@ export type HtpbBlendingPreparationDetails = BlendingStylePreparationDetails;
 
 export const emptyBlendingStylePreparationDetails = (): BlendingStylePreparationDetails => ({
   mfgBatchLotNo: "",
-  totalQty: null,
+  totalQty: "",
   equipmentId: "",
-  agitatorRpm: null,
-  processTemp: null,
-  jacketTemp: null,
+  agitatorRpm: "",
+  processTemp: "",
+  jacketTemp: "",
   processStartTime: "",
   processEndTime: "",
   otherObservations: "",
@@ -106,10 +108,17 @@ export const isAcemHtpbBlendingMaterial = (
     .trim()
     .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "HTPB_BLENDING";
 
-const parseAdductNumeric = (value: unknown): number | null => {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+/** Keep decimal digits exact — never coerce through JS Number. */
+const parseDecimalDigitString = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  const raw = String(value).trim();
+  if (!raw || raw.toLowerCase() === "null" || raw.toLowerCase() === "undefined") return "";
+  return raw;
+};
+
+const serializeDecimalDigitString = (value: string | null | undefined): string | null => {
+  const trimmed = String(value ?? "").trim();
+  return trimmed ? trimmed : null;
 };
 
 export const parseAdductPreparationDetails = (raw: unknown): AdductPreparationDetails => {
@@ -117,35 +126,35 @@ export const parseAdductPreparationDetails = (raw: unknown): AdductPreparationDe
   return {
     adductBatchPrepDate: String(source.adductBatchPrepDate ?? "").trim(),
     tmpMfgLotNo: String(source.tmpMfgLotNo ?? "").trim(),
-    tmpTotalQtyGm: parseAdductNumeric(source.tmpTotalQtyGm),
+    tmpTotalQtyGm: parseDecimalDigitString(source.tmpTotalQtyGm),
     nbdMfgLotNo: String(source.nbdMfgLotNo ?? "").trim(),
-    nbdTotalQtyGm: parseAdductNumeric(source.nbdTotalQtyGm),
-    rpm: parseAdductNumeric(source.rpm),
-    processTemp: parseAdductNumeric(source.processTemp),
-    jacketTemp: parseAdductNumeric(source.jacketTemp),
+    nbdTotalQtyGm: parseDecimalDigitString(source.nbdTotalQtyGm),
+    rpm: parseDecimalDigitString(source.rpm),
+    processTemp: parseDecimalDigitString(source.processTemp),
+    jacketTemp: parseDecimalDigitString(source.jacketTemp),
     processStartTime: String(source.processStartTime ?? "").trim(),
     processEndTime: String(source.processEndTime ?? "").trim(),
-    finalAdductQty: parseAdductNumeric(source.finalAdductQty),
+    finalAdductQty: parseDecimalDigitString(source.finalAdductQty),
     dispatchDateTime: String(source.dispatchDateTime ?? "").trim(),
   };
 };
 
 export const serializeAdductPreparationDetails = (
   details: AdductPreparationDetails | null | undefined,
-): AdductPreparationDetails | undefined => {
+): Record<string, unknown> | undefined => {
   if (!details) return undefined;
   return {
     adductBatchPrepDate: details.adductBatchPrepDate.trim(),
     tmpMfgLotNo: details.tmpMfgLotNo.trim(),
-    tmpTotalQtyGm: details.tmpTotalQtyGm,
+    tmpTotalQtyGm: serializeDecimalDigitString(details.tmpTotalQtyGm),
     nbdMfgLotNo: details.nbdMfgLotNo.trim(),
-    nbdTotalQtyGm: details.nbdTotalQtyGm,
-    rpm: details.rpm,
-    processTemp: details.processTemp,
-    jacketTemp: details.jacketTemp,
+    nbdTotalQtyGm: serializeDecimalDigitString(details.nbdTotalQtyGm),
+    rpm: serializeDecimalDigitString(details.rpm),
+    processTemp: serializeDecimalDigitString(details.processTemp),
+    jacketTemp: serializeDecimalDigitString(details.jacketTemp),
     processStartTime: details.processStartTime.trim(),
     processEndTime: details.processEndTime.trim(),
-    finalAdductQty: details.finalAdductQty,
+    finalAdductQty: serializeDecimalDigitString(details.finalAdductQty),
     dispatchDateTime: details.dispatchDateTime.trim(),
   };
 };
@@ -156,11 +165,11 @@ export const parseBlendingStylePreparationDetails = (
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
     mfgBatchLotNo: String(source.mfgBatchLotNo ?? "").trim(),
-    totalQty: parseAdductNumeric(source.totalQty),
+    totalQty: parseDecimalDigitString(source.totalQty),
     equipmentId: String(source.equipmentId ?? "").trim(),
-    agitatorRpm: parseAdductNumeric(source.agitatorRpm),
-    processTemp: parseAdductNumeric(source.processTemp),
-    jacketTemp: parseAdductNumeric(source.jacketTemp),
+    agitatorRpm: parseDecimalDigitString(source.agitatorRpm),
+    processTemp: parseDecimalDigitString(source.processTemp),
+    jacketTemp: parseDecimalDigitString(source.jacketTemp),
     processStartTime: String(source.processStartTime ?? "").trim(),
     processEndTime: String(source.processEndTime ?? "").trim(),
     otherObservations: String(source.otherObservations ?? "").trim(),
@@ -169,15 +178,15 @@ export const parseBlendingStylePreparationDetails = (
 
 export const serializeBlendingStylePreparationDetails = (
   details: BlendingStylePreparationDetails | null | undefined,
-): BlendingStylePreparationDetails | undefined => {
+): Record<string, unknown> | undefined => {
   if (!details) return undefined;
   return {
     mfgBatchLotNo: details.mfgBatchLotNo.trim(),
-    totalQty: details.totalQty,
+    totalQty: serializeDecimalDigitString(details.totalQty),
     equipmentId: details.equipmentId.trim(),
-    agitatorRpm: details.agitatorRpm,
-    processTemp: details.processTemp,
-    jacketTemp: details.jacketTemp,
+    agitatorRpm: serializeDecimalDigitString(details.agitatorRpm),
+    processTemp: serializeDecimalDigitString(details.processTemp),
+    jacketTemp: serializeDecimalDigitString(details.jacketTemp),
     processStartTime: details.processStartTime.trim(),
     processEndTime: details.processEndTime.trim(),
     otherObservations: details.otherObservations.trim(),
@@ -1436,13 +1445,14 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
   };
   const adductPreparation = serializeAdductPreparationDetails(lot.adductPreparation);
   if (adductPreparation) {
-    payload.adductPreparation = adductPreparation;
+    payload.adductPreparation = adductPreparation as unknown as AdductPreparationDetails;
   }
   const htpbBlendingPreparation = serializeHtpbBlendingPreparationDetails(
     lot.htpbBlendingPreparation,
   );
   if (htpbBlendingPreparation) {
-    payload.htpbBlendingPreparation = htpbBlendingPreparation;
+    payload.htpbBlendingPreparation =
+      htpbBlendingPreparation as unknown as HtpbBlendingPreparationDetails;
   }
   return payload;
 }
@@ -1500,13 +1510,17 @@ export function mapFirstBlockToLotUpdatePayload(
       })),
     certificates: mapCertificatesForApi(block.certificates),
     ...(serializeAdductPreparationDetails(block.adductPreparation)
-      ? { adductPreparation: serializeAdductPreparationDetails(block.adductPreparation) }
+      ? {
+          adductPreparation: serializeAdductPreparationDetails(
+            block.adductPreparation,
+          ) as unknown as AdductPreparationDetails,
+        }
       : {}),
     ...(serializeHtpbBlendingPreparationDetails(block.htpbBlendingPreparation)
       ? {
           htpbBlendingPreparation: serializeHtpbBlendingPreparationDetails(
             block.htpbBlendingPreparation,
-          ),
+          ) as unknown as HtpbBlendingPreparationDetails,
         }
       : {}),
   };

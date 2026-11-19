@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, type ChangeEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import { useAlertStore } from "@app/store/alertStore";
 import { useAuthStore } from "@app/store/authStore";
 import { STRINGS } from "@app/config/strings";
@@ -21,11 +21,19 @@ export function useLotCertificateActions(
     certificatesRef.current = certificates;
   }, [certificates]);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const [certificateFieldError, setCertificateFieldError] = useState<string | undefined>();
   const subDepartmentId = useAuthStore(
     (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "raw-material")?.subDepartmentId,
   );
   const { upload, removeStoredFile } = useFileService();
   const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+
+  const showUploadSnackbar = useCallback(
+    (message: string, severity: "error" | "warning" = "error") => {
+      showAlert(message, severity, { display: "snackbar", autoCloseMs: 4000 });
+    },
+    [showAlert],
+  );
 
   const patchByLocalId = useCallback(
     (localId: string, patch: Partial<LotCertificate>) => {
@@ -42,7 +50,8 @@ export function useLotCertificateActions(
     async (localId: string, file: File) => {
       if (!subDepartmentId) {
         patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
-        showAlert(formStrings.SUB_DEPARTMENT_MISSING, "error");
+        setCertificateFieldError(formStrings.SUB_DEPARTMENT_MISSING);
+        showUploadSnackbar(formStrings.SUB_DEPARTMENT_MISSING);
         return;
       }
       patchByLocalId(localId, { status: "uploading", uploadProgress: 0, fileId: null });
@@ -51,8 +60,10 @@ export function useLotCertificateActions(
       });
       if (!result?.fileId) {
         patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
+        setCertificateFieldError(formStrings.CERT_INVALID_FILE);
         return;
       }
+      setCertificateFieldError(undefined);
       patchByLocalId(localId, {
         fileId: result.fileId,
         fileName: result.fileName || file.name,
@@ -63,7 +74,7 @@ export function useLotCertificateActions(
         uploadProgress: undefined,
       });
     },
-    [patchByLocalId, showAlert, subDepartmentId, upload],
+    [patchByLocalId, showUploadSnackbar, subDepartmentId, upload],
   );
 
   const handleFilesSelected = useCallback(
@@ -73,10 +84,15 @@ export function useLotCertificateActions(
       if (!incoming.length) return;
 
       const accepted: LotCertificate[] = [];
+      const rejectedNames: string[] = [];
       for (const file of incoming) {
         const { valid, error } = fileUtils.validateCertificateFile(file);
         if (!valid) {
-          showAlert(`${file.name}: ${error ?? formStrings.CERT_INVALID_FILE}`, "warning");
+          rejectedNames.push(file.name);
+          showUploadSnackbar(
+            `${file.name}: ${error ?? formStrings.CERT_INVALID_FILE}`,
+            "warning",
+          );
           continue;
         }
         accepted.push({
@@ -93,6 +109,12 @@ export function useLotCertificateActions(
         });
       }
 
+      if (rejectedNames.length) {
+        setCertificateFieldError(formStrings.CERT_INVALID_FILE);
+      } else {
+        setCertificateFieldError(undefined);
+      }
+
       if (accepted.length) {
         const next = [...certificatesRef.current, ...accepted];
         certificatesRef.current = next;
@@ -106,7 +128,7 @@ export function useLotCertificateActions(
         input.value = "";
       });
     },
-    [onChange, showAlert, uploadCertificate],
+    [onChange, showUploadSnackbar, uploadCertificate],
   );
 
   const handleRetry = useCallback(
@@ -133,6 +155,9 @@ export function useLotCertificateActions(
       const next = certificatesRef.current.filter((_, i) => i !== index);
       certificatesRef.current = next;
       onChange(next);
+      if (!next.some((item) => item.status === "failed")) {
+        setCertificateFieldError(undefined);
+      }
     },
     [onChange, removeStoredFile, subDepartmentId],
   );
@@ -152,6 +177,7 @@ export function useLotCertificateActions(
     handleRetry,
     handleRemove,
     handleOpen,
+    certificateFieldError,
     filePreview: preview,
     closeFilePreview: closePreview,
     downloadFilePreview: downloadCurrent,

@@ -1202,7 +1202,7 @@ const CastingMotorPanel = ({
                 <TableRow>
                   {[
                     { label: "Bowl Id", required: true },
-                    { label: "Time", required: true },
+                    { label: "Date & Time", required: true },
                     { label: "RH (%)", required: true },
                     { label: "Viscosity (Poise)", required: false },
                     { label: "Motor Id No.", required: true },
@@ -1215,13 +1215,19 @@ const CastingMotorPanel = ({
                   ].map((col, idx) => (
                     <TableCell
                       key={`${col.label}-${idx}`}
-                      sx={castingCuringTableHeaderCellSx(idx === 0)}
+                      sx={{
+                        ...castingCuringTableHeaderCellSx(idx === 0),
+                        ...(idx === 1 ? { minWidth: 240, width: 240 } : {}),
+                      }}
                     >
                       {col.required ? (
                         <FieldLabelWithAsterisk
                           label={col.label}
                           required
-                          sx={castingCuringTableHeaderCellSx(idx === 0)}
+                          sx={{
+                            ...castingCuringTableHeaderCellSx(idx === 0),
+                            ...(idx === 1 ? { minWidth: 240, width: 240 } : {}),
+                          }}
                         />
                       ) : (
                         col.label
@@ -1263,7 +1269,7 @@ const CastingMotorPanel = ({
                           }
                         />
                       </TableCell>
-                      <TableCell sx={castingCuringTableCellSx}>
+                      <TableCell sx={{ ...castingCuringTableCellSx, minWidth: 240, width: 240 }}>
                         <DateTimeField
                           value={row.TIME_INTERVAL}
                           onChange={(v) => {

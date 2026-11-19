@@ -187,6 +187,9 @@ const CastingAndCuringForm = ({
     const formMotors = Array.isArray(addedMotors) ? addedMotors : [];
     return mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors);
   }, [addedMotors, batch]);
+  const curingCycle = useMemo(() => {
+    return batch?.identificationSheet?.metadata?.curingCycleMaster ?? null;
+  }, [batch]);
   const resolveMotorStatus = useCallback(
     (motorId: string) =>
       getMotorStatus?.(motorId) ??
@@ -930,6 +933,7 @@ const CastingAndCuringForm = ({
                       activeMotorEntry && onLoadCuringForm(activeMotorEntry.motorId)
                     }
                     theme={theme}
+                    curingCycleMaster={curingCycle}
                   />
                   {curingFormLoaded && activeMotorSession ? (
                     <CuringSetupHeaderCard

@@ -212,7 +212,11 @@ const RocketMotorCasing = () => {
             saveLabel={STRINGS.SOURCING.CASING_FORM.SAVE_DRAFT}
             submitLabel={STRINGS.SOURCING.CASING_FORM.SUBMIT_APPROVAL}
             resubmitLabel={STRINGS.SOURCING.CASING_FORM.RESUBMIT_APPROVAL}
-            saveTooltip={STRINGS.SOURCING.CASING_FORM.SAVE_TOOLTIP}
+            saveTooltip={
+              !canSaveDraft
+                ? STRINGS.SOURCING.CASING_FORM.NOT_READY_TO_SUBMIT
+                : STRINGS.SOURCING.CASING_FORM.SAVE_TOOLTIP
+            }
             disableActions={actionLoading}
             allowInvalidSubmitAttempt
             disableSubmit={actionLoading || loadingDimensionalParams}

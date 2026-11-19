@@ -879,10 +879,15 @@ export const enrichCasePrepTableRows = (
   const enriched: Record<string, unknown>[] = [];
 
   rows.forEach((row, index) => {
+    const displayRow =
+      /dispatchtocastingdetails/i.test(tableId) &&
+      /^dispatch\s*time$/i.test(String(row.parameter ?? "").trim())
+        ? { ...row, parameter: "Dispatch Date & Time" }
+        : row;
     const preset = presetRows[index];
     if (preset?.type === "header") {
-      if (!isCasePrepDisplayRowEmpty(row)) {
-        enriched.push(row);
+      if (!isCasePrepDisplayRowEmpty(displayRow)) {
+        enriched.push(displayRow);
         return;
       }
       const headerLabel = String(preset.label ?? "").trim();
@@ -892,8 +897,8 @@ export const enrichCasePrepTableRows = (
       return;
     }
 
-    if (!isCasePrepDisplayRowEmpty(row)) {
-      enriched.push(row);
+    if (!isCasePrepDisplayRowEmpty(displayRow)) {
+      enriched.push(displayRow);
     }
   });
 

@@ -194,7 +194,7 @@ export const FINAL_MIX_BOWL_COLUMNS: CcDetailsColumn[] = [
 
 export const CASTING_FROM_BOWL_COLUMNS: CcDetailsColumn[] = [
   { key: "bowlId", label: "Bowl Id" },
-  { key: "timeInterval", label: "Time" },
+  { key: "timeInterval", label: "Date & Time" },
   { key: "rh", label: "RH (%)" },
   { key: "viscosity", label: "Viscosity (Poise)" },
   { key: "motorId", label: "Motor Id No." },

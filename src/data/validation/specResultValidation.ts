@@ -1,3 +1,7 @@
+import {
+  DECIMAL_MAX_PLACES,
+  decimalMaxLengthFor,
+} from "./inputLimits";
 import { parseMixingSpecificationBounds } from "./specificationBounds";
 
 /** Min/max shape used by RMS reference ranges and structured master specs. */
@@ -20,33 +24,57 @@ export function isReferenceRangeNotApplicable(
   return referenceRange.minValue == null && referenceRange.maxValue == null;
 }
 
-/** Restrict numeric spec inputs to digits, one decimal point, and optional leading minus. */
-export function sanitizeNumericAnalysedResultInput(value: string): string {
+/**
+ * Restrict numeric inputs to digits, one decimal point, optional leading minus,
+ * total length (20 / 21 signed), and ≤6 fraction digits.
+ * Pass `allowNegative: false` for quantity fields (positive-only).
+ */
+export function sanitizeNumericAnalysedResultInput(
+  value: string,
+  options?: { allowNegative?: boolean },
+): string {
+  const allowNegative = options?.allowNegative !== false;
   const raw = String(value ?? "");
   if (!raw) return "";
 
   let result = "";
   let hasDecimal = false;
+  let fractionDigits = 0;
   let index = 0;
 
-  if (raw[0] === "-") {
+  if (allowNegative && raw[0] === "-") {
     result = "-";
+    index = 1;
+  } else if (!allowNegative && raw[0] === "-") {
     index = 1;
   }
 
   for (; index < raw.length; index += 1) {
     const char = raw[index];
     if (char >= "0" && char <= "9") {
-      result += char;
+      if (hasDecimal) {
+        if (fractionDigits >= DECIMAL_MAX_PLACES) continue;
+        fractionDigits += 1;
+      }
+      const next = result + char;
+      if (next.length > decimalMaxLengthFor(next)) continue;
+      result = next;
       continue;
     }
     if (char === "." && !hasDecimal) {
+      const next = result + char;
+      if (next.length > decimalMaxLengthFor(next)) continue;
       hasDecimal = true;
-      result += char;
+      result = next;
     }
   }
 
   return result;
+}
+
+/** Positive quantity sanitize: same decimal caps, no leading minus. */
+export function sanitizePositiveNumericInput(value: string): string {
+  return sanitizeNumericAnalysedResultInput(value, { allowNegative: false });
 }
 
 /** Numeric-range specs only accept numeric input; N/A specs keep free text. */

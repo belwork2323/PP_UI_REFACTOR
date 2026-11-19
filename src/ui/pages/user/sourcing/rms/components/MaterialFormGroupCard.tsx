@@ -1,7 +1,5 @@
-import { useMemo } from "react";
 import {
   Box,
-  Chip,
   IconButton,
   Stack,
   Tooltip,
@@ -42,7 +40,6 @@ const {
   delete: DeleteOutlineRoundedIcon,
   science: ScienceRoundedIcon,
   add: AddRoundedIcon,
-  checkCircleOutline: CheckCircleOutlineRoundedIcon,
 } = icons.user.sourcing.specificationFormBuilder;
 
 type MaterialFormGroupCardProps = {
@@ -115,19 +112,6 @@ const MaterialFormGroupCard = ({
     group.preparationType,
   );
 
-  const { filledCount, totalCount, allFilled } = useMemo(() => {
-    const allRows = group.lots.flatMap((lot) => lot.rows);
-    const filled = allRows.filter(
-      (row) => row.analysedResult.trim() !== "",
-    ).length;
-    const total = allRows.length;
-    return {
-      filledCount: filled,
-      totalCount: total,
-      allFilled: total > 0 && filled === total,
-    };
-  }, [group.lots]);
-
   const specCount = group.lots[0]?.rows.length ?? 0;
 
   return (
@@ -159,29 +143,15 @@ const MaterialFormGroupCard = ({
           </Box>
         </StackRow>
 
-        <StackRow gap={1}>
-          <Chip
-            icon={
-              allFilled ? (
-                <CheckCircleOutlineRoundedIcon
-                  sx={specStyles.progressChipIconFilled}
-                />
-              ) : undefined
-            }
-            label={`${filledCount}/${totalCount} ${formStrings.RESULTS_FILLED_SUFFIX}`}
+        <Tooltip title={formStrings.REMOVE_MATERIAL_TOOLTIP}>
+          <IconButton
             size="small"
-            sx={specStyles.progressChip(allFilled)}
-          />
-          <Tooltip title={formStrings.REMOVE_MATERIAL_TOOLTIP}>
-            <IconButton
-              size="small"
-              onClick={() => onRemoveMaterial(materialIndex)}
-              sx={specStyles.removeIconButton}
-            >
-              <DeleteOutlineRoundedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </StackRow>
+            onClick={() => onRemoveMaterial(materialIndex)}
+            sx={specStyles.removeIconButton}
+          >
+            <DeleteOutlineRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <Stack
@@ -208,6 +178,7 @@ const MaterialFormGroupCard = ({
                 })
               }
               error={Boolean(supplyOrderError)}
+              inputProps={{ maxLength: 50 }}
               sx={mandatoryFieldInputSx(
                 theme.workflow.formElements.metaRowTextField,
                 Boolean(supplyOrderError),
@@ -261,6 +232,7 @@ const MaterialFormGroupCard = ({
                 })
               }
               error={Boolean(manufacturerError)}
+              inputProps={{ maxLength: 100 }}
               sx={mandatoryFieldInputSx(
                 theme.workflow.formElements.metaRowTextField,
                 Boolean(manufacturerError),

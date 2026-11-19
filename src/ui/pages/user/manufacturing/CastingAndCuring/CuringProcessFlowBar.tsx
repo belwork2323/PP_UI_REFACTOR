@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { useEffect, useMemo } from "react";
+import { Alert, Box, Button, CircularProgress, Stack, TextField, Typography } from "@mui/material";
 import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import type { CuringProcessSetup } from "../../../../../data/models/user/CastingCuringFormModel";
 import { CURING_TYPE_OPTIONS } from "../../../../../data/models/admin/MasterData/curingTypeOptions";
@@ -12,6 +12,9 @@ import {
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 import type { OvenSelectOption } from "../../../../../hooks/user/manufacturing/ovenSelectOptions";
+import { CuringMetadata } from "@/data/models/admin/BatchManagement/BatchManagementModel";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { TableTextInput } from "./CastingCuringFormPrimitives";
 
 export type { OvenSelectOption };
 
@@ -19,6 +22,7 @@ type CuringProcessFlowBarProps = {
   setup: CuringProcessSetup;
   curingFormLoaded: boolean;
   curingCycleConfig?: CuringCycleConfig | null;
+  curingCycleMaster?: CuringMetadata | null; // <-- Added here
   batch?: CastingCuringBatchMotorSource | null;
   curingCyclesLoading?: boolean;
   ovenOptions: OvenSelectOption[];
@@ -52,10 +56,15 @@ const CuringProcessFlowBar = ({
   onChange,
   onLoadCuringForm,
   theme,
+  curingCycleMaster = null,
 }: CuringProcessFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const L = CASTING_CURING_FLOW_LABELS;
-
+  useEffect(() => {
+    if (curingCycleMaster?.curingType && setup.curingType !== curingCycleMaster.curingType) {
+      onChange("curingType", curingCycleMaster.curingType);
+    }
+  }, [curingCycleMaster?.curingType, setup.curingType, onChange]);
   const selectedOven = useMemo(
     () => ovenOptions.find((option) => option.value === setup.oven) ?? null,
     [ovenOptions, setup.oven],
@@ -65,7 +74,7 @@ const CuringProcessFlowBar = ({
     () => buildCuringOvenNoOptions(selectedOven?.noOfOvenAvailable),
     [selectedOven?.noOfOvenAvailable],
   );
-
+  const hasCuringCycle = Boolean(curingCycleMaster && curingCycleMaster.curingType);
   const canLoad = useMemo(
     () => canLoadCuringForm({ setup, curingFormLoaded }),
     [curingFormLoaded, setup],
@@ -75,7 +84,14 @@ const CuringProcessFlowBar = ({
     () => formatMotorStageLabel(curingCycleConfig, batch),
     [batch, curingCycleConfig],
   );
-
+  const formatCuringTypeLabel = (type?: string) => {
+    if (!type) return "";
+    return type
+      .toLowerCase()
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
   if (curingFormLoaded) return null;
 
   return (
@@ -91,19 +107,26 @@ const CuringProcessFlowBar = ({
           value={curingCyclesLoading ? L.curingCyclesLoading : motorStageLabel}
         />
       </Stack> */}
+      {!hasCuringCycle ? (
+        <Alert severity="error" sx={{ mb: 2, fontSize: "0.78rem" }}>
+          Curing cycle is not added for the current project and motor stage.
+        </Alert>
+      ) : null}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={flowBar.topRow}>
-          <CasePrepSelect
-            label={L.curingType}
-            value={setup.curingType}
-            placeholder={L.curingTypePlaceholder}
-            options={CURING_TYPE_OPTIONS}
-            width={220}
-            theme={theme}
-            required
-            disabled={curingCyclesLoading}
-            onChange={(value) => onChange("curingType", value)}
-          />
+          <Box sx={flowBar.selectField?.(220)}>
+            <Typography component="label" sx={flowBar.selectLabel}>
+              <FieldLabelWithAsterisk label={L.curingType} required />
+            </Typography>
+            <TableTextInput
+              value={
+                curingCycleMaster?.curingCycleCode
+                  ? `${curingCycleMaster.curingCycleCode} (${formatCuringTypeLabel(curingCycleMaster.curingType)})`
+                  : "—"
+              }
+              disabled
+            />
+          </Box>
           <CasePrepSelect
             label={L.curingSelectOven}
             value={setup.oven}

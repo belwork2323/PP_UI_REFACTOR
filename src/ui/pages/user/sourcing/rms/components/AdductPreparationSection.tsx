@@ -15,6 +15,11 @@ import useValidationDisplay, {
   type ValidationAttemptFlags,
 } from "@/ui/components/validation/useValidationDisplay";
 import { blockAdductPath } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
+import { DECIMAL_MAX_LENGTH, DECIMAL_MAX_LENGTH_SIGNED } from "@/data/validation/inputLimits";
+import {
+  sanitizeNumericAnalysedResultInput,
+  sanitizePositiveNumericInput,
+} from "@/data/validation/specResultValidation";
 
 const L = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
 const FORM_STRINGS = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -68,12 +73,14 @@ const AdductPreparationSection = ({
     onChange({ ...details, [field]: value });
   };
 
-  const parseNumericInput = (value: string): number | null => {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
+  /** Keep exact digit string — never coerce through JS Number (precision loss). */
+  const parseNumericInput = (
+    value: string,
+    options?: { positiveOnly?: boolean },
+  ): string =>
+    options?.positiveOnly
+      ? sanitizePositiveNumericInput(value)
+      : sanitizeNumericAnalysedResultInput(value);
 
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
 
@@ -145,11 +152,16 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH }}
               value={details.tmpTotalQtyGm ?? ""}
               disabled={disabled}
               onChange={(e) =>
-                updateField("tmpTotalQtyGm", parseNumericInput(e.target.value))
+                updateField(
+                  "tmpTotalQtyGm",
+                  parseNumericInput(e.target.value, { positiveOnly: true }),
+                )
               }
               error={Boolean(
                 visibleError(blockAdductPath(blockIndex, "tmpTotalQtyGm")),
@@ -197,11 +209,16 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH }}
               value={details.nbdTotalQtyGm ?? ""}
               disabled={disabled}
               onChange={(e) =>
-                updateField("nbdTotalQtyGm", parseNumericInput(e.target.value))
+                updateField(
+                  "nbdTotalQtyGm",
+                  parseNumericInput(e.target.value, { positiveOnly: true }),
+                )
               }
               error={Boolean(
                 visibleError(blockAdductPath(blockIndex, "nbdTotalQtyGm")),
@@ -223,7 +240,9 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               value={details.rpm ?? ""}
               disabled={disabled}
               onChange={(e) =>
@@ -248,7 +267,9 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               value={details.processTemp ?? ""}
               disabled={disabled}
               onChange={(e) =>
@@ -274,7 +295,9 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH_SIGNED }}
               value={details.jacketTemp ?? ""}
               disabled={disabled}
               onChange={(e) =>
@@ -347,11 +370,16 @@ const AdductPreparationSection = ({
               compact
               size="small"
               fullWidth
-              type="number"
+              type="text"
+              inputMode="decimal"
+              inputProps={{ maxLength: DECIMAL_MAX_LENGTH }}
               value={details.finalAdductQty ?? ""}
               disabled={disabled}
               onChange={(e) =>
-                updateField("finalAdductQty", parseNumericInput(e.target.value))
+                updateField(
+                  "finalAdductQty",
+                  parseNumericInput(e.target.value, { positiveOnly: true }),
+                )
               }
               error={Boolean(
                 visibleError(blockAdductPath(blockIndex, "finalAdductQty")),

@@ -15,6 +15,10 @@ export type FieldRuleConfig = {
   // For number value validation
   minVal?: number;
   maxVal?: number;
+  /** Max digits after decimal point (RMS decimals: 6). */
+  maxDecimals?: number;
+  /** Quantity fields: reject zero and negatives. */
+  positiveOnly?: boolean;
 
   requiredIn: ValidationTier[];
   messages: {
@@ -61,8 +65,10 @@ export function runValidation<TData>(
       pattern: rule.pattern,
       minLength: rule.minLength,
       maxLength: rule.maxLength,
+      maxDecimals: rule.maxDecimals,
       minVal: rule.minVal,
       maxVal: rule.maxVal,
+      positiveOnly: rule.positiveOnly,
     });
 
     const message = stateToMessage(

@@ -1,16 +1,15 @@
+/** RMS certificate uploads — exclude gif/svg (rejected by upload config / unsupported). */
 const RMS_CERTIFICATE_EXTENSIONS = [
   ".pdf",
   ".jpg",
   ".jpeg",
   ".png",
   ".webp",
-  ".gif",
   ".bmp",
   ".tif",
   ".tiff",
   ".heic",
   ".heif",
-  ".svg",
   ".mp3",
   ".mp4",
   ".webm",
@@ -66,12 +65,10 @@ export const fileUtils = {
       "image/jpeg",
       "image/png",
       "image/webp",
-      "image/gif",
       "image/bmp",
       "image/tiff",
       "image/heic",
       "image/heif",
-      "image/svg+xml",
       "audio/mpeg",
       "audio/mp3",
       "video/mp4",
@@ -117,7 +114,10 @@ export const fileUtils = {
     ) {
       return { valid: true as const };
     }
-    return { valid: false as const, error: undefined };
+    return {
+      valid: false as const,
+      error: "Unsupported file format for upload.",
+    };
   },
 
   /** True when URL can be opened in browser (not blob/pending/placeholder). */

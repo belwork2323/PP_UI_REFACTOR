@@ -1,3 +1,9 @@
+import {
+  DECIMAL_MAX_LENGTH,
+  decimalFractionDigits,
+  decimalMaxLengthFor,
+} from "./inputLimits";
+
 export const ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/;
 export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
 /** Rubber sheet dimension — allows size products like 20*20 / 20x20. */
@@ -92,8 +98,11 @@ export const validateFieldState = (
     pattern?: RegExp;
     minLength?: number;
     maxLength?: number;
+    maxDecimals?: number;
     minVal?: number;
     maxVal?: number;
+    /** When true, reject zero and negatives (quantity fields). */
+    positiveOnly?: boolean;
   },
 ): FieldValidationState => {
   if (options.valueType === "file") {
@@ -107,12 +116,36 @@ export const validateFieldState = (
   if (options.valueType === "number") {
     if (!isFiniteNumber(text)) return "invalid";
 
+    const compact = text.replace(/,/g, "");
+
+    // Character-length cap (signed decimals allow one extra char for leading "-")
+    if (options.maxLength !== undefined) {
+      const limit =
+        options.maxLength === DECIMAL_MAX_LENGTH
+          ? decimalMaxLengthFor(compact)
+          : compact.startsWith("-")
+            ? options.maxLength + 1
+            : options.maxLength;
+      if (compact.length > limit) return "maxLength";
+    }
+
+    if (
+      options.maxDecimals !== undefined &&
+      decimalFractionDigits(compact) > options.maxDecimals
+    ) {
+      return "invalid";
+    }
+
     // Validate numeric format (integer / decimal precision)
     if (options.pattern && !options.pattern.test(text)) {
       return "invalid";
     }
 
-    const num = Number(text.replace(/,/g, ""));
+    const num = Number(compact);
+
+    if (options.positiveOnly && num <= 0) {
+      return "minVal";
+    }
 
     if (options.minVal !== undefined && num < options.minVal) {
       return "minVal";

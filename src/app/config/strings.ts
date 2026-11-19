@@ -422,8 +422,7 @@ export const STRINGS = {
     BATCH_LIST: {
       RM_TITLE: "Raw material lots",
       MOTOR_TITLE: "Rocket Motor batch list",
-      SEARCH_PLACEHOLDER:
-        "Search lot ID, sourcing ID, material, manufacturer, status, created by…",
+      SEARCH_PLACEHOLDER: "Search lot ID, sourcing ID, material, manufacturer, status, created by…",
       COL_BATCH_ID: "Batch ID",
       COL_MOTOR_CASING_ID: "Motor casing ID",
       COL_PROJECT_ID: "Project ID",
@@ -573,7 +572,7 @@ export const STRINGS = {
       BLOCK_LABEL: "Block",
       SPECIFICATION_LABEL: "specification",
       SPECIFICATION_LABEL_PLURAL: "specifications",
-      RESULTS_FILLED_SUFFIX: "filled",
+      RESULTS_FILLED_SUFFIX: "specification filled",
       RESULTS_ENTERED_SUFFIX: "results entered",
       MATERIAL_SUFFIX: "material",
       MATERIAL_SUFFIX_PLURAL: "materials",
@@ -598,16 +597,28 @@ export const STRINGS = {
       FIELD_REQUIRED_RECEIPT_DATE: "Receipt date is required",
       FIELD_REQUIRED_MANUFACTURER: "Manufacturer is required",
       FIELD_REQUIRED_LOT_ID: "Lot ID is required",
-      FIELD_INVALID_SUPPLY_ORDER:
-        "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+      FIELD_INVALID_SUPPLY_ORDER: "Use letters, numbers, hyphens, or underscores only",
       FIELD_INVALID_RECEIPT_DATE: "Enter a valid receipt date",
-      FIELD_INVALID_MANUFACTURER:
-        "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
-      FIELD_INVALID_LOT_ID: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+      FIELD_INVALID_MANUFACTURER: "Use letters, numbers, and spaces only",
+      FIELD_INVALID_LOT_ID: "Use letters, numbers, hyphens, or underscores only",
       VALIDATION: {
+        shortText: {
+          maxLength: "Cannot exceed {max} characters",
+          minLength: "Must be at least {min} characters",
+        },
+        codeRef: {
+          maxLength: "Cannot exceed {max} characters",
+          minLength: "Must be at least {min} characters",
+        },
+        remarks: {
+          maxLength: "Cannot exceed {max} characters",
+        },
+        decimal: {
+          maxLength: "Cannot exceed {max} characters",
+        },
         supplyOrderNo: {
           required: "Supply order no. is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         receiptDate: {
           required: "Receipt date is required",
@@ -615,28 +626,28 @@ export const STRINGS = {
         },
         manufacturerName: {
           required: "Manufacturer is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, and spaces only",
         },
         lotNo: {
           required: "Lot ID is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
           duplicate: "Lot ID already exists in this form",
         },
         analysedResult: {
           required: "Analyze Result @ Source is required",
-          invalid: "Analyze Result @ Source must be a valid number",
+          invalid: "Analyze Result @ Source must be a valid number with at most 6 decimal places",
         },
         analysedResultAlphanumeric: {
           required: "Analyze Result @ Source is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         acemQcResult: {
           required: "ACEM QC Result is required",
-          invalid: "ACEM QC Result must be a valid number",
+          invalid: "ACEM QC Result must be a valid number with at most 6 decimal places",
         },
         acemQcResultAlphanumeric: {
           required: "ACEM QC Result is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         certificates: {
           required: "Upload at least one certificate for this lot",
@@ -644,7 +655,7 @@ export const STRINGS = {
         },
         certificateType: {
           required: "Certificate type is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         validationFailedSnackbar: "Validation Error — Check mandatory fields or wrong input",
       },
@@ -658,8 +669,8 @@ export const STRINGS = {
         RPM: "RPM",
         PROCESS_TEMP: "Process temp",
         JACKET_TEMP: "Jacket temp",
-        PROCESS_START_TIME: "Process start time",
-        PROCESS_END_TIME: "Process end time",
+        PROCESS_START_TIME: "Process start date & time",
+        PROCESS_END_TIME: "Process end date & time",
         FINAL_ADDUCT_QTY: "Final quantity of adduct preparation",
         DISPATCH_DATE_TIME: "Date & Time Of Dispatch",
         adductBatchPrepDate: {
@@ -668,43 +679,46 @@ export const STRINGS = {
         },
         tmpMfgLotNo: {
           required: "TMP mfg / lot no is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         tmpTotalQtyGm: {
           required: "TMP total quantity is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a positive number (greater than 0) with at most 6 decimal places",
+          minVal: "Enter a positive number (greater than 0) with at most 6 decimal places",
         },
         nbdMfgLotNo: {
           required: "nBD mfg / lot no is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         nbdTotalQtyGm: {
           required: "nBD total quantity is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a positive number (greater than 0) with at most 6 decimal places",
+          minVal: "Enter a positive number (greater than 0) with at most 6 decimal places",
         },
         rpm: {
           required: "RPM is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         processTemp: {
           required: "Process temp is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         jacketTemp: {
           required: "Jacket temp is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         processStartTime: {
-          required: "Process start time is required",
+          required: "Process start date & time is required",
           invalid: "Enter a valid date and time",
         },
         processEndTime: {
-          required: "Process end time is required",
+          required: "Process end date & time is required",
           invalid: "Enter a valid date and time",
         },
         finalAdductQty: {
           required: "Final adduct quantity is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a positive number (greater than 0) with at most 6 decimal places",
+          minVal: "Enter a positive number (greater than 0) with at most 6 decimal places",
         },
         dispatchDateTime: {
           required: "Dispatch date time is required",
@@ -724,27 +738,28 @@ export const STRINGS = {
         OTHER_OBSERVATIONS: "Any other observation",
         mfgBatchLotNo: {
           required: "Mfg / Batch lot no is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         totalQty: {
           required: "Total qty is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a positive number (greater than 0) with at most 6 decimal places",
+          minVal: "Enter a positive number (greater than 0) with at most 6 decimal places",
         },
         equipmentId: {
           required: "Equipment id is required",
-          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          invalid: "Use letters, numbers, hyphens, or underscores only",
         },
         agitatorRpm: {
           required: "Agitator RPM is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         processTemp: {
           required: "Process temp is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         jacketTemp: {
           required: "Jacket temp is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a valid number with at most 6 decimal places",
         },
         processStartTime: {
           required: "Start date & time is required",
@@ -754,15 +769,21 @@ export const STRINGS = {
           required: "End date / time is required",
           invalid: "Enter a valid date and time",
         },
+        otherObservations: {
+          required: "Other observations are required",
+          invalid: "Use letters, numbers, and common punctuation only",
+        },
       },
       MANDATORY_FIELDS_PENDING:
-        "Complete manufacturer, lot ID, every analyzed result, and upload a certificate for each lot before submitting.",
+        "Completely fill in manufacturer, lot ID, every analyzed result, and upload a certificate for each lot before submitting.",
+      DRAFT_FIELDS_PENDING:
+        "Add a material and enter manufacturer and lot ID before saving as draft.",
       FIELD_REQUIRED_ANALYZED_RESULT: "Analyze Result @ Source is required",
       FIELD_INVALID_ANALYZED_RESULT: "Analyze Result @ Source must be a valid number",
       FIELD_REQUIRED_CERTIFICATES: "Upload at least one certificate for this lot",
       CERTIFICATES_TITLE: "Certificates",
       CERTIFICATES_SUBTITLE:
-        "Upload PDF, images, MP3, or video (no zip, Excel, or Word). Multiple files allowed.",
+        "Upload PDF, JPG/PNG/WebP, MP3, or video (no GIF, SVG, zip, Excel, or Word). Multiple files allowed.",
       CERT_FILE_NAME: "File name",
       CERT_TYPE: "Certificate type",
       UPLOAD_CERTIFICATES: "Upload files",
@@ -775,8 +796,8 @@ export const STRINGS = {
       REUPLOAD_CERTIFICATE: "Retry upload",
       CERT_UPLOAD_PENDING:
         "Wait for file uploads to finish, or retry failed uploads, before saving or submitting.",
-      CERT_INVALID_FILE:
-        "Invalid file type. Use PDF, images, MP3, or video only (no zip, Excel, or Word).",
+      CERT_INVALID_FILE: "Unsupported file format for upload.",
+      CERT_UPLOAD_FAILED: "File upload failed.",
       TABLE_HEADERS: {
         MATERIAL: "Material",
         LOT_ID: "Lot ID",

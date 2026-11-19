@@ -9,11 +9,23 @@ import {
   type BlendingStylePreparationDetails,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 import {
-  ALPHA_NUM,
   type FieldValidationState,
   validateFieldState,
 } from "@data/validation/fieldValidators";
-import type { SubDeptValidationConfig } from "@data/validation/runValidation";
+import {
+  CODE_REF_MAX,
+  CODE_REF_MIN,
+  CODE_REF_PATTERN,
+  DECIMAL_MAX_LENGTH,
+  DECIMAL_MAX_PLACES,
+  REMARKS_MAX,
+  REMARKS_MIN,
+  REMARKS_PATTERN,
+  SHORT_TEXT_MAX,
+  SHORT_TEXT_MIN,
+  SHORT_TEXT_PATTERN,
+} from "@data/validation/inputLimits";
+import type { FieldRuleConfig, SubDeptValidationConfig } from "@data/validation/runValidation";
 import {
   isReferenceRangeNotApplicable,
   specResultRuleKey,
@@ -24,13 +36,69 @@ const M = STRINGS.SOURCING.SPECIFICATION_FORM.VALIDATION;
 const A = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
 const H = STRINGS.SOURCING.SPECIFICATION_FORM.HTPB_BLENDING_PREPARATION;
 
-export const rawMaterialSourcingFieldRules = {
-  supplyOrderNo: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: [] as ValidationTier[],
-    messages: { required: M.supplyOrderNo.required, invalid: M.supplyOrderNo.invalid },
+const CODE_MSG = {
+  maxLength: M.codeRef.maxLength,
+  minLength: M.codeRef.minLength,
+};
+const SHORT_MSG = {
+  maxLength: M.shortText.maxLength,
+  minLength: M.shortText.minLength,
+};
+const DECIMAL_MSG = {
+  maxLength: M.decimal.maxLength,
+};
+const REMARKS_MSG = {
+  maxLength: M.remarks.maxLength,
+};
+
+const codeTextRule = (
+  requiredIn: ValidationTier[],
+  messages: { required: string; invalid: string },
+): FieldRuleConfig => ({
+  valueType: "text",
+  pattern: CODE_REF_PATTERN,
+  minLength: CODE_REF_MIN,
+  maxLength: CODE_REF_MAX,
+  requiredIn,
+  messages: { ...messages, ...CODE_MSG },
+});
+
+const decimalNumberRule = (
+  requiredIn: ValidationTier[],
+  messages: { required: string; invalid: string },
+): FieldRuleConfig => ({
+  valueType: "number",
+  maxLength: DECIMAL_MAX_LENGTH,
+  maxDecimals: DECIMAL_MAX_PLACES,
+  requiredIn,
+  messages: { ...messages, ...DECIMAL_MSG },
+});
+
+const POSITIVE_QTY_MSG = "Enter a positive number (greater than 0) with at most 6 decimal places";
+
+const positiveDecimalNumberRule = (
+  requiredIn: ValidationTier[],
+  messages: { required: string; invalid?: string; minVal?: string },
+): FieldRuleConfig => ({
+  valueType: "number",
+  maxLength: DECIMAL_MAX_LENGTH,
+  maxDecimals: DECIMAL_MAX_PLACES,
+  minVal: 0,
+  positiveOnly: true,
+  requiredIn,
+  messages: {
+    required: messages.required,
+    invalid: messages.invalid ?? POSITIVE_QTY_MSG,
+    minVal: messages.minVal ?? POSITIVE_QTY_MSG,
+    ...DECIMAL_MSG,
   },
+});
+
+export const rawMaterialSourcingFieldRules = {
+  supplyOrderNo: codeTextRule([], {
+    required: M.supplyOrderNo.required,
+    invalid: M.supplyOrderNo.invalid,
+  }),
   receiptDate: {
     valueType: "date" as const,
     requiredIn: [] as ValidationTier[],
@@ -38,97 +106,80 @@ export const rawMaterialSourcingFieldRules = {
   },
   manufacturerName: {
     valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    pattern: SHORT_TEXT_PATTERN,
+    minLength: SHORT_TEXT_MIN,
+    maxLength: SHORT_TEXT_MAX,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.manufacturerName.required, invalid: M.manufacturerName.invalid },
-  },
-  lotNo: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.lotNo.required, invalid: M.lotNo.invalid },
-  },
-  analysedResult: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.analysedResult.required, invalid: M.analysedResult.invalid },
-  },
-  analysedResultAlphanumeric: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: {
-      required: M.analysedResultAlphanumeric.required,
-      invalid: M.analysedResultAlphanumeric.invalid,
+      required: M.manufacturerName.required,
+      invalid: M.manufacturerName.invalid,
+      ...SHORT_MSG,
     },
   },
-  acemQcResult: {
-    valueType: "number" as const,
-    requiredIn: [] as ValidationTier[],
-    messages: { required: M.acemQcResult.required, invalid: M.acemQcResult.invalid },
-  },
-  acemQcResultAlphanumeric: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: [] as ValidationTier[],
-    messages: {
-      required: M.acemQcResultAlphanumeric.required,
-      invalid: M.acemQcResultAlphanumeric.invalid,
-    },
-  },
+  lotNo: codeTextRule(["UNIT", "SUBMIT"], {
+    required: M.lotNo.required,
+    invalid: M.lotNo.invalid,
+  }),
+  analysedResult: decimalNumberRule(["SUBMIT"], {
+    required: M.analysedResult.required,
+    invalid: M.analysedResult.invalid,
+  }),
+  analysedResultAlphanumeric: codeTextRule(["SUBMIT"], {
+    required: M.analysedResultAlphanumeric.required,
+    invalid: M.analysedResultAlphanumeric.invalid,
+  }),
+  acemQcResult: decimalNumberRule([], {
+    required: M.acemQcResult.required,
+    invalid: M.acemQcResult.invalid,
+  }),
+  acemQcResultAlphanumeric: codeTextRule([], {
+    required: M.acemQcResultAlphanumeric.required,
+    invalid: M.acemQcResultAlphanumeric.invalid,
+  }),
   certificates: {
     valueType: "file" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.certificates.required, invalid: M.certificates.invalid },
   },
-  certificateType: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.certificateType.required, invalid: M.certificateType.invalid },
-  },
+  certificateType: codeTextRule(["SUBMIT"], {
+    required: M.certificateType.required,
+    invalid: M.certificateType.invalid,
+  }),
   adductBatchPrepDate: {
     valueType: "date" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.adductBatchPrepDate.required, invalid: A.adductBatchPrepDate.invalid },
   },
-  tmpMfgLotNo: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.tmpMfgLotNo.required, invalid: A.tmpMfgLotNo.invalid },
-  },
-  tmpTotalQtyGm: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.tmpTotalQtyGm.required, invalid: A.tmpTotalQtyGm.invalid },
-  },
-  nbdMfgLotNo: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.nbdMfgLotNo.required, invalid: A.nbdMfgLotNo.invalid },
-  },
-  nbdTotalQtyGm: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.nbdTotalQtyGm.required, invalid: A.nbdTotalQtyGm.invalid },
-  },
-  rpm: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.rpm.required, invalid: A.rpm.invalid },
-  },
-  processTemp: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.processTemp.required, invalid: A.processTemp.invalid },
-  },
-  jacketTemp: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.jacketTemp.required, invalid: A.jacketTemp.invalid },
-  },
+  tmpMfgLotNo: codeTextRule(["SUBMIT"], {
+    required: A.tmpMfgLotNo.required,
+    invalid: A.tmpMfgLotNo.invalid,
+  }),
+  tmpTotalQtyGm: positiveDecimalNumberRule(["SUBMIT"], {
+    required: A.tmpTotalQtyGm.required,
+    invalid: A.tmpTotalQtyGm.invalid,
+    minVal: A.tmpTotalQtyGm.minVal,
+  }),
+  nbdMfgLotNo: codeTextRule(["SUBMIT"], {
+    required: A.nbdMfgLotNo.required,
+    invalid: A.nbdMfgLotNo.invalid,
+  }),
+  nbdTotalQtyGm: positiveDecimalNumberRule(["SUBMIT"], {
+    required: A.nbdTotalQtyGm.required,
+    invalid: A.nbdTotalQtyGm.invalid,
+    minVal: A.nbdTotalQtyGm.minVal,
+  }),
+  rpm: decimalNumberRule(["SUBMIT"], {
+    required: A.rpm.required,
+    invalid: A.rpm.invalid,
+  }),
+  processTemp: decimalNumberRule(["SUBMIT"], {
+    required: A.processTemp.required,
+    invalid: A.processTemp.invalid,
+  }),
+  jacketTemp: decimalNumberRule(["SUBMIT"], {
+    required: A.jacketTemp.required,
+    invalid: A.jacketTemp.invalid,
+  }),
   processStartTime: {
     valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
@@ -139,48 +190,41 @@ export const rawMaterialSourcingFieldRules = {
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.processEndTime.required, invalid: A.processEndTime.invalid },
   },
-  finalAdductQty: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: A.finalAdductQty.required, invalid: A.finalAdductQty.invalid },
-  },
+  finalAdductQty: positiveDecimalNumberRule(["SUBMIT"], {
+    required: A.finalAdductQty.required,
+    invalid: A.finalAdductQty.invalid,
+    minVal: A.finalAdductQty.minVal,
+  }),
   dispatchDateTime: {
     valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.dispatchDateTime.required, invalid: A.dispatchDateTime.invalid },
   },
-  mfgBatchLotNo: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.mfgBatchLotNo.required, invalid: H.mfgBatchLotNo.invalid },
-  },
-  totalQty: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.totalQty.required, invalid: H.totalQty.invalid },
-  },
-  equipmentId: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.equipmentId.required, invalid: H.equipmentId.invalid },
-  },
-  agitatorRpm: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.agitatorRpm.required, invalid: H.agitatorRpm.invalid },
-  },
-  htpbProcessTemp: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.processTemp.required, invalid: H.processTemp.invalid },
-  },
-  htpbJacketTemp: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: H.jacketTemp.required, invalid: H.jacketTemp.invalid },
-  },
+  mfgBatchLotNo: codeTextRule(["SUBMIT"], {
+    required: H.mfgBatchLotNo.required,
+    invalid: H.mfgBatchLotNo.invalid,
+  }),
+  totalQty: positiveDecimalNumberRule(["SUBMIT"], {
+    required: H.totalQty.required,
+    invalid: H.totalQty.invalid,
+    minVal: H.totalQty.minVal,
+  }),
+  equipmentId: codeTextRule(["SUBMIT"], {
+    required: H.equipmentId.required,
+    invalid: H.equipmentId.invalid,
+  }),
+  agitatorRpm: decimalNumberRule(["SUBMIT"], {
+    required: H.agitatorRpm.required,
+    invalid: H.agitatorRpm.invalid,
+  }),
+  htpbProcessTemp: decimalNumberRule(["SUBMIT"], {
+    required: H.processTemp.required,
+    invalid: H.processTemp.invalid,
+  }),
+  htpbJacketTemp: decimalNumberRule(["SUBMIT"], {
+    required: H.jacketTemp.required,
+    invalid: H.jacketTemp.invalid,
+  }),
   htpbProcessStartTime: {
     valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
@@ -191,7 +235,33 @@ export const rawMaterialSourcingFieldRules = {
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: H.processEndTime.required, invalid: H.processEndTime.invalid },
   },
+  otherObservations: {
+    valueType: "text" as const,
+    pattern: REMARKS_PATTERN,
+    minLength: REMARKS_MIN,
+    maxLength: REMARKS_MAX,
+    requiredIn: [] as ValidationTier[],
+    messages: {
+      required: H.otherObservations.required,
+      invalid: H.otherObservations.invalid,
+      ...REMARKS_MSG,
+    },
+  },
 };
+
+function optionsFromRule(rule: FieldRuleConfig, required: boolean) {
+  return {
+    valueType: rule.valueType,
+    required,
+    pattern: rule.pattern,
+    minLength: rule.minLength,
+    maxLength: rule.maxLength,
+    maxDecimals: rule.maxDecimals,
+    minVal: rule.minVal,
+    maxVal: rule.maxVal,
+    positiveOnly: rule.positiveOnly,
+  };
+}
 
 export function analysedResultRuleKey(row: Pick<SpecRow, "referenceRange">): string {
   return specResultRuleKey("analysedResult", row.referenceRange);
@@ -207,16 +277,12 @@ export function validateAnalysedResultState(
 ): FieldValidationState {
   const fields = rawMaterialSourcingFieldRules;
   if (isReferenceRangeNotApplicable(row.referenceRange)) {
-    return validateFieldState(row.analysedResult, {
-      valueType: fields.analysedResultAlphanumeric.valueType,
-      required,
-      pattern: fields.analysedResultAlphanumeric.pattern,
-    });
+    return validateFieldState(
+      row.analysedResult,
+      optionsFromRule(fields.analysedResultAlphanumeric, required),
+    );
   }
-  return validateFieldState(row.analysedResult, {
-    valueType: fields.analysedResult.valueType,
-    required,
-  });
+  return validateFieldState(row.analysedResult, optionsFromRule(fields.analysedResult, required));
 }
 
 function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
@@ -307,6 +373,7 @@ function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
       ["jacketTemp", "htpbJacketTemp"],
       ["processStartTime", "htpbProcessStartTime"],
       ["processEndTime", "htpbProcessEndTime"],
+      ["otherObservations", "otherObservations"],
     ];
 
     const appendBlendingStylePaths = (
@@ -340,20 +407,12 @@ export const isMaterialMetaUnitComplete = (meta: {
 }): boolean => {
   const fields = rawMaterialSourcingFieldRules;
   return (
-    validateFieldState(meta.supplyOrderNo, {
-      valueType: fields.supplyOrderNo.valueType,
-      required: false,
-      pattern: fields.supplyOrderNo.pattern,
-    }) === "valid" &&
-    validateFieldState(meta.receiptDate, {
-      valueType: fields.receiptDate.valueType,
-      required: false,
-    }) === "valid" &&
-    validateFieldState(meta.manufacturerName, {
-      valueType: fields.manufacturerName.valueType,
-      required: true,
-      pattern: fields.manufacturerName.pattern,
-    }) === "valid"
+    validateFieldState(meta.supplyOrderNo, optionsFromRule(fields.supplyOrderNo, false)) ===
+      "valid" &&
+    validateFieldState(meta.receiptDate, optionsFromRule(fields.receiptDate, false)) ===
+      "valid" &&
+    validateFieldState(meta.manufacturerName, optionsFromRule(fields.manufacturerName, true)) ===
+      "valid"
   );
 };
 
@@ -362,11 +421,7 @@ export const isBlockUnitComplete = (block: MaterialBlock): boolean => {
   const fields = rawMaterialSourcingFieldRules;
   const metaOk = isMaterialMetaUnitComplete(block);
   const lotOk =
-    validateFieldState(block.lotNo, {
-      valueType: fields.lotNo.valueType,
-      required: true,
-      pattern: fields.lotNo.pattern,
-    }) === "valid";
+    validateFieldState(block.lotNo, optionsFromRule(fields.lotNo, true)) === "valid";
   return metaOk && lotOk;
 };
 
@@ -390,13 +445,7 @@ const isAdductSubmitComplete = (block: MaterialBlock): boolean => {
   ];
   return entries.every(([field, ruleKey]) => {
     const rule = fields[ruleKey];
-    return (
-      validateFieldState(adduct[field], {
-        valueType: rule.valueType,
-        required: true,
-        pattern: "pattern" in rule ? rule.pattern : undefined,
-      }) === "valid"
-    );
+    return validateFieldState(adduct[field], optionsFromRule(rule, true)) === "valid";
   });
 };
 
@@ -421,13 +470,7 @@ const isBlendingStyleSubmitComplete = (
   const fields = rawMaterialSourcingFieldRules;
   return blendingStyleSubmitEntries.every(([field, ruleKey]) => {
     const rule = fields[ruleKey];
-    return (
-      validateFieldState(details[field], {
-        valueType: rule.valueType,
-        required: true,
-        pattern: "pattern" in rule ? rule.pattern : undefined,
-      }) === "valid"
-    );
+    return validateFieldState(details[field], optionsFromRule(rule, true)) === "valid";
   });
 };
 
@@ -448,11 +491,8 @@ export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
     }) === "valid";
   const certTypesOk = (block.certificates ?? []).every(
     (cert) =>
-      validateFieldState(cert.certificateType, {
-        valueType: fields.certificateType.valueType,
-        required: true,
-        pattern: fields.certificateType.pattern,
-      }) === "valid",
+      validateFieldState(cert.certificateType, optionsFromRule(fields.certificateType, true)) ===
+      "valid",
   );
   const rowsOk =
     (block.rows ?? []).length > 0 &&
