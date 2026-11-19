@@ -226,45 +226,6 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                 theme.workflow.formElements.textField,
                 specStyles.materialDropdownField,
               ]}
-              inputSx={
-                mode === "dark"
-                  ? {
-                      minHeight: 36,
-                      height: 36,
-                      bgcolor: "rgba(255,255,255,0.1)",
-                      // Inset ring — survives MUI light-theme notchedOutline (near-black).
-                      boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.7)",
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.7) !important",
-                        borderWidth: "1.5px !important",
-                      },
-                      "&:hover": {
-                        boxShadow: "inset 0 0 0 1.5px #64b5f6",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#64b5f6 !important",
-                      },
-                      "&.Mui-focused": {
-                        boxShadow: "inset 0 0 0 1.5px #64b5f6",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#64b5f6 !important",
-                        borderWidth: "1.5px !important",
-                      },
-                      "&.Mui-disabled": {
-                        opacity: 1,
-                        bgcolor: "rgba(255,255,255,0.06)",
-                        boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.4)",
-                      },
-                      "&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.4) !important",
-                      },
-                    }
-                  : {
-                      minHeight: 36,
-                      height: 36,
-                    }
-              }
               SelectProps={{ IconComponent: ExpandMoreRoundedIcon }}
               MenuProps={{
                 disableScrollLock: true,
@@ -305,9 +266,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
       )}
 
       {createLotMode && allMaterialsAdded && (
-        <Typography
-          sx={{ fontSize: "0.8rem", color: theme.palette.textSub, mb: 2 }}
-        >
+        <Typography sx={specStyles.allMaterialsAddedText}>
           {formStrings.ALL_MATERIALS_ADDED}
         </Typography>
       )}

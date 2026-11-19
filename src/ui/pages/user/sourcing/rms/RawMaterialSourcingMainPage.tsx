@@ -52,7 +52,11 @@ const RawMaterialSourcingMainPage = () => {
       <WorkflowFormOpeningLoader
         open={listLoading || Boolean(loadingFormDetails)}
         title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
-        message={loadingFormDetails ? strings.FORM_OPENING_MESSAGE : "Loading raw material lots…"}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : strings.LIST_LOADING_MESSAGE
+        }
         color={theme.palette.primary}
         accentColor={theme.palette.primaryLight}
       />

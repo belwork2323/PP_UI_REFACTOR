@@ -385,6 +385,7 @@ export const STRINGS = {
       FORM_OPENING_TITLE: "Opening Raw Material Lot Form",
       FORM_OPENING_MESSAGE:
         "Loading lot details, specifications, and form data. This will only take a moment…",
+      LIST_LOADING_MESSAGE: "Loading raw material lots…",
       SHORT_DESCRIPTION: "Register new material lots, update partner details.",
       NEW_SUBMISSION: "New Submission",
       FORM_HEADER_CREATE_LOT_TITLE: "Create Lot",
@@ -619,6 +620,7 @@ export const STRINGS = {
         lotNo: {
           required: "Lot ID is required",
           invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+          duplicate: "Lot ID already exists in this form",
         },
         analysedResult: {
           required: "Analyze Result @ Source is required",

@@ -9,6 +9,9 @@ export const createRawMaterialSourcingFormTheme = (
 ) => {
 	const isDark = mode === "dark";
 	const fieldBg = isDark ? (palette.pageBg ?? "#0f1117") : "#fff";
+	const border = palette.border;
+	const primary = palette.primary;
+	const primaryLight = palette.primaryLight;
 	// Hard-code dark text — MUI light ThemeProvider keeps near-black fill otherwise.
 	const fieldText = isDark ? "#f0f2f8" : (palette.text ?? "#111111");
 	const fieldPlaceholder = isDark
@@ -66,6 +69,10 @@ export const createRawMaterialSourcingFormTheme = (
 			whiteIcon: { color: "#fff" },
 			blockScienceIcon: { fontSize: 16 },
 			progressChipIcon: { fontSize: "13px !important" },
+			progressChipIconFilled: {
+				fontSize: "13px !important",
+				color: `${palette.accent} !important`,
+			},
 			blockTitle: { fontWeight: fonts.weight.bold, fontSize: fonts.size.xs, color: palette.text },
 			blockMeta: { fontSize: "0.68rem", color: palette.textSub },
 			progressChip: (allFilled: boolean) => ({
@@ -81,6 +88,92 @@ export const createRawMaterialSourcingFormTheme = (
 					: amberChipSx),
 			}),
 			removeIconButton: { color: palette.danger, "&:hover": { background: alpha(palette.danger, 0.08) } },
+			/** Nested lot / preparation panels inside a material card. */
+			lotSubCard: {
+				borderRadius: 1.5,
+				border: `1px solid ${alpha(border, 0.55)}`,
+				overflow: "hidden",
+				mb: 2,
+			},
+			lotSubCardHeader: {
+				px: 2,
+				py: 1.25,
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "space-between",
+				flexWrap: "wrap",
+				gap: 1,
+				background: alpha(primary, 0.04),
+				borderBottom: `1px solid ${alpha(border, 0.45)}`,
+			},
+			lotSubCardTitle: {
+				fontSize: "0.85rem",
+				fontWeight: 700,
+				color: palette.text,
+			},
+			/** ACEM / HTPB preparation bordered panels. */
+			subPanel: {
+				mx: 2,
+				mb: 2,
+				p: 2,
+				borderRadius: 1.5,
+				border: `1px solid ${alpha(border, 0.55)}`,
+				bgcolor: isDark
+					? alpha(palette.surface ?? "#1e1e1e", 0.65)
+					: alpha(primary, 0.03),
+			},
+			subPanelTitle: {
+				fontSize: "0.78rem",
+				fontWeight: 700,
+				color: palette.text,
+				mb: 1.5,
+			},
+			addLotButton: {
+				textTransform: "none",
+				fontWeight: 700,
+				borderRadius: 2,
+				borderColor: primaryLight,
+				color: primaryLight,
+				"&:hover": { background: alpha(primaryLight, 0.06) },
+			},
+			deleteLotButton: {
+				textTransform: "none",
+				fontWeight: 700,
+				borderRadius: 2,
+				flexShrink: 0,
+			},
+			lockedLotNoText: {
+				fontSize: "0.78rem",
+				fontWeight: 600,
+				color: palette.text,
+				lineHeight: 1.35,
+				wordBreak: "break-word",
+			},
+			lockedLotNoHint: {
+				mx: 0,
+				mt: 0.5,
+				fontSize: "0.68rem",
+				color: palette.textSub,
+			},
+			fieldErrorHint: {
+				mx: 0,
+				mt: 0.5,
+				fontSize: "0.68rem",
+			},
+			cellHelperText: {
+				mx: 0,
+				fontSize: "0.65rem",
+			},
+			cellHelperTextWarning: {
+				mx: 0,
+				fontSize: "0.65rem",
+				color: "error.main",
+			},
+			allMaterialsAddedText: {
+				fontSize: "0.8rem",
+				color: palette.textSub,
+				mb: 2,
+			},
 			lotField: { minWidth: 0 },
 			specText: { fontSize: "0.8rem", color: palette.text, fontWeight: 500, lineHeight: 1.35 },
 			refRangeChip: {
@@ -219,9 +312,8 @@ export const createRawMaterialSourcingFormTheme = (
 				border: `1.5px dashed ${isDark ? "rgba(255,255,255,0.35)" : alpha(palette.primaryLight, 0.35)}`,
 			},
 			/**
-			 * Explicit field chrome. MUI ThemeProvider stays light, so default
-			 * `.MuiOutlinedInput-notchedOutline` is rgba(0,0,0,0.23) — invisible on dark.
-			 * Target notchedOutline with !important so it actually wins.
+			 * Material picker chrome (height + dark outline). Shared AppDropdown dark
+			 * tokens handle text; this layer keeps the denser 36px selector row.
 			 */
 			materialDropdownField: {
 				mb: 0,
@@ -231,19 +323,31 @@ export const createRawMaterialSourcingFormTheme = (
 					background: isDark ? alpha("#fff", 0.1) : "#fff",
 					...(isDark
 						? {
+								boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.7)",
 								"& .MuiOutlinedInput-notchedOutline": {
-									borderColor: "rgba(255,255,255,0.55) !important",
-									borderWidth: "1.5px",
+									borderColor: "rgba(255,255,255,0.7) !important",
+									borderWidth: "1.5px !important",
+								},
+								"&:hover": {
+									boxShadow: `inset 0 0 0 1.5px ${primaryLight}`,
 								},
 								"&:hover .MuiOutlinedInput-notchedOutline": {
-									borderColor: `${palette.primaryLight ?? "#64b5f6"} !important`,
+									borderColor: `${primaryLight} !important`,
+								},
+								"&.Mui-focused": {
+									boxShadow: `inset 0 0 0 1.5px ${primaryLight}`,
 								},
 								"&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-									borderColor: `${palette.primaryLight ?? "#64b5f6"} !important`,
-									borderWidth: "1.5px",
+									borderColor: `${primaryLight} !important`,
+									borderWidth: "1.5px !important",
+								},
+								"&.Mui-disabled": {
+									opacity: 1,
+									bgcolor: "rgba(255,255,255,0.06)",
+									boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.4)",
 								},
 								"&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
-									borderColor: "rgba(255,255,255,0.35) !important",
+									borderColor: "rgba(255,255,255,0.4) !important",
 								},
 							}
 						: {}),
@@ -400,6 +504,7 @@ export const createRawMaterialSourcingFormTheme = (
 				borderRadius: 1.5,
 				overflowX: "auto",
 				boxSizing: "border-box",
+				border: `1px solid ${alpha(border, 0.45)}`,
 			},
 			specsTable: {
 				tableLayout: "fixed",

@@ -4,6 +4,8 @@ import {
   appDropdownInputProps,
   appDropdownLabelProps,
   appDropdownSx,
+  getAppControlDarkInputStyle,
+  getAppControlDarkModeSx,
 } from "./fieldStyles";
 
 export type AppTextFieldProps = TextFieldProps & {
@@ -31,20 +33,12 @@ const AppTextField = ({
 }: AppTextFieldProps) => {
   const muiTheme = useTheme();
   const isDark = muiTheme.palette.mode === "dark";
-  const textColor = isDark ? "#f0f2f8" : undefined;
-  const placeholderColor = isDark ? "rgba(240,242,248,0.65)" : undefined;
 
   const baseInputStyle = filterPanel
     ? { fontSize: "0.72rem" }
     : { ...(appDropdownInputProps.style ?? {}) };
 
-  const darkInputStyle = textColor
-    ? {
-        color: textColor,
-        WebkitTextFillColor: textColor,
-        caretColor: textColor,
-      }
-    : {};
+  const darkInputStyle = isDark ? getAppControlDarkInputStyle() : {};
 
   return (
     <TextField
@@ -75,18 +69,7 @@ const AppTextField = ({
                 margin: 0,
               },
           },
-          isDark && {
-            "& .MuiInputBase-input, & .MuiOutlinedInput-input": {
-              color: `${textColor} !important`,
-              WebkitTextFillColor: `${textColor} !important`,
-              caretColor: textColor,
-              "&::placeholder, &::-webkit-input-placeholder": {
-                color: `${placeholderColor} !important`,
-                WebkitTextFillColor: `${placeholderColor} !important`,
-                opacity: 1,
-              },
-            },
-          },
+          isDark && getAppControlDarkModeSx(),
           inputSx,
           sx,
         ] as SxProps<Theme>

@@ -3,6 +3,7 @@ import {
   Box,
   MenuItem,
   TextField,
+  useTheme,
   type SelectProps,
   type SxProps,
   type Theme,
@@ -15,6 +16,7 @@ import {
   appDropdownMenuProps,
   appDropdownPlaceholderSx,
   appDropdownSx,
+  getAppControlDarkModeSx,
 } from "./fieldStyles";
 
 export type AppDropdownOption = {
@@ -84,10 +86,13 @@ const AppDropdown = ({
   startAdornment,
   inputSx,
 }: AppDropdownProps) => {
+  const muiTheme = useTheme();
+  const isDark = muiTheme.palette.mode === "dark";
   const resolvedPlaceholder = loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
   const hasPlaceholder = Boolean(resolvedPlaceholder);
   const sxList = [
     ...(filterPanel ? [{ mb: 0 }] : [compact ? appDenseControlSx : appDropdownSx]),
+    ...(isDark ? [getAppControlDarkModeSx()] : []),
     ...(sx == null ? [] : Array.isArray(sx) ? sx : [sx]),
   ];
 

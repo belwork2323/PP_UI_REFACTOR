@@ -7,6 +7,7 @@ import {
   type ApproverStatusMeta,
 } from "@app/theme/approver";
 import { icons } from "@app/theme/icons";
+import { useThemeStore } from "@app/store/themeStore";
 import { getApproverListTheme } from "@app/theme/custom_themes/approver/approverList_theme";
 import type { ApproverFilterField } from "@hooks/approver/useApproverList";
 import { useApproverList } from "@hooks/approver/useApproverList";
@@ -17,10 +18,16 @@ import {
   resolveApproverRowStatus,
 } from "@data/models/approver/ApproverBatchListModel";
 import ListLayout from "@ui/components/custom/ListLayout";
-import Pagination from "@ui/components/common/Pagination";
+import ListPagination from "@ui/components/custom/ListPagination";
+
+const APPROVER_ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
+
+export type ApproverListPaginationSlot = {
+  pagination: ReactNode;
+};
 
 export type ApproverListProps<T> = {
-  children: (filteredItems: T[]) => ReactNode;
+  children: (filteredItems: T[], slot?: ApproverListPaginationSlot) => ReactNode;
   department: ApproverDepartmentKey;
   emptyIcon?: ElementType;
   emptySubtitle?: string;
@@ -74,7 +81,8 @@ const ApproverList = <T extends Record<string, unknown>>({
   subDepartment,
 }: ApproverListProps<T>) => {
   const brand = getApproverBrand(department);
-  const listTheme = useMemo(() => getApproverListTheme(brand), [brand]);
+  const mode = useThemeStore((state) => state.mode);
+  const listTheme = useMemo(() => getApproverListTheme(brand, mode), [brand, mode]);
   const EmptyIcon = emptyIcon ?? DEFAULT_ICONS[department];
   const {
     activeStatus: internalActiveStatus,
@@ -105,8 +113,10 @@ const ApproverList = <T extends Record<string, unknown>>({
     items: resolvedItems,
     loading,
     page,
+    limit,
     pagination,
     setPage,
+    setLimit,
     statusCounts,
   } = useApproverSubDepartmentBatchList<T>({
     allLabel,
@@ -222,10 +232,27 @@ const ApproverList = <T extends Record<string, unknown>>({
       statusTabs={displayStatusTabs}
       theme={listTheme}
     >
-      {children(filteredItems)}
-      {subDepartment && pagination.totalPages > 1 ? (
-        <Pagination currentPage={page} totalPages={pagination.totalPages} onChange={setPage} />
-      ) : null}
+      {(() => {
+        const paginationNode =
+          subDepartment ? (
+            <ListPagination
+              count={pagination.totalRecords}
+              page={Math.max(0, page - 1)}
+              rowsPerPage={limit}
+              rowsPerPageOptions={APPROVER_ROWS_PER_PAGE_OPTIONS}
+              onPageChange={(nextPage) => setPage(nextPage + 1)}
+              onRowsPerPageChange={setLimit}
+              palette={{
+                border: mode === "dark" ? "rgba(255,255,255,0.2)" : brand.border,
+                surface: mode === "dark" ? "#1e1e1e" : brand.surface,
+                text: mode === "dark" ? "#f0f2f8" : brand.text,
+                textSub: mode === "dark" ? "rgba(240,242,248,0.65)" : brand.textSub,
+              }}
+            />
+          ) : null;
+
+        return children(filteredItems, paginationNode ? { pagination: paginationNode } : undefined);
+      })()}
     </ListLayout>
   );
 };

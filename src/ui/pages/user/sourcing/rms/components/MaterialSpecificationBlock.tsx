@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  alpha,
   Box,
   Chip,
   FormHelperText,
@@ -280,10 +279,7 @@ const MaterialSpecificationBlock = ({
             icon={
               allFilled ? (
                 <CheckCircleOutlineRoundedIcon
-                  sx={{
-                    ...specStyles.progressChipIcon,
-                    color: `${theme.palette.accent} !important`,
-                  }}
+                  sx={specStyles.progressChipIconFilled}
                 />
               ) : undefined
             }
@@ -306,12 +302,7 @@ const MaterialSpecificationBlock = ({
                   startIcon={<DeleteOutlineRoundedIcon />}
                   onClick={onDeleteLot}
                   disabled={deleteLoading}
-                  sx={{
-                    textTransform: "none",
-                    fontWeight: 700,
-                    borderRadius: 2,
-                    flexShrink: 0,
-                  }}
+                  sx={specStyles.deleteLotButton}
                 >
                   {formStrings.DELETE_LOT}
                 </AppButton>
@@ -455,12 +446,7 @@ const MaterialSpecificationBlock = ({
       ) : null}
 
       <Box sx={specStyles.specsTableWrap}>
-        <TableContainer
-          sx={{
-            ...specStyles.specsTableContainer,
-            border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
-          }}
-        >
+        <TableContainer sx={specStyles.specsTableContainer}>
           <Table size="small" sx={specStyles.specsTable}>
             <TableHead>
               <TableRow>
@@ -569,25 +555,10 @@ const MaterialSpecificationBlock = ({
                         <Box data-rms-field={blockLotPath(index, "lotNo")}>
                           {lockLotNo ? (
                             <>
-                              <Typography
-                                sx={{
-                                  fontSize: "0.78rem",
-                                  fontWeight: 600,
-                                  color: theme.palette.text,
-                                  lineHeight: 1.35,
-                                  wordBreak: "break-word",
-                                }}
-                              >
+                              <Typography sx={specStyles.lockedLotNoText}>
                                 {block.lotNo || "—"}
                               </Typography>
-                              <FormHelperText
-                                sx={{
-                                  mx: 0,
-                                  mt: 0.5,
-                                  fontSize: "0.68rem",
-                                  color: theme.palette.textSub,
-                                }}
-                              >
+                              <FormHelperText sx={specStyles.lockedLotNoHint}>
                                 {formStrings.LOT_ID_LOCKED_HINT}
                               </FormHelperText>
                             </>
@@ -616,7 +587,7 @@ const MaterialSpecificationBlock = ({
                               {lotNoError ? (
                                 <FormHelperText
                                   error
-                                  sx={{ mx: 0, mt: 0.5, fontSize: "0.68rem" }}
+                                  sx={specStyles.fieldErrorHint}
                                 >
                                   {lotNoError}
                                 </FormHelperText>
@@ -699,7 +670,7 @@ const MaterialSpecificationBlock = ({
                           error={Boolean(analyzedError)}
                           helperText={analyzedError}
                           FormHelperTextProps={{
-                            sx: { mx: 0, fontSize: "0.65rem" },
+                            sx: specStyles.cellHelperText,
                           }}
                           sx={[
                             theme.workflow.formElements.cellField,
@@ -751,13 +722,10 @@ const MaterialSpecificationBlock = ({
                               : undefined)
                           }
                           FormHelperTextProps={{
-                            sx: {
-                              mx: 0,
-                              fontSize: "0.65rem",
-                              ...(acemOutOfRange && !acemError
-                                ? { color: "error.main" }
-                                : {}),
-                            },
+                            sx:
+                              acemOutOfRange && !acemError
+                                ? specStyles.cellHelperTextWarning
+                                : specStyles.cellHelperText,
                           }}
                           sx={[
                             theme.workflow.formElements.cellField,

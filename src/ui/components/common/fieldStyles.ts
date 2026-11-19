@@ -1,4 +1,4 @@
-import type { InputLabelProps } from "@mui/material";
+import type { InputLabelProps, SxProps, Theme } from "@mui/material";
 import { spacing } from "../../../app/theme";
 
 /** Shared control heights — keep text / dropdown / date pickers aligned. */
@@ -7,6 +7,75 @@ export const APP_CONTROL_HEIGHT_COMPACT = 32;
 export const APP_CONTROL_RADIUS = "8px";
 export const APP_CONTROL_FONT_SIZE = "0.78rem";
 export const APP_CONTROL_FONT_SIZE_COMPACT = "0.75rem";
+
+/** Shared dark-mode text fill — keep AppTextField / AppDropdown / DateField aligned. */
+export const APP_CONTROL_DARK_TEXT = "#f0f2f8";
+export const APP_CONTROL_DARK_PLACEHOLDER = "rgba(240,242,248,0.65)";
+export const APP_CONTROL_DARK_OUTLINE = "rgba(255,255,255,0.55)";
+export const APP_CONTROL_DARK_OUTLINE_HOVER = "rgba(255,255,255,0.75)";
+export const APP_CONTROL_DARK_OUTLINE_DISABLED = "rgba(255,255,255,0.35)";
+
+export type AppControlDarkColors = {
+  text: string;
+  placeholder: string;
+  outline: string;
+  outlineHover: string;
+  outlineDisabled: string;
+};
+
+export const getAppControlDarkColors = (): AppControlDarkColors => ({
+  text: APP_CONTROL_DARK_TEXT,
+  placeholder: APP_CONTROL_DARK_PLACEHOLDER,
+  outline: APP_CONTROL_DARK_OUTLINE,
+  outlineHover: APP_CONTROL_DARK_OUTLINE_HOVER,
+  outlineDisabled: APP_CONTROL_DARK_OUTLINE_DISABLED,
+});
+
+/** Inline style fragment for native input elements in dark mode. */
+export const getAppControlDarkInputStyle = () => {
+  const { text } = getAppControlDarkColors();
+  return {
+    color: text,
+    WebkitTextFillColor: text,
+    caretColor: text,
+  };
+};
+
+/**
+ * Dark-mode sx for outlined text + select controls.
+ * Applied by AppTextField and AppDropdown so light/dark stay consistent.
+ */
+export const getAppControlDarkModeSx = (): SxProps<Theme> => {
+  const { text, placeholder, outline, outlineHover, outlineDisabled } =
+    getAppControlDarkColors();
+  return {
+    "& .MuiInputBase-input, & .MuiOutlinedInput-input, & .MuiSelect-select": {
+      color: `${text} !important`,
+      WebkitTextFillColor: `${text} !important`,
+      caretColor: text,
+      "&::placeholder, &::-webkit-input-placeholder": {
+        color: `${placeholder} !important`,
+        WebkitTextFillColor: `${placeholder} !important`,
+        opacity: 1,
+      },
+    },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: `${outline} !important`,
+    },
+    "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: `${outlineHover} !important`,
+    },
+    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: `${outlineHover} !important`,
+    },
+    "& .MuiOutlinedInput-root.Mui-disabled .MuiOutlinedInput-notchedOutline": {
+      borderColor: `${outlineDisabled} !important`,
+    },
+    "& .MuiSelect-icon": {
+      color: APP_CONTROL_DARK_PLACEHOLDER,
+    },
+  };
+};
 
 /** Label sits above the control — avoids overlap with placeholder / selected value. */
 export const appDropdownLabelProps: Partial<InputLabelProps> = {

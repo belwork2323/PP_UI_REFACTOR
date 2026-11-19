@@ -1,5 +1,4 @@
 import { IconButton, Stack, Tooltip } from "@mui/material";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 
 import { STRINGS } from "@app/config/strings";
 import { icons } from "@app/theme/icons";
@@ -10,7 +9,11 @@ import AppButton from "@ui/components/common/Button";
 import UserWorkflowStatusAction from "@ui/components/custom/UserWorkflowStatusAction";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
-const { visibility: VisibilityRoundedIcon } = icons.user.sourcing.rawMaterialBatchList;
+const {
+  visibility: VisibilityRoundedIcon,
+} = icons.user.sourcing.rawMaterialBatchList;
+const { delete: DeleteOutlineRoundedIcon } =
+  icons.user.sourcing.specificationFormBuilder;
 
 /** Lot metadata edit — only for drafts not yet in workflow filling */
 const canShowEditLotButton = (status: string) => status === OPERATION_STATUS.TO_BE_INITIATED;

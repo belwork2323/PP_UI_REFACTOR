@@ -1,10 +1,19 @@
 import { flattenValidationErrorTree } from "@utils/flattenValidationErrorTree";
 import type { ValidationErrors } from "@data/validation/submissionIntent";
 import { extractApiErrorDetails } from "@utils/resolveApiErrorMessage";
+import {
+  groupBlocksToMaterialGroups,
+  type MaterialBlock,
+} from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
 export type MapRmsApiErrorsOptions = {
   /** create → materials[i]; update → lot.* / short keys on block 0 */
   mode?: "create" | "update";
+  /**
+   * Flat create-form blocks (same order as submitted). Required to map
+   * `materials[i].lots[j].…` onto `blocks[flat].…` when one material has multiple lots.
+   */
+  blocks?: Array<Pick<MaterialBlock, "material" | "gradeCode" | "lotNo"> | MaterialBlock>;
 };
 
 /** Normalize `materials[0].lots[1].x` → `materials.0.lots.1.x` for remapping. */
@@ -16,22 +25,59 @@ export function normalizeApiErrorPath(path: string): string {
 }
 
 /**
+ * Build materials[i].lots[j] → flat block index using the same grouping as create payload.
+ */
+export function buildMaterialLotFlatIndexMap(
+  blocks?: MapRmsApiErrorsOptions["blocks"],
+): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!blocks?.length) return map;
+
+  const groups = groupBlocksToMaterialGroups(blocks as MaterialBlock[]);
+  let flat = 0;
+  groups.forEach((group, materialIndex) => {
+    (group.lots ?? []).forEach((_lot, lotIndex) => {
+      map.set(`${materialIndex}:${lotIndex}`, flat);
+      flat += 1;
+    });
+  });
+  return map;
+}
+
+function resolveFlatBlockIndex(
+  materialIndex: number,
+  lotIndex: number | null,
+  flatIndexByMaterialLot: Map<string, number>,
+): number {
+  if (lotIndex == null) {
+    return flatIndexByMaterialLot.get(`${materialIndex}:0`) ?? materialIndex;
+  }
+  return (
+    flatIndexByMaterialLot.get(`${materialIndex}:${lotIndex}`) ??
+    // Fallback when blocks were not provided: assume 1:1 material↔block (legacy).
+    (lotIndex === 0 ? materialIndex : materialIndex + lotIndex)
+  );
+}
+
+/**
  * Map one backend validation path onto RMS UI `validationErrors` keys
  * (`blocks.{i}.…` used by client validation / MaterialSpecificationBlock).
  */
 export function remapRmsApiPathToUi(
   apiPath: string,
-  _options: MapRmsApiErrorsOptions = {},
+  options: MapRmsApiErrorsOptions = {},
 ): string | null {
   const path = normalizeApiErrorPath(apiPath);
   if (!path) return null;
 
+  const flatIndexByMaterialLot = buildMaterialLotFlatIndexMap(options.blocks);
+
   // Create payload: materials.i.…
   const materialsMatch = path.match(/^materials\.(\d+)(?:\.(.*))?$/);
   if (materialsMatch) {
-    const blockIndex = Number(materialsMatch[1]);
+    const materialIndex = Number(materialsMatch[1]);
     const rest = materialsMatch[2] ?? "";
-    return mapMaterialRelativeToBlock(blockIndex, rest);
+    return mapMaterialRelativeToBlock(materialIndex, rest, flatIndexByMaterialLot);
   }
 
   // Update payload: lot.…
@@ -77,8 +123,15 @@ export function remapRmsApiPathToUi(
   return null;
 }
 
-function mapMaterialRelativeToBlock(blockIndex: number, rest: string): string | null {
-  if (!rest) return `blocks.${blockIndex}.manufacturerName`;
+function mapMaterialRelativeToBlock(
+  materialIndex: number,
+  rest: string,
+  flatIndexByMaterialLot: Map<string, number>,
+): string | null {
+  // Material-level fields live on the first lot block of that material group.
+  const metaBlockIndex = resolveFlatBlockIndex(materialIndex, 0, flatIndexByMaterialLot);
+
+  if (!rest) return `blocks.${metaBlockIndex}.manufacturerName`;
 
   if (
     rest === "manufacturerName" ||
@@ -88,24 +141,26 @@ function mapMaterialRelativeToBlock(blockIndex: number, rest: string): string | 
     rest === "grade"
   ) {
     if (rest === "materialCode" || rest === "grade") {
-      return `blocks.${blockIndex}.manufacturerName`;
+      return `blocks.${metaBlockIndex}.manufacturerName`;
     }
-    return `blocks.${blockIndex}.${rest}`;
+    return `blocks.${metaBlockIndex}.${rest}`;
   }
 
-  if (rest === "lots") return `blocks.${blockIndex}.lots.0.lotNo`;
+  if (rest === "lots") return `blocks.${metaBlockIndex}.lots.0.lotNo`;
 
   const lotMatch = rest.match(/^lots\.(\d+)(?:\.(.*))?$/);
   if (lotMatch) {
-    // UI stores one lot per block at lots.0
-    return mapLotRelativeToBlock(blockIndex, lotMatch[2] ?? "");
+    const lotIndex = Number(lotMatch[1]);
+    const flatBlockIndex = resolveFlatBlockIndex(materialIndex, lotIndex, flatIndexByMaterialLot);
+    // UI stores one lot per flat block at lots.0
+    return mapLotRelativeToBlock(flatBlockIndex, lotMatch[2] ?? "");
   }
 
   if (rest.startsWith("adductPreparation") || rest.startsWith("htpbBlendingPreparation")) {
-    return `blocks.${blockIndex}.${rest}`;
+    return `blocks.${metaBlockIndex}.${rest}`;
   }
 
-  return `blocks.${blockIndex}.${rest}`;
+  return `blocks.${metaBlockIndex}.${rest}`;
 }
 
 function mapLotRelativeToBlock(blockIndex: number, rest: string): string | null {
@@ -176,6 +231,47 @@ export function mapRmsApiErrorsToUi(
   }
 
   return result;
+}
+
+/**
+ * When the API returns DUPLICATE_LOT (409) without a field map, map the message
+ * onto the matching Lot ID field so the create form stays open with a highlight.
+ */
+export function synthesizeRmsDuplicateLotFieldErrors(
+  response: {
+    errorCode?: string | null;
+    message?: string | null;
+    statusCode?: number;
+  } | null | undefined,
+  blocks?: Array<{ lotNo?: string | null }>,
+): ValidationErrors {
+  if (!response) return {};
+  const code = String(response.errorCode ?? "").toUpperCase();
+  const message = String(response.message ?? "").trim();
+  const isDuplicate =
+    code === "DUPLICATE_LOT" ||
+    /lot id already exists/i.test(message) ||
+    /duplicate lot id/i.test(message);
+  if (!isDuplicate) return {};
+
+  const extracted =
+    message.match(/Lot ID already exists:\s*(.+)$/i)?.[1]?.trim() ||
+    message.match(/Duplicate Lot ID in request:\s*(.+)$/i)?.[1]?.trim() ||
+    "";
+  const fieldMessage =
+    message || (extracted ? `Lot ID already exists: ${extracted}` : "Lot ID already exists");
+
+  if (extracted && Array.isArray(blocks) && blocks.length > 0) {
+    const needle = extracted.toLowerCase();
+    // Prefer the last matching block (later duplicate in multi-lot create).
+    for (let i = blocks.length - 1; i >= 0; i--) {
+      if (String(blocks[i]?.lotNo ?? "").trim().toLowerCase() === needle) {
+        return { [`blocks.${i}.lots.0.lotNo`]: fieldMessage };
+      }
+    }
+  }
+
+  return { "blocks.0.lots.0.lotNo": fieldMessage };
 }
 
 /** Extract + map in one step from an ApiResponseModel-like object. */

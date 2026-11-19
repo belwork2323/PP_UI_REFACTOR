@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import {
-  alpha,
   Box,
   Chip,
   IconButton,
@@ -165,10 +164,7 @@ const MaterialFormGroupCard = ({
             icon={
               allFilled ? (
                 <CheckCircleOutlineRoundedIcon
-                  sx={{
-                    ...specStyles.progressChipIcon,
-                    color: `${theme.palette.accent} !important`,
-                  }}
+                  sx={specStyles.progressChipIconFilled}
                 />
               ) : undefined
             }
@@ -308,14 +304,7 @@ const MaterialFormGroupCard = ({
           startIcon={<AddRoundedIcon />}
           onClick={() => onAddLot(materialIndex)}
           disabled={!canAddLot}
-          sx={{
-            textTransform: "none",
-            fontWeight: 700,
-            borderRadius: 2,
-            borderColor: theme.palette.primaryLight,
-            color: theme.palette.primaryLight,
-            "&:hover": { background: alpha(theme.palette.primaryLight, 0.06) },
-          }}
+          sx={specStyles.addLotButton}
         >
           {formStrings.ADD_LOT}
         </AppButton>

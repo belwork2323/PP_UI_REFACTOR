@@ -1,4 +1,4 @@
-import { alpha, Box, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import AppTextField from "@ui/components/common/AppTextField";
 import { STRINGS } from "@app/config/strings";
 import DateField, { DateTimeField } from "@ui/components/common/DateField";
@@ -75,25 +75,11 @@ const AdductPreparationSection = ({
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  const specStyles = theme.sourcing.rawMaterial.specificationForm;
+
   return (
-    <Box
-      sx={{
-        mx: 2,
-        mb: 2,
-        p: 2,
-        borderRadius: 1.5,
-        border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.55)}`,
-        bgcolor: alpha(theme.palette?.primary ?? "#1B4F72", 0.03),
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: "0.78rem",
-          fontWeight: 700,
-          color: theme.palette.text,
-          mb: 1.5,
-        }}
-      >
+    <Box sx={specStyles.subPanel}>
+      <Typography sx={specStyles.subPanelTitle}>
         {L.SECTION_TITLE}
       </Typography>
 

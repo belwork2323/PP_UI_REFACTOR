@@ -29,7 +29,10 @@ import {
 } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcing.validation";
 import { hasValidationErrors } from "@data/validation/validationErrors";
 import type { ValidationErrors, ValidationTier } from "@data/validation/submissionIntent";
-import { mapRmsApiErrorsToUi } from "@data/validation/adapters/sourcing/rms/rawMaterialSourcingApiErrorMap";
+import {
+  mapRmsApiErrorsToUi,
+  synthesizeRmsDuplicateLotFieldErrors,
+} from "@data/validation/adapters/sourcing/rms/rawMaterialSourcingApiErrorMap";
 import { extractApiErrorDetails, resolveApiErrorMessage } from "@utils/resolveApiErrorMessage";
 import { getRawMaterialSourcingErrorMessage as getErrorMessage } from "@hooks/user/sourcing/rms/rawMaterialSourcingErrors";
 import { resolveLotDetailsFetchErrorFallback } from "@hooks/user/sourcing/rms/rawMaterialSourcingDetailsHelpers";
@@ -80,9 +83,19 @@ export const useRawMaterialSourcingForm = ({
       response: unknown,
       fallbackMessage: string,
       mode: "create" | "update",
+      blocksForDuplicateMap?: MaterialBlock[],
     ): RawMaterialSourcingSubmitResult => {
       const details = extractApiErrorDetails(response as any);
-      const fieldErrors = mapRmsApiErrorsToUi(details, { mode });
+      let fieldErrors = mapRmsApiErrorsToUi(details, {
+        mode,
+        blocks: blocksForDuplicateMap,
+      });
+      if (!hasValidationErrors(fieldErrors)) {
+        fieldErrors = synthesizeRmsDuplicateLotFieldErrors(
+          response as { errorCode?: string | null; message?: string | null; statusCode?: number },
+          blocksForDuplicateMap,
+        );
+      }
       const message = resolveApiErrorMessage(response as any, fallbackMessage);
       if (hasValidationErrors(fieldErrors)) {
         showValidationAlert(message);
@@ -401,6 +414,7 @@ export const useRawMaterialSourcingForm = ({
             response,
             STRINGS.SOURCING.SPECIFICATION_FORM.CREATE_FAILED,
             "create",
+            blocks,
           );
         }
 

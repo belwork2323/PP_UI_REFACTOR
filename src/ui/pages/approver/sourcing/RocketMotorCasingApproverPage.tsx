@@ -414,7 +414,7 @@ const RocketMotorApproverPage = () => {
         "casing type",
       ])}
     >
-      {(filtered) => (
+      {(filtered, slot) => (
         <>
           <Card sx={theme.table.containerCard} elevation={0}>
             <TableContainer>
@@ -508,6 +508,7 @@ const RocketMotorApproverPage = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+            {slot?.pagination}
           </Card>
 
           <RocketCasingDetailDialog

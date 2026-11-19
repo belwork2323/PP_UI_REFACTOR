@@ -108,6 +108,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
   const userId = useAuthStore((state) => state.user?.userId);
   const refreshVersion = useApproverListRefreshStore((state) => state.version);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(DEFAULT_PAGINATION.limit);
   const [pagination, setPagination] = useState<ApproverBatchPagination>(DEFAULT_PAGINATION);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
     [allLabel]: items.length,
@@ -128,6 +129,10 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
 
     return () => window.clearTimeout(timerId);
   }, [searchText]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [limit]);
 
   useEffect(() => {
     setPage(1);
@@ -203,7 +208,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       const result = await fetchList({
         subDepartmentId: selectedSubDepartment.subDepartmentId,
         page,
-        limit: DEFAULT_PAGINATION.limit,
+        limit,
         status,
         allLabel,
         search: debouncedSearchText,
@@ -230,7 +235,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       subDepartmentId: selectedSubDepartment.subDepartmentId,
       userId: String(userId),
       page,
-      limit: DEFAULT_PAGINATION.limit,
+      limit,
       statusFilter: status,
       search: debouncedSearchText,
       priority: extraFilters.priority,
@@ -260,7 +265,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       );
       const resolvedPagination = resolveSubdepartmentBatchPagination(
         data.pagination as Record<string, unknown> | undefined,
-        DEFAULT_PAGINATION.limit,
+        limit,
       );
 
       setRemoteBatches(nextBatches);
@@ -285,6 +290,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     debouncedSearchText,
     extraFilters,
     items.length,
+    limit,
     page,
     refreshVersion,
     selectedSubDepartment?.subDepartmentId,
@@ -354,13 +360,20 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     return merged.length > 0 ? merged : items;
   }, [items, remoteBatches]);
 
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
+  };
+
   return {
     items: mergedItems,
     loading,
     isRefreshing,
     page,
+    limit,
     pagination,
     setPage,
+    setLimit: handleLimitChange,
     statusCounts,
     refresh: loadBatches,
   };

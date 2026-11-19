@@ -19,6 +19,8 @@ type Palette = {
   text: string;
   textSub: string;
   border: string;
+  surface?: string;
+  pageBg?: string;
   white?: string;
 };
 
@@ -76,7 +78,10 @@ const PreparationSection = ({
       p: 2,
       borderRadius: 1.5,
       border: `1px solid ${alpha(palette.border, 0.8)}`,
-      bgcolor: alpha(palette.white ?? "#fff", 0.9),
+      // Match form subPanel: tinted surface in dark, soft primary wash in light.
+      bgcolor: palette.surface
+        ? alpha(palette.surface, 0.65)
+        : alpha(palette.primary, 0.04),
     }}
   >
     <Typography

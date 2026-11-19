@@ -18,7 +18,7 @@ import {
   isReferenceRangeNotApplicable,
   specResultRuleKey,
 } from "@data/validation/specResultValidation";
-import type { ValidationTier } from "@data/validation/submissionIntent";
+import type { ValidationErrors, ValidationTier } from "@data/validation/submissionIntent";
 
 const M = STRINGS.SOURCING.SPECIFICATION_FORM.VALIDATION;
 const A = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
@@ -472,9 +472,34 @@ export const areBlocksUnitComplete = (blocks: MaterialBlock[]): boolean =>
 export const areBlocksSubmitComplete = (blocks: MaterialBlock[]): boolean =>
   blocks.length > 0 && blocks.every(isBlockSubmitComplete);
 
+
+/** Flag later blocks that reuse a lot ID already present earlier in the form. */
+const collectDuplicateLotNoErrors = (
+  blocks: MaterialBlock[],
+  _tier: ValidationTier,
+  errors: ValidationErrors,
+) => {
+  const seen = new Map<string, number>();
+  (blocks ?? []).forEach((block, blockIndex) => {
+    const lotNo = String(block.lotNo ?? "").trim();
+    if (!lotNo) return;
+    const key = lotNo.toLowerCase();
+    const firstIndex = seen.get(key);
+    if (firstIndex === undefined) {
+      seen.set(key, blockIndex);
+      return;
+    }
+    const path = `blocks.${blockIndex}.lots.0.lotNo`;
+    if (!errors[path]) {
+      errors[path] = M.lotNo.duplicate;
+    }
+  });
+};
+
 export const rawMaterialSourcingValidationConfig: SubDeptValidationConfig<MaterialBlock[]> = {
   id: "raw-material-sourcing",
   fields: rawMaterialSourcingFieldRules,
   resolveFieldPaths: resolveBlockFieldPaths,
+  customRules: [collectDuplicateLotNoErrors],
   isUnitComplete: areBlocksUnitComplete,
 };

@@ -80,7 +80,7 @@ const ApproverSubdepartmentBatchListSection = ({
       emptySubtitle={emptySubtitle}
       emptyTitle={emptyTitle}
     >
-      {(filtered) => {
+      {(filtered, slot) => {
         const rows = filterBar.applyClientFilters(filtered, filterBar.appliedFilters);
 
         return (
@@ -97,6 +97,7 @@ const ApproverSubdepartmentBatchListSection = ({
               primaryColor={tableTheme.primaryColor}
               allowViewDetailsWhenApproved={allowViewDetailsWhenApproved}
             />
+            {slot?.pagination}
             {children}
           </>
         );

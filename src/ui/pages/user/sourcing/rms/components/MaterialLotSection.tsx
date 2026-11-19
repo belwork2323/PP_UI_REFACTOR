@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  alpha,
   Box,
   Chip,
   IconButton,
@@ -184,34 +183,9 @@ const MaterialLotSection = ({
   );
 
   return (
-    <Box
-      sx={{
-        borderRadius: 1.5,
-        border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.55)}`,
-        overflow: "hidden",
-        mb: 2,
-      }}
-    >
-      <Box
-        sx={{
-          px: 2,
-          py: 1.25,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 1,
-          background: alpha(theme.palette?.primary ?? "#1B4F72", 0.04),
-          borderBottom: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
-        }}
-      >
-        <Typography
-          sx={{
-            fontSize: "0.85rem",
-            fontWeight: 700,
-            color: theme.palette.text,
-          }}
-        >
+    <Box sx={specStyles.lotSubCard}>
+      <Box sx={specStyles.lotSubCardHeader}>
+        <Typography sx={specStyles.lotSubCardTitle}>
           {formStrings.LOT_LABEL} #{lotIndex + 1}
         </Typography>
         <Stack direction="row" alignItems="center" gap={1}>
@@ -219,10 +193,7 @@ const MaterialLotSection = ({
             icon={
               allFilled ? (
                 <CheckCircleOutlineRoundedIcon
-                  sx={{
-                    ...specStyles.progressChipIcon,
-                    color: `${theme.palette.accent} !important`,
-                  }}
+                  sx={specStyles.progressChipIconFilled}
                 />
               ) : undefined
             }
@@ -312,12 +283,7 @@ const MaterialLotSection = ({
       ) : null}
 
       <Box sx={specStyles.specsTableWrap}>
-        <TableContainer
-          sx={{
-            ...specStyles.specsTableContainer,
-            border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
-          }}
-        >
+        <TableContainer sx={specStyles.specsTableContainer}>
           <Table size="small" sx={specStyles.specsTable}>
             <TableHead>
               <TableRow>
@@ -450,7 +416,7 @@ const MaterialLotSection = ({
                           error={Boolean(analyzedError)}
                           helperText={analyzedError}
                           FormHelperTextProps={{
-                            sx: { mx: 0, fontSize: "0.65rem" },
+                            sx: specStyles.cellHelperText,
                           }}
                           sx={[
                             theme.workflow.formElements.cellField,
@@ -501,13 +467,10 @@ const MaterialLotSection = ({
                               : undefined)
                           }
                           FormHelperTextProps={{
-                            sx: {
-                              mx: 0,
-                              fontSize: "0.65rem",
-                              ...(acemOutOfRange && !acemError
-                                ? { color: "error.main" }
-                                : {}),
-                            },
+                            sx:
+                              acemOutOfRange && !acemError
+                                ? specStyles.cellHelperTextWarning
+                                : specStyles.cellHelperText,
                           }}
                           sx={[
                             theme.workflow.formElements.cellField,

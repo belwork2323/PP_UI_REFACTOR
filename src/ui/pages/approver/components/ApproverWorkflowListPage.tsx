@@ -140,7 +140,7 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
       searchKeys={config.searchKeys}
       searchPlaceholder={config.searchPlaceholder}
     >
-      {(filtered) => {
+      {(filtered, slot) => {
         const batch = config.batchTable;
         const table = batch ? (
           <BatchTable
@@ -175,11 +175,17 @@ const ApproverWorkflowListPage = ({ config, onViewDetails }: ApproverWorkflowLis
             rowSx={config.tableSx?.rowSx}
           />
         );
+        const tableWithPagination = (
+          <>
+            {table}
+            {slot?.pagination}
+          </>
+        );
         const content = config.renderTableChrome ? (
-          config.renderTableChrome(table)
+          config.renderTableChrome(tableWithPagination)
         ) : (
           <Card elevation={0} disableContent>
-            {table}
+            {tableWithPagination}
           </Card>
         );
         return content;
