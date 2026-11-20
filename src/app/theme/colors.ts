@@ -119,6 +119,20 @@ const colors = {
       footerBg:            "rgba(0,0,0,0.35)",
       footerBorder:        "rgba(255,255,255,0.08)",
       footerText:          "rgba(255,255,255,0.85)",
+
+      // Auth form fields — empty string means "leave the MUI default"
+      inputBorder:         "#1976d2",
+      inputBorderHover:    "#1976d2",
+      inputLabel:          "",
+      inputText:           "",
+      inputIcon:           "",
+      inputAdornmentIcon:  "",
+      focusBorder:         "#1976d2",
+      backButtonHoverBg:   "rgba(27,79,114,0.08)",
+      captchaBorder:       "divider",
+      captchaBg:           "#eef2ff",
+      captchaErrorText:    "",
+      captchaReloadColor:  "primary.main",
     },
 
     // ── dark: standard dark theme ─────────────────────────────────
@@ -150,6 +164,20 @@ const colors = {
       footerBg:            "rgba(0,0,0,0.50)",
       footerBorder:        "rgba(255,255,255,0.08)",
       footerText:          "rgba(240,242,248,0.60)",
+
+      // Auth form fields
+      inputBorder:         "rgba(255,255,255,0.18)",
+      inputBorderHover:    "rgba(255,255,255,0.45)",
+      inputLabel:          "rgba(240,242,248,0.70)",
+      inputText:           "#f0f2f8",
+      inputIcon:           "rgba(240,242,248,0.70)",
+      inputAdornmentIcon:  "rgba(240,242,248,0.55)",
+      focusBorder:         "#63a4ff",
+      backButtonHoverBg:   "rgba(255,255,255,0.08)",
+      captchaBorder:       "rgba(255,255,255,0.18)",
+      captchaBg:           "rgba(255,255,255,0.06)",
+      captchaErrorText:    "rgba(240,242,248,0.70)",
+      captchaReloadColor:  "#63a4ff",
     },
   },
 

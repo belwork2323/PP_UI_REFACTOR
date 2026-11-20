@@ -1,39 +1,37 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Box, TextField, CircularProgress, Typography, InputAdornment } from "@mui/material";
-import { icons } from "../../../../app/theme";
-import getLoginTheme from "../../../../app/theme/custom_themes/auth/login_theme";
-import { useThemeStore } from "../../../../app/store/themeStore";
-import { STRINGS } from "../../../../app/config/strings";
-import { useCaptchaHook } from "../../../../hooks/auth/useCaptchaHook";
+import { Box, CircularProgress, InputAdornment, TextField, Typography } from "@mui/material";
+import { icons } from "@app/theme/icons";
+import type { LoginTheme } from "@app/theme/custom_themes/auth/login_theme";
+import { STRINGS } from "@app/config/strings";
+import { useCaptchaHook } from "@hooks/auth/useCaptchaHook";
 
 const S = STRINGS.CAPTCHA;
 
-const CaptchaField = ({
-  onChange,
-  onCaptchaId,
-  reloadKey = 0,
-  label = S.LABEL,
-  required = false,
-  disabled = false,
-  // ── External validation props (from LoginPage) ──
-  error = false,
-  helperText = "",
-  sx = {},
-  inputSx = {},
-}: {
+type CaptchaFieldProps = {
+  theme: LoginTheme["captcha"];
   onChange?: (val: string, isValid?: boolean) => void;
   onCaptchaId?: (id: string) => void;
   reloadKey?: number;
-  label?: ReactNode; // Updated to ReactNode so it accepts JSX from ControlledField
-  required?: boolean;
+  label?: ReactNode;
   disabled?: boolean;
   error?: boolean;
   helperText?: string;
   sx?: object;
   inputSx?: object;
-}) => {
-  const mode = useThemeStore((s) => s.mode);
-  const t = getLoginTheme(mode).captcha;
+};
+
+const CaptchaField = ({
+  theme: t,
+  onChange,
+  onCaptchaId,
+  reloadKey = 0,
+  label = S.LABEL,
+  disabled = false,
+  error = false,
+  helperText = "",
+  sx = {},
+  inputSx = {},
+}: CaptchaFieldProps) => {
   const {
     captcha,
     loading,
@@ -42,7 +40,6 @@ const CaptchaField = ({
     internalShowSuccess,
     resolvedError,
     resolvedHelperText,
-    resolvedHelperColor,
     focusBorderColor,
     load,
     handleInputChange,
@@ -57,9 +54,7 @@ const CaptchaField = ({
 
   return (
     <Box sx={{ ...t.wrapper, ...sx }}>
-      {/* ── Row: [image col] [input col] ── */}
       <Box sx={t.row}>
-        {/* Left col: image + reload */}
         <Box sx={t.leftCol}>
           <Box sx={{ ...t.imageBox, ...(fetchErr ? t.imageBoxError : {}) }}>
             {loading && <CircularProgress size={18} thickness={4} />}
@@ -80,7 +75,6 @@ const CaptchaField = ({
             )}
           </Box>
 
-          {/* Reload link */}
           <Box
             onClick={!loading && !disabled ? load : undefined}
             sx={{
@@ -98,7 +92,6 @@ const CaptchaField = ({
           </Box>
         </Box>
 
-        {/* Right col: input + helper */}
         <Box sx={t.rightCol}>
           <TextField
             fullWidth
@@ -111,7 +104,7 @@ const CaptchaField = ({
             inputProps={{
               maxLength: 6,
               spellCheck: false,
-              onKeyPress: (e) => {
+              onKeyPress: (e: { key: string; preventDefault: () => void }) => {
                 if (!/^[a-zA-Z0-9]$/.test(e.key)) {
                   e.preventDefault();
                 }

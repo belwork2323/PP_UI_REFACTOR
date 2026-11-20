@@ -1040,7 +1040,7 @@ export const mapTrimmingDetailsForDisplay = (
 
       return {
         motorId,
-        motorStageLabel: mapTrimmingMotorStage(motorStage),
+        motorStageLabel: mapTrimmingMotorStage(motorStage).replace(/^S(\d+)$/, "Stage $1"),
         motorReceivedAt: toUiDateTime(
           src.motorReceivedDateTime ??
             src.motorReceivedAt ??

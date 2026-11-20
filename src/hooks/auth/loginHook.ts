@@ -51,7 +51,6 @@ export function useLoginForm({ navigate }) {
   const [systemLookupsLoading, setSystemLookupsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [captchaValue, setCaptchaValue] = useState("");
-  const [captchaValid, setCaptchaValid] = useState(false);
   const [captchaId, setCaptchaId] = useState(null);
   const [captchaReloadTrigger, setCaptchaReloadTrigger] = useState(0);
 
@@ -158,9 +157,8 @@ export function useLoginForm({ navigate }) {
     [roles],
   );
 
-  const handleCaptchaChange = useCallback((value, isValid) => {
+  const handleCaptchaChange = useCallback((value) => {
     setCaptchaValue(value);
-    setCaptchaValid(isValid ?? false);
     setErrors((prev) => (prev.captcha ? { ...prev, captcha: "" } : prev));
   }, []);
 
@@ -256,7 +254,6 @@ export function useLoginForm({ navigate }) {
         autoCloseMs: 2000,
       });
       setCaptchaValue("");
-      setCaptchaValid(false);
       // Keep existing captchaId until the reload's onCaptchaId replaces it
       // (nulling here races with the new image and causes false CAPTCHA_INVALID).
       setCaptchaReloadTrigger((prev) => prev + 1);
@@ -265,7 +262,6 @@ export function useLoginForm({ navigate }) {
       if (showDeptDropdown && !user.hasSubDeptAccess(credentials.subDepartmentId)) {
         showAlert(STRINGS.AUTH.ACCESS_DENIED_DEPT, "error", { autoCloseMs: 2000 });
         setCaptchaValue("");
-        setCaptchaValid(false);
         setCaptchaReloadTrigger((prev) => prev + 1);
       } else {
         login(user);
@@ -338,9 +334,6 @@ export function useLoginForm({ navigate }) {
     subDeptHelperText,
     loginBlocked,
     submitting,
-    captchaValue,
-    captchaValid,
-    captchaId,
     setCaptchaId,
     captchaReloadTrigger,
     handleChange,

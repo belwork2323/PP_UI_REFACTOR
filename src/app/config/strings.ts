@@ -24,6 +24,12 @@ export const STRINGS = {
     PASSWORD_LABEL: "Password",
     LOGIN_BUTTON: "Login",
     FORGOT_PASSWORD: "Forgot password ?",
+    AUTHENTICATING: "Authenticating...",
+    UPDATING_PASSWORD: "Updating password...",
+    SELECT_ROLE: "Select Role",
+    SELECT_SUB_DEPARTMENT: "Select Sub Department",
+    BEL_LOGO_ALT: "BEL Logo",
+    DRDO_LOGO_ALT: "DRDO Logo",
     /* Features - Left Panel Information */
     FEATURES: [
       {
@@ -178,10 +184,7 @@ export const STRINGS = {
     LOADING_TEXT: "Loading…",
     FAILED_TO_LOAD: "Failed to load",
     HELPER_INCORRECT: "Incorrect captcha",
-    HELPER_ENTERED: "✓ Captcha entered",
     HELPER_MATCHED: "✓ Matched",
-    HELPER_EMPTY: "Please enter the captcha",
-    HELPER_PLACEHOLDER: "\u00a0",
     ALT_TEXT: "captcha",
     CONSOLE_ERR: "[CaptchaField] fetchCaptcha error:",
   },

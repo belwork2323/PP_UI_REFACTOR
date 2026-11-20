@@ -91,20 +91,7 @@ export const useCaptchaHook = ({
   const internalShowSuccess = touched && value.trim().length === 6;
   const resolvedError = error;
 
-  const resolvedHelperText =
-    error && helperText
-      ? helperText
-      : internalShowSuccess
-        ? S.HELPER_ENTERED
-        : touched && !value
-          ? S.HELPER_EMPTY
-          : S.HELPER_PLACEHOLDER;
-
-  const resolvedHelperColor = resolvedError
-    ? "error.main"
-    : internalShowSuccess
-      ? "success.main"
-      : "text.secondary";
+  const resolvedHelperText = error && helperText ? helperText : "";
 
   const focusBorderColor = resolvedError
     ? "error.main"
@@ -120,7 +107,6 @@ export const useCaptchaHook = ({
     internalShowSuccess,
     resolvedError,
     resolvedHelperText,
-    resolvedHelperColor,
     focusBorderColor,
     load,
     handleInputChange,

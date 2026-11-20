@@ -198,6 +198,10 @@ export const icons = {
   apartment: ApartmentIcon,
   reset: RestartAltIcon,
   login: LoginIcon,
+  auth: {
+    back: ArrowBackRoundedIcon,
+    description: DescriptionRoundedIcon,
+  },
 
   visibility: VisibilityIcon,
   visibilityOff: VisibilityOffIcon,

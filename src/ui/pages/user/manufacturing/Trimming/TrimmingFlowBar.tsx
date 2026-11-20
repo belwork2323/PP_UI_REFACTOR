@@ -7,6 +7,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
 import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+import { getTodayInIstDate } from "../../../../../utils/dateUtils";
 
 type TrimmingFlowBarProps = {
   selectedMotorStage: string;
@@ -132,6 +133,7 @@ const TrimmingFlowBar = ({
             <DateTimeField
               value={motorReceivedAt}
               onChange={onMotorReceivedAtChange}
+              maxDate={getTodayInIstDate()}
               disabled={!setupFieldsEnabled}
               placeholder={L.motorReceivedAtPlaceholder}
               sx={{

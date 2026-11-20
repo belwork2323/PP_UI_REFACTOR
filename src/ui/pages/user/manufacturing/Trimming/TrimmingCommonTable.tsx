@@ -20,6 +20,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
 import { DateTimeField } from "@/ui/components/common/DateField";
+import { getTodayInIstDate } from "@/utils/dateUtils";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 import {
@@ -400,6 +401,7 @@ export const TrimmingCommonTable = ({
                     motorReceivedAt: value,
                   })
                 }
+                maxDate={getTodayInIstDate()}
                 placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
                 compact
                 disabled={inputsLocked}

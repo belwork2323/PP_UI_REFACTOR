@@ -290,8 +290,8 @@ const toDetailTable = (
 const buildDispatchSetupFields = (setup: DispatchMotorSetup) =>
   toDetailFields([
     { key: "motorStage", label: "Stage", value: formatDispatchStageLabel(setup.motorStage) },
-    { key: "castingDate", label: "Date of Casting", value: setup.castingDate },
-    { key: "dispatchDate", label: "Dispatch Date", value: setup.dispatchDate },
+    { key: "castingDate", label: "Date & Time of Casting", value: setup.castingDate },
+    { key: "dispatchDate", label: "Date & Time of Dispatch", value: setup.dispatchDate },
     { key: "dispatchLocation", label: "Dispatch Location", value: setup.dispatchLocation },
     { key: "ndtClearance", label: "NDT Clearance Accorded", value: setup.ndtClearance },
     ...(setup.ndtClearance === "YES"
