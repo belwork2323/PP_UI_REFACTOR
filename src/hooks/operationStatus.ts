@@ -43,6 +43,11 @@ export const SOURCING_LOT_HIDDEN_STATUS_FILTERS: OperationStatus[] = [
   OPERATION_STATUS.COMPLETELY_APPROVED,
 ];
 
+export const SUBSCALE_LOT_HIDDEN_STATUS_FILTERS: OperationStatus[] = [
+  OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
+  OPERATION_STATUS.APPROVED,
+];
+
 const SOURCING_LOT_SUBDEPT_SLUGS = new Set(["raw-material", "rocket-motor"]);
 
 export const isSourcingLotSubdepartment = (subDeptSlug?: string | null): boolean =>
@@ -54,6 +59,10 @@ export const SOURCING_LOT_STATUS_FILTER_VALUES: OperationStatus[] =
     (status) => !SOURCING_LOT_HIDDEN_STATUS_FILTERS.includes(status),
   );
 
+export const SUBSCALE_STATUS_FILTER_VALUES: OperationStatus[] =
+  OPERATION_STATUS_FILTER_VALUES.filter(
+    (status) => !SUBSCALE_LOT_HIDDEN_STATUS_FILTERS.includes(status),
+  );
 /**
  * Display label for status filter tabs.
  * Kept for callers that pass options for sourcing vs manufacturing lists.

@@ -257,7 +257,11 @@ const MasterDataList = ({
   ]);
 
   const renderAttributeInput = (field: MasterDataFieldDef) => {
-    if (isSubscaleArticles && (field.key === "bemSize" || field.key === "bemUnit") && !subscaleIsBem) {
+    if (
+      isSubscaleArticles &&
+      (field.key === "bemSize" || field.key === "bemUnit") &&
+      !subscaleIsBem
+    ) {
       return <Typography sx={table.bodyText}>—</Typography>;
     }
 
@@ -310,7 +314,9 @@ const MasterDataList = ({
           fullWidth
           placeholder={`Select ${requiredFieldLabel(
             getMasterDataFieldLabel(selectedType, field),
-            Boolean(field.required) || (isSubscaleArticles && field.key === "isBem") || (subscaleIsBem && field.key === "bemUnit"),
+            Boolean(field.required) ||
+              (isSubscaleArticles && field.key === "isBem") ||
+              (subscaleIsBem && field.key === "bemUnit"),
           )}`}
           value={currentValue}
           onChange={(value) => {
@@ -408,7 +414,9 @@ const MasterDataList = ({
   };
 
   const nameInlineCell = showNameInput ? (
-    <TableCell sx={{ ...table.cell, minWidth: isSubscaleArticles && subscaleIsBem ? 280 : undefined }}>
+    <TableCell
+      sx={{ ...table.cell, minWidth: isSubscaleArticles && subscaleIsBem ? 280 : undefined }}
+    >
       {isSubscaleArticles && subscaleIsBem ? (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, minWidth: 240 }}>
           <Box sx={{ display: "flex", gap: 0.75, alignItems: "flex-start" }}>

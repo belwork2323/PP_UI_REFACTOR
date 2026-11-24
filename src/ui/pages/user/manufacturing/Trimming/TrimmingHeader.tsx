@@ -17,7 +17,21 @@ const formatMotorSubtitle = (batch?: {
   return motorId && motorId !== "—" ? motorId : undefined;
 };
 
-const TrimmingHeader = ({ batch, onBack, theme }: any) => {
+const TrimmingHeader = ({
+  batch,
+  onBack,
+  theme,
+}: {
+  batch?: any;
+  onBack: () => void;
+  theme: any;
+  motorStatusById?: Record<
+    string,
+    { motorSubmissionStatus?: string | null; rejectionReason?: string | null }
+  >;
+  activeMotorId?: string | null;
+}) => {
+  // Per-motor rejection reason is shown under the motor card title, not in the form header.
   const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
     preferredStatusKeys: ["trStatus"],
   });
@@ -30,7 +44,7 @@ const TrimmingHeader = ({ batch, onBack, theme }: any) => {
         subtitle: formatMotorSubtitle(batch),
         statusLabel: headerStatus.statusLabel,
         statusVariant: headerStatus.statusVariant,
-        rejectionReason: headerStatus.rejectionReason,
+        rejectionReason: null,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

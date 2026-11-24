@@ -22,7 +22,8 @@ const RawMaterialPreparationHeader = ({ batch, onBack, theme }: any) => {
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
         statusLabel: headerStatus.statusLabel,
         statusVariant: headerStatus.statusVariant,
-        rejectionReason: headerStatus.rejectionReason,
+        // Per-premix rejection reason is shown under the premix card title.
+        rejectionReason: null,
         extraChips: batch.batchType ? (
           <Chip label={scaleLabel} size="small" sx={rmTheme.header.scaleChip(theme.palette.primary)} />
         ) : null,

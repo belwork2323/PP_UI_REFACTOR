@@ -58,7 +58,7 @@ export function useLotCertificateActions(
       const result = await upload(file, subDepartmentId, (progress) => {
         patchByLocalId(localId, { uploadProgress: progress });
       });
-      if (!result?.fileId) {
+      if (!result || !("fileId" in result) || !result.fileId) {
         patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
         setCertificateFieldError(formStrings.CERT_INVALID_FILE);
         return;

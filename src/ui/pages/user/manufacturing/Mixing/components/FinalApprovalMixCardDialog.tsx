@@ -127,7 +127,7 @@ const FinalApprovalMixCardDialog = ({
                 <PremixStatusChip
                   status={row.mixCardSubmissionStatus as any}
                   statusConfig={statusConfig}
-                  variant="embedded"
+                  variant="default"
                 />
               </TableCell>
             </TableRow>

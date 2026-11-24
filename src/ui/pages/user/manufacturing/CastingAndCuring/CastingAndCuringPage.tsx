@@ -20,6 +20,7 @@ const CastingCuringPage = () => {
   const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
   const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
   const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
+  const [headerActiveMotorId, setHeaderActiveMotorId] = useState<string | null>(null);
 
   const hookState = useCastingAndCuringHook();
   const {
@@ -106,12 +107,19 @@ const CastingCuringPage = () => {
               <CircularProgress size={28} sx={{ color: CASTING_CURING_BRAND.cc }} />
             </Box>
           ) : null}
-          <CastingAndCuringHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} />
+          <CastingAndCuringHeader
+            batch={activeBatch}
+            isEdit={isEditMode}
+            onBack={handleBack}
+            motorStatusById={motorStatusById}
+            activeMotorId={headerActiveMotorId}
+          />
           <CastingCuringForm
             batch={activeBatch}
             formData={formData}
             castingMotorDraftsById={castingMotorDraftsById}
             addedMotors={addedMotors}
+            onActiveMotorChange={setHeaderActiveMotorId}
             curingCycleConfig={curingCycleConfig}
             curingCyclesLoading={curingCyclesLoading}
             onFetchCuringCycleConfig={fetchCuringCycleConfig}

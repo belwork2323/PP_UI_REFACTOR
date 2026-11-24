@@ -78,7 +78,14 @@ const TrimmingPage = () => {
 
       {view === "form" && activeBatch && !loadingFormDetails && (
         <>
-          <TrimmingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
+          <TrimmingHeader
+            batch={activeBatch}
+            isEdit={isEditMode}
+            onBack={handleBack}
+            theme={theme}
+            motorStatusById={motorStatusById}
+            activeMotorId={activeBatch?.motorId}
+          />
           <TrimmingForm
             batch={activeBatch}
             formData={formData}

@@ -31,6 +31,7 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../components/custom/WorkflowUnitStatusTabNav";
 import { formatRmpMaterialNavLabel } from "../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -168,23 +169,19 @@ const RawMaterialPreparationApproverReviewContent = ({
     text: palette.text,
   };
 
-  const premixNavTabs = useMemo<UserWorkflowNavTab[]>(
+  const premixUnits = useMemo(
     () =>
       premixes.map((premix) => ({
         id: `premix-${premix.premixNo}`,
         label: `Premix ${premix.premixNo}`,
-        endAdornment: (
-          <PremixStatusChip
-            status={premix.premixSubmissionStatus}
-            statusConfig={statusConfig}
-            showIcon={false}
-            variant="embedded"
-            onAccent={premix.premixNo === activePremixNo}
-          />
-        ),
       })),
-    [activePremixNo, premixes, statusConfig],
+    [premixes],
   );
+
+  const getPremixNavStatus = (unitId: string) =>
+    premixes.find((premix) => `premix-${premix.premixNo}` === unitId)?.premixSubmissionStatus;
+
+  const activePremixUnitId = activePremixNo > 0 ? `premix-${activePremixNo}` : null;
 
   const materialNavTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -248,15 +245,19 @@ const RawMaterialPreparationApproverReviewContent = ({
       </Box>
 
       <UserWorkflowNavPanel palette={navPalette}>
-        <UserWorkflowTabNav
+        <WorkflowUnitStatusTabNav
           title="Premix Navigation"
           hint={RM.PREMIX_APPROVER_NAV_HINT}
-          tabs={premixNavTabs}
-          activeIndex={activePremixIndex >= 0 ? activePremixIndex : 0}
-          onActiveIndexChange={(index) => {
-            onActivePremixChange(premixes[index].premixNo);
+          units={premixUnits}
+          activeId={activePremixUnitId}
+          onActiveIdChange={(id) => {
+            const premix = premixes.find((entry) => `premix-${entry.premixNo}` === id);
+            if (!premix) return;
+            onActivePremixChange(premix.premixNo);
             setActiveMaterialIndex(0);
           }}
+          getStatus={getPremixNavStatus}
+          statusConfig={statusConfig}
           palette={navPalette}
           showStepArrows
           onStepBack={() => goToEnabledPremix(-1)}
@@ -265,14 +266,16 @@ const RawMaterialPreparationApproverReviewContent = ({
           disableStepNext={
             enabledPremixIndex < 0 || enabledPremixIndex >= enabledPremixes.length - 1
           }
-          isTabDisabled={(_, index) =>
-            isPremixApproverTabDisabled(premixes[index]?.premixSubmissionStatus)
-          }
-          tabTooltip={(_, index) =>
-            isPremixApproverTabDisabled(premixes[index]?.premixSubmissionStatus)
+          isUnitDisabled={(id) => {
+            const premix = premixes.find((entry) => `premix-${entry.premixNo}` === id);
+            return isPremixApproverTabDisabled(premix?.premixSubmissionStatus);
+          }}
+          unitTooltip={(id) => {
+            const premix = premixes.find((entry) => `premix-${entry.premixNo}` === id);
+            return isPremixApproverTabDisabled(premix?.premixSubmissionStatus)
               ? RM.PREMIX_APPROVER_TAB_DISABLED
-              : undefined
-          }
+              : undefined;
+          }}
           mb={materialNavTabs.length > 0 ? 1 : 0}
         />
         {materialNavTabs.length > 0 ? (
@@ -311,9 +314,14 @@ const RawMaterialPreparationApproverReviewContent = ({
           </Stack>
 
           {activePremix.premixSubmissionStatus === "REJECTED" && activePremix.rejectionReason ? (
-            <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.25 }}>
-              Rejection reason: {activePremix.rejectionReason}
-            </Typography>
+            <Box sx={{ mb: 1.25 }}>
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}>
+                Rejection Reason
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+                {activePremix.rejectionReason}
+              </Typography>
+            </Box>
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (

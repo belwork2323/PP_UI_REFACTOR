@@ -231,7 +231,8 @@ const DispatchPage = () => {
                 return {
                   statusLabel: hs.statusLabel,
                   statusVariant: hs.statusVariant,
-                  rejectionReason: hs.rejectionReason,
+                  // Per-motor rejection reason is shown under the motor card title.
+                  rejectionReason: null,
                 };
               })(),
             }}

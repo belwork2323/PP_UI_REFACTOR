@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
@@ -34,11 +34,8 @@ import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
 } from "./components/FinalApprovalMotorDialog";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import {
   buildMotorNavGateHelpers,
   type BatchStageContext,
@@ -88,6 +85,8 @@ type CasePreparationFormProps = {
   motorValidationErrors?: Record<string, CasePrepValidationErrors>;
   /** Focus request after failed SUBMIT (RMS/RMP/RMC parity). */
   validationFocusRequest?: { id: number; fieldPath: string | null } | null;
+  /** Notify parent when the selected motor tab changes (header rejection banner). */
+  onActiveMotorChange?: (motorId: string | null) => void;
   theme: any;
 };
 
@@ -107,6 +106,7 @@ const CasePreparationForm = ({
   onSubscaleValuesChange,
   onSaveMotorDraft,
   onSubmitMotor,
+  onActiveMotorChange,
   motorValidationErrors = {},
   validationFocusRequest = null,
   theme,
@@ -164,6 +164,9 @@ const CasePreparationForm = ({
 
   const statusConfig = theme?.manufacturing?.casePreparation?.details?.bannerStatusConfig ?? {};
   const activeMotorId = activeMotorEntry?.motorId ?? "";
+  useEffect(() => {
+    onActiveMotorChange?.(activeMotorId || null);
+  }, [activeMotorId, onActiveMotorChange]);
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as MotorSubmissionStatus;
@@ -180,13 +183,19 @@ const CasePreparationForm = ({
       !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
 
+  const resolveMotorStatus = (motorId: string) =>
+    getMotorStatus?.(motorId) ??
+    motorStatusById[motorId]?.motorSubmissionStatus ??
+    "TO_BE_INITIATED";
+
   const finalApprovalRows = useMemo(
     () =>
       buildFinalApprovalMotorRows(
         motorStatusById,
         motorCards.map((m) => m.motorId),
+        resolveMotorStatus,
       ),
-    [motorCards, motorStatusById],
+    [getMotorStatus, motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
@@ -248,27 +257,9 @@ const CasePreparationForm = ({
       });
     }
   }, [activeMotorMeta, activeMotorEntry?.motorId]);
-  const motorTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motorCards.map((entry, index) => {
-        const status =
-          getMotorStatus?.(entry.motorId) ??
-          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-          "TO_BE_INITIATED";
-        return {
-          id: entry.motorId,
-          label: entry.motorId,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              variant="embedded"
-              onAccent={index === activeMotorIndex}
-            />
-          ),
-        };
-      }),
-    [activeMotorIndex, getMotorStatus, motorCards, motorStatusById, statusConfig],
+  const motorUnits = useMemo(
+    () => motorCards.map((entry) => ({ id: entry.motorId, label: entry.motorId })),
+    [motorCards],
   );
 
   const subscaleData = formData.subscaleData ?? createEmptyCasePrepMotorData();
@@ -359,14 +350,25 @@ const CasePreparationForm = ({
         activeMotorSession && (
           <Stack spacing={1.25}>
             <UserWorkflowNavPanel palette={navPalette}>
-              <UserWorkflowTabNav
+              <WorkflowUnitStatusTabNav
                 title={S.MOTOR_NAV_TITLE}
                 hint={S.MOTOR_NAV_HINT}
-                tabs={motorTabs}
-                activeIndex={activeMotorIndex}
-                onActiveIndexChange={setActiveMotorIndex}
-                isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-                tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+                units={motorUnits}
+                activeId={activeMotorId || null}
+                onActiveIdChange={(id) => {
+                  const idx = motorCards.findIndex((m) => m.motorId === id);
+                  if (idx >= 0) setActiveMotorIndex(idx);
+                }}
+                getStatus={resolveMotorStatus}
+                statusConfig={statusConfig}
+                isUnitDisabled={(id) => {
+                  const idx = motorCards.findIndex((m) => m.motorId === id);
+                  return idx < 0 || !motorNavGate.isMotorTabEnabled(idx);
+                }}
+                unitTooltip={(id) => {
+                  const idx = motorCards.findIndex((m) => m.motorId === id);
+                  return idx >= 0 ? motorNavGate.getMotorTabTooltip(idx) : undefined;
+                }}
                 palette={navPalette}
                 showStepArrows
                 titleEndAdornment={
@@ -437,6 +439,16 @@ const CasePreparationForm = ({
                   />
                 </Stack>
               </Stack>
+
+              {activeMotorStatus === "REJECTED" &&
+              motorStatusById[activeMotorId]?.rejectionReason ? (
+                <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                  <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                    {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+                  </Typography>
+                  {motorStatusById[activeMotorId]?.rejectionReason}
+                </Alert>
+              ) : null}
 
               {activeMotorLocked ? (
                 <Box

@@ -599,6 +599,19 @@ const QCDivisionApproverReviewContent = ({
             />
           ) : null}
 
+          {activeItem?.status === "REJECTED" && activeItem.rejectionReason ? (
+            <Box sx={{ mb: 1.25 }}>
+              <Typography
+                sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}
+              >
+                Rejection Reason
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+                {activeItem.rejectionReason}
+              </Typography>
+            </Box>
+          ) : null}
+
           {activeItem && !isQcPartialItemApproverTabDisabled(activeItem.status) ? (
             canApproveOrRejectUnit ? (
               <Stack

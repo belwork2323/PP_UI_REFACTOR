@@ -108,7 +108,8 @@ const NDTPage = () => {
               subtitle: formatMotorSubtitle(activeBatch),
               statusLabel: formHeaderStatus.statusLabel,
               statusVariant: formHeaderStatus.statusVariant,
-              rejectionReason: formHeaderStatus.rejectionReason,
+              // Per-motor rejection reason is shown under the motor card title.
+              rejectionReason: null,
             }}
             onBack={handleBack}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}

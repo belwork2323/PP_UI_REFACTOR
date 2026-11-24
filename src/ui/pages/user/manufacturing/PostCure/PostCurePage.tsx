@@ -89,6 +89,8 @@ const PostCurePage = () => {
             isEdit={isEditMode}
             onBack={handleBack}
             theme={theme}
+            motorStatusById={motorStatusById}
+            activeMotorId={activeMotorId}
           />
           <PostCureForm
             batch={activeBatch}

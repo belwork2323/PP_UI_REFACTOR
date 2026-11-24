@@ -15,6 +15,8 @@ type CasingFormStepNavProps = {
   isLastStep: boolean;
   stepError: string | null;
   nextDisabledHint?: string | null;
+  /** When true on the last step, hide the “complete all sections” hint. */
+  canSubmit?: boolean;
   canNavigateToStep: (stepIndex: number) => boolean;
   onStepClick: (stepIndex: number) => void;
   onBack: () => void;
@@ -32,6 +34,7 @@ const CasingFormStepNav = ({
   isLastStep,
   stepError,
   nextDisabledHint = null,
+  canSubmit = false,
   canNavigateToStep,
   onStepClick,
   onBack,
@@ -101,7 +104,7 @@ const CasingFormStepNav = ({
           </Box>
         ) : nextDisabledHint ? (
           <Typography sx={cf.stepNav.hint(theme)}>{nextDisabledHint}</Typography>
-        ) : isLastStep ? (
+        ) : isLastStep && !canSubmit ? (
           <Typography sx={cf.stepNav.hint(theme)}>{S.COMPLETE_ALL_STEPS}</Typography>
         ) : null}
       </Stack>

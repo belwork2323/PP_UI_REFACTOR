@@ -11,12 +11,22 @@ type Props = {
   batch: any;
   isEdit?: boolean;
   onBack: () => void;
+  motorStatusById?: Record<
+    string,
+    { motorSubmissionStatus?: string | null; rejectionReason?: string | null }
+  >;
+  activeMotorId?: string | null;
 };
 
-const CastingAndCuringHeader: React.FC<Props> = ({ batch, onBack }) => {
+const CastingAndCuringHeader: React.FC<Props> = ({
+  batch,
+  onBack,
+  activeMotorId,
+}) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
-  const motorId = String(batch?.motorId ?? "").trim();
+  const motorId = String(activeMotorId ?? batch?.motorId ?? "").trim();
+  // Per-motor rejection reason is shown under the motor card title, not in the form header.
   const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
     preferredStatusKeys: ["ccStatus"],
   });
@@ -29,7 +39,7 @@ const CastingAndCuringHeader: React.FC<Props> = ({ batch, onBack }) => {
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
         statusLabel: headerStatus.statusLabel,
         statusVariant: headerStatus.statusVariant,
-        rejectionReason: headerStatus.rejectionReason,
+        rejectionReason: null,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

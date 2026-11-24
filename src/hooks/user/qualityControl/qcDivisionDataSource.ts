@@ -36,6 +36,12 @@ const pickString = (...values: unknown[]): string => {
   return "";
 };
 
+const pickRejectionReason = (rec: Record<string, unknown> | null | undefined): string | null => {
+  if (!rec) return null;
+  const reason = pickString(rec.rejectionReason, rec.rejection_reason);
+  return reason || null;
+};
+
 /** Unit/division not yet in QC workflow — seed from /qc-division/division-details, not saved form details. */
 export const isQcStatusAwaitingInitiation = (status: unknown): boolean => {
   const normalized = normalizePartialItemStatus(status);
@@ -782,6 +788,7 @@ export const groupUnitStatusesByDivisionTabKey = (payload: {
       label: motorId,
       status: normalizePartialItemStatus(rec.motorSubmissionStatus ?? rec.status),
       motorId,
+      rejectionReason: pickRejectionReason(rec),
     });
   });
 
@@ -801,6 +808,7 @@ export const groupUnitStatusesByDivisionTabKey = (payload: {
         status: normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status),
         finalMixNo: premixNo,
         premixNo,
+        rejectionReason: pickRejectionReason(rec),
       });
       return;
     }
@@ -811,6 +819,7 @@ export const groupUnitStatusesByDivisionTabKey = (payload: {
       status: normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status),
       premixNo,
       processingType: "SOLID_PROCESSING",
+      rejectionReason: pickRejectionReason(rec),
     });
   });
 
@@ -858,6 +867,7 @@ export const extractWeighmentMotorNavFromFormDetails = (
           motorRec?.motorSubmissionStatus ?? motorRec?.status ?? divisionStatus,
         ),
         motorId,
+        rejectionReason: pickRejectionReason(motorRec),
       });
     }
   }
@@ -894,6 +904,7 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
       label: motorId,
       status: normalizePartialItemStatus(rec.motorSubmissionStatus ?? rec.status),
       motorId,
+      rejectionReason: pickRejectionReason(rec),
     });
   });
 
@@ -915,6 +926,7 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
     if (!matchesStatusDivision(division, subType, divisionFilter)) return;
     const premixNo = pickNumber(rec.premixNo, rec.premix_no);
     if (premixNo == null) return;
+    const nextReason = pickRejectionReason(rec);
     if (stage === "FINAL_MIX") {
       const id = `final-mix:${premixNo}`;
       if (seen.has(id)) {
@@ -922,18 +934,24 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
         const idx = items.findIndex((row) => row.id === id);
         const nextStatus = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
         if (idx >= 0 && items[idx].status === "TO_BE_INITIATED" && nextStatus !== "TO_BE_INITIATED") {
-          items[idx] = { ...items[idx], status: nextStatus };
+          items[idx] = {
+            ...items[idx],
+            status: nextStatus,
+            rejectionReason: nextStatus === "REJECTED" ? nextReason : null,
+          };
         }
         return;
       }
       seen.add(id);
+      const status = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
       items.push({
         id,
         kind: "FINAL_MIX",
         label: `Final Mix ${premixNo}`,
-        status: normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status),
+        status,
         finalMixNo: premixNo,
         premixNo,
+        rejectionReason: status === "REJECTED" ? nextReason : null,
       });
       return;
     }
@@ -946,18 +964,24 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
       const idx = items.findIndex((row) => row.id === id);
       const nextStatus = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
       if (idx >= 0 && items[idx].status === "TO_BE_INITIATED" && nextStatus !== "TO_BE_INITIATED") {
-        items[idx] = { ...items[idx], status: nextStatus };
+        items[idx] = {
+          ...items[idx],
+          status: nextStatus,
+          rejectionReason: nextStatus === "REJECTED" ? nextReason : null,
+        };
       }
       return;
     }
     seen.add(id);
+    const status = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
     items.push({
       id,
       kind: "PREMIX",
       label: `Premix ${premixNo}`,
-      status: normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status),
+      status,
       premixNo,
       processingType: "SOLID_PROCESSING",
+      rejectionReason: status === "REJECTED" ? nextReason : null,
     });
   });
 
@@ -1025,16 +1049,26 @@ export const extractStfMotorNavFromBatch = (batchPayload: unknown): QcPartialNav
 
   const byId = new Map<string, QcPartialNavItem>();
 
-  const pushMotor = (motorId: string, status: unknown) => {
+  const pushMotor = (
+    motorId: string,
+    status: unknown,
+    rejectionReason?: string | null,
+  ) => {
     const id = String(motorId ?? "").trim();
     if (!id) return;
     const key = `motor:${id}`;
     const nextStatus = normalizePartialItemStatus(status);
+    const nextReason =
+      nextStatus === "REJECTED" ? String(rejectionReason ?? "").trim() || null : null;
     const existing = byId.get(key);
     if (existing) {
       // Prefer authoritative non-seed statuses (e.g. YET_TO_START over TO_BE_INITIATED).
       if (existing.status === "TO_BE_INITIATED" && nextStatus && nextStatus !== "TO_BE_INITIATED") {
-        byId.set(key, { ...existing, status: nextStatus });
+        byId.set(key, {
+          ...existing,
+          status: nextStatus,
+          rejectionReason: nextReason,
+        });
       }
       return;
     }
@@ -1044,6 +1078,7 @@ export const extractStfMotorNavFromBatch = (batchPayload: unknown): QcPartialNav
       label: id,
       status: nextStatus || "YET_TO_START",
       motorId: id,
+      rejectionReason: nextReason,
     });
   };
 
@@ -1057,7 +1092,11 @@ export const extractStfMotorNavFromBatch = (batchPayload: unknown): QcPartialNav
         if (!motorRec) continue;
         const motorId = pickString(motorRec.motorId, motorRec.motor_id);
         if (!motorId) continue;
-        pushMotor(motorId, motorRec.motorSubmissionStatus ?? motorRec.status);
+        pushMotor(
+          motorId,
+          motorRec.motorSubmissionStatus ?? motorRec.status,
+          pickRejectionReason(motorRec),
+        );
       }
     }
   }
@@ -1106,6 +1145,10 @@ export const mergePartialNavItems = (
               item.divisionDetailsStatus ??
               existing.divisionDetailsStatus ??
               preferStatus(item.status, existing.status),
+            rejectionReason:
+              preferStatus(item.status, existing.status) === "REJECTED"
+                ? item.rejectionReason ?? existing.rejectionReason ?? null
+                : null,
           }
         : item,
     );

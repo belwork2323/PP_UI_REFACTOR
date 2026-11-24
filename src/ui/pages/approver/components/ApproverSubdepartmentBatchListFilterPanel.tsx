@@ -13,6 +13,7 @@ import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import DateField from "../../../components/common/DateField";
 import { getFromToOrderMessages } from "../../../../data/validation/dateRangeValidation";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
+import dayjs from "dayjs";
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
 import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
 import { RefreshRounded } from "@mui/icons-material";
@@ -38,11 +39,13 @@ type FilterBarTheme = {
 type UseApproverSubdepartmentBatchListFilterBarArgs = {
   mode?: string;
   theme: FilterBarTheme;
+  subDepartment?: string;
 };
 
 export const useApproverSubdepartmentBatchListFilterBar = ({
   mode = "light",
   theme,
+  subDepartment,
 }: UseApproverSubdepartmentBatchListFilterBarArgs) => {
   const filterStyles = useMemo(() => getApproverManufacturingFilterStyles(mode), [mode]);
   const bumpListVersion = useApproverListRefreshStore((state) => state.bumpVersion);
@@ -63,7 +66,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     projectsLoading,
     ensureProjectOptions,
     applyClientFilters,
-  } = useApproverSubdepartmentBatchListFilters();
+  } = useApproverSubdepartmentBatchListFilters(subDepartment);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftBatchId, setDraftBatchId] = useState("");
@@ -75,6 +78,12 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
   const [draftStatus, setDraftStatus] = useState(filterAllLabel);
+  const todayFilterDate = dayjs().startOf("day");
+  const todayFilterDateLabel = todayFilterDate.format("DD-MM-YYYY");
+  const parsedDraftTo = dayjs(formatToUiDate(draftTo), "DD-MM-YYYY", true);
+  const fromDateMaximum = parsedDraftTo.isValid() && parsedDraftTo.isBefore(todayFilterDate)
+    ? parsedDraftTo.format("DD-MM-YYYY")
+    : todayFilterDateLabel;
 
   const syncDraftsFromApplied = useCallback(() => {
     setDraftBatchId(appliedFilters.batchId);
@@ -368,7 +377,9 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
         <DateField
           label={BL.FILTERS_FROM_DATE}
           value={formatToUiDate(draftFrom)}
+          maxDate={fromDateMaximum}
           onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
+          clearable
           compact
           error={Boolean(draftDateRangeErrors?.from)}
           helperText={draftDateRangeErrors?.from}
@@ -378,7 +389,9 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
           label={BL.FILTERS_TO_DATE}
           value={formatToUiDate(draftTo)}
           minDate={formatToUiDate(draftFrom)}
+          maxDate={todayFilterDateLabel}
           onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
+          clearable
           compact
           error={Boolean(draftDateRangeErrors?.to)}
           helperText={draftDateRangeErrors?.to}

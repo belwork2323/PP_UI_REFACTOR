@@ -77,11 +77,8 @@ import {
   usesParallelUnitLocks,
 } from "../../../../../utils/batchStageUtils";
 import type { BatchView } from "../../../../../data/models/user/BatchStageTypes";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import { fetchCastingStationsApi } from "@/data/api/users/operationsApi";
 
 const S = STRINGS.MANUFACTURING.CASTING_CURING;
@@ -153,6 +150,7 @@ type CastingAndCuringFormProps = {
   isMotorEditable?: (motorId: string) => boolean;
   previousStageGate?: PreviousStageApprovedUnits | null;
   actionLoading?: boolean;
+  onActiveMotorChange?: (motorId: string | null) => void;
   theme: any;
 };
 
@@ -179,6 +177,7 @@ const CastingAndCuringForm = ({
   isMotorEditable,
   previousStageGate = null,
   actionLoading = false,
+  onActiveMotorChange,
   theme,
 }: CastingAndCuringFormProps) => {
   const BRAND = CASTING_CURING_BRAND;
@@ -423,6 +422,9 @@ const CastingAndCuringForm = ({
 
   const statusConfig = theme?.manufacturing?.castingAndCuring?.details?.bannerStatusConfig ?? {};
   const activeMotorId = activeMotorEntry?.motorId ?? "";
+  useEffect(() => {
+    onActiveMotorChange?.(activeMotorId || null);
+  }, [activeMotorId, onActiveMotorChange]);
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as CastingCuringMotorSubmissionStatus;
@@ -470,38 +472,16 @@ const CastingAndCuringForm = ({
       buildFinalApprovalMotorRows(
         motorStatusById,
         motorCards.map((m) => m.motorId),
+        resolveMotorStatus,
       ),
-    [motorCards, motorStatusById],
+    [motorCards, motorStatusById, resolveMotorStatus],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
-  const motorTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motorCards.map((entry, index) => {
-        const status =
-          getMotorStatus?.(entry.motorId) ??
-          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-          "TO_BE_INITIATED";
-        return {
-          id: entry.motorId,
-          label: entry.motorId,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              variant="embedded"
-              onAccent={index === activeMotorIndex}
-            />
-          ),
-        };
-      }),
-    [activeMotorIndex, getMotorStatus, motorCards, motorStatusById, statusConfig],
+  const motorUnits = useMemo(
+    () => motorCards.map((entry) => ({ id: entry.motorId, label: entry.motorId })),
+    [motorCards],
   );
-
-  const handleMotorNavIndexChange = (index: number) => {
-    setActiveMotorIndex(index);
-    setActiveProcessTab("CASTING");
-  };
 
   const sectionToggleSx = {
     width: "100%",
@@ -612,14 +592,28 @@ const CastingAndCuringForm = ({
       {showMotorNav ? (
         <Stack spacing={1.25}>
           <UserWorkflowNavPanel palette={navPalette}>
-            <UserWorkflowTabNav
+            <WorkflowUnitStatusTabNav
               title={S.MOTOR_NAV_TITLE}
               hint={S.MOTOR_NAV_HINT}
-              tabs={motorTabs}
-              activeIndex={activeMotorIndex}
-              onActiveIndexChange={handleMotorNavIndexChange}
-              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+              units={motorUnits}
+              activeId={activeMotorId || null}
+              onActiveIdChange={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                if (idx >= 0) {
+                  setActiveMotorIndex(idx);
+                  setActiveProcessTab("CASTING");
+                }
+              }}
+              getStatus={resolveMotorStatus}
+              statusConfig={statusConfig}
+              isUnitDisabled={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx < 0 || !motorNavGate.isMotorTabEnabled(idx);
+              }}
+              unitTooltip={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx >= 0 ? motorNavGate.getMotorTabTooltip(idx) : undefined;
+              }}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={
@@ -785,6 +779,16 @@ const CastingAndCuringForm = ({
                 </Stack>
               </Stack>
 
+              {activeMotorStatus === "REJECTED" &&
+              motorStatusById[activeMotorId]?.rejectionReason ? (
+                <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                  <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                    {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+                  </Typography>
+                  {motorStatusById[activeMotorId]?.rejectionReason}
+                </Alert>
+              ) : null}
+
               {!upstreamMixingGate.submitEnabled ? (
                 <Box
                   sx={{
@@ -829,13 +833,6 @@ const CastingAndCuringForm = ({
                             : S.MOTOR_LOCKED_WAITING}
                   </Typography>
                 </Box>
-              ) : null}
-
-              {activeMotorStatus === "REJECTED" &&
-              motorStatusById[activeMotorId]?.rejectionReason ? (
-                <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-                  {motorStatusById[activeMotorId]?.rejectionReason}
-                </Alert>
               ) : null}
 
               <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1 }}>

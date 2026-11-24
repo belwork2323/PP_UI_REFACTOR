@@ -30,6 +30,8 @@ export const STRINGS = {
     SELECT_SUB_DEPARTMENT: "Select Sub Department",
     BEL_LOGO_ALT: "BEL Logo",
     DRDO_LOGO_ALT: "DRDO Logo",
+    SWITCH_TO_LIGHT_MODE: "Switch to light mode",
+    SWITCH_TO_DARK_MODE: "Switch to dark mode",
     /* Features - Left Panel Information */
     FEATURES: [
       {
@@ -847,9 +849,10 @@ export const STRINGS = {
       TITLE: "Casing Verification Overview",
       SUBTITLE: "Review casing dimensional data and material proofing",
       READY_TO_SUBMIT: "Ready to submit for approval",
-      NOT_READY_TO_SUBMIT: "Select project, motor stage, and enter motor ID to save or submit.",
+      NOT_READY_TO_SUBMIT: "Enter project, motor stage, and motor ID to enable Save as Draft.",
+      SUBMIT_SECTIONS_PENDING: "Complete remaining mandatory sections before Submit.",
       ACTION_HELPER:
-        "Save or submit once identification is complete. Other sections can be filled in later.",
+        "Save as Draft after identification. Submit requires all sections to be complete.",
       SAVE_TOOLTIP: "Save progress and continue later",
       SAVE_DRAFT: "Save as Draft",
       SUBMIT_APPROVAL: "Submit for Approval",
@@ -961,6 +964,7 @@ export const STRINGS = {
         motorId: {
           required: "Motor ID is required.",
           invalid: "Motor ID must be alphanumeric.",
+          maxLength: "Cannot exceed {max} characters",
         },
         casingType: { required: "Casing type is required.", invalid: "Casing type is invalid." },
         receivingDate: {
@@ -1067,6 +1071,7 @@ export const STRINGS = {
         radiographyPlanName: {
           required: "Radiography Plan Name is required.",
           invalid: "Radiography Plan Name is invalid.",
+          maxLength: "Cannot exceed {max} characters",
         },
         radiographyPlanRows: {
           required: "At least one radiography plan row is required.",
@@ -1096,6 +1101,7 @@ export const STRINGS = {
         calibrationDueDate: {
           required: "Calibration Due Date is required and must be valid.",
           invalid: "Calibration Due Date must be a valid date.",
+          notPast: "Calibration Due Date cannot be in the past.",
         },
         dimensionalReading: {
           required: "Dimensional reading is required and must be numeric.",
@@ -1124,14 +1130,19 @@ export const STRINGS = {
         visualInspectionReport: {
           required: "Visual Inspection Report is required.",
           invalid: "Visual Inspection Report is required.",
+          uploadFailed:
+            "Visual Inspection Report upload failed. Retry or remove the failed file.",
         },
         dimensionalInspectionReport: {
           required: "Dimension Inspection Report is required.",
           invalid: "Dimension Inspection Report is required.",
+          uploadFailed:
+            "Dimensional Inspection Report upload failed. Retry or remove the failed file.",
         },
         mockTrialReport: {
           required: "Mock Trial Report is required.",
           invalid: "Mock Trial Report is required.",
+          uploadFailed: "Mock Trial Report upload failed. Retry or remove the failed file.",
         },
       },
     },
@@ -1302,7 +1313,8 @@ export const STRINGS = {
       STEP_OF: "Step {current} of {total}",
       BACK: "Back",
       NEXT: "Next",
-      COMPLETE_ALL_STEPS: "Complete all steps to enable Save as Draft and Submit.",
+      COMPLETE_ALL_STEPS:
+        "Complete all required sections before Submit. Save as Draft is available after identification.",
     },
   },
 
@@ -3416,6 +3428,7 @@ export const STRINGS = {
       REJECTION_REASON_LABEL: "Rejection Reason",
       REJECTION_REASON_PLACEHOLDER: "Explain why this submission is being rejected",
       REJECTION_REASON_REQUIRED: "Rejection reason is required.",
+      REJECTION_REASON_TOO_SHORT: "Rejection reason must be at least 3 characters.",
       BATCH_ID_LABEL: "Batch ID",
       LOT_ID_LABEL: "Lot ID",
       MOTOR_CASING_ID_LABEL: "Motor casing ID",
@@ -3770,13 +3783,13 @@ export const STRINGS = {
       ACTION_FAILED: "Failed to update password reset request",
     },
     DELETE_DIALOG: {
-      TITLE: "Delete User?",
+      TITLE: "Deactivate User?",
       BODY: (name: string, username: string) =>
-        `This will permanently remove ${name} (${username}) and all associated data. This action cannot be undone.`,
-      FALLBACK_MESSAGE: "Delete this user?",
+        `Are you sure you want to deactivate ${name} (${username})? They will no longer be able to log in until reactivated.`,
+      FALLBACK_MESSAGE: "Deactivate this user?",
       CANCEL: "Cancel",
-      CONFIRM: "Delete User",
-      DELETING: "Deleting…",
+      CONFIRM: "Deactivate User",
+      DELETING: "Deactivating",
     },
     ACTIVATE_DIALOG: {
       TITLE: "Activate User?",
@@ -3839,10 +3852,10 @@ export const STRINGS = {
     },
     STATS: [
       { label: "Total Projects", subLabel: "All projects", variant: "total" },
-      { label: "Created Today", subLabel: "Today", variant: "today" },
-      { label: "This Month", subLabel: "Current month", variant: "month" },
+      // { label: "Created Today", subLabel: "Today", variant: "today" },
+      // { label: "This Month", subLabel: "Current month", variant: "month" },
       { label: "Active", subLabel: "Active projects", variant: "active" },
-      { label: "Idle", subLabel: "Idle projects", variant: "idle" },
+      { label: "In Active", subLabel: "Inactive projects", variant: "idle" },
     ],
     TOOLBAR: {
       SEARCH_PLACEHOLDER: "Search projects…",
@@ -3852,7 +3865,7 @@ export const STRINGS = {
       FILTER_DATE_FROM_LABEL: "From Date",
       FILTER_DATE_TO_LABEL: "To Date",
     },
-    TABLE_COLS: ["Project ID", "Project Name", "Description", "Created On", "Actions"],
+    TABLE_COLS: ["Project ID", "Project Name", "Description", "Created On", "Status", "Actions"],
     TABLE: {
       EMPTY: "No projects found",
     },
@@ -3909,7 +3922,7 @@ export const STRINGS = {
       STAT_INACTIVE: (noun: string, count: number | string) => `Inactive ${noun}: ${count}`,
     },
     TOOLBAR: {
-      SEARCH_PLACEHOLDER: "Search by code or name…",
+      SEARCH_PLACEHOLDER: "Search by name…",
       FILTER_STATUS_LABEL: "Select Status",
       STATUS_PLACEHOLDER: "Select Status",
       FILTER_ALL: "All",

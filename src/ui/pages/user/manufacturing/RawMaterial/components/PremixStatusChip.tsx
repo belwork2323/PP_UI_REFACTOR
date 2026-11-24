@@ -56,7 +56,17 @@ export const PremixStatusChip = ({
   const padX = size === "small" ? "8px" : "10px";
 
   if (variant === "embedded") {
-    const accent = chipStyle?.color ?? "#334155";
+    // Solid banner configs use white label color + colored `bg`. Prefer fill for
+    // inactive tint so chips stay visible on outlined (non-active) tabs.
+    const labelColor = String(chipStyle?.color ?? "").trim().toLowerCase();
+    const isLightLabel =
+      !labelColor ||
+      labelColor === "#fff" ||
+      labelColor === "#ffffff" ||
+      labelColor === "white" ||
+      labelColor === "#eceff1";
+    const statusFill = chipStyle?.bg ?? chipStyle?.color ?? "#334155";
+    const accent = isLightLabel ? statusFill : (chipStyle?.color ?? statusFill);
     const glass = onAccent
       ? {
           color: "#fff",
@@ -66,8 +76,8 @@ export const PremixStatusChip = ({
         }
       : {
           color: accent,
-          bgcolor: alpha(accent, 0.12),
-          border: `1px solid ${alpha(accent, 0.28)}`,
+          bgcolor: alpha(accent, 0.14),
+          border: `1px solid ${alpha(accent, 0.4)}`,
           iconColor: accent,
         };
 

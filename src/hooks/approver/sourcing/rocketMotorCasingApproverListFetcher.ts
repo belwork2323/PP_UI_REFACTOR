@@ -1,6 +1,10 @@
 import rocketMotorCasingApproverController from "@controllers/approver/rocketMotorCasingApproverController";
 import type { SubDepartmentListFetcher } from "@hooks/approver/subDepartmentListFetcher";
+import { mapRocketMotorCasingListRow } from "@hooks/user/sourcing/useRocketMotorCasingList";
+import { rocketMotorCasingMatchesSearch } from "@data/models/user/RocketMotorCasingProcurementModel";
 import { mapApiStatusCountKeyToUiTab, toOperationStatusApiValue } from "@hooks/operationStatus";
+
+const CLIENT_SEARCH_FETCH_LIMIT = 5000;
 
 type CasingStatusCounts = Record<string, number | undefined>;
 
@@ -55,15 +59,15 @@ export const fetchRocketMotorCasingApproverList: SubDepartmentListFetcher = asyn
   const casingType = String(extraFilters.casingType ?? "").trim();
   const insulationType = String(extraFilters.insulationType ?? "").trim();
 
+  const isClientSearch = Boolean(search.trim());
   const payload = {
     subDepartmentId,
-    page,
-    limit,
+    page: isClientSearch ? 1 : page,
+    limit: isClientSearch ? CLIENT_SEARCH_FETCH_LIMIT : limit,
     ...(apiStatus ? { status: [apiStatus] } : {}),
     ...(motorStage && motorStage !== allLabel ? { motorStage: [motorStage] } : {}),
     ...(casingType && casingType !== allLabel ? { casingType: [casingType] } : {}),
     ...(insulationType && insulationType !== allLabel ? { insulationType: [insulationType] } : {}),
-    ...(search ? { search } : {}),
     ...(fromDate ? { fromDate } : {}),
     ...(toDate ? { toDate } : {}),
   };
@@ -71,19 +75,44 @@ export const fetchRocketMotorCasingApproverList: SubDepartmentListFetcher = asyn
   const response = await rocketMotorCasingApproverController.fetchCasingList(payload);
   if (!response.success || !response.data) return null;
 
-  const batches = (response.data.casings ?? []) as unknown as Record<string, unknown>[];
+  const fetchedBatches = ((response.data.casings ?? []) as unknown as Record<string, unknown>[]).map(
+    (batch) => {
+      const stage = String(
+        batch.motorStage ?? batch.motorStageName ?? batch.motorType ?? batch.stage ?? "",
+      ).trim();
+      return {
+        ...batch,
+        motorStageLabel: stage
+          ? /^stage\b/i.test(stage)
+            ? stage
+            : `Stage ${stage}`
+          : "",
+      };
+    },
+  );
+  const matchingBatches = isClientSearch
+    ? fetchedBatches.filter((batch) =>
+        rocketMotorCasingMatchesSearch(mapRocketMotorCasingListRow(batch), search),
+      )
+    : fetchedBatches;
+  const batches = isClientSearch
+    ? matchingBatches.slice((page - 1) * limit, page * limit)
+    : matchingBatches;
+  const totalRecords = isClientSearch
+    ? matchingBatches.length
+    : response.data.pagination?.totalRecords ?? batches.length;
   return {
     batches,
     pagination: {
-      page: response.data.pagination?.page ?? page,
-      limit: response.data.pagination?.limit ?? limit,
-      totalRecords: response.data.pagination?.totalRecords ?? batches.length,
-      totalPages: response.data.pagination?.totalPages ?? 1,
+      page,
+      limit,
+      totalRecords,
+      totalPages: Math.max(1, Math.ceil(totalRecords / limit)),
     },
     statusCounts: mapCasingStatusCounts(
       response.data.statusCounts as CasingStatusCounts | undefined,
       allLabel,
-      batches,
+      isClientSearch ? matchingBatches : batches,
     ),
   };
 };

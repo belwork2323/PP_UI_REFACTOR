@@ -37,7 +37,8 @@ export const createBannerStatusConfig = (
   const rejected = solid("#b71c1c", "#fff", "#ef9a9a");
   const waiting = solid("#f9a825", "#1a1a1a", "#fdd835");
   const approved = solid("#1b5e20", "#fff", "#81c784");
-  const initiated = solid("#455a64", "#eceff1");
+  // Light grey fill + darker text so inactive To Be Initiated chips stay readable.
+  const initiated = { color: "#546e7a", bg: "#eceff1", border: "#cfd8dc" };
   const inProgress = solid("#0d47a1", "#e3f2fd", "#64b5f6");
 
   return {

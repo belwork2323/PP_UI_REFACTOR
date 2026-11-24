@@ -1,7 +1,8 @@
 import { normalizeRocketCasingListStatus } from "../user/RocketMotorCasingProcurementModel";
-import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { SOURCING_LOT_STATUS_FILTER_VALUES } from "../../../hooks/operationStatus";
 
-export const ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS = Object.values(OPERATION_STATUS);
+/** Match the user-side Rocket Motor Casing list; omit workflow states that aren't useful filters here. */
+export const ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS = SOURCING_LOT_STATUS_FILTER_VALUES;
 
 export const formatMotorStageLabel = (motorStage: string | number | null | undefined): string => {
   if (motorStage === null || motorStage === undefined || motorStage === "") return "—";
@@ -76,6 +77,10 @@ const readProjectName = (casing: Record<string, unknown>) => {
 };
 
 const mapPerson = (value: unknown) => {
+  if (typeof value === "string") {
+    const fullName = value.trim();
+    return fullName ? { id: "", fullName } : null;
+  }
   if (!value || typeof value !== "object") return null;
   const person = value as Record<string, unknown>;
   const id = String(person.id ?? "").trim();
@@ -87,12 +92,16 @@ const mapPerson = (value: unknown) => {
 export const mapRocketMotorCasingApproverRow = (
   casing: Record<string, unknown>,
 ): RocketMotorCasingApproverRow => {
-  const motorCasingId = String(casing.motorCasingId ?? "").trim();
+  const motorCasingId = String(casing.motorCasingId ?? casing.casingId ?? casing.formId ?? "").trim();
   const motorStage =
-    casing.motorStage != null && String(casing.motorStage).trim() !== ""
-      ? String(casing.motorStage).trim()
+    (casing.motorStage ?? casing.motorStageName ?? casing.motorType) != null &&
+    String(casing.motorStage ?? casing.motorStageName ?? casing.motorType).trim() !== ""
+      ? String(casing.motorStage ?? casing.motorStageName ?? casing.motorType).trim()
       : "";
-  const motorId = String(casing.motorId ?? casing.motorNo ?? "").trim();
+  const motorId = String(casing.motorId ?? casing.motorNo ?? casing.motorNumber ?? "").trim();
+  const creator = casing.createdBy ?? casing.formSubmittedBy ?? casing.submittedBy;
+  const assignedTo = casing.assignedTo;
+  const status = casing.status ?? casing.stageStatus ?? casing.workflowStatus;
 
   return {
     projectId: readProjectId(casing),
@@ -100,15 +109,15 @@ export const mapRocketMotorCasingApproverRow = (
     motorCasingId,
     motorStage,
     motorId,
-    casingType: String(casing.casingType ?? "").trim(),
-    insulationType: String(casing.insulationType ?? "").trim(),
-    receivingDate: String(casing.receivingDate ?? "").trim(),
+    casingType: String(casing.casingType ?? casing.casingTypeName ?? "").trim(),
+    insulationType: String(casing.insulationType ?? casing.insulationTypeName ?? "").trim(),
+    receivingDate: String(casing.receivingDate ?? casing.receivedDate ?? casing.receivedOn ?? "").trim(),
     nextStep: String(casing.nextStep ?? "").trim(),
     priority: String(casing.priority ?? "Medium").trim(),
-    status: normalizeRocketCasingListStatus(String(casing.status ?? "")),
-    assignedTo: mapPerson(casing.assignedTo),
-    createdBy: mapPerson(casing.createdBy),
-    createdOn: String(casing.createdOn ?? "").trim(),
+    status: normalizeRocketCasingListStatus(String(status ?? "")),
+    assignedTo: mapPerson(assignedTo),
+    createdBy: mapPerson(creator),
+    createdOn: String(casing.createdOn ?? casing.createdAt ?? casing.createdDate ?? "").trim(),
     rejectionReason:
       casing.rejectionReason === null || casing.rejectionReason === undefined
         ? null

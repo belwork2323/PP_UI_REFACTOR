@@ -23,11 +23,8 @@ import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMat
 import { MotorDetailPanel } from "../../user/qualityControl/NDT/components/NDTDetailsContent";
 import { useFilePreview } from "../../../../hooks/useFilePreview";
 import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../components/custom/WorkflowUnitStatusTabNav";
 
 const NDT = STRINGS.QUALITY_CONTROL.NDT;
 const {
@@ -126,23 +123,13 @@ const NDTApproverReviewContent = ({
     text: palette.text,
   };
 
-  const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motors.map((motor) => ({
-        id: motor.motorId,
-        label: motor.motorId,
-        endAdornment: (
-          <PremixStatusChip
-            status={motor.motorSubmissionStatus as PremixSubmissionStatus}
-            statusConfig={statusConfig}
-            showIcon={false}
-            variant="embedded"
-            onAccent={motor.motorId === activeMotorId}
-          />
-        ),
-      })),
-    [activeMotorId, motors, statusConfig],
+  const motorUnits = useMemo(
+    () => motors.map((motor) => ({ id: motor.motorId, label: motor.motorId })),
+    [motors],
   );
+
+  const getMotorNavStatus = (motorId: string) =>
+    motors.find((motor) => motor.motorId === motorId)?.motorSubmissionStatus;
 
   const goToEnabledMotor = (direction: -1 | 1) => {
     if (enabledMotors.length === 0) return;
@@ -193,12 +180,14 @@ const NDTApproverReviewContent = ({
       </Box>
 
       <UserWorkflowNavPanel palette={navPalette}>
-        <UserWorkflowTabNav
+        <WorkflowUnitStatusTabNav
           title={NDT.MOTOR_NAV_TITLE}
           hint={NDT.MOTOR_APPROVER_NAV_HINT}
-          tabs={motorNavTabs}
-          activeIndex={activeMotorIndex >= 0 ? activeMotorIndex : 0}
-          onActiveIndexChange={(index) => onActiveMotorChange(motors[index].motorId)}
+          units={motorUnits}
+          activeId={activeMotorId}
+          onActiveIdChange={onActiveMotorChange}
+          getStatus={getMotorNavStatus}
+          statusConfig={statusConfig}
           palette={navPalette}
           showStepArrows
           wrapTabs
@@ -208,14 +197,16 @@ const NDTApproverReviewContent = ({
           disableStepNext={
             enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1
           }
-          isTabDisabled={(_, index) =>
-            isNDTMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
-          }
-          tabTooltip={(_, index) =>
-            isNDTMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
+          isUnitDisabled={(id) => {
+            const motor = motors.find((m) => m.motorId === id);
+            return isNDTMotorApproverTabDisabled(motor?.motorSubmissionStatus);
+          }}
+          unitTooltip={(id) => {
+            const motor = motors.find((m) => m.motorId === id);
+            return isNDTMotorApproverTabDisabled(motor?.motorSubmissionStatus)
               ? NDT.MOTOR_APPROVER_TAB_DISABLED
-              : undefined
-          }
+              : undefined;
+          }}
         />
       </UserWorkflowNavPanel>
 
@@ -247,9 +238,14 @@ const NDTApproverReviewContent = ({
           </Stack>
 
           {activeMotor.motorSubmissionStatus === "REJECTED" && activeMotor.rejectionReason ? (
-            <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.25 }}>
-              Rejection reason: {activeMotor.rejectionReason}
-            </Typography>
+            <Box sx={{ mb: 1.25 }}>
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}>
+                Rejection Reason
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+                {activeMotor.rejectionReason}
+              </Typography>
+            </Box>
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (

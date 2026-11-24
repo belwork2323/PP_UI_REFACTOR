@@ -27,6 +27,7 @@ import DashboardDateFilter, {
   getDateFilterDisplayLabel,
 } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
+import { useAuthStore } from "@/app/store/authStore";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 const S1 = STRINGS.DASHBOARD_PAGE;
@@ -44,6 +45,9 @@ const BatchManagementPage = () => {
   const mode = useThemeStore((s) => s.mode);
   const t = getBatchManagementTheme(mode);
   const smTheme = useMemo(() => getSystemManagerTheme(mode), [mode]);
+  const user = useAuthStore((s) => s.user);
+  console.log(user);
+
   const {
     list,
     stats,
@@ -99,16 +103,17 @@ const BatchManagementPage = () => {
                 <MenuItem value="month">{S.TOOLBAR.THIS_MONTH}</MenuItem>
               </Select>
             </FormControl> */}
-
-            <Button
-              variant="contained"
-              startIcon={<icons.batchMgmt.add />}
-              onClick={form.openCreate}
-              disabled={list.loading}
-              sx={t.pageHeader.newBatchButton}
-            >
-              {S.PAGE.NEW_BATCH_BUTTON}
-            </Button>
+            {user.roleId !== 5 && (
+              <Button
+                variant="contained"
+                startIcon={<icons.batchMgmt.add />}
+                onClick={form.openCreate}
+                disabled={list.loading}
+                sx={t.pageHeader.newBatchButton}
+              >
+                {S.PAGE.NEW_BATCH_BUTTON}
+              </Button>
+            )}
           </Stack>
         }
         theme={t}
@@ -264,6 +269,7 @@ const BatchManagementPage = () => {
             list.setRowsPerPage(+e.target.value);
             list.setPage(0);
           }}
+          user={user}
         />
       </AdminListShell>
 

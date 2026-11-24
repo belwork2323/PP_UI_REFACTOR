@@ -41,6 +41,7 @@ type BatchListTableProps = {
   onViewDetails?: (batch: any) => void;
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  user?: any;
 };
 
 const BatchListTable = ({
@@ -57,6 +58,7 @@ const BatchListTable = ({
   onViewDetails,
   onPageChange,
   onRowsPerPageChange,
+  user,
 }: BatchListTableProps) => {
   const { table, tableCell } = t;
   const [trackingTarget, setTrackingTarget] = useState<{
@@ -172,6 +174,8 @@ const BatchListTable = ({
           const sheetDraft = isIdentificationSheetDraft(batch);
           const sheetCompleted = isIdentificationSheetCompleted(batch);
           const canDelete = canDeleteAdminBatch(batch);
+          const isAllowedRole = user?.roleId !== 5;
+
           return (
             <Box sx={tableCell.actionsBox}>
               {onViewStatus && (
@@ -185,7 +189,8 @@ const BatchListTable = ({
                   </IconButton>
                 </Tooltip>
               )}
-              {sheetDraft && onCompleteImplementation && (
+
+              {isAllowedRole && sheetDraft && onCompleteImplementation && (
                 <Tooltip title={TA.COMPLETE_IMPLEMENTATION_TOOLTIP}>
                   <Button
                     size="small"
@@ -198,6 +203,7 @@ const BatchListTable = ({
                   </Button>
                 </Tooltip>
               )}
+
               {sheetCompleted && onViewDetails && (
                 <Tooltip title={TA.VIEW_DETAILS_TOOLTIP}>
                   <Button
@@ -210,25 +216,16 @@ const BatchListTable = ({
                   </Button>
                 </Tooltip>
               )}
-              {canEditAdminBatch(batch) && !batch.isBatchLocked && (
+
+              {isAllowedRole && onEdit && canEditAdminBatch(batch) && !batch.isBatchLocked && (
                 <Tooltip title={TA.EDIT_BATCH}>
                   <IconButton size="small" onClick={() => onEdit(batch)} sx={tableCell.editButton}>
                     <icons.Edit sx={tableCell.editIcon} />
                   </IconButton>
                 </Tooltip>
               )}
-              {sheetCompleted && canDelete && (
-                <Tooltip title={TA.DELETE_BATCH}>
-                  <IconButton
-                    size="small"
-                    onClick={() => onDelete(batch)}
-                    sx={tableCell.deleteButton}
-                  >
-                    <icons.Delete sx={tableCell.deleteIcon} />
-                  </IconButton>
-                </Tooltip>
-              )}
-              {sheetDraft && canDelete && (
+
+              {isAllowedRole && onDelete && (sheetCompleted || sheetDraft) && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
                   <IconButton
                     size="small"

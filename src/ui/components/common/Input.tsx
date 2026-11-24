@@ -5,7 +5,7 @@ import {
   IconButton,
   type TextFieldProps,
 } from "@mui/material";
-import { icons, colors } from "../../../app/theme";
+import { icons } from "../../../app/theme";
 
 export type InputProps = TextFieldProps & {
   icon?: ReactNode;
@@ -43,7 +43,7 @@ const Input = ({
             <IconButton
               onClick={() => setShowPassword((prev) => !prev)}
               edge="end"
-              sx={{ color: colors.grey[700] }}
+              sx={{ color: "inherit" }}
             >
               <EndIcon />
             </IconButton>

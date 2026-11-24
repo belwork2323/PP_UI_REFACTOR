@@ -147,7 +147,7 @@ export const routes = [
   },
   {
     path: "/centre-head/batch",
-    element: <CHBatchManagementPage />,
+    element: <BatchManagementPage />,
     isProtected: true,
     roles: ["CENTRE_HEAD"],
   },

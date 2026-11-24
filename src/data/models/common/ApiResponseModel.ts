@@ -36,13 +36,18 @@ export class ApiResponseModel<T = any> {
       const details = apiResponse.details ?? null;
       this.errorDetails = details;
       this.error = details;
+      const hasFieldErrorMap =
+        details != null && typeof details === "object" && !Array.isArray(details);
       this.errorCode =
         typeof apiResponse.errorCode === "string"
           ? apiResponse.errorCode
-          : typeof details === "string"
-            ? details
-            : "INTERNAL_SERVER_ERROR";
-      this.data = null;
+          : this.statusCode === 400 || hasFieldErrorMap
+            ? "VALIDATION_ERROR"
+            : typeof details === "string"
+              ? details
+              : "INTERNAL_SERVER_ERROR";
+      // Preserve field-error maps so callers can show under-field messages.
+      this.data = hasFieldErrorMap ? (details as T) : null;
     } else {
       // Direct API response
       this.success = apiResponse.success ?? false;

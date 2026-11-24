@@ -100,6 +100,9 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     projectOptions = [],
     projectsLoading = false,
     ensureProjectOptions,
+    insulationTypeOptions,
+    insulationTypesLoading,
+    ensureInsulationTypeOptions,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,
@@ -122,6 +125,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     onOpen: () => {
       void ensureMotorStageOptions?.();
       void ensureProjectOptions?.();
+      void ensureInsulationTypeOptions?.();
     },
   });
   const { draft } = filterPanel;
@@ -156,6 +160,8 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     motorStageOptions,
     motorStagesLoading,
     statusOptions,
+    insulationTypeOptions,
+    insulationTypesLoading,
     dateErrors: draftDateRangeErrors,
   });
 

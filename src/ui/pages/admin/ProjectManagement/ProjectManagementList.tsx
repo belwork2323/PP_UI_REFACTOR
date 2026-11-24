@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, Typography, IconButton, Tooltip } from "@mui/material";
+import { Box, Typography, IconButton, Tooltip, Chip } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
@@ -45,61 +45,87 @@ const ProjectManagementList = ({
       {
         id: "projectId",
         label: S.TABLE_COLS[0],
-        render: (project) => (
-          <Typography sx={table.bodyText}>
-            {getProjectId(project)}
-          </Typography>
-        ),
+        render: (project) => <Typography sx={table.bodyText}>{getProjectId(project)}</Typography>,
       },
       {
         id: "projectName",
         label: S.TABLE_COLS[1],
-        render: (project) => (
-          <Typography sx={table.bodyText}>
-            {getProjectName(project)}
-          </Typography>
-        ),
+        render: (project) => <Typography sx={table.bodyText}>{getProjectName(project)}</Typography>,
       },
       {
         id: "description",
         label: S.TABLE_COLS[2],
         render: (project) => (
-          <Typography sx={table.bodyText}>
-            {getProjectDescription(project)}
-          </Typography>
+          <Typography sx={table.bodyText}>{getProjectDescription(project)}</Typography>
         ),
       },
       {
         id: "createdOn",
         label: S.TABLE_COLS[3],
         render: (project) => (
-          <Typography sx={table.bodyText}>
-            {formatDateTime(project.createdOn)}
-          </Typography>
+          <Typography sx={table.bodyText}>{formatDateTime(project.createdOn)}</Typography>
         ),
       },
       {
-        id: "actions",
+        id: "status",
         label: S.TABLE_COLS[4],
+        render: (project) => {
+          const isInactive = String(project.status).toUpperCase() === "INACTIVE";
+          return (
+            <Chip
+              size="small"
+              label={project.status || "Active"}
+              sx={{
+                ...table.bodyText,
+                ...(isInactive
+                  ? {
+                      bgcolor: "#f3f4f6",
+                      color: "#4b5563",
+                      border: "1px solid #d1d5db",
+                    }
+                  : {
+                      bgcolor: "#dcfce7",
+                      color: "#15803d",
+                    }),
+              }}
+            />
+          );
+        },
+      },
+      {
+        id: "actions",
+        label: S.TABLE_COLS[5],
         isActions: true,
-        render: (project) => (
-          <Box sx={tableCell.actionsBox}>
-            <Tooltip title="Edit project">
-              <IconButton size="small" onClick={() => onEdit(project)} sx={tableCell.editButton}>
-                <icons.Edit sx={tableCell.editIcon} />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete project">
-              <IconButton size="small" onClick={() => onDelete(project)} sx={tableCell.deleteButton}>
-                <icons.Delete sx={tableCell.deleteIcon} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ),
+        render: (project) => {
+          const isInactive = String(project.status).toUpperCase() === "INACTIVE";
+          if (isInactive) {
+            return null;
+          }
+
+          return (
+            <Box sx={tableCell.actionsBox}>
+              <Tooltip title="Edit project">
+                <IconButton size="small" onClick={() => onEdit(project)} sx={tableCell.editButton}>
+                  <icons.Edit sx={tableCell.editIcon} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Delete project">
+                <IconButton
+                  size="small"
+                  onClick={() => onDelete(project)}
+                  sx={tableCell.deleteButton}
+                >
+                  <icons.Delete sx={tableCell.deleteIcon} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          );
+        },
       },
     ],
     [onDelete, onEdit, table.bodyText, tableCell],
   );
+  console.log(paginated);
 
   return (
     <AdminManagementDataTable

@@ -11,11 +11,16 @@ import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
-const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig => ({
+const text = (
+  requiredIn: ValidationTier[],
+  pattern?: RegExp,
+  maxLength?: number,
+): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
   pattern,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  maxLength,
 });
 
 const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
@@ -36,7 +41,7 @@ export type StfValidationTarget = StfMotorSession;
 export const stfValidationFields: Record<string, FieldRuleConfig> = {
   // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
   // bemMotorNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
-  stfTestNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  stfTestNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE, 30),
 
   // Shared header / remarks
   firingDate: dateTime(["SUBMIT"]),

@@ -32,11 +32,8 @@ import PremixStatusChip, {
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
 import PostCureMotorPanel from "../../user/manufacturing/PostCure/PostCureMotorPanel";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../components/custom/WorkflowUnitStatusTabNav";
 
 const PC = STRINGS.MANUFACTURING.POST_CURE;
 const BL = STRINGS.SOURCING.BATCH_LIST;
@@ -188,23 +185,13 @@ const PostCureApproverReviewContent = ({
     },
   };
 
-  const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motors.map((motor) => ({
-        id: motor.motorId,
-        label: motor.motorId,
-        endAdornment: (
-          <PremixStatusChip
-            status={motor.motorSubmissionStatus as PremixSubmissionStatus}
-            statusConfig={statusConfig}
-            showIcon={false}
-            variant="embedded"
-            onAccent={motor.motorId === activeMotorId}
-          />
-        ),
-      })),
-    [activeMotorId, motors, statusConfig],
+  const motorUnits = useMemo(
+    () => motors.map((motor) => ({ id: motor.motorId, label: motor.motorId })),
+    [motors],
   );
+
+  const getMotorNavStatus = (motorId: string) =>
+    motors.find((motor) => motor.motorId === motorId)?.motorSubmissionStatus;
 
   const goToEnabledMotor = (direction: -1 | 1) => {
     if (enabledMotors.length === 0) return;
@@ -283,32 +270,36 @@ const PostCureApproverReviewContent = ({
       </Box>
 
       <UserWorkflowNavPanel palette={navPalette}>
-        <UserWorkflowTabNav
+        <WorkflowUnitStatusTabNav
           title={PC.MOTOR_NAV_TITLE}
           hint={PC.MOTOR_APPROVER_NAV_HINT}
-          tabs={motorNavTabs}
-          activeIndex={activeMotorIndex >= 0 ? activeMotorIndex : 0}
-          onActiveIndexChange={(index) => {
-            const motor = motors[index];
+          units={motorUnits}
+          activeId={activeMotorId}
+          onActiveIdChange={(id) => {
+            const motor = motors.find((m) => m.motorId === id);
             if (!motor || isPostCureMotorApproverTabDisabled(motor.motorSubmissionStatus)) {
               return;
             }
-            onActiveMotorChange(motor.motorId);
+            onActiveMotorChange(id);
           }}
+          getStatus={getMotorNavStatus}
+          statusConfig={statusConfig}
           palette={navPalette}
           showStepArrows
           onStepBack={() => goToEnabledMotor(-1)}
           onStepNext={() => goToEnabledMotor(1)}
           disableStepBack={enabledMotorIndex <= 0}
           disableStepNext={enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1}
-          isTabDisabled={(_, index) =>
-            isPostCureMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
-          }
-          tabTooltip={(_, index) =>
-            isPostCureMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
+          isUnitDisabled={(id) => {
+            const motor = motors.find((m) => m.motorId === id);
+            return isPostCureMotorApproverTabDisabled(motor?.motorSubmissionStatus);
+          }}
+          unitTooltip={(id) => {
+            const motor = motors.find((m) => m.motorId === id);
+            return isPostCureMotorApproverTabDisabled(motor?.motorSubmissionStatus)
               ? PC.MOTOR_APPROVER_TAB_DISABLED
-              : undefined
-          }
+              : undefined;
+          }}
         />
       </UserWorkflowNavPanel>
 
@@ -344,9 +335,14 @@ const PostCureApproverReviewContent = ({
           </Typography>
 
           {activeMotor.motorSubmissionStatus === "REJECTED" && activeMotor.rejectionReason ? (
-            <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.25 }}>
-              Rejection reason: {activeMotor.rejectionReason}
-            </Typography>
+            <Box sx={{ mb: 1.25 }}>
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}>
+                Rejection Reason
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+                {activeMotor.rejectionReason}
+              </Typography>
+            </Box>
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (

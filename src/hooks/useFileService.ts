@@ -25,6 +25,16 @@ export type UploadedFileResult = {
   fileName: string;
 };
 
+export type UploadFailureResult = {
+  error: string;
+};
+
+export type UploadOutcome = UploadedFileResult | UploadFailureResult;
+
+export const isUploadFailure = (
+  result: UploadOutcome | null | undefined,
+): result is UploadFailureResult => Boolean(result && "error" in result);
+
 export const useFileService = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
 
@@ -33,10 +43,11 @@ export const useFileService = () => {
       file: File,
       subDepartmentId: number,
       onProgress?: (progress: number) => void,
-    ): Promise<UploadedFileResult | null> => {
+    ): Promise<UploadOutcome | null> => {
       if (!subDepartmentId) {
-        showAlert("Sub-department is required to upload files.", "error");
-        return null;
+        const message = "Sub-department is required to upload files.";
+        showAlert(message, "error");
+        return { error: message };
       }
 
       const response = await fileController.uploadFile(file, subDepartmentId, onProgress);
@@ -55,7 +66,7 @@ export const useFileService = () => {
             : "") ||
           "Unsupported file format for upload.";
         showAlert(message, "error", { display: "snackbar", autoCloseMs: 4000 });
-        return null;
+        return { error: message };
       }
 
       return {

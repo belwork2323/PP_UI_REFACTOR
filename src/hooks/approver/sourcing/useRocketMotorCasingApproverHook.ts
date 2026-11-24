@@ -76,6 +76,9 @@ export const useRocketMotorCasingApproverHook = () => {
   const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
   const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
   const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+  const [insulationTypeOptions, setInsulationTypeOptions] = useState<string[]>([]);
+  const [insulationTypesLoading, setInsulationTypesLoading] = useState(false);
+  const [insulationTypesLoaded, setInsulationTypesLoaded] = useState(false);
 
   const subDepartmentId = useMemo(
     () =>
@@ -122,6 +125,23 @@ export const useRocketMotorCasingApproverHook = () => {
       active = false;
     };
   }, [subDepartmentId]);
+
+  const ensureInsulationTypeOptions = async () => {
+    if (!subDepartmentId || insulationTypesLoaded || insulationTypesLoading) return;
+    setInsulationTypesLoading(true);
+    try {
+      const response = await operationsController.fetchInsulationTypeList();
+      const types = response?.success
+        ? (response.data ?? []).map((row) => String(row.insulationType ?? "").trim()).filter(Boolean)
+        : [];
+      setInsulationTypeOptions([...new Set(types)].sort((a, b) => a.localeCompare(b)));
+      setInsulationTypesLoaded(true);
+    } catch {
+      setInsulationTypeOptions([]);
+    } finally {
+      setInsulationTypesLoading(false);
+    }
+  };
 
   const listFiltersRecord = useMemo(
     () => ({
@@ -363,6 +383,9 @@ export const useRocketMotorCasingApproverHook = () => {
     listFiltersRecord,
     motorStageOptions,
     motorStagesLoading,
+    insulationTypeOptions,
+    insulationTypesLoading,
+    ensureInsulationTypeOptions,
     statusFilter,
     setStatusFilter,
     statusTabs,

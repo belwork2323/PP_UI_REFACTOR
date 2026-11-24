@@ -19,6 +19,7 @@ import {
 } from "@data/models/approver/ApproverBatchListModel";
 import ListLayout from "@ui/components/custom/ListLayout";
 import ListPagination from "@ui/components/custom/ListPagination";
+import { SUBSCALE_STATUS_FILTER_VALUES, toApiStatusEnum } from "@/hooks/operationStatus";
 
 const APPROVER_ROWS_PER_PAGE_OPTIONS = [5, 10, 25];
 
@@ -127,7 +128,6 @@ const ApproverList = <T extends Record<string, unknown>>({
     status: activeStatus,
     subDepartment,
   });
-
   const filteredItems = useMemo(() => {
     const sourceItems = subDepartment ? resolvedItems : items;
     const query = searchText.trim();
@@ -136,7 +136,7 @@ const ApproverList = <T extends Record<string, unknown>>({
       const row = item as Record<string, unknown>;
       if (
         activeStatus !== allLabel &&
-        resolveApproverRowStatus(row, statusField) !== activeStatus
+        toApiStatusEnum(resolveApproverRowStatus(row, statusField)) !== toApiStatusEnum(activeStatus)
       ) {
         return false;
       }
@@ -182,6 +182,9 @@ const ApproverList = <T extends Record<string, unknown>>({
   ]);
 
   const displayStatusTabs = useMemo(() => {
+    if (subDepartment === "subscale") {
+      return [allLabel, ...SUBSCALE_STATUS_FILTER_VALUES];
+    }
     if (statusTabsOverride?.length) {
       return statusTabsOverride;
     }
@@ -192,7 +195,6 @@ const ApproverList = <T extends Record<string, unknown>>({
 
     return [allLabel, ...APPROVER_BATCH_STATUS_TABS];
   }, [allLabel, statusTabs, statusTabsOverride, subDepartment]);
-
   const resolvedSearchPlaceholder =
     searchPlaceholder ?? STRINGS.APPROVER.LIST.SEARCH_PLACEHOLDER(searchKeys);
 
@@ -233,23 +235,22 @@ const ApproverList = <T extends Record<string, unknown>>({
       theme={listTheme}
     >
       {(() => {
-        const paginationNode =
-          subDepartment ? (
-            <ListPagination
-              count={pagination.totalRecords}
-              page={Math.max(0, page - 1)}
-              rowsPerPage={limit}
-              rowsPerPageOptions={APPROVER_ROWS_PER_PAGE_OPTIONS}
-              onPageChange={(nextPage) => setPage(nextPage + 1)}
-              onRowsPerPageChange={setLimit}
-              palette={{
-                border: mode === "dark" ? "rgba(255,255,255,0.2)" : brand.border,
-                surface: mode === "dark" ? "#1e1e1e" : brand.surface,
-                text: mode === "dark" ? "#f0f2f8" : brand.text,
-                textSub: mode === "dark" ? "rgba(240,242,248,0.65)" : brand.textSub,
-              }}
-            />
-          ) : null;
+        const paginationNode = subDepartment ? (
+          <ListPagination
+            count={pagination.totalRecords}
+            page={Math.max(0, page - 1)}
+            rowsPerPage={limit}
+            rowsPerPageOptions={APPROVER_ROWS_PER_PAGE_OPTIONS}
+            onPageChange={(nextPage) => setPage(nextPage + 1)}
+            onRowsPerPageChange={setLimit}
+            palette={{
+              border: mode === "dark" ? "rgba(255,255,255,0.2)" : brand.border,
+              surface: mode === "dark" ? "#1e1e1e" : brand.surface,
+              text: mode === "dark" ? "#f0f2f8" : brand.text,
+              textSub: mode === "dark" ? "rgba(240,242,248,0.65)" : brand.textSub,
+            }}
+          />
+        ) : null;
 
         return children(filteredItems, paginationNode ? { pagination: paginationNode } : undefined);
       })()}

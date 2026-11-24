@@ -151,18 +151,38 @@ const ReportRowFiles = ({
                     >
                       {ref.fileName}
                     </Typography>
-                    <Chip
-                      size="small"
-                      label={statusLabel(ref)}
-                      sx={{
-                        height: 18,
-                        mt: 0.25,
-                        fontSize: "0.58rem",
-                        fontWeight: 700,
-                        background: alpha(color, 0.12),
-                        color,
-                      }}
-                    />
+                    <Tooltip
+                      title={
+                        ref.status === "failed" && ref.errorMessage
+                          ? ref.errorMessage
+                          : statusLabel(ref)
+                      }
+                    >
+                      <Chip
+                        size="small"
+                        label={statusLabel(ref)}
+                        sx={{
+                          height: 18,
+                          mt: 0.25,
+                          fontSize: "0.58rem",
+                          fontWeight: 700,
+                          background: alpha(color, 0.12),
+                          color,
+                        }}
+                      />
+                    </Tooltip>
+                    {ref.status === "failed" && ref.errorMessage ? (
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          color: colors.danger,
+                          mt: 0.25,
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {ref.errorMessage}
+                      </Typography>
+                    ) : null}
                   </Box>
                   {ref.status === "failed" ? (
                     <Tooltip title={S.UPLOAD_REPORT_RETRY}>

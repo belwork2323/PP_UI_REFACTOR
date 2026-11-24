@@ -92,6 +92,7 @@ const LoginForm = ({
           value={credentials.roleId}
           options={roleOptions}
           sx={t.dropdown.select}
+          MenuProps={{ PaperProps: { sx: t.dropdown.menu } }}
           disabled={roleDropdownDisabled}
           error={Boolean(errors.roleId) || rolesEmpty}
           helperText={roleHelperText}
@@ -104,6 +105,7 @@ const LoginForm = ({
             value={credentials.subDepartmentId}
             options={subDeptOptions}
             sx={t.dropdown.select}
+            MenuProps={{ PaperProps: { sx: t.dropdown.menu } }}
             disabled={subDeptDropdownDisabled}
             error={
               Boolean(errors.subDepartmentId) ||

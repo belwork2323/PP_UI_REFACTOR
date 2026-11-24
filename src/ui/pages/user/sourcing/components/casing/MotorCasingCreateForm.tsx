@@ -74,9 +74,12 @@ import {
 import CasingReportUpload from "./CasingReportUpload";
 import rocketMotorCasingController from "@/controllers/user/sourcing/rocketMotorCasingController";
 import { getTodayInIstDate } from "@utils/dateUtils";
+import { VALIDATIONSTRING } from "@/data/validation/configs/validationString";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 const SF = STRINGS.SOURCING.CASING_FORM;
+const SPEC_OUT_OF_RANGE = STRINGS.SOURCING.SPECIFICATION_FORM.SPEC_STATUS_OUT_OF_RANGE;
+const MAX_STANDARD = VALIDATIONSTRING.LENGTH.MAX_STANDARD;
 
 const DIM_COLUMNS = DIM_READING_KEYS.map((key) => ({
   key,
@@ -117,6 +120,7 @@ type Props = {
     target: RmcValidationFocusTarget | null;
   } | null;
   freezeMasterRows?: boolean;
+  canSubmit?: boolean;
   theme: any;
 };
 
@@ -136,6 +140,7 @@ const MotorCasingCreateForm = ({
   validationErrors = {},
   validationFocusRequest = null,
   freezeMasterRows = false,
+  canSubmit = false,
   theme,
 }: Props) => {
   const req = isCasingFieldRequired;
@@ -398,7 +403,7 @@ const MotorCasingCreateForm = ({
         canGoNext={!isLastStep && canAdvanceFromStep}
         isLastStep={isLastStep}
         stepError={stepError}
-        nextDisabledHint={!canAdvanceFromStep && !isLastStep ? S.IDENTIFICATION_GATE_HINT : null}
+        canSubmit={canSubmit}
         canNavigateToStep={canNavigateToStep}
         onStepClick={handleStepClick}
         onBack={handleStepBack}
@@ -485,6 +490,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 error={validationErrors.motorId}
                 fieldPath="motorId"
+                maxLength={MAX_STANDARD}
                 lightPlaceholder
               />
               {form.motorCasingId || lockIdentification ? (
@@ -560,6 +566,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 error={validationErrors.radiographyPlanName}
                 fieldPath="radiographyPlanName"
+                maxLength={MAX_STANDARD}
               />
             </FieldGrid>
             <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1.5, overflowX: "auto" }}>
@@ -1285,6 +1292,7 @@ const MotorCasingCreateForm = ({
               required={req("calibrationDueDate")}
               value={form.calibrationDueDate}
               onChange={(v) => patch({ calibrationDueDate: v })}
+              minDate={getTodayInIstDate()}
               theme={theme}
               error={validationErrors.calibrationDueDate}
               fieldPath="calibrationDueDate"
@@ -1392,96 +1400,107 @@ const MotorCasingCreateForm = ({
                         </TableCell>
                         {isLooseFlap ? (
                           <>
-                            <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <Box data-rmc-field={`dimensionalData.${idx}.looseFlap.arcLength`}>
-                                <CasingDeferredInput
-                                  size="small"
-                                  fullWidth
-                                  type="number"
-                                  placeholder={S.COL_ARC_LENGTH}
-                                  value={row.looseFlap?.arcLength ?? ""}
-                                  onChange={(value) => {
-                                    const next = [...form.dimensionalData];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      looseFlap: {
-                                        ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                        arcLength: value,
-                                      },
-                                    };
-                                    patch({ dimensionalData: next });
-                                  }}
-                                  error={Boolean(
-                                    validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`],
-                                  )}
-                                  sx={casingWhiteInputSx({
-                                    ...theme.workflow.formElements.cellField,
-                                    ...casingTheme.dimInput,
-                                  })}
-                                />
-                              </Box>
-                            </TableCell>
-                            <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <Box data-rmc-field={`dimensionalData.${idx}.looseFlap.axialLength`}>
-                                <CasingDeferredInput
-                                  size="small"
-                                  fullWidth
-                                  type="number"
-                                  placeholder={S.COL_AXIAL_LENGTH}
-                                  value={row.looseFlap?.axialLength ?? ""}
-                                  onChange={(value) => {
-                                    const next = [...form.dimensionalData];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      looseFlap: {
-                                        ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                        axialLength: value,
-                                      },
-                                    };
-                                    patch({ dimensionalData: next });
-                                  }}
-                                  error={Boolean(
-                                    validationErrors[
-                                      `dimensionalData.${idx}.looseFlap.axialLength`
-                                    ],
-                                  )}
-                                  sx={casingWhiteInputSx({
-                                    ...theme.workflow.formElements.cellField,
-                                    ...casingTheme.dimInput,
-                                  })}
-                                />
-                              </Box>
-                            </TableCell>
+                            {(["arcLength", "axialLength"] as const).map((looseKey) => {
+                              const fieldPath = `dimensionalData.${idx}.looseFlap.${looseKey}`;
+                              const fieldValue = row.looseFlap?.[looseKey] ?? "";
+                              const fieldError = validationErrors[fieldPath];
+                              const outOfRange = computeIsOutOfRange(fieldValue, row.referenceRange);
+                              const showFailed = Boolean(fieldError || outOfRange);
+                              return (
+                                <TableCell
+                                  key={looseKey}
+                                  colSpan={2}
+                                  sx={theme.workflow.formElements.tableCell}
+                                >
+                                  <Box data-rmc-field={fieldPath}>
+                                    <CasingDeferredInput
+                                      size="small"
+                                      fullWidth
+                                      type="number"
+                                      placeholder={
+                                        looseKey === "arcLength" ? S.COL_ARC_LENGTH : S.COL_AXIAL_LENGTH
+                                      }
+                                      value={fieldValue}
+                                      onChange={(value) => {
+                                        const next = [...form.dimensionalData];
+                                        next[idx] = {
+                                          ...next[idx],
+                                          looseFlap: {
+                                            ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
+                                            [looseKey]: value,
+                                          },
+                                        };
+                                        patch({ dimensionalData: next });
+                                      }}
+                                      error={showFailed}
+                                      helperText={fieldError ?? (outOfRange ? SPEC_OUT_OF_RANGE : undefined)}
+                                      FormHelperTextProps={{
+                                        sx: {
+                                          mx: 0,
+                                          fontSize: "0.65rem",
+                                          ...(outOfRange && !fieldError
+                                            ? { color: theme.palette.danger ?? "error.main" }
+                                            : {}),
+                                        },
+                                      }}
+                                      sx={casingWhiteInputSx({
+                                        ...theme.workflow.formElements.cellField,
+                                        ...casingTheme.dimInput,
+                                        ...(showFailed ? cf.propertiesFailedField : {}),
+                                      })}
+                                    />
+                                  </Box>
+                                </TableCell>
+                              );
+                            })}
                           </>
                         ) : (
-                          DIM_COLUMNS.map((col) => (
-                            <TableCell key={col.key} sx={theme.workflow.formElements.tableCell}>
-                              <Box data-rmc-field={`dimensionalData.${idx}.readings.${col.key}`}>
-                                <CasingDeferredInput
-                                  size="small"
-                                  fullWidth
-                                  type="number"
-                                  placeholder={col.label}
-                                  value={row.readings[col.key]}
-                                  onChange={(value) => {
-                                    const next = [...form.dimensionalData];
-                                    next[idx] = {
-                                      ...next[idx],
-                                      readings: { ...next[idx].readings, [col.key]: value },
-                                    };
-                                    patch({ dimensionalData: next });
-                                  }}
-                                  error={Boolean(
-                                    validationErrors[`dimensionalData.${idx}.readings.${col.key}`],
-                                  )}
-                                  sx={casingWhiteInputSx({
-                                    ...theme.workflow.formElements.cellField,
-                                    ...casingTheme.dimInput,
-                                  })}
-                                />
-                              </Box>
-                            </TableCell>
-                          ))
+                          DIM_COLUMNS.map((col) => {
+                            const fieldPath = `dimensionalData.${idx}.readings.${col.key}`;
+                            const fieldValue = row.readings[col.key];
+                            const fieldError = validationErrors[fieldPath];
+                            const outOfRange = computeIsOutOfRange(fieldValue, row.referenceRange);
+                            const showFailed = Boolean(fieldError || outOfRange);
+                            return (
+                              <TableCell key={col.key} sx={theme.workflow.formElements.tableCell}>
+                                <Box data-rmc-field={fieldPath}>
+                                  <CasingDeferredInput
+                                    size="small"
+                                    fullWidth
+                                    type="number"
+                                    placeholder={col.label}
+                                    value={fieldValue}
+                                    onChange={(value) => {
+                                      const next = [...form.dimensionalData];
+                                      next[idx] = {
+                                        ...next[idx],
+                                        readings: { ...next[idx].readings, [col.key]: value },
+                                      };
+                                      patch({ dimensionalData: next });
+                                    }}
+                                    error={showFailed}
+                                    helperText={
+                                      fieldError ?? (outOfRange ? SPEC_OUT_OF_RANGE : undefined)
+                                    }
+                                    FormHelperTextProps={{
+                                      sx: {
+                                        mx: 0,
+                                        fontSize: "0.65rem",
+                                        ...(outOfRange && !fieldError
+                                          ? { color: theme.palette.danger ?? "error.main" }
+                                          : {}),
+                                      },
+                                    }}
+                                    sx={casingWhiteInputSx({
+                                      ...theme.workflow.formElements.cellField,
+                                      ...casingTheme.dimInput,
+                                      ...(showFailed ? cf.propertiesFailedField : {}),
+                                    })}
+                                  />
+                                </Box>
+                              </TableCell>
+                            );
+                          })
                         )}
                       </TableRow>
                     );

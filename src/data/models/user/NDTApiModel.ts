@@ -11,7 +11,12 @@ import {
   type NDTVisualInspectionRow,
 } from "./NDTFormModel";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
-import { parseFileRef, parseFileRefs, toFileIdListPayload, toFileIdPayloadOrNull } from "../common/FileUploadModel";
+import {
+  parseFileRef,
+  parseFileRefs,
+  toFileIdListPayload,
+  toFileIdPayloadOrNull,
+} from "../common/FileUploadModel";
 import { NDT_VISUAL_INSPECTION_PRESETS } from "../../../hooks/user/qualityControl/ndtFlowConfig";
 import {
   NDT_CUSTOM_OBSERVATION_TYPE,
@@ -177,7 +182,7 @@ const mapVisualInspectionRowToApi = (row: NDTVisualInspectionRow) => {
     observationType: row.isPreset
       ? mapNdtObservationTypeToApi(row.observation)
       : NDT_CUSTOM_OBSERVATION_TYPE,
-    sectionNumber: sectionNumber ?? 0,
+    sectionNumber: sectionNumber ?? "",
     orientation: mapNdtOrientationToApi(row.orientation),
     observation: row.isPreset ? (row.observationNotes ?? "") : (row.observation ?? ""),
     uploadedImages: toFileIdListPayload(row.files ?? []),
@@ -201,11 +206,11 @@ const hasRadiographyPlanDetails = (motor: NDTMotorSession) => {
   return rows.some((row) =>
     Boolean(
       Number(row.sections) ||
-        Number(row.orientations) ||
-        Number(row.sfd) ||
-        Number(row.normalExposures) ||
-        Number(row.tangentialExposures) ||
-        String(row.detectorType ?? "").trim(),
+      Number(row.orientations) ||
+      Number(row.sfd) ||
+      Number(row.normalExposures) ||
+      Number(row.tangentialExposures) ||
+      String(row.detectorType ?? "").trim(),
     ),
   );
 };
@@ -312,8 +317,7 @@ const hydrateFormState = (payload: any): NDTFormState => {
     visualInspectionMedia: parseFileRefs(
       payload?.visualInspectionMediaFilePaths ?? payload?.visualInspectionMedia,
     ),
-    signedReport:
-      parseFileRef(payload?.signedReportFilePath ?? payload?.signedReport) ?? null,
+    signedReport: parseFileRef(payload?.signedReportFilePath ?? payload?.signedReport) ?? null,
     additionalRemarks: payload?.additionalRemarks,
     formLoaded: true,
   });
@@ -433,9 +437,7 @@ export const mapNDTPayload = (
     .filter((motor) => !targetIds || targetIds.has(motor.motorId))
     .map((motor) => ({
       ...mapMotorSessionToApi(motor),
-      ...(options?.motorSubmissionType
-        ? { motorSubmissionType: options.motorSubmissionType }
-        : {}),
+      ...(options?.motorSubmissionType ? { motorSubmissionType: options.motorSubmissionType } : {}),
     }));
 
   return { motors };

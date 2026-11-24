@@ -11,10 +11,11 @@ import {
 
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
 import { STRINGS } from "../../../app/config/strings";
+import { useAlertStore } from "../../../app/store/alertStore";
 import { FieldLabelWithAsterisk } from "../common/FieldLabelWithAsterisk";
 import { useEffect, useState } from "react";
 
-export const REASON_MIN_LENGTH = 10;
+export const REASON_MIN_LENGTH = 3;
 export const REASON_MAX_LENGTH = 500;
 
 // Alphanumeric + spaces + @$%^&*()-+[]/\"':,.<>
@@ -51,6 +52,7 @@ const ApproverActionDialog = ({
   subdepartment,
 }: ApproverActionDialogProps) => {
   const isReject = actionType === "REJECTED";
+  const showAlert = useAlertStore((state) => state.showAlert);
 
   const [errorMsg, setErrorMsg] = useState("");
   const [showBlockchainWarning, setShowBlockchainWarning] = useState(false);
@@ -80,6 +82,7 @@ const ApproverActionDialog = ({
     const error = validateReason(value);
     if (error) {
       setErrorMsg(error);
+      showAlert(error, "warning", { autoCloseMs: 3000 });
       return;
     }
     setErrorMsg("");

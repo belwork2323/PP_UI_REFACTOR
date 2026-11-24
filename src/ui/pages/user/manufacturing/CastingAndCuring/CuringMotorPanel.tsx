@@ -215,6 +215,8 @@ const CuringMotorPanel = ({
                 const reading1 = `CURING_CYCLES.CURING_TABLE.${index}.PROPELLANT_PRESSURE.READING1`;
                 const reading2 = `CURING_CYCLES.CURING_TABLE.${index}.PROPELLANT_PRESSURE.READING2`;
                 const waterStatusPath = `CURING_CYCLES.CURING_TABLE.${index}.HOT_WATER_STATUS`;
+                const durationError = `CURING_CYCLES.CURING_TABLE.${index}.DURATION`;
+
                 const rawStartError =
                   validationErrors?.[startDatePath] || validationErrors?.[startTimePath];
                 const rawEndError =
@@ -365,7 +367,15 @@ const CuringMotorPanel = ({
                       />
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
-                      <TableTextInput value={duration} readOnly disabled type="number" />
+                      <TableTextInput
+                        value={duration}
+                        readOnly
+                        disabled
+                        type="number"
+                        fieldPath={durationError}
+                        error={Boolean(validationErrors?.[durationError])}
+                        helperText={validationErrors?.[durationError]}
+                      />
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
                       <TableTextInput

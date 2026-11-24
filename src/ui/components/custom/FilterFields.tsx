@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Box, CircularProgress } from "@mui/material";
 
 import { formatToIsoDateInput, formatToUiDate } from "@utils/dateUtils";
+import dayjs from "dayjs";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import AppTextField from "@ui/components/common/AppTextField";
 import DateField from "@ui/components/common/DateField";
@@ -110,12 +111,15 @@ const FilterFields = <D,>({ fields, draft, onDraftChange, theme }: FilterFieldsP
         }
 
         const from = valueOf(field.fromKey);
+        const today = dayjs().format("DD-MM-YYYY");
         return [
           <Box key={field.fromKey} sx={boxSx(field.minWidth)}>
             <DateField
               label={field.fromLabel}
               value={formatToUiDate(from)}
+              maxDate={formatToUiDate(valueOf(field.toKey)) || today}
               onChange={(value) => patch(field.fromKey, formatToIsoDateInput(value))}
+              clearable
               compact
               error={Boolean(field.errors?.from)}
               helperText={field.errors?.from}
@@ -127,7 +131,9 @@ const FilterFields = <D,>({ fields, draft, onDraftChange, theme }: FilterFieldsP
               label={field.toLabel}
               value={formatToUiDate(valueOf(field.toKey))}
               minDate={formatToUiDate(from)}
+              maxDate={today}
               onChange={(value) => patch(field.toKey, formatToIsoDateInput(value))}
+              clearable
               compact
               error={Boolean(field.errors?.to)}
               helperText={field.errors?.to}

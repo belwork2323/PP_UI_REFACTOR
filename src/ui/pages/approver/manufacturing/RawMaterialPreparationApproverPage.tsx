@@ -43,6 +43,24 @@ const RawMaterialPreparationApproverPage = () => {
       department="manufacturing"
       subDepartment="raw-material-prep"
       items={items}
+      searchKeys={[
+        "batchId",
+        "batchType",
+        "projectId",
+        "projectName",
+        "motorId",
+        "motorStage",
+        "motorStageLabel",
+        "motorType",
+        "stage",
+        "submittedBy",
+        "systemManager.fullName",
+        "assignedTo.fullName",
+        "createdOn",
+        "status",
+        "statusApi",
+      ]}
+      searchPlaceholder="Search batch type, motor ID, stage, manager, or created on"
       statusMeta={RMP_STATUS_META}
       onViewDetails={handleViewDetails}
       allowViewDetailsWhenApproved

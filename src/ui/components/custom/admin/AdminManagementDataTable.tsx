@@ -66,7 +66,7 @@ const AdminManagementDataTable = <T,>({
   onRowsPerPageChange,
   emptyState,
   theme,
-  rowsPerPageOptions = [5, 8, 15, 25],
+  rowsPerPageOptions = [5, 10, 25],
 }: AdminManagementDataTableProps<T>) => {
   const table = theme.table;
 

@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
-import { projectManagementController } from "../../controllers/admin/ProjectManagement/projectManagementController";
+import { fetchProjectFilterOptions } from "../projectFilterOptions";
 import {
   approverRowMatchesSubmittedByFilter,
   APPROVER_BATCH_STATUS_TABS,
 } from "../../data/models/approver/ApproverBatchListModel";
 import { normalizeMotorStage } from "../../data/models/admin/BatchManagement/BatchManagementModel";
 import { normalizeBatchTypeCode } from "../../data/models/user/SubdepartmentBatchModel";
+import { formatToIsoDateInput } from "../../utils/dateUtils";
+import { OPERATION_STATUS, SUBSCALE_STATUS_FILTER_VALUES } from "../operationStatus";
 
 const FILTER_ALL = STRINGS.APPROVER.COMMON.STATUS_ALL;
 
@@ -44,10 +46,12 @@ type ProjectFilterOption = {
 };
 
 const parseRowDate = (value: unknown) => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const isoDate = formatToIsoDateInput(String(value ?? "").trim());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+  const parsed = new Date(`${isoDate}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== isoDate
+    ? null
+    : isoDate;
 };
 
 /** Optional client-side refinement when list rows are merged with local mock data. */
@@ -102,16 +106,15 @@ export const applyApproverSubdepartmentBatchListClientFilters = <T extends Recor
     if (fromDate || toDate) {
       const rowDate = parseRowDate(row.createdOn);
       if (!rowDate) return false;
-      const day = rowDate.toISOString().slice(0, 10);
-      if (fromDate && day < fromDate) return false;
-      if (toDate && day > toDate) return false;
+      if (fromDate && rowDate < fromDate) return false;
+      if (toDate && rowDate > toDate) return false;
     }
 
     return true;
   });
 };
 
-export const useApproverSubdepartmentBatchListFilters = () => {
+export const useApproverSubdepartmentBatchListFilters = (subDepartment?: string) => {
   const [appliedFilters, setAppliedFilters] =
     useState<ApproverSubdepartmentBatchListAppliedFilters>(emptyAppliedFilters);
   const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
@@ -160,23 +163,7 @@ export const useApproverSubdepartmentBatchListFilters = () => {
     if (projectsLoaded || projectsLoading) return;
     setProjectsLoading(true);
     try {
-      const res = await projectManagementController.getAllProjects({
-        page: 1,
-        limit: 1000,
-        sortBy: "createdOn",
-        sortOrder: "desc",
-      });
-      if (res?.success && res.data) {
-        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
-        setProjectOptions(
-          raw.map((p: any) => ({
-            projectId: String(p.projectId ?? ""),
-            projectName: String(p.projectName ?? p.projectId ?? ""),
-          })),
-        );
-      } else {
-        setProjectOptions([]);
-      }
+      setProjectOptions(await fetchProjectFilterOptions());
       setProjectsLoaded(true);
     } catch {
       setProjectOptions([]);
@@ -234,9 +221,18 @@ export const useApproverSubdepartmentBatchListFilters = () => {
     setStatusFilter(FILTER_ALL);
   };
 
-  const statusTabs = useMemo(() => [FILTER_ALL, ...APPROVER_BATCH_STATUS_TABS], []);
+  const subdepartmentStatuses =
+    subDepartment === "subscale"
+      ? SUBSCALE_STATUS_FILTER_VALUES
+      : subDepartment === "static-test-facility"
+        ? [...APPROVER_BATCH_STATUS_TABS, OPERATION_STATUS.WAITING_FOR_APPROVAL]
+        : APPROVER_BATCH_STATUS_TABS;
+  const statusTabs = useMemo(
+    () => [FILTER_ALL, ...subdepartmentStatuses],
+    [subdepartmentStatuses],
+  );
 
-  const statusDropdownValues = useMemo(() => [FILTER_ALL, ...APPROVER_BATCH_STATUS_TABS], []);
+  const statusDropdownValues = statusTabs;
 
   return {
     appliedFilters,

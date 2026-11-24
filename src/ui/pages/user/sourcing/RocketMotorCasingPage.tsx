@@ -198,6 +198,7 @@ const RocketMotorCasing = () => {
               validationErrors={validationErrors}
               validationFocusRequest={validationFocusRequest}
               freezeMasterRows={isRocketMotorCasingMasterFrozen(activeBatch?.rmStatus)}
+              canSubmit={canSubmit}
               theme={theme}
             />
           </Box>
@@ -207,7 +208,11 @@ const RocketMotorCasing = () => {
             canSubmit={canSubmit}
             canSaveDraft={canSaveDraft}
             readinessText={STRINGS.SOURCING.CASING_FORM.READY_TO_SUBMIT}
-            pendingText={STRINGS.SOURCING.CASING_FORM.NOT_READY_TO_SUBMIT}
+            pendingText={
+              canSaveDraft
+                ? STRINGS.SOURCING.CASING_FORM.SUBMIT_SECTIONS_PENDING
+                : STRINGS.SOURCING.CASING_FORM.NOT_READY_TO_SUBMIT
+            }
             helperText={STRINGS.SOURCING.CASING_FORM.ACTION_HELPER}
             saveLabel={STRINGS.SOURCING.CASING_FORM.SAVE_DRAFT}
             submitLabel={STRINGS.SOURCING.CASING_FORM.SUBMIT_APPROVAL}

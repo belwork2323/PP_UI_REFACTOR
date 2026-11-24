@@ -14,6 +14,7 @@ import {
   getOperationStatusFilterLabel,
   isManufacturingViewOnlyStatus,
   type OperationStatusMap,
+  SUBSCALE_STATUS_FILTER_VALUES,
 } from "../../../hooks/operationStatus";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../data/models/user/SubdepartmentBatchModel";
 import RefreshIconButton from "../common/RefreshIconButton";
@@ -80,6 +81,7 @@ export type UserSubdepartmentBatchListHookState = {
   projectOptions: Array<{ projectId: string; projectName: string }>;
   projectsLoading: boolean;
   ensureProjectOptions: () => void;
+  subDepartmentId?: string;
 };
 
 export type BatchListSectionProps = {
@@ -129,7 +131,7 @@ const BatchListSection = ({
   viewDetailsTooltip = STRINGS.MANUFACTURING.BATCH_LIST.VIEW_DETAILS_TOOLTIP,
   actionStrings = STRINGS.MANUFACTURING.BATCH_LIST,
   columnLabels,
-  statusDropdownValues = [FILTER_ALL, ...MANUFACTURING_STATUS_FILTER_VALUES],
+  // statusDropdownValues = [FILTER_ALL, ...MANUFACTURING_STATUS_FILTER_VALUES],
   extraSearchFields = [],
   rejectedStatus = OPERATION_STATUS.REJECTED,
   emptyText,
@@ -165,6 +167,7 @@ const BatchListSection = ({
     projectOptions,
     projectsLoading,
     ensureProjectOptions,
+    subDepartmentId,
   } = hookState;
 
   const statusConfig = useMemo(
@@ -182,9 +185,21 @@ const BatchListSection = ({
     [rawStatusConfig, theme],
   );
 
-  /** Tabs follow manufacturing statusCounts keys (incl. Waiting for Approval). */
+  const isSubscaleSubDept = useMemo(() => {
+    const normalized = String(subDepartmentId);
+    return normalized.includes("8");
+  }, [subDepartmentId]);
+
+  const statusDropdownValues = useMemo(() => {
+    const baseValues = isSubscaleSubDept
+      ? SUBSCALE_STATUS_FILTER_VALUES
+      : MANUFACTURING_STATUS_FILTER_VALUES;
+
+    return [FILTER_ALL, ...baseValues];
+  }, [isSubscaleSubDept]);
+
   const statusTabs = useMemo(
-    () => statusDropdownValues.filter((status) => status in statusConfig || status === FILTER_ALL),
+    () => statusDropdownValues.filter((status) => status === FILTER_ALL || status in statusConfig),
     [statusConfig, statusDropdownValues],
   );
 

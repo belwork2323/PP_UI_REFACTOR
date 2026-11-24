@@ -27,10 +27,11 @@ const SEARCH_KEYS = [
   "materialCode",
   "materialName",
   "supplyOrderNo",
+  "receiptDate",
   "manufacturerName",
   "status",
   "submittedBy",
-  "createdBy",
+  "createdOn",
 ];
 
 /** Same field-row layout as User RMS lot list filter panel. */

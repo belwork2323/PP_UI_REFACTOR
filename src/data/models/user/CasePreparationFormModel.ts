@@ -174,7 +174,7 @@ export const isMotorApproverActionable = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+  return normalized === "WAITING_FOR_APPROVAL";
 };
 
 /** Entire form can be approved/rejected once submitted and every motor is approved. */
@@ -878,12 +878,44 @@ export const enrichCasePrepTableRows = (
   const presetRows = labelIndex?.tablePresetRows[tableId] ?? [];
   const enriched: Record<string, unknown>[] = [];
 
-  rows.forEach((row, index) => {
-    const displayRow =
-      /dispatchtocastingdetails/i.test(tableId) &&
-      /^dispatch\s*time$/i.test(String(row.parameter ?? "").trim())
-        ? { ...row, parameter: "Dispatch Date & Time" }
-        : row;
+  // Older dispatch payloads call the combined date-time field "Dispatch Time".
+  // Merge that value into the current canonical row instead of displaying both.
+  const isDispatchToCasting = /dispatchtocastingdetails/i.test(tableId);
+  const sourceRows = isDispatchToCasting
+    ? (() => {
+        const legacyIndex = rows.findIndex(
+          (row) => /^dispatch\s*time$/i.test(String(row.parameter ?? "").trim()),
+        );
+        if (legacyIndex < 0) return rows;
+
+        const legacyRow = rows[legacyIndex];
+        const canonicalIndex = rows.findIndex(
+          (row) => /^dispatch\s*date\s*&\s*time$/i.test(String(row.parameter ?? "").trim()),
+        );
+        const canonicalRow = canonicalIndex >= 0 ? rows[canonicalIndex] : null;
+        const mergedRow = {
+          ...(canonicalRow ?? legacyRow),
+          parameter: "Dispatch Date & Time",
+          value:
+            String(canonicalRow?.value ?? "").trim() ||
+            String(legacyRow.value ?? "").trim(),
+          remarks:
+            String(canonicalRow?.remarks ?? "").trim() ||
+            String(legacyRow.remarks ?? "").trim(),
+        };
+
+        return rows.flatMap((row, index) => {
+          if (index === legacyIndex) {
+            return canonicalIndex < 0 ? [mergedRow] : [];
+          }
+          if (index === canonicalIndex) return [mergedRow];
+          return [row];
+        });
+      })()
+    : rows;
+
+  sourceRows.forEach((row, index) => {
+    const displayRow = row;
     const preset = presetRows[index];
     if (preset?.type === "header") {
       if (!isCasePrepDisplayRowEmpty(displayRow)) {

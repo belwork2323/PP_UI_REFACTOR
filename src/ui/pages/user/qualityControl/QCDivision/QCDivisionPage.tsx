@@ -221,7 +221,8 @@ const QualityControlPage = () => {
                 return {
                   statusLabel: hs.statusLabel,
                   statusVariant: hs.statusVariant,
-                  rejectionReason: hs.rejectionReason,
+                  // Per-unit rejection reason is shown under the active motor/premix tab.
+                  rejectionReason: null,
                 };
               })(),
             }}

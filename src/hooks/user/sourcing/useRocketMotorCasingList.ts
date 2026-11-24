@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { STRINGS } from "../../../app/config/strings";
-import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
+import { fetchProjectFilterOptions } from "@hooks/projectFilterOptions";
 import rocketMotorCasingController from "../../../controllers/user/sourcing/rocketMotorCasingController";
 import {
   normalizeRocketCasingListStatus,
@@ -66,7 +66,9 @@ export function mapRocketMotorCasingListRow(row: Record<string, unknown>): Rocke
   const projectId = String(project?.projectId ?? row?.projectId ?? "").trim();
   const projectName = String(project?.projectName ?? row?.projectName ?? "").trim();
   const motorStage =
-    row?.motorStage != null && String(row.motorStage).trim() !== "" ? String(row.motorStage) : "";
+    row?.motorStage != null && String(row.motorStage).trim() !== ""
+      ? String(row.motorStage)
+      : String(row?.motorStageName ?? row?.motorType ?? row?.stage ?? "").trim();
   const motorId = String(row?.motorId ?? row?.motorNo ?? "").trim();
   const casingType = String(row?.casingType ?? "").trim();
   const statusRaw = String(row?.status ?? "");
@@ -161,6 +163,7 @@ export const useRocketMotorCasingList = () => {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [search, setSearch] = useState("");
@@ -175,6 +178,9 @@ export const useRocketMotorCasingList = () => {
   const [projectOptions, setProjectOptions] = useState<ProjectFilterOption[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [insulationTypeOptions, setInsulationTypeOptions] = useState<string[]>([]);
+  const [insulationTypesLoading, setInsulationTypesLoading] = useState(false);
+  const [insulationTypesLoaded, setInsulationTypesLoaded] = useState(false);
 
   const setStatusFilter = useCallback((value: string) => {
     setStatusFilterState(value);
@@ -222,23 +228,7 @@ export const useRocketMotorCasingList = () => {
     if (projectsLoaded || projectsLoading) return;
     setProjectsLoading(true);
     try {
-      const res = await projectManagementController.getAllProjects({
-        page: 1,
-        limit: 1000,
-        sortBy: "createdOn",
-        sortOrder: "desc",
-      });
-      if (res?.success && res.data) {
-        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
-        setProjectOptions(
-          raw.map((p: any) => ({
-            projectId: String(p.projectId ?? ""),
-            projectName: String(p.projectName ?? p.projectId ?? ""),
-          })),
-        );
-      } else {
-        setProjectOptions([]);
-      }
+      setProjectOptions(await fetchProjectFilterOptions());
       setProjectsLoaded(true);
     } catch {
       setProjectOptions([]);
@@ -246,6 +236,23 @@ export const useRocketMotorCasingList = () => {
       setProjectsLoading(false);
     }
   }, [projectsLoaded, projectsLoading]);
+
+  const ensureInsulationTypeOptions = useCallback(async () => {
+    if (!subDepartmentId || insulationTypesLoaded || insulationTypesLoading) return;
+    setInsulationTypesLoading(true);
+    try {
+      const response = await operationsController.fetchInsulationTypeList();
+      const types = response?.success
+        ? (response.data ?? []).map((row) => String(row.insulationType ?? "").trim()).filter(Boolean)
+        : [];
+      setInsulationTypeOptions([...new Set(types)].sort((a, b) => a.localeCompare(b)));
+      setInsulationTypesLoaded(true);
+    } catch {
+      setInsulationTypeOptions([]);
+    } finally {
+      setInsulationTypesLoading(false);
+    }
+  }, [insulationTypesLoaded, insulationTypesLoading, subDepartmentId]);
 
   useEffect(() => {
     setMotorStagesLoaded(false);
@@ -287,6 +294,7 @@ export const useRocketMotorCasingList = () => {
   }, [advancedFilters, statusFilter]);
 
   const fetchBatches = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
     if (!subDepartmentId) {
       setLoading(false);
       setIsRefreshing(false);
@@ -304,10 +312,12 @@ export const useRocketMotorCasingList = () => {
     }
     try {
       const isClientSearch = Boolean(debouncedSearch.trim());
+      const hasProjectFilter = advancedFilters.projectIds.length > 0;
+      const isClientFiltering = isClientSearch || hasProjectFilter;
       const payload: Parameters<typeof rocketMotorCasingController.fetchCasingList>[0] = {
         subDepartmentId,
-        page: isClientSearch ? 1 : page + 1,
-        limit: isClientSearch ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
+        page: isClientFiltering ? 1 : page + 1,
+        limit: isClientFiltering ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
       };
 
       if (statusFilter !== FILTER_ALL) {
@@ -317,9 +327,6 @@ export const useRocketMotorCasingList = () => {
         }
       }
 
-      if (advancedFilters.projectIds.length) {
-        payload.projectId = advancedFilters.projectIds[0];
-      }
       if (advancedFilters.motorStages.length) {
         payload.motorStage = advancedFilters.motorStages;
       }
@@ -336,6 +343,7 @@ export const useRocketMotorCasingList = () => {
       if (to) payload.toDate = to;
 
       const res = await rocketMotorCasingController.fetchCasingList(payload);
+      if (requestId !== fetchRequestIdRef.current) return;
 
       if (res?.success && res.data) {
         const data = res.data as {
@@ -346,10 +354,18 @@ export const useRocketMotorCasingList = () => {
         const rows = Array.isArray(data.casings) ? data.casings : [];
         const mapped = rows.map((r) => mapRocketMotorCasingListRow(r as Record<string, unknown>));
 
-        if (isClientSearch) {
-          const matched = mapped.filter((batch) =>
-            rocketMotorCasingMatchesSearch(batch, debouncedSearch),
-          );
+        if (isClientFiltering) {
+          const matched = mapped.filter((batch) => {
+            if (
+              hasProjectFilter &&
+              !advancedFilters.projectIds.some(
+                (projectId) => projectId.trim().toLowerCase() === batch.projectId.trim().toLowerCase(),
+              )
+            ) {
+              return false;
+            }
+            return !isClientSearch || rocketMotorCasingMatchesSearch(batch, debouncedSearch);
+          });
           const paged = matched.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
           setBatches(paged);
           setTotalRecords(matched.length);
@@ -366,14 +382,17 @@ export const useRocketMotorCasingList = () => {
         setStatusCounts({});
       }
     } catch (e) {
+      if (requestId !== fetchRequestIdRef.current) return;
       console.error("Rocket motor casing list fetch failed", e);
       setBatches([]);
       setTotalRecords(0);
       setStatusCounts({});
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-      hasLoadedOnceRef.current = true;
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+        hasLoadedOnceRef.current = true;
+      }
     }
   }, [subDepartmentId, page, rowsPerPage, debouncedSearch, statusFilter, advancedFilters]);
 
@@ -417,6 +436,9 @@ export const useRocketMotorCasingList = () => {
     projectOptions,
     projectsLoading,
     ensureProjectOptions,
+    insulationTypeOptions,
+    insulationTypesLoading,
+    ensureInsulationTypeOptions,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,

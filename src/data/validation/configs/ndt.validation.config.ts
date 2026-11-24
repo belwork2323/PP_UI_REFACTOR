@@ -11,10 +11,7 @@ import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
-const text = (
-  requiredIn: ValidationTier[],
-  pattern?: RegExp,
-): FieldRuleConfig => ({
+const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
   pattern,
@@ -191,4 +188,3 @@ export function toNdtValidationTarget(motor: NDTMotorSession): NdtValidationTarg
 
 /** Alias used by ndt.validation adapter. */
 export const toNDTValidationTarget = toNdtValidationTarget;
-

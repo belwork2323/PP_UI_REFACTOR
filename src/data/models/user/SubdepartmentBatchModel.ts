@@ -10,6 +10,7 @@ import {
 } from "../../../hooks/operationStatus";
 import {
   motorStageForApi,
+  motorStageLabel as formatMotorStageLabel,
   normalizeMotorStage,
 } from "../admin/BatchManagement/BatchManagementModel";
 import {
@@ -141,6 +142,7 @@ export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
   "batchId",
   "motorId",
   "motorStage",
+  "motorStageLabel",
   "motorType",
   "batchType",
   "priority",
@@ -150,8 +152,22 @@ export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
   "stage",
   "assignedTo.fullName",
   "systemManager.fullName",
+  "createdOn",
   "formSubmittedBy.fullName",
   "createdBy.fullName",
+  "status",
+  "rmStatus",
+  "cpStatus",
+  "mxStatus",
+  "ccStatus",
+  "pcStatus",
+  "ssStatus",
+  "trStatus",
+  "dispatchStatus",
+  "qcRmStatus",
+  "qcDivStatus",
+  "ndtStatus",
+  "stfStatus",
 ] as const;
 
 const getNestedValue = (obj: Record<string, unknown>, key: string) =>
@@ -498,6 +514,7 @@ export function mapSubdepartmentBatchListRow(
     motorId: resolveMotorId(batch),
     numberOfMotors: Number(batch.numberOfMotors ?? 0) || undefined,
     motorStage,
+    motorStageLabel: formatMotorStageLabel(motorStage),
     motorType: motorStage != null ? String(motorStage) : resolveMotorType(batch),
     batchType: batch.batchType,
     subBatchType: batch.subBatchType ?? null,

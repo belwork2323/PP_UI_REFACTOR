@@ -16,6 +16,7 @@ import type {
 } from "../../data/api/approver/approverApi";
 import { submitApproverFormStatusChange } from "../../controllers/approver/approverController";
 import type { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
+import { REASON_MIN_LENGTH } from "../../ui/components/custom/ApproverActionDialog";
 
 type ActionableApproverItem = {
   id?: number | string;
@@ -61,15 +62,61 @@ const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
   qualityControl: "quality",
 };
 
+const extractFieldValidationMessage = (source: unknown): string | null => {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return null;
+  }
+  const map = source as Record<string, unknown>;
+  const preferredKeys = ["rejectionReason", "remarks"];
+  for (const key of preferredKeys) {
+    const value = map[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  for (const value of Object.values(map)) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+};
+
+const getFieldValidationMessage = (
+  response?: {
+    message?: string;
+    errorCode?: string | null;
+    statusCode?: number;
+    code?: number;
+    errorDetails?: unknown;
+    error?: unknown;
+    data?: unknown;
+  } | null,
+) => {
+  if (!response) return null;
+  return (
+    extractFieldValidationMessage(response.errorDetails) ||
+    extractFieldValidationMessage(response.error) ||
+    extractFieldValidationMessage(response.data)
+  );
+};
+
 const getResponseMessage = (
   response?: {
     message?: string;
     errorCode?: string | null;
     statusCode?: number;
     code?: number;
+    errorDetails?: unknown;
+    error?: unknown;
+    data?: unknown;
   } | null,
 ) => {
   if (!response) return STRINGS.SYSTEM.SERVER_ERROR;
+  const fieldMessage = getFieldValidationMessage(response);
+  if (fieldMessage) {
+    return fieldMessage;
+  }
   const statusCode = Number(response.statusCode ?? response.code ?? 0);
   const errorCode = String(response.errorCode ?? "").toUpperCase();
   if (
@@ -145,7 +192,6 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       showAlert(STRINGS.APPROVER.ACTION.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
-    console.log(resolveItemStatus(item));
 
     const actionable = isItemActionable
       ? isItemActionable(item)
@@ -160,7 +206,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     const initialValue = getInitialDialogValue
       ? getInitialDialogValue(item, nextActionType)
       : nextActionType === "REJECTED"
-        ? String(item.rejectionReason ?? "")
+        ? ""
         : String(item.remarks ?? "");
     setDialogValue(initialValue);
     setDialogError("");
@@ -174,7 +220,16 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     const trimmedValue = dialogValue.trim();
 
     if (actionType === "REJECTED" && !trimmedValue) {
-      setDialogError(STRINGS.APPROVER.ACTION.REJECTION_REASON_REQUIRED);
+      const message = STRINGS.APPROVER.ACTION.REJECTION_REASON_REQUIRED;
+      setDialogError(message);
+      showAlert(message, "warning", { autoCloseMs: 3000 });
+      return;
+    }
+
+    if (actionType === "REJECTED" && trimmedValue.length < REASON_MIN_LENGTH) {
+      const message = STRINGS.APPROVER.ACTION.REJECTION_REASON_TOO_SHORT;
+      setDialogError(message);
+      showAlert(message, "warning", { autoCloseMs: 3000 });
       return;
     }
 
@@ -258,15 +313,32 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
         return;
       }
 
+      const fieldMessage = getFieldValidationMessage(response);
+      if (fieldMessage) {
+        setDialogError(fieldMessage);
+        showAlert(fieldMessage, "error", { autoCloseMs: 4000 });
+        return;
+      }
+
       // Close action dialog first so GlobalAlert is not covered by it.
       closeDialog({ force: true });
       showAlert(getResponseMessage(response), "error", { autoCloseMs: 4000 });
     } catch (error) {
-      closeDialog({ force: true });
+      setSubmitting(false);
       const status =
         error && typeof error === "object" && "status" in error
           ? Number((error as { status?: unknown }).status ?? 0)
           : 0;
+      const details =
+        error && typeof error === "object" && "details" in error
+          ? (error as { details?: unknown }).details
+          : null;
+      const fieldMessage = extractFieldValidationMessage(details);
+      if (fieldMessage && status > 0 && status < 500) {
+        setDialogError(fieldMessage);
+        showAlert(fieldMessage, "error", { autoCloseMs: 4000 });
+        return;
+      }
       const rawMessage =
         error && typeof error === "object" && "message" in error
           ? String((error as { message?: unknown }).message ?? "")
@@ -275,6 +347,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
         status >= 500 || !rawMessage || /unexpected server error/i.test(rawMessage)
           ? STRINGS.SYSTEM.SERVER_ERROR
           : rawMessage;
+      closeDialog({ force: true });
       showAlert(message, "error", { autoCloseMs: 4000 });
     }
   };
@@ -284,7 +357,8 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       subdepartment: selectedSubDepartment?.subDepartmentId ?? 0,
       actionType,
       batchId: dialogItem?.batchId ?? null,
-      confirmDisabled: actionType === "REJECTED" ? dialogValue.trim().length === 0 : false,
+      confirmDisabled:
+        actionType === "REJECTED" ? dialogValue.trim().length < REASON_MIN_LENGTH : false,
       helperText: dialogError,
       onCancel: closeDialog,
       onConfirm: handleConfirm,

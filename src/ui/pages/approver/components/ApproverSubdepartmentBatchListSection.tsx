@@ -59,7 +59,7 @@ const ApproverSubdepartmentBatchListSection = ({
   statusField = "status",
   allowViewDetailsWhenApproved = false,
 }: ApproverSubdepartmentBatchListSectionProps) => {
-  const filterBar = useApproverBatchListPageFilterBar();
+  const filterBar = useApproverBatchListPageFilterBar(subDepartment);
 
   return (
     <ApproverList

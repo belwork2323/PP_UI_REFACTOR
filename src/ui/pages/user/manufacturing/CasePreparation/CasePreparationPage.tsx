@@ -26,6 +26,7 @@ const CasePreparationPage = () => {
   const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
   const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
   const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
+  const [headerActiveMotorId, setHeaderActiveMotorId] = useState<string | null>(null);
 
   const hookState = useCasePreparationHook();
   const {
@@ -111,6 +112,8 @@ const CasePreparationPage = () => {
             isEdit={isEditMode}
             onBack={handleBack}
             theme={theme}
+            motorStatusById={motorStatusById}
+            activeMotorId={headerActiveMotorId}
           />
           <CasePreparationForm
             batch={activeBatch}
@@ -120,6 +123,7 @@ const CasePreparationPage = () => {
             motorStatusById={motorStatusById}
             getMotorStatus={getMotorStatus}
             isMotorEditable={isMotorEditable}
+            onActiveMotorChange={setHeaderActiveMotorId}
             previousStageGate={previousStageGate}
             schemaLoading={schemaLoading}
             schemaError={schemaError}

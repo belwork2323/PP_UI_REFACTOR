@@ -53,5 +53,5 @@ export const USER_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 /** Reason: alphanumeric + spaces + limited punctuation */
 export const REASON_PATTERN = /^[a-zA-Z0-9 .,!?'\-()]+$/;
 
-export const REASON_MIN_LENGTH = 10;
+export const REASON_MIN_LENGTH = 3;
 export const REASON_MAX_LENGTH = 200;

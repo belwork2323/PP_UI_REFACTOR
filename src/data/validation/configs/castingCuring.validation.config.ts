@@ -262,6 +262,7 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     maxLength: S.LENGTH.MAX_STANDARD,
   },
+
   // Post-curing details
   postOtherObservations: {
     valueType: "text" as const,
@@ -334,6 +335,13 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
     maxLength: S.LENGTH.MAX_LONG_TEXT,
+  },
+  propellantTemperature: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ONLY_DIGITS,
+    maxLength: S.PATTERNS.SIGNED_FLOAT_WITH_5_DECIMAL,
   },
   deCoringVisualObservation: {
     valueType: "file" as const,

@@ -106,7 +106,7 @@ const FinalApprovalPremixDialog = ({
                 <PremixStatusChip
                   status={row.premixSubmissionStatus as PremixSubmissionStatus}
                   statusConfig={statusConfig}
-                  variant="embedded"
+                  variant="default"
                 />
               </TableCell>
             </TableRow>

@@ -114,9 +114,9 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
     { label: BL.COL_MOTOR_STAGE, value: "Stage " + row.motorStage || "—" },
     { label: BL.COL_BATCH_TYPE, value: row.casingType || "—" },
     { label: "Insulation type", value: row.insulationType || "—" },
-    { label: "Receiving date", value: formatDisplayDate(row.receivingDate) },
+    { label: BL.COL_RECEIVING_DATE, value: formatDisplayDate(row.receivingDate) },
     { label: BL.COL_CREATED_BY, value: row.createdBy?.fullName ?? BL.UNASSIGNED },
-    { label: BL.COL_CREATED_ON, value: formatDisplayDateTime(row.createdOn, row.createdOn || "—") },
+    { label: BL.COL_CREATED_ON, value: formatDisplayDateTime(row.createdOn) },
   ];
 
   const defaultColumns = [

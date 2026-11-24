@@ -13,6 +13,7 @@ import {
 import ListLayout from "./ListLayout";
 import BatchTable from "./BatchTable";
 import ListPagination from "./ListPagination";
+import { toApiStatusEnum } from "@/hooks/operationStatus";
 
 // ─── Animation ────────────────────────────────────────────────────────────────
 const fadeUp = keyframes`
@@ -169,7 +170,7 @@ const BatchList = ({
         if (!targets.some((t) => t.includes(q))) return false;
       }
       if (statusConfig && activeStatusFilter !== STRINGS.USER_BATCH_LIST.FILTER_ALL) {
-        if (getVal(row, statusField) !== activeStatusFilter) return false;
+        if (toApiStatusEnum(getVal(row, statusField)) !== toApiStatusEnum(activeStatusFilter)) return false;
       }
       for (const { field } of filters) {
         if (

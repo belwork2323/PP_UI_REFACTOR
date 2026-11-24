@@ -4,13 +4,18 @@ import { useApproverListRefreshStore } from "../../app/store/approverListRefresh
 import { useAuthStore } from "../../app/store/authStore";
 import type { ApproverDepartmentKey } from "../../app/theme/approver";
 import { getApproverSubDepartmentBatchList } from "../../controllers/approver/approverController";
+import { mapApiStatusCountKeyToUiTab, toApiStatusEnum } from "../operationStatus";
+import { formatToIsoDateInput } from "../../utils/dateUtils";
 import {
   buildApproverBatchListPayload,
+  approverRowMatchesSearchQuery,
+  APPROVER_BATCH_LIST_SEARCH_KEYS,
   mapApproverBatchListRow,
   mapApproverBatchStatusCounts,
   mirrorApproverSubdepartmentStatusFields,
   normalizeApproverBatchStatus,
   resolveSubdepartmentBatchPagination,
+  approverRowMatchesSubmittedByFilter,
 } from "../../data/models/approver/ApproverBatchListModel";
 import type { SubDepartmentListFetcher } from "./subDepartmentListFetcher";
 
@@ -84,6 +89,9 @@ const DEFAULT_PAGINATION: ApproverBatchPagination = {
   totalPages: 1,
 };
 
+const CLIENT_SEARCH_FETCH_LIMIT = 5000;
+const CLIENT_SEARCH_KEYS = APPROVER_BATCH_LIST_SEARCH_KEYS;
+
 const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
   sourcing: "sourcing",
   manufacturing: "manufacturing",
@@ -118,6 +126,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasLoadedOnceRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
 
   const [debouncedSearchText, setDebouncedSearchText] = useState(searchText);
 
@@ -176,6 +185,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
   }, [subDepartment, selectedSubDepartment?.subDepartmentId]);
 
   const loadBatches = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
     if (!selectedSubDepartment?.subDepartmentId || !subDepartment) {
       setRemoteBatches([]);
       setPagination(DEFAULT_PAGINATION);
@@ -205,6 +215,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
 
     if (loadSubDepartmentFetcher) {
       const fetchList = await loadSubDepartmentFetcher();
+      if (requestId !== fetchRequestIdRef.current) return;
       const result = await fetchList({
         subDepartmentId: selectedSubDepartment.subDepartmentId,
         page,
@@ -214,6 +225,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
         search: debouncedSearchText,
         extraFilters,
       });
+      if (requestId !== fetchRequestIdRef.current) return;
 
       if (result) {
         setRemoteBatches(result.batches as ApproverBatchSummary[]);
@@ -231,50 +243,110 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       return;
     }
 
+    const isClientSearch = Boolean(debouncedSearchText.trim());
+    const submittedByQuery = String(extraFilters.submittedBy ?? "").trim();
+    const hasSubmittedByFilter = Boolean(submittedByQuery);
+    const projectIdFilter = String(extraFilters.projectId ?? "").trim();
+    const hasProjectFilter = Boolean(projectIdFilter && projectIdFilter !== allLabel);
+    const fromDateFilter = String(extraFilters.fromDate ?? "").trim();
+    const toDateFilter = String(extraFilters.toDate ?? "").trim();
+    // Keep every status in the fetched set so the tab counts and the rows use
+    // the same normalized client-side status values.
+    const isClientFiltering = true;
     const payload = buildApproverBatchListPayload({
       subDepartmentId: selectedSubDepartment.subDepartmentId,
       userId: String(userId),
-      page,
-      limit,
-      statusFilter: status,
-      search: debouncedSearchText,
+      page: isClientFiltering ? 1 : page,
+      limit: isClientFiltering ? CLIENT_SEARCH_FETCH_LIMIT : limit,
+      statusFilter: allLabel,
+      search: isClientSearch ? undefined : debouncedSearchText,
       priority: extraFilters.priority,
       advancedFilters: {
         batchId: extraFilters.batchId,
         batchType: extraFilters.batchType,
         motorId: extraFilters.motorId,
         motorStage: extraFilters.motorStage,
-        submittedBy: extraFilters.submittedBy,
-        fromDate: extraFilters.fromDate,
-        toDate: extraFilters.toDate,
-        projectId: extraFilters.projectId,
+        fromDate: fromDateFilter,
+        toDate: toDateFilter,
+        projectId: hasProjectFilter ? "" : extraFilters.projectId,
       },
       allLabel,
     });
 
     const response = await getApproverSubDepartmentBatchList(payload);
+    if (requestId !== fetchRequestIdRef.current) return;
     const data = (response.data ?? null) as ApproverBatchListResponse | null;
 
     if (response.success && data) {
-      const nextBatches = (Array.isArray(data.batches) ? data.batches : []).map(
+      const fetchedBatches = (Array.isArray(data.batches) ? data.batches : []).map(
         (batch: Record<string, unknown>) =>
           mapApproverBatchListRow(
             batch,
             selectedSubDepartment.subDepartmentId,
           ) as ApproverBatchSummary,
       );
+      const batchesMatchingOtherFilters = fetchedBatches.filter((batch) => {
+            if (hasProjectFilter) {
+              const nestedProject =
+                batch.project && typeof batch.project === "object"
+                  ? (batch.project as { projectId?: string | null })
+                  : null;
+              const rowProjectId = String(nestedProject?.projectId ?? batch.projectId ?? "")
+                .trim()
+                .toLowerCase();
+              if (rowProjectId !== projectIdFilter.toLowerCase()) return false;
+            }
+            if (
+              hasSubmittedByFilter &&
+              !approverRowMatchesSubmittedByFilter(batch, submittedByQuery)
+            ) {
+              return false;
+            }
+            if (fromDateFilter || toDateFilter) {
+              const rowCreatedDate = formatToIsoDateInput(
+                String(batch.createdOn ?? batch.createdAt ?? batch.submittedAt ?? ""),
+              );
+              if (!rowCreatedDate) return false;
+              if (fromDateFilter && rowCreatedDate < fromDateFilter) return false;
+              if (toDateFilter && rowCreatedDate > toDateFilter) return false;
+            }
+            return (
+              !isClientSearch ||
+              approverRowMatchesSearchQuery(batch, debouncedSearchText, CLIENT_SEARCH_KEYS)
+            );
+          });
+      const localStatusCounts = batchesMatchingOtherFilters.reduce<Record<string, number>>((counts, batch) => {
+        const tab = mapApiStatusCountKeyToUiTab(String(batch.status ?? ""));
+        if (tab) counts[tab] = (counts[tab] ?? 0) + 1;
+        return counts;
+      }, {});
+      const matchingBatches = status === allLabel
+        ? batchesMatchingOtherFilters
+        : batchesMatchingOtherFilters.filter(
+            (batch) => toApiStatusEnum(batch.status) === toApiStatusEnum(status),
+          );
+      const nextBatches = matchingBatches.slice((page - 1) * limit, page * limit);
       const resolvedPagination = resolveSubdepartmentBatchPagination(
         data.pagination as Record<string, unknown> | undefined,
         limit,
       );
 
       setRemoteBatches(nextBatches);
-      setPagination(resolvedPagination);
+      setPagination(
+        isClientFiltering
+          ? {
+              page,
+              limit,
+              totalRecords: matchingBatches.length,
+              totalPages: Math.max(1, Math.ceil(matchingBatches.length / limit)),
+            }
+          : resolvedPagination,
+      );
       setStatusCounts(
         mapApproverBatchStatusCounts(
-          data.statusCounts as Record<string, number> | undefined,
+          localStatusCounts,
           allLabel,
-          resolvedPagination.totalRecords || nextBatches.length,
+          batchesMatchingOtherFilters.length,
         ),
       );
     } else {
@@ -299,66 +371,67 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     userId,
   ]);
   useEffect(() => {
-    let cancelled = false;
     void loadBatches();
     return () => {
-      cancelled = true;
+      fetchRequestIdRef.current += 1;
     };
   }, [loadBatches]);
 
   const mergedItems = useMemo(() => {
     if (remoteBatches.length === 0) {
-      return items;
+      return subDepartment ? (remoteBatches as unknown as T[]) : items;
     }
 
     if (items.length === 0) {
       return remoteBatches as unknown as T[];
     }
 
-    const remoteByKey = new Map<string, ApproverBatchSummary>();
-    remoteBatches.forEach((batch) => {
-      [batch.batchId, batch.formId]
-        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-        .forEach((value) => {
-          remoteByKey.set(value.trim().toLowerCase(), batch);
-        });
+    const localByKey = new Map<string, T>();
+    items.forEach((item) => {
+      createLookupKeys(item).forEach((key) => localByKey.set(key, item));
+    });
+    const preferPopulated = <V,>(remote: V | undefined, local: V | undefined): V | undefined => {
+      if (remote === undefined || remote === null) return local;
+      if (typeof remote === "object") {
+        const values = Object.values(remote as Record<string, unknown>);
+        return values.some((value) => String(value ?? "").trim() !== "") ? remote : local;
+      }
+      return String(remote).trim() ? remote : local;
+    };
+
+    const merged = remoteBatches.map((remote) => {
+      const lookupKey = createLookupKeys(remote).find((key) => localByKey.has(key));
+      const item = lookupKey ? localByKey.get(lookupKey) : undefined;
+      const workflowStatus = normalizeApproverBatchStatus(
+        preferPopulated(remote.status, item?.status),
+      );
+
+      return {
+        ...item,
+        ...remote,
+        batchId: preferPopulated(remote.batchId, item?.batchId),
+        formId: preferPopulated(remote.formId, item?.formId),
+        batchType: preferPopulated(remote.batchType, item?.batchType),
+        motorId: preferPopulated(remote.motorId, item?.motorId),
+        motorType: preferPopulated(remote.motorType, item?.motorType),
+        motorStage: preferPopulated(remote.motorStage, item?.motorStage),
+        motorStageLabel: preferPopulated(remote.motorStageLabel, item?.motorStageLabel),
+        projectId: preferPopulated(remote.projectId, item?.projectId),
+        priority: preferPopulated(remote.priority, item?.priority),
+        createdOn: preferPopulated(remote.createdOn, item?.createdOn),
+        status: workflowStatus,
+        ...mirrorApproverSubdepartmentStatusFields(workflowStatus),
+        rejectionReason: preferPopulated(remote.rejectionReason, item?.rejectionReason),
+        assignedTo: preferPopulated(remote.assignedTo, item?.assignedTo),
+        submittedBy: preferPopulated(
+          (remote as { submittedBy?: string }).submittedBy,
+          item?.submittedBy as string | undefined,
+        ),
+      } as T;
     });
 
-    const merged = items
-      .map((item) => {
-        const lookupKey = createLookupKeys(item).find((value) => remoteByKey.has(value));
-        const remote = lookupKey ? remoteByKey.get(lookupKey) : null;
-
-        if (!remote) {
-          return null;
-        }
-
-        const workflowStatus = normalizeApproverBatchStatus(remote.status ?? item.status);
-
-        return {
-          ...item,
-          ...remote,
-          batchId: remote.batchId ?? item.batchId,
-          formId: remote.formId ?? item.formId,
-          batchType: remote.batchType ?? item.batchType,
-          motorId: remote.motorId ?? item.motorId,
-          motorType: remote.motorType ?? item.motorType,
-          motorStage: remote.motorStage ?? item.motorStage,
-          motorStageLabel: remote.motorStageLabel ?? item.motorStageLabel,
-          projectId: remote.projectId ?? item.projectId,
-          priority: remote.priority ?? item.priority,
-          createdOn: remote.createdOn ?? item.createdOn,
-          status: workflowStatus,
-          ...mirrorApproverSubdepartmentStatusFields(workflowStatus),
-          rejectionReason: remote.rejectionReason ?? item.rejectionReason,
-          assignedTo: remote.assignedTo ?? item.assignedTo,
-          submittedBy: (remote as { submittedBy?: string }).submittedBy ?? item.submittedBy,
-        } as T;
-      })
-      .filter((item): item is T => item !== null);
-
-    return merged.length > 0 ? merged : items;
-  }, [items, remoteBatches]);
+    return subDepartment ? merged : merged.length > 0 ? merged : items;
+  }, [items, remoteBatches, subDepartment]);
 
   const handleLimitChange = (nextLimit: number) => {
     setLimit(nextLimit);

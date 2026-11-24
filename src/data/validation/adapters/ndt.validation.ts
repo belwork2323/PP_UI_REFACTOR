@@ -7,7 +7,12 @@ import {
 import { runValidation } from "../runValidation";
 import type { ValidationErrors, ValidationTier } from "../submissionIntent";
 import { legacyIntentToTier, tierToLegacyIntent } from "../submissionIntent";
-import { fieldError, firstValidationError, firstValidationErrorWithPath, hasValidationErrors } from "../validationErrors";
+import {
+  fieldError,
+  firstValidationError,
+  firstValidationErrorWithPath,
+  hasValidationErrors,
+} from "../validationErrors";
 import { focusFieldByDataAttr } from "../utils/focusFieldByDataAttr";
 
 export type NDTValidationIntent = "DRAFT" | "SUBMIT";
@@ -81,7 +86,9 @@ export function formatNdtValidationPath(path: string): string {
   const parts = trimmed.split(".");
   const leaf = parts[parts.length - 1] ?? trimmed;
   const leafLabel = NDT_FIELD_LABELS[leaf] ?? leaf;
-  const rowMatch = trimmed.match(/^(radiographyPlanRows|additionalExposureRows|radiographyObservationRows|visualInspectionRows)\.(\d+)\./);
+  const rowMatch = trimmed.match(
+    /^(radiographyPlanRows|additionalExposureRows|radiographyObservationRows|visualInspectionRows)\.(\d+)\./,
+  );
   if (rowMatch) {
     const section =
       rowMatch[1] === "radiographyPlanRows"
@@ -112,21 +119,6 @@ export function validateNDTMotorSession(
     return tier === "SUBMIT" || tier === "UNIT" ? { motor: "Motor data is required." } : {};
   }
   return validateNDT(toNDTValidationTarget(motor), tier);
-}
-
-export function validateNDTBlocks(
-  motor: NDTMotorSession | null | undefined,
-  intent: NDTValidationIntent,
-): ValidationErrors {
-  return validateNDTMotorSession(motor, intent === "SUBMIT" ? "SUBMIT" : "FORMAT");
-}
-
-export function isNDTUnitComplete(motor: NDTMotorSession): boolean {
-  const target = toNDTValidationTarget(motor);
-  if (ndtValidationConfig.isUnitComplete) {
-    return ndtValidationConfig.isUnitComplete(target);
-  }
-  return Object.keys(validateNDT(target, "UNIT")).length === 0;
 }
 
 export { ndtValidationConfig };

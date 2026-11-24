@@ -50,6 +50,7 @@ type FinalApprovalMotorDialogProps = {
 export const buildFinalApprovalMotorRows = (
   motorStatusById: Record<string, MotorStatusMeta> | undefined,
   motorIds: string[],
+  getStatus?: (motorId: string) => string | null | undefined,
 ): FinalApprovalMotorRow[] => {
   const statuses = motorStatusById ?? {};
   const ids =
@@ -59,9 +60,11 @@ export const buildFinalApprovalMotorRows = (
 
   return ids.map((motorId) => {
     const meta = statuses[motorId];
+    const resolved =
+      getStatus?.(motorId) ?? meta?.motorSubmissionStatus ?? "TO_BE_INITIATED";
     return {
       motorId,
-      motorSubmissionStatus: meta?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+      motorSubmissionStatus: resolved,
       motorSubmissionType: meta?.motorSubmissionType ?? null,
     };
   });
@@ -143,7 +146,7 @@ const FinalApprovalMotorDialog = ({
                 <PremixStatusChip
                   status={row.motorSubmissionStatus as any}
                   statusConfig={statusConfig}
-                  variant="embedded"
+                  variant="default"
                 />
               </TableCell>
             </TableRow>

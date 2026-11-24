@@ -33,8 +33,8 @@ function useProjectListSection(dashboardDateFilter) {
     try {
       const payload = {
         search: search.trim() || undefined,
-        startDate: appliedFilters.fromDate || dashboardDateFilter.startDate,
-        endDate: appliedFilters.toDate || dashboardDateFilter.endDate,
+        startDate: dashboardDateFilter.startDate || appliedFilters.fromDate,
+        endDate: dashboardDateFilter.endDate || appliedFilters.toDate,
         sortBy: "createdOn",
         sortOrder: "desc",
         page: page + 1,
@@ -228,7 +228,7 @@ function useProjectStatsSection(
     setCustomEndDate("");
     setAppliedCustomStart("");
     setAppliedCustomEnd("");
-    const { startDate, endDate } = getDateRange("month");
+    const { startDate, endDate } = getDateRange("one_year");
     setDashboardDateFilter({ startDate, endDate });
   }, [setDashboardDateFilter]);
 

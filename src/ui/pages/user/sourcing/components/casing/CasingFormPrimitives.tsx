@@ -1,4 +1,12 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import {
   Autocomplete,
   Box,
@@ -75,7 +83,9 @@ export const casingWhiteInputSx = (baseSx: object = {}) => ({
   ...baseSx,
   "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
     ...((baseSx as Record<string, unknown>)["& .MuiOutlinedInput-root"] as object),
-    ...((baseSx as Record<string, unknown>)["& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root"] as object),
+    ...((baseSx as Record<string, unknown>)[
+      "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root"
+    ] as object),
     background: "#fff",
     backgroundColor: "#fff",
     "&.Mui-focused": { background: "#fff", backgroundColor: "#fff" },
@@ -247,6 +257,7 @@ export const TextFieldField = ({
   fieldPath,
   lightPlaceholder = true,
   inputSx,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -264,8 +275,15 @@ export const TextFieldField = ({
   fieldPath?: string;
   lightPlaceholder?: boolean;
   inputSx?: object;
+  maxLength?: number;
 }) => (
-  <Field label={label} fullWidth={fullWidth} theme={theme} required={required} fieldPath={fieldPath}>
+  <Field
+    label={label}
+    fullWidth={fullWidth}
+    theme={theme}
+    required={required}
+    fieldPath={fieldPath}
+  >
     <CasingDeferredInput
       size="small"
       fullWidth
@@ -279,6 +297,7 @@ export const TextFieldField = ({
       label={undefined}
       disabled={disabled}
       error={Boolean(error)}
+      inputProps={maxLength != null ? { maxLength } : undefined}
       sx={{
         ...casingWhiteInputSx(
           multiline
@@ -289,7 +308,11 @@ export const TextFieldField = ({
         ...inputSx,
       }}
     />
-    {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
+    {error ? (
+      <FormHelperText error sx={{ mx: 0 }}>
+        {error}
+      </FormHelperText>
+    ) : null}
   </Field>
 );
 
@@ -301,6 +324,7 @@ export const DateField = ({
   disabled,
   error,
   required,
+  minDate,
   maxDate,
   fieldPath,
 }: {
@@ -311,6 +335,7 @@ export const DateField = ({
   disabled?: boolean;
   error?: string;
   required?: boolean;
+  minDate?: string;
   maxDate?: string;
   fieldPath?: string;
 }) => (
@@ -319,6 +344,7 @@ export const DateField = ({
       value={formatToUiDate(value)}
       onChange={(next) => onChange(formatToIsoDateInput(next))}
       disabled={disabled}
+      minDate={minDate}
       maxDate={maxDate}
       error={Boolean(error)}
       helperText={error}
@@ -366,7 +392,12 @@ export const ProjectSelectField = ({
       return (
         <Typography
           component="em"
-          sx={{ color: theme.palette.textSub, fontSize: "0.84rem", fontStyle: "italic", opacity: 0.45 }}
+          sx={{
+            color: theme.palette.textSub,
+            fontSize: "0.84rem",
+            fontStyle: "italic",
+            opacity: 0.45,
+          }}
         >
           {loading ? "Loading projects..." : placeholder}
         </Typography>
@@ -414,7 +445,11 @@ export const ProjectSelectField = ({
           ))}
         </Select>
       </FormControl>
-      {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
+      {error ? (
+        <FormHelperText error sx={{ mx: 0 }}>
+          {error}
+        </FormHelperText>
+      ) : null}
     </Field>
   );
 };
@@ -484,7 +519,11 @@ export const SelectField = ({
         ))}
       </Select>
     </FormControl>
-    {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
+    {error ? (
+      <FormHelperText error sx={{ mx: 0 }}>
+        {error}
+      </FormHelperText>
+    ) : null}
   </Field>
 );
 
@@ -554,7 +593,11 @@ export const SearchableSelectField = ({
         }}
         noOptionsText="No matches"
       />
-      {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
+      {error ? (
+        <FormHelperText error sx={{ mx: 0 }}>
+          {error}
+        </FormHelperText>
+      ) : null}
     </Field>
   );
 };

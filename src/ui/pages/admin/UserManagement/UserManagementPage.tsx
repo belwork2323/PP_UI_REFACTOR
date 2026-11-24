@@ -184,14 +184,14 @@ const UserManagementPage = () => {
               filterPanel
               sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
             />
-            <FilterSelect
+            {/* <FilterSelect
               label={S.TOOLBAR.FILTER_DEPT_LABEL}
               value={draftFilters.dept}
               onChange={(e) => list.setDraftFilter("dept", e.target.value)}
               options={lookups.deptNames}
               filterPanel
               sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
-            />
+            /> */}
             <FilterSelect
               label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
               value={draftFilters.subDept}

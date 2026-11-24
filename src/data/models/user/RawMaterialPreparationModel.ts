@@ -88,7 +88,7 @@ export const isPremixApproverActionable = (status: PremixSubmissionStatus | unde
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+  return normalized === "WAITING_FOR_APPROVAL";
 };
 
 /** Entire form can be approved/rejected once submitted and every premix is approved. */

@@ -8,7 +8,11 @@ import {
   type OperationStatus,
 } from "../../../hooks/operationStatus";
 import type { ApproverFormActionType } from "../../api/approver/approverApi";
-import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
+import {
+  motorStageForApi,
+  motorStageLabel,
+  normalizeMotorStage,
+} from "../admin/BatchManagement/BatchManagementModel";
 import {
   BATCH_STATUS_UNAVAILABLE,
   batchTypeFilterToApiValue,
@@ -255,6 +259,10 @@ const resolveMotorId = (batch: Record<string, unknown>) => {
 };
 
 const resolveAssignedTo = (batch: Record<string, unknown>) => {
+  if (typeof batch.assignedTo === "string") {
+    const fullName = batch.assignedTo.trim();
+    return fullName ? { id: "", fullName } : null;
+  }
   if (batch.assignedTo && typeof batch.assignedTo === "object") {
     const assigned = batch.assignedTo as { id?: string; fullName?: string; name?: string };
     return {
@@ -266,6 +274,10 @@ const resolveAssignedTo = (batch: Record<string, unknown>) => {
 };
 
 const resolveCreatedBy = (batch: Record<string, unknown>) => {
+  if (typeof batch.createdBy === "string") {
+    const fullName = batch.createdBy.trim();
+    return fullName ? { id: "", fullName } : null;
+  }
   if (batch.createdBy && typeof batch.createdBy === "object") {
     const created = batch.createdBy as { id?: string; fullName?: string; name?: string };
     return {
@@ -277,6 +289,10 @@ const resolveCreatedBy = (batch: Record<string, unknown>) => {
 };
 
 const resolveSystemManager = (batch: Record<string, unknown>) => {
+  if (typeof batch.systemManager === "string") {
+    const fullName = batch.systemManager.trim();
+    return fullName ? { id: "", fullName } : null;
+  }
   if (batch.systemManager && typeof batch.systemManager === "object") {
     const manager = batch.systemManager as { id?: string; fullName?: string; name?: string };
     return {
@@ -288,6 +304,10 @@ const resolveSystemManager = (batch: Record<string, unknown>) => {
 };
 
 const resolveFormSubmittedBy = (batch: Record<string, unknown>) => {
+  if (typeof batch.formSubmittedBy === "string") {
+    const fullName = batch.formSubmittedBy.trim();
+    return fullName ? { id: "", fullName } : null;
+  }
   if (batch.formSubmittedBy && typeof batch.formSubmittedBy === "object") {
     const submitter = batch.formSubmittedBy as { id?: string; fullName?: string; name?: string };
     return {
@@ -301,14 +321,23 @@ const resolveFormSubmittedBy = (batch: Record<string, unknown>) => {
 /** Values used for submitted-by search and client-side filter matching. */
 export function resolveApproverRowSubmittedByValues(batch: Record<string, unknown>): string[] {
   const values = new Set<string>();
-  const submittedBy = String(batch.submittedBy ?? "").trim();
-  if (submittedBy && submittedBy !== "NA") {
-    values.add(submittedBy);
-  }
+  const addActorValues = (value: unknown) => {
+    if (typeof value === "string") {
+      const text = value.trim();
+      if (text && text !== "NA") values.add(text);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const actor = value as Record<string, unknown>;
+    ["fullName", "name", "username", "id", "email"].forEach((key) => {
+      const text = String(actor[key] ?? "").trim();
+      if (text && text !== "NA") values.add(text);
+    });
+  };
 
-  const formSubmittedBy = resolveFormSubmittedBy(batch);
-  if (formSubmittedBy?.id) values.add(formSubmittedBy.id);
-  if (formSubmittedBy?.fullName) values.add(formSubmittedBy.fullName);
+  ["submittedBy", "submittedByFullName", "submittedById", "formSubmittedBy", "createdBy", "assignedTo", "systemManager"].forEach(
+    (key) => addActorValues(batch[key]),
+  );
 
   return [...values];
 };
@@ -320,17 +349,31 @@ export function approverRowMatchesSubmittedByFilter(
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
 
-  return resolveApproverRowSubmittedByValues(row).some((value) =>
-    value.toLowerCase().includes(needle),
+  return resolveApproverRowSubmittedByValues(row).some(
+    (value) => value.trim().toLowerCase() === needle,
   );
 }
 
 export const APPROVER_BATCH_LIST_SEARCH_KEYS = [
   "batchId",
+  "batchType",
+  "projectId",
+  "projectName",
+  "project.projectId",
+  "project.projectName",
   "motorId",
+  "motorStage",
+  "motorStageLabel",
+  "motorType",
+  "stage",
+  "assignedTo.fullName",
+  "systemManager.fullName",
   "submittedBy",
   "formSubmittedBy.id",
   "formSubmittedBy.fullName",
+  "createdOn",
+  "status",
+  "statusApi",
 ] as const;
 
 const getNestedRowValue = (row: Record<string, unknown>, key: string) =>
@@ -414,18 +457,41 @@ export function mapApproverBatchListRow(
   batch: Record<string, unknown>,
   subDepartmentId?: number | null,
 ) {
+  const project =
+    batch.project && typeof batch.project === "object"
+      ? (batch.project as { projectId?: unknown; projectName?: unknown })
+      : null;
   const assignedTo = resolveAssignedTo(batch);
   const createdBy = resolveCreatedBy(batch);
   const formSubmittedBy = resolveFormSubmittedBy(batch);
+  const submittedByActor = resolveFormSubmittedBy({
+    ...batch,
+    formSubmittedBy: batch.formSubmittedBy ?? batch.submittedBy,
+  });
   const systemManager = resolveSystemManager(batch);
-  const submittedBy = String(
-    batch.submittedBy ?? formSubmittedBy?.fullName ?? formSubmittedBy?.id ?? "",
-  ).trim();
+  const submittedBy = [
+    submittedByActor?.fullName,
+    submittedByActor?.id,
+    typeof batch.submittedBy === "string" ? batch.submittedBy : "",
+    formSubmittedBy?.fullName,
+    formSubmittedBy?.id,
+    createdBy?.fullName,
+    createdBy?.id,
+    systemManager?.fullName,
+    assignedTo?.fullName,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .find(Boolean) ?? "";
   const stageResolution = resolveWorkflowStatusFromBatchStages(batch, subDepartmentId);
   const workflowStatus = normalizeApproverBatchStatus(
     resolveRawBatchStatus(batch, subDepartmentId),
   );
-  const motorStage = normalizeMotorStage(batch.motorStage ?? batch.motorType);
+  const motorStage = normalizeMotorStage(
+    batch.motorStage ?? batch.motorStageName ?? batch.motorType ?? batch.stage,
+  );
+  const batchType = [batch.batchType, batch.batchTypeName, batch.subBatchType, batch.type]
+    .map((value) => String(value ?? "").trim())
+    .find(Boolean) ?? "";
   const statusMirrors = buildSubdepartmentStatusMirrors(workflowStatus);
 
   return {
@@ -433,22 +499,27 @@ export function mapApproverBatchListRow(
     ...statusMirrors,
     id: batch.id ?? batch.formId ?? batch.batchId,
     batchId: batch.batchId,
+    projectId: batch.projectId ?? project?.projectId,
+    projectName: batch.projectName ?? project?.projectName,
     parallelFlowEnabled: parseParallelFlowEnabled(batch.parallelFlowEnabled),
     currentStage: normalizeStageProgressArray(batch.currentStage),
     stageProgress: normalizeStageProgressArray(batch.stageProgress),
     formId: batch.formId ?? null,
-    batchType: batch.batchType,
-    motorId: resolveMotorId(batch),
+    batchType,
+    motorId: resolveMotorId(batch) || String(batch.motorNo ?? batch.motorIdNo ?? "").trim(),
     motorIds: Array.isArray(batch.motorIds) ? batch.motorIds.map((id) => String(id)) : [],
     motorStage,
+    motorStageLabel: motorStageLabel(motorStage),
     motorType: motorStage != null ? String(motorStage) : "",
     priority: batch.priority ?? "Medium",
     assignedTo,
     createdBy,
     formSubmittedBy,
     systemManager,
+    submittedByFullName: submittedByActor?.fullName ?? formSubmittedBy?.fullName ?? "",
+    submittedById: submittedByActor?.id ?? formSubmittedBy?.id ?? "",
     submittedBy: submittedBy || "NA",
-    createdOn: batch.createdOn,
+    createdOn: batch.createdOn ?? batch.createdAt ?? batch.submittedAt,
     rejectionReason:
       stageResolution.rejectionReason ??
       (batch.rejectionReason != null ? String(batch.rejectionReason) : null),

@@ -3,7 +3,6 @@ import type { FilterField, FilterFieldOption } from "@ui/components/custom/Filte
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const CASING_TYPES = ["COMPOSITE", "METALLIC"] as const;
-const INSULATION_TYPES = ["ROCASIN", "EPDM"] as const;
 
 export type CasingFilterDraft = {
   projectId: string;
@@ -22,6 +21,8 @@ type CasingFilterFieldsArgs = {
   motorStageOptions: { motorStage: string }[];
   motorStagesLoading: boolean;
   statusOptions: FilterFieldOption[];
+  insulationTypeOptions: string[];
+  insulationTypesLoading: boolean;
   dateErrors?: { from?: string; to?: string } | null;
 };
 
@@ -33,6 +34,8 @@ export const getCasingFilterFields = ({
   motorStageOptions,
   motorStagesLoading,
   statusOptions,
+  insulationTypeOptions,
+  insulationTypesLoading,
   dateErrors,
 }: CasingFilterFieldsArgs): FilterField<CasingFilterDraft>[] => [
   {
@@ -76,9 +79,10 @@ export const getCasingFilterFields = ({
     type: "select",
     key: "insulationType",
     label: BL.FILTERS_INSULATION_TYPE,
+    loading: insulationTypesLoading,
     options: [
       { value: filterAllLabel, label: BL.FILTERS_ALL_INSULATION },
-      ...INSULATION_TYPES.map((t) => ({ value: t, label: t })),
+      ...insulationTypeOptions.map((type) => ({ value: type, label: type })),
     ],
   },
   { type: "select", key: "status", label: BL.FILTERS_STATUS, minWidth: 130, options: statusOptions },

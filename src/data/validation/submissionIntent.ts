@@ -11,10 +11,7 @@ export const tierToLegacyIntent = (tier: ValidationTier): SubmissionIntent =>
 export const legacyIntentToTier = (intent: SubmissionIntent): ValidationTier =>
   intent === "SUBMIT" ? "SUBMIT" : "FORMAT";
 
-export const isRequiredForTier = (
-  requiredIn: ValidationTier[],
-  tier: ValidationTier,
-): boolean => {
+export const isRequiredForTier = (requiredIn: ValidationTier[], tier: ValidationTier): boolean => {
   // FORMAT = live/draft format checks only — never enforce mandatory
   if (tier === "FORMAT") return false;
   // UNIT = optional legacy "min fields to persist" (manufacturing); QC draft uses FORMAT

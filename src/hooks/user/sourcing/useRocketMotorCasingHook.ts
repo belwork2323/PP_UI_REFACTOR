@@ -151,9 +151,16 @@ export const useRocketMotorCasingHook = () => {
         ? "FORMAT"
         : null;
 
+  // Always surface FORMAT errors live (e.g. invalid Motor ID) so fields show messages
+  // without waiting for Save/Submit. Attempt-tier errors override on key conflict.
   useEffect(() => {
-    if (!activeValidationTier) return;
-    setValidationErrors(validateRocketMotorCasing(casingForm, activeValidationTier));
+    const formatErrors = validateRocketMotorCasing(casingForm, "FORMAT");
+    if (!activeValidationTier || activeValidationTier === "FORMAT") {
+      setValidationErrors(formatErrors);
+      return;
+    }
+    const attemptErrors = validateRocketMotorCasing(casingForm, activeValidationTier);
+    setValidationErrors({ ...formatErrors, ...attemptErrors });
   }, [activeValidationTier, casingForm]);
 
   const snapshotStateRef = useRef(casingForm);
@@ -210,7 +217,7 @@ export const useRocketMotorCasingHook = () => {
         return false;
       }
 
-      const detailsModel = detailsResponse.data as RocketMotorCasingDetailsModel;
+      const detailsModel = new RocketMotorCasingDetailsModel(detailsResponse.data);
       let resolvedForm = RocketMotorCasingDetailsModel.toCasingFormData(detailsModel);
       const stage = resolvedForm.motorStageApi || "";
       const projectId = String(resolvedForm.projectId ?? "").trim();
@@ -395,7 +402,7 @@ export const useRocketMotorCasingHook = () => {
         return;
       }
 
-      const detailsModel = detailsResponse.data as RocketMotorCasingDetailsModel;
+      const detailsModel = new RocketMotorCasingDetailsModel(detailsResponse.data);
       resolvedForm = RocketMotorCasingDetailsModel.toCasingFormData(detailsModel);
       resolvedBatch = {
         ...resolvedBatch,
@@ -474,7 +481,7 @@ export const useRocketMotorCasingHook = () => {
         return;
       }
 
-      const detailsModel = detailsResponse.data as RocketMotorCasingDetailsModel;
+      const detailsModel = new RocketMotorCasingDetailsModel(detailsResponse.data);
       const formData = RocketMotorCasingDetailsModel.toCasingFormData(detailsModel);
       const blocks = mapCasingFormDataToDetailBlocks(formData);
       const header = RocketMotorCasingDetailsModel.toDetailHeaderFields(detailsModel, {
@@ -505,7 +512,8 @@ export const useRocketMotorCasingHook = () => {
           : batch.assignedTo
             ? { fullName: batch.assignedTo.fullName }
             : null,
-        createdOn: header.createdOn || batch.createdOn,
+        // Prefer details createdOn/createdAt; fall back to list row — never receivingDate.
+        createdOn: header.createdOn || batch.createdOn || "",
         rejectionReason: batch.rejectionReason,
       });
     } finally {
@@ -851,6 +859,10 @@ export const useRocketMotorCasingHook = () => {
   const validateBeforeSubmit = useCallback(() => {
     flushCasingPendingDrafts();
     const formState = snapshotStateRef.current;
+    if (hasIncompleteCasingUploads(formState)) {
+      showAlert(STRINGS.SOURCING.CASING_CREATE.FILE_UPLOAD_PENDING, "warning");
+      return false;
+    }
     setValidationAttempt({ format: true, unit: true, submit: true });
     const submitErrors = validateRocketMotorCasing(formState, "SUBMIT");
     setValidationErrors(submitErrors);
@@ -872,7 +884,7 @@ export const useRocketMotorCasingHook = () => {
       return false;
     }
     return true;
-  }, [showValidationAlert]);
+  }, [showAlert, showValidationAlert]);
 
   const canDeleteActiveCasing =
     formEntryMode !== "create" && canDeleteRocketMotorCasing(activeBatch?.rmStatus);

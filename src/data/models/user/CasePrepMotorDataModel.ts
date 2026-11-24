@@ -1202,6 +1202,34 @@ const mergeParameterPresets = (
   return [...merged, ...extras];
 };
 
+const normalizeDispatchDateTimeRows = (value: unknown): unknown[] => {
+  const rows = asArray(value)
+    .map((item) => asRecord(item))
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+  const legacyIndex = rows.findIndex(
+    (row) => /^dispatch\s*time$/i.test(str(row.parameter).trim()),
+  );
+  if (legacyIndex < 0) return rows;
+
+  const legacyRow = rows[legacyIndex];
+  const canonicalIndex = rows.findIndex(
+    (row) => /^dispatch\s*date\s*&\s*time$/i.test(str(row.parameter).trim()),
+  );
+  const canonicalRow = canonicalIndex >= 0 ? rows[canonicalIndex] : null;
+  const mergedRow = {
+    ...(canonicalRow ?? legacyRow),
+    parameter: "Dispatch Date & Time",
+    value: str(canonicalRow?.value).trim() || str(legacyRow.value),
+    remarks: str(canonicalRow?.remarks).trim() || str(legacyRow.remarks),
+  };
+
+  return rows.flatMap((row, index) => {
+    if (index === legacyIndex) return canonicalIndex < 0 ? [mergedRow] : [];
+    if (index === canonicalIndex) return [mergedRow];
+    return [row];
+  });
+};
+
 const parseTemperatureDuration = (value: unknown): CasePrepParameterRow[] => {
   const rows = asArray(value)
     .map((item) => asRecord(item))
@@ -1406,7 +1434,7 @@ export const parseCasePrepMotorDataFromApi = (
       ),
       dispatchToCastingDetails: mergeParameterPresets(
         empty.dispatchToCasting.dispatchToCastingDetails,
-        dispatch.dispatchToCastingDetails,
+        normalizeDispatchDateTimeRows(dispatch.dispatchToCastingDetails),
       ),
     },
   };

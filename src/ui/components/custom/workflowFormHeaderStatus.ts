@@ -71,6 +71,14 @@ export const resolveWorkflowFormHeaderStatus = (
     preferredStatusKeys?: string[];
     /** Override default "New Submission" (e.g. "New Revalidation"). */
     newSubmissionLabel?: string;
+    /**
+     * When set, rejection banner uses this unit's reason only while the unit is REJECTED
+     * (per-motor / per-premix — not a shared form reason).
+     */
+    activeUnit?: {
+      status?: string | null;
+      rejectionReason?: string | null;
+    } | null;
   },
 ): WorkflowFormHeaderStatusResult => {
   const status = pickBatchWorkflowStatus(batch, options?.preferredStatusKeys);
@@ -95,16 +103,24 @@ export const resolveWorkflowFormHeaderStatus = (
   }
 
   const isRejected = status === "REJECTED";
-  // Keep reason visible during rework drafts (status may become IN_PROGRESS after Save as Draft).
-  const rejectionReason =
-    String((batch as { rejectionReason?: unknown } | null | undefined)?.rejectionReason ?? "").trim() ||
-    null;
+  let rejectionReason: string | null = null;
+  if (options?.activeUnit) {
+    const unitStatus = normalizeWorkflowStatus(options.activeUnit.status);
+    if (unitStatus === "REJECTED") {
+      rejectionReason = String(options.activeUnit.rejectionReason ?? "").trim() || null;
+    }
+  } else if (isRejected) {
+    rejectionReason =
+      String(
+        (batch as { rejectionReason?: unknown } | null | undefined)?.rejectionReason ?? "",
+      ).trim() || null;
+  }
 
   return {
     status,
     statusLabel,
-    statusVariant: isRejected ? "edit" : "new",
-    isRejected,
+    statusVariant: isRejected || Boolean(rejectionReason) ? "edit" : "new",
+    isRejected: isRejected || Boolean(rejectionReason),
     rejectionReason,
   };
 };

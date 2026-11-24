@@ -2,7 +2,7 @@ import { useCallback, useRef, type ChangeEvent } from "react";
 import { useAlertStore } from "@app/store/alertStore";
 import { useAuthStore } from "@app/store/authStore";
 import { STRINGS } from "@app/config/strings";
-import { useFileService } from "@hooks/useFileService";
+import { isUploadFailure, useFileService } from "@hooks/useFileService";
 import { useFilePreview } from "@hooks/useFilePreview";
 import {
   newCasingFileLocalId,
@@ -60,19 +60,36 @@ export function useCasingFileActions(
   const uploadOne = useCallback(
     async (localId: string, file: File) => {
       if (!subDepartmentId) {
-        patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
-        showAlert(
-          S.SUB_DEPARTMENT_MISSING ?? "Sub-department is required to upload files.",
-          "error",
-        );
+        const message =
+          S.SUB_DEPARTMENT_MISSING ?? "Sub-department is required to upload files.";
+        patchByLocalId(localId, {
+          status: "failed",
+          fileId: null,
+          uploadProgress: undefined,
+          errorMessage: message,
+        });
+        showAlert(message, "error");
         return;
       }
-      patchByLocalId(localId, { status: "uploading", uploadProgress: 0, fileId: null });
+      patchByLocalId(localId, {
+        status: "uploading",
+        uploadProgress: 0,
+        fileId: null,
+        errorMessage: undefined,
+      });
       const result = await upload(file, subDepartmentId, (progress) => {
         patchByLocalId(localId, { uploadProgress: progress });
       });
-      if (!result?.fileId) {
-        patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
+      if (!result || isUploadFailure(result) || !("fileId" in result) || !result.fileId) {
+        const message = isUploadFailure(result)
+          ? result.error
+          : "Upload failed. Please retry.";
+        patchByLocalId(localId, {
+          status: "failed",
+          fileId: null,
+          uploadProgress: undefined,
+          errorMessage: message,
+        });
         return;
       }
       patchByLocalId(localId, {
@@ -84,6 +101,7 @@ export function useCasingFileActions(
         isTemp: true,
         file,
         uploadProgress: undefined,
+        errorMessage: undefined,
       });
     },
     [patchByLocalId, showAlert, subDepartmentId, upload],
@@ -169,7 +187,12 @@ export function useCasingFileActions(
     (index: number) => {
       const ref = filesRef.current[index];
       if (!ref?.file || !ref.localId) return;
-      patchByLocalId(ref.localId, { status: "uploading", uploadProgress: 0, fileId: null });
+      patchByLocalId(ref.localId, {
+        status: "uploading",
+        uploadProgress: 0,
+        fileId: null,
+        errorMessage: undefined,
+      });
       void uploadOne(ref.localId, ref.file);
     },
     [patchByLocalId, uploadOne],

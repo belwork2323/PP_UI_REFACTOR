@@ -58,7 +58,7 @@ export const isDispatchMotorApproverActionable = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+  return normalized === "WAITING_FOR_APPROVAL";
 };
 
 export const canApproverActionEntireDispatchForm = (params: {

@@ -1078,7 +1078,17 @@ export const applyStatusMapsToPartialNav = (
   const premixes = collectQcMixUnitStatusRows(payload);
   const divisionFilter = String(payload.division ?? "").trim();
 
-  const motorStatusById = new Map<string, QcPartialItemStatus>();
+  type UnitStatusMeta = {
+    status: QcPartialItemStatus;
+    rejectionReason: string | null;
+  };
+
+  const pickRejectionReason = (rec: Record<string, unknown>): string | null => {
+    const reason = pickString(rec.rejectionReason, rec.rejection_reason);
+    return reason || null;
+  };
+
+  const motorStatusById = new Map<string, UnitStatusMeta>();
   motors.forEach((row) => {
     const rec = asRecord(row);
     if (!rec) return;
@@ -1092,7 +1102,11 @@ export const applyStatusMapsToPartialNav = (
     }
     const motorId = pickString(rec.motorId, rec.motor_id, rec.motorIdNo);
     if (!motorId) return;
-    motorStatusById.set(motorId, normalizeStatus(rec.motorSubmissionStatus ?? rec.status));
+    const status = normalizeStatus(rec.motorSubmissionStatus ?? rec.status);
+    motorStatusById.set(motorId, {
+      status,
+      rejectionReason: status === "REJECTED" ? pickRejectionReason(rec) : null,
+    });
   });
 
   const statusRank = (status: QcPartialItemStatus): number => {
@@ -1110,7 +1124,7 @@ export const applyStatusMapsToPartialNav = (
     }
   };
 
-  const premixStatusByKey = new Map<string, QcPartialItemStatus>();
+  const premixStatusByKey = new Map<string, UnitStatusMeta>();
   premixes.forEach((rec) => {
     const division = String(rec.division ?? "").trim();
     const subType = String(rec.subType ?? rec.sub_type ?? "").trim();
@@ -1133,25 +1147,37 @@ export const applyStatusMapsToPartialNav = (
       .toUpperCase();
     const key = stage === "FINAL_MIX" ? `final-mix:${premixNo}` : `premix:${premixNo}`;
     const nextStatus = normalizeStatus(rec.premixSubmissionStatus ?? rec.status);
+    const nextMeta: UnitStatusMeta = {
+      status: nextStatus,
+      rejectionReason: nextStatus === "REJECTED" ? pickRejectionReason(rec) : null,
+    };
     const existing = premixStatusByKey.get(key);
-    if (!existing || statusRank(nextStatus) >= statusRank(existing)) {
-      premixStatusByKey.set(key, nextStatus);
+    if (!existing || statusRank(nextStatus) >= statusRank(existing.status)) {
+      premixStatusByKey.set(key, nextMeta);
     }
   });
 
   return items.map((item) => {
     const divisionDetailsStatus = item.divisionDetailsStatus ?? item.status;
     if (item.kind === "MOTOR" && item.motorId && motorStatusById.has(item.motorId)) {
+      const meta = motorStatusById.get(item.motorId)!;
       return {
         ...item,
         divisionDetailsStatus,
-        status: motorStatusById.get(item.motorId)!,
+        status: meta.status,
+        rejectionReason: meta.status === "REJECTED" ? meta.rejectionReason : null,
       };
     }
     if (item.kind === "PREMIX" && item.premixNo != null) {
       const key = `premix:${item.premixNo}`;
       if (premixStatusByKey.has(key)) {
-        return { ...item, divisionDetailsStatus, status: premixStatusByKey.get(key)! };
+        const meta = premixStatusByKey.get(key)!;
+        return {
+          ...item,
+          divisionDetailsStatus,
+          status: meta.status,
+          rejectionReason: meta.status === "REJECTED" ? meta.rejectionReason : null,
+        };
       }
     }
     if (item.kind === "FINAL_MIX") {
@@ -1159,11 +1185,21 @@ export const applyStatusMapsToPartialNav = (
       if (mixNo != null) {
         const key = `final-mix:${mixNo}`;
         if (premixStatusByKey.has(key)) {
-          return { ...item, divisionDetailsStatus, status: premixStatusByKey.get(key)! };
+          const meta = premixStatusByKey.get(key)!;
+          return {
+            ...item,
+            divisionDetailsStatus,
+            status: meta.status,
+            rejectionReason: meta.status === "REJECTED" ? meta.rejectionReason : null,
+          };
         }
       }
     }
-    return { ...item, divisionDetailsStatus };
+    return {
+      ...item,
+      divisionDetailsStatus,
+      rejectionReason: item.status === "REJECTED" ? item.rejectionReason ?? null : null,
+    };
   });
 };
 

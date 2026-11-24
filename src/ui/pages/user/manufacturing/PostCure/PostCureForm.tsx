@@ -28,11 +28,8 @@ import {
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import PostCureFlowBar from "./PostCureFlowBar";
 import PostCureMotorPanel from "./PostCureMotorPanel";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
@@ -320,13 +317,19 @@ export const PostCureForm = ({
     inhibitionTypeSelected &&
     isPostCureInhibitionPanelVisible(activeMotorSession?.inhibitorType ?? "");
 
+  const resolveMotorStatusForApproval = (motorId: string) =>
+    getMotorStatus?.(motorId) ??
+    motorStatusById[motorId]?.motorSubmissionStatus ??
+    "TO_BE_INITIATED";
+
   const finalApprovalRows = useMemo(
     () =>
       buildFinalApprovalMotorRows(
         motorStatusById,
         motorCards.map((m) => m.motorId),
+        resolveMotorStatusForApproval,
       ),
-    [motorCards, motorStatusById],
+    [getMotorStatus, motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
@@ -362,28 +365,15 @@ export const PostCureForm = ({
     },
   };
 
-  const motorTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motorCards.map((entry, index) => {
-        const status =
-          getMotorStatus?.(entry.motorId) ??
-          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-          "TO_BE_INITIATED";
-        return {
-          id: entry.motorId,
-          label: entry.motorId,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              variant="embedded"
-              onAccent={index === activeMotorIndex}
-            />
-          ),
-        };
-      }),
-    [activeMotorIndex, getMotorStatus, motorCards, motorStatusById, statusConfig],
+  const motorUnits = useMemo(
+    () => motorCards.map((entry) => ({ id: entry.motorId, label: entry.motorId })),
+    [motorCards],
   );
+
+  const resolveMotorNavStatus = (motorId: string) =>
+    getMotorStatus?.(motorId) ??
+    motorStatusById[motorId]?.motorSubmissionStatus ??
+    "TO_BE_INITIATED";
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -424,17 +414,26 @@ export const PostCureForm = ({
       {motorCards.length > 0 ? (
         <Stack spacing={1.25} sx={{ mb: 1.5 }}>
           <UserWorkflowNavPanel palette={navPalette}>
-            <UserWorkflowTabNav
+            <WorkflowUnitStatusTabNav
               title={S.MOTOR_NAV_TITLE}
               hint={S.MOTOR_NAV_HINT}
-              tabs={motorTabs}
-              activeIndex={activeMotorIndex}
-              onActiveIndexChange={(index) => {
-                const next = motorCards[index];
-                if (next) onActiveMotorChange(next.motorId);
+              units={motorUnits}
+              activeId={activeMotorId || null}
+              onActiveIdChange={(id) => {
+                if (motorCards.some((m) => m.motorId === id)) {
+                  onActiveMotorChange(id);
+                }
               }}
-              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+              getStatus={resolveMotorNavStatus}
+              statusConfig={statusConfig}
+              isUnitDisabled={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx < 0 || !motorNavGate.isMotorTabEnabled(idx);
+              }}
+              unitTooltip={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx >= 0 ? motorNavGate.getMotorTabTooltip(idx) : undefined;
+              }}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={
@@ -539,6 +538,16 @@ export const PostCureForm = ({
             ) : null}
           </Stack>
 
+          {activeMotorStatus === "REJECTED" &&
+          motorStatusById[resolvedActiveMotorId]?.rejectionReason ? (
+            <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+              <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+              </Typography>
+              {motorStatusById[resolvedActiveMotorId]?.rejectionReason}
+            </Alert>
+          ) : null}
+
           {activeMotorLocked ? (
             <Box
               sx={{
@@ -560,13 +569,6 @@ export const PostCureForm = ({
                     : S.MOTOR_LOCKED_WAITING}
               </Typography>
             </Box>
-          ) : null}
-
-          {activeMotorStatus === "REJECTED" &&
-          motorStatusById[resolvedActiveMotorId]?.rejectionReason ? (
-            <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-              {motorStatusById[resolvedActiveMotorId]?.rejectionReason}
-            </Alert>
           ) : null}
 
           <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.25 }}>

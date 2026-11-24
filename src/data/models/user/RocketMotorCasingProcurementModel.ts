@@ -126,6 +126,8 @@ export const ROCKET_MOTOR_CASING_SEARCH_FIELDS = [
 export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
+  const stage = String(row.motorStage ?? "").trim();
+  const stageLabel = stage && /^stage\b/i.test(stage) ? stage : stage ? `Stage ${stage}` : "";
 
   const parts: string[] = [
     row.motorCasingId ?? "",
@@ -133,7 +135,9 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
     row.projectName ?? "",
     row.motorId,
     row.motorNo ?? "",
-    row.motorStage ?? "",
+    stage,
+    stageLabel,
+    stage ? `Motor Stage ${stage.replace(/^stage\s*/i, "")}` : "",
     row.casingType ?? "",
     row.insulationType ?? "",
     row.rmStatus,
@@ -980,16 +984,20 @@ export function mapCasingFormDataToDetailBlocks(
     { label: "Insulation Lining Report", files: form.insulationLiningReportExisting },
   ];
 
-  const reportUploadRows: CasingDetailBlock["rows"] = reportConfigs.flatMap(({ label, files }) =>
-    (files ?? []).map((file) => {
+  const reportUploadRows: CasingDetailBlock["rows"] = reportConfigs.flatMap(({ label, files }) => {
+    const uploadedFiles = (files ?? []).filter(Boolean);
+    if (!uploadedFiles.length) return [detailRow(label, "—")];
+
+    return uploadedFiles.map((file) => {
       const name =
-        file.originalFileName ?? file.storedFileName ?? file.fileName ?? "—";
+        [file.originalFileName, file.storedFileName, file.fileName]
+          .find((candidate) => candidate?.trim())?.trim() ?? "—";
       return detailRow(label, name, "", {
         fileId: file.fileId,
         fileName: name,
       });
-    }),
-  );
+    });
+  });
 
   const blocks: CasingDetailBlock[] = [
     {
@@ -1133,15 +1141,11 @@ export function mapCasingFormDataToDetailBlocks(
           },
         ]
       : []),
-    ...(reportUploadRows.length
-      ? [
-          {
-            material: "Uploaded Reports",
-            rows: reportUploadRows,
-            _columns: REPORT_COLUMNS,
-          },
-        ]
-      : []),
+    {
+      material: "Uploaded Reports",
+      rows: reportUploadRows,
+      _columns: REPORT_COLUMNS,
+    },
   ];
 
   return blocks;

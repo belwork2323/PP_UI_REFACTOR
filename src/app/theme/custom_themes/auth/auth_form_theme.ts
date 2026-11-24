@@ -1,29 +1,41 @@
+import colors from "../../colors";
 import fonts from "../../fonts";
 import spacing from "../../spacing";
-import layout from "../../layout";
 import general from "../common/common_css_theme";
 import type { AuthModeTokens } from "./auth_shell_theme";
 
 const optionalColor = (color: string) => (color ? { color } : {});
 
+const optionalFill = (color: string) =>
+  color ? { color, WebkitTextFillColor: color } : {};
+
 /** Fields, captcha, and form layout shared by the auth screens. */
 export const createAuthFormTheme = (m: AuthModeTokens) => {
+  // Fill sits on the outlined input so it uses the same radius as the border.
+  // A background on the TextField root uses a larger radius and the outline no longer fits.
+  const outlinedSurfaceSx = {
+    backgroundColor: m.cardBg,
+    ...optionalColor(m.inputText),
+    "& .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorder },
+    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorderHover },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: m.focusBorder },
+    "& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus": {
+      WebkitBoxShadow: `0 0 0 100px ${m.cardBg} inset`,
+      ...(m.inputText ? { WebkitTextFillColor: m.inputText, caretColor: m.inputText } : {}),
+    },
+  };
+
   const sharedFieldSx = {
-    bgcolor: m.cardBg,
-    borderRadius: layout.cardBorderRadius,
     "& .MuiInputLabel-root": {
       fontSize: fonts.responsive.inputLabel,
       fontWeight: fonts.weight.medium,
       ...optionalColor(m.inputLabel),
       "&.Mui-focused": { color: m.focusBorder },
     },
-    "& .MuiInputBase-root": {
+    "& .MuiOutlinedInput-root": {
       height: "clamp(40px, 6vh, 52px)",
-      ...optionalColor(m.inputText),
+      ...outlinedSurfaceSx,
     },
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorder },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorderHover },
-    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: m.focusBorder },
   };
 
   const dropdownSelectSx = {
@@ -41,6 +53,19 @@ export const createAuthFormTheme = (m: AuthModeTokens) => {
     ...(m.inputIcon ? { "& .MuiSvgIcon-root": { color: m.inputIcon } } : {}),
   };
 
+  const authButtonSx = {
+    height: "clamp(44px, 6.5vh, 56px)",
+    fontSize: fonts.responsive.button,
+    backgroundColor: m.focusBorder,
+    color: colors.white.full,
+    "&:hover": { backgroundColor: colors.primary.dark },
+    "&.Mui-disabled": {
+      backgroundColor: m.focusBorder,
+      color: colors.white.full,
+      opacity: 0.55,
+    },
+  };
+
   return {
     form: {
       wrapper: {
@@ -54,6 +79,10 @@ export const createAuthFormTheme = (m: AuthModeTokens) => {
 
     dropdown: {
       select: dropdownSelectSx,
+      menu: {
+        bgcolor: m.cardBg,
+        "& .MuiMenuItem-root": optionalFill(m.inputText),
+      },
     },
 
     inputField: {
@@ -61,16 +90,13 @@ export const createAuthFormTheme = (m: AuthModeTokens) => {
         "& .MuiInputBase-root": {
           height: "clamp(40px, 6vh, 52px)",
           fontSize: fonts.responsive.inputLabel,
-          ...optionalColor(m.inputText),
+          ...outlinedSurfaceSx,
         },
         "& .MuiInputLabel-root": {
           fontSize: fonts.responsive.inputLabel,
           ...optionalColor(m.inputLabel),
           "&.Mui-focused": { color: m.focusBorder },
         },
-        "& .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorder },
-        "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: m.inputBorderHover },
-        "& .Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: m.focusBorder },
         ...(m.inputAdornmentIcon
           ? {
               "& .MuiInputAdornment-root .MuiSvgIcon-root": {
@@ -82,10 +108,7 @@ export const createAuthFormTheme = (m: AuthModeTokens) => {
     },
 
     loginButton: {
-      sx: {
-        height: "clamp(44px, 6.5vh, 56px)",
-        fontSize: fonts.responsive.button,
-      },
+      sx: authButtonSx,
     },
 
     forgotPassword: {
@@ -128,19 +151,20 @@ export const createAuthFormTheme = (m: AuthModeTokens) => {
           minHeight: "clamp(96px, 12vh, 140px)",
           alignItems: "flex-start",
           paddingTop: "10px",
+          ...outlinedSurfaceSx,
+          ...optionalFill(m.inputText),
         },
-        "& textarea": { lineHeight: fonts.lineHeight.normal },
+        "& textarea": {
+          lineHeight: fonts.lineHeight.normal,
+          ...optionalFill(m.inputText),
+        },
       },
       actions: {
         ...general.flexColumn,
         gap: 1.5,
       },
       requestButton: {
-        sx: {
-          height: "clamp(44px, 6.5vh, 56px)",
-          fontSize: fonts.responsive.button,
-          "&.Mui-disabled": { opacity: 0.55 },
-        },
+        sx: authButtonSx,
       },
     },
 

@@ -179,7 +179,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
           : "TO_BE_INITIATED",
       rejectionReason,
     });
-
+    const BEM_MOTOR_NO_MAX_LENGTH = 30;
     return (
       <Box sx={{ mt: 1 }}>
         <UserWorkflowFormHeader
@@ -281,7 +281,8 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                     activeValidationErrors.motorId || activeValidationErrors.bemMotorNo || " "
                   }
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    handleDraftBemNoChange?.(e.target.value);
+                    const nextValue = e.target.value.slice(0, BEM_MOTOR_NO_MAX_LENGTH);
+                    handleDraftBemNoChange?.(nextValue);
                   }}
                 />
               </Box>

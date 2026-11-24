@@ -41,6 +41,7 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../../components/custom/WorkflowUnitStatusTabNav";
 import { formatRmpMaterialNavLabel } from "../../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import { resolveWeightmentRowDisplay } from "../../../../../../data/models/user/rawMaterialWeightmentValidation";
 
@@ -337,9 +338,14 @@ export const PremixDetailPanel = ({
       </Stack>
 
       {premix.premixSubmissionStatus === "REJECTED" && premix.rejectionReason ? (
-        <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.5 }}>
-          Rejection reason: {premix.rejectionReason}
-        </Typography>
+        <Box sx={{ mb: 1.5 }}>
+          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}>
+            {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+          </Typography>
+          <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+            {premix.rejectionReason}
+          </Typography>
+        </Box>
       ) : null}
 
       {showMaterialNav && materialNavTabs.length > 0 ? (
@@ -589,23 +595,19 @@ const RawMaterialPreparationDetailsContent = ({
     text: theme.palette.text,
   };
 
-  const premixTabs = useMemo<UserWorkflowNavTab[]>(
+  const premixUnits = useMemo(
     () =>
-      premixes.map((premix, index) => ({
+      premixes.map((premix) => ({
         id: `premix-${premix.premixNo}`,
         label: `Premix ${premix.premixNo}`,
-        endAdornment: (
-          <PremixStatusChip
-            status={premix.premixSubmissionStatus}
-            statusConfig={statusConfig}
-            variant="embedded"
-            onAccent={index === activePremixIndexSafe}
-            showIcon={false}
-          />
-        ),
       })),
-    [activePremixIndexSafe, premixes, statusConfig],
+    [premixes],
   );
+
+  const activePremixUnitId = activePremix ? `premix-${activePremix.premixNo}` : null;
+
+  const getPremixNavStatus = (unitId: string) =>
+    premixes.find((premix) => `premix-${premix.premixNo}` === unitId)?.premixSubmissionStatus;
 
   const materialNavTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -693,11 +695,18 @@ const RawMaterialPreparationDetailsContent = ({
           {showPremixTabs ? (
             <Box sx={{ mb: 2 }}>
               <UserWorkflowNavPanel palette={navPalette}>
-                <UserWorkflowTabNav
+                <WorkflowUnitStatusTabNav
                   title={RM.PREMIX_NAV_TITLE}
-                  tabs={premixTabs}
-                  activeIndex={activePremixIndexSafe}
-                  onActiveIndexChange={setActivePremixIndex}
+                  units={premixUnits}
+                  activeId={activePremixUnitId}
+                  onActiveIdChange={(id) => {
+                    const index = premixes.findIndex(
+                      (premix) => `premix-${premix.premixNo}` === id,
+                    );
+                    if (index >= 0) setActivePremixIndex(index);
+                  }}
+                  getStatus={getPremixNavStatus}
+                  statusConfig={statusConfig}
                   palette={navPalette}
                   showStepArrows
                   mb={materialNavTabs.length > 0 ? 1 : 0}
@@ -745,15 +754,25 @@ const RawMaterialPreparationDetailsContent = ({
 
               {activePremix.premixSubmissionStatus === "REJECTED" &&
               activePremix.rejectionReason ? (
-                <Typography
-                  sx={{
-                    fontSize: "0.72rem",
-                    color: theme.palette.danger ?? "#C0392B",
-                    mb: 1.5,
-                  }}
-                >
-                  Rejection reason: {activePremix.rejectionReason}
-                </Typography>
+                <Box sx={{ mb: 1.5 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      color: theme.palette.danger ?? "#C0392B",
+                    }}
+                  >
+                    {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.72rem",
+                      color: theme.palette.danger ?? "#C0392B",
+                    }}
+                  >
+                    {activePremix.rejectionReason}
+                  </Typography>
+                </Box>
               ) : null}
 
               {activeMaterial ? (

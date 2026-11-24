@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useMemo } from "react";
-import { Box, CardContent, IconButton, Typography } from "@mui/material";
+import { Box, CardContent, IconButton, Tooltip, Typography } from "@mui/material";
 import Card from "../../common/Card";
 import FullPageLoader from "../../common/FullPageLoader";
 import GlobalAlert from "../../common/GlobalAlertSnackBar";
@@ -37,13 +37,22 @@ const AuthPageShell = ({
       <FullPageLoader open={loaderOpen} message={loaderMessage} />
 
       <Box sx={theme.toggleButton.wrapper}>
-        <IconButton onClick={toggleMode} sx={theme.toggleButton.root}>
-          {mode === "dark" ? (
-            <icons.lightModeToggleIcon sx={theme.toggleButton.icon} />
-          ) : (
-            <icons.darkModeToggleIcon sx={theme.toggleButton.icon} />
-          )}
-        </IconButton>
+        <Tooltip
+          title={mode === "dark" ? strings.SWITCH_TO_LIGHT_MODE : strings.SWITCH_TO_DARK_MODE}
+          arrow
+        >
+          <IconButton
+            onClick={toggleMode}
+            aria-label={mode === "dark" ? strings.SWITCH_TO_LIGHT_MODE : strings.SWITCH_TO_DARK_MODE}
+            sx={theme.toggleButton.root}
+          >
+            {mode === "dark" ? (
+              <icons.lightModeToggleIcon sx={theme.toggleButton.icon} />
+            ) : (
+              <icons.darkModeToggleIcon sx={theme.toggleButton.icon} />
+            )}
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <Box sx={theme.belLogo.wrapper}>

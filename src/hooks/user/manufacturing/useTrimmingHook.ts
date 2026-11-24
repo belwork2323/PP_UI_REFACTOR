@@ -646,12 +646,12 @@ export const useTrimmingHook = () => {
         return false;
       }
 
-      if (intent === "submit") {
-        if (!hasMotorTrimmingValue(formData, motorId)) {
-          showAlert(S.EMPTY_FORM_ERROR, "warning");
-          return false;
-        }
-      }
+      // if (intent === "submit") {
+      //   if (!hasMotorTrimmingValue(formData, motorId)) {
+      //     showAlert(S.EMPTY_FORM_ERROR, "warning");
+      //     return false;
+      //   }
+      // }
 
       // UNIT on draft; SUBMIT on submit — red under fields, no field toast
       {
@@ -687,10 +687,10 @@ export const useTrimmingHook = () => {
         motorSubmissionType,
       });
 
-      if (!payloadBody.motors?.length) {
-        showAlert(S.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
+      // if (!payloadBody.motors?.length) {
+      //   showAlert(S.EMPTY_FORM_ERROR, "warning");
+      //   return false;
+      // }
 
       setActionLoading(true);
       try {

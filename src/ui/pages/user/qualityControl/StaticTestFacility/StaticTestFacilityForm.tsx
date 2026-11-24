@@ -31,11 +31,8 @@ import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
 } from "../../manufacturing/CasePreparation/components/FinalApprovalMotorDialog";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import StfMotorPanel from "./StfMotorPanel";
 import AppTextField from "../../../../components/common/AppTextField";
 import { focusStfField } from "@/data/validation/adapters/stf.validation";
@@ -299,8 +296,9 @@ const StaticTestFacilityForm = ({
       buildFinalApprovalMotorRows(
         motorStatusById as Parameters<typeof buildFinalApprovalMotorRows>[0],
         motorCards.map((m) => m.motorId),
+        resolveMotorStatus,
       ),
-    [motorCards, motorStatusById],
+    [motorCards, motorStatusById, resolveMotorStatus],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
@@ -313,30 +311,16 @@ const StaticTestFacilityForm = ({
     text: BRAND.text,
   };
 
-  const motorTabs = useMemo<UserWorkflowNavTab[]>(
+  const motorUnits = useMemo(
     () =>
-      motorCards.map((entry) => {
-        const status = (getMotorStatus?.(entry.motorId) ??
-          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-          "TO_BE_INITIATED") as StfMotorSubmissionStatus;
-        return {
-          id: entry.motorId,
-          label:
-            entry.subType === "BEM"
-              ? `${STF_FLOW_LABELS.bemCardTitle} · ${entry.motorId}`
-              : entry.motorId,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              showIcon={false}
-              variant="embedded"
-              onAccent={entry.motorId === activeMotorId}
-            />
-          ),
-        };
-      }),
-    [activeMotorId, getMotorStatus, motorCards, motorStatusById, statusConfig],
+      motorCards.map((entry) => ({
+        id: entry.motorId,
+        label:
+          entry.subType === "BEM"
+            ? `${STF_FLOW_LABELS.bemCardTitle} · ${entry.motorId}`
+            : entry.motorId,
+      })),
+    [motorCards],
   );
 
   return (
@@ -417,14 +401,25 @@ const StaticTestFacilityForm = ({
       {hasMotors && activeMotorEntry ? (
         <Stack spacing={1.25} sx={{ mt: 2 }}>
           <UserWorkflowNavPanel palette={navPalette}>
-            <UserWorkflowTabNav
+            <WorkflowUnitStatusTabNav
               title={S.MOTOR_NAV_TITLE}
               hint={S.MOTOR_NAV_HINT}
-              tabs={motorTabs}
-              activeIndex={activeMotorIndex}
-              onActiveIndexChange={setActiveMotorIndex}
-              isTabDisabled={(_, index) => !stfMotorNavGate.isStfMotorTabEnabled(index)}
-              tabTooltip={(_, index) => stfMotorNavGate.getStfMotorTabTooltip(index)}
+              units={motorUnits}
+              activeId={activeMotorId || null}
+              onActiveIdChange={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                if (idx >= 0) setActiveMotorIndex(idx);
+              }}
+              getStatus={resolveMotorStatus}
+              statusConfig={statusConfig}
+              isUnitDisabled={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx < 0 || !stfMotorNavGate.isStfMotorTabEnabled(idx);
+              }}
+              unitTooltip={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx >= 0 ? stfMotorNavGate.getStfMotorTabTooltip(idx) : undefined;
+              }}
               palette={navPalette}
               showStepArrows
               wrapTabs
@@ -498,6 +493,15 @@ const StaticTestFacilityForm = ({
               </Stack>
             </Stack>
 
+            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
+              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                  {STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
+                </Typography>
+                {motorStatusById[activeMotorId]?.rejectionReason}
+              </Alert>
+            ) : null}
+
             {activeMotorLocked ? (
               <Box
                 sx={{
@@ -517,12 +521,6 @@ const StaticTestFacilityForm = ({
                       : S.MOTOR_LOCKED_WAITING}
                 </Typography>
               </Box>
-            ) : null}
-
-            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
-              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-                {motorStatusById[activeMotorId]?.rejectionReason}
-              </Alert>
             ) : null}
 
             <Box sx={{ mb: 1.5, maxWidth: 360 }} data-stf-field="stfTestNo">

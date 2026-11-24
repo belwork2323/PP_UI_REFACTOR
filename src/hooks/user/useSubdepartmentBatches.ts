@@ -1,26 +1,23 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
-import { projectManagementController } from "../../controllers/admin/ProjectManagement/projectManagementController";
 import { useAuthStore } from "../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../app/store/userBatchRefreshStore";
 import { useCuringMotorStages } from "./manufacturing/useCuringMotorStages";
+import { fetchProjectFilterOptions, type ProjectFilterOption } from "../projectFilterOptions";
 import {
   buildSubdepartmentBatchListPayload,
   emptySubdepartmentBatchAdvancedFilters,
   mapSubdepartmentBatchListRow,
   mapSubdepartmentBatchStatusCounts,
+  subdepartmentBatchMatchesAdvancedFilters,
+  subdepartmentBatchMatchesSearch,
   type SubdepartmentBatchListAdvancedFilters,
 } from "../../data/models/user/SubdepartmentBatchModel";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 /** Fetch up to this many rows when filtering search client-side across all columns */
 const CLIENT_SEARCH_FETCH_LIMIT = 5000;
-
-type ProjectFilterOption = {
-  projectId: string;
-  projectName: string;
-};
 
 export type { SubdepartmentBatchListAdvancedFilters };
 
@@ -40,6 +37,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const hasLoadedOnceRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [search, setSearch] = useState<string>("");
@@ -116,23 +114,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     if (projectsLoaded || projectsLoading) return;
     setProjectsLoading(true);
     try {
-      const res = await projectManagementController.getAllProjects({
-        page: 1,
-        limit: 1000,
-        sortBy: "createdOn",
-        sortOrder: "desc",
-      });
-      if (res?.success && res.data) {
-        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
-        setProjectOptions(
-          raw.map((p: any) => ({
-            projectId: String(p.projectId ?? ""),
-            projectName: String(p.projectName ?? p.projectId ?? ""),
-          })),
-        );
-      } else {
-        setProjectOptions([]);
-      }
+      setProjectOptions(await fetchProjectFilterOptions());
       setProjectsLoaded(true);
     } catch {
       setProjectOptions([]);
@@ -191,6 +173,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
   );
 
   const fetchBatches = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
     const subDepartmentId = selectedSubDepartment?.subDepartmentId;
     const userId = user?.userId != null ? String(user.userId) : "";
 
@@ -210,46 +193,80 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       setIsRefreshing(true);
     }
     try {
+      const isClientSearch = Boolean(debouncedSearch.trim());
+      const hasProjectFilter = advancedFilters.projectIds.length > 0;
+      const isClientFiltering = isClientSearch || hasProjectFilter;
+      const requestAdvancedFilters = hasProjectFilter
+        ? { ...advancedFilters, projectIds: [] }
+        : advancedFilters;
       const payload = buildSubdepartmentBatchListPayload({
         subDepartmentId,
         userId,
-        page: page + 1,
-        limit: rowsPerPage,
+        page: isClientFiltering ? 1 : page + 1,
+        limit: isClientFiltering ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
         statusFilter,
-        search: debouncedSearch,
-        advancedFilters,
+        search: isClientSearch ? undefined : debouncedSearch,
+        advancedFilters: requestAdvancedFilters,
       });
 
       const res = await operationsController.fetchSubdepartmentBatches(payload);
+      if (requestId !== fetchRequestIdRef.current) return;
 
       if (res?.success && res.data) {
-        const rows = (res.data.batches || []).map((batch: Record<string, unknown>) =>
+        const mappedRows = (res.data.batches || []).map((batch: Record<string, unknown>) =>
           mapSubdepartmentBatchListRow(batch, targetSlug, subDepartmentId),
         );
 
+        const matchedRows = isClientFiltering
+          ? mappedRows.filter((batch: Record<string, unknown>) => {
+              if (
+                hasProjectFilter &&
+                !subdepartmentBatchMatchesAdvancedFilters(batch, {
+                  ...emptySubdepartmentBatchAdvancedFilters(),
+                  projectIds: advancedFilters.projectIds,
+                })
+              ) {
+                return false;
+              }
+              return !isClientSearch || subdepartmentBatchMatchesSearch(batch, debouncedSearch);
+            })
+          : mappedRows;
+        const rows = isClientFiltering
+          ? matchedRows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+          : matchedRows;
+
         const pagination = res.data.pagination ?? {};
-        const total = Number(
-          pagination.totalRecords ?? pagination.total ?? rows.length,
-        );
+        const total = isClientFiltering
+          ? matchedRows.length
+          : Number(pagination.totalRecords ?? pagination.total ?? rows.length);
 
         setBatches(rows);
         setTotalRecords(total);
-        setStatusCounts(resolveStatusCounts(rows, res.data.statusCounts, total));
-        refreshGlobalStatusCountsInBackground(subDepartmentId, userId);
+        setStatusCounts(
+          isClientFiltering
+            ? resolveStatusCounts(matchedRows, undefined, total)
+            : resolveStatusCounts(rows, res.data.statusCounts, total),
+        );
+        if (!isClientFiltering) {
+          refreshGlobalStatusCountsInBackground(subDepartmentId, userId);
+        }
       } else {
         setBatches([]);
         setTotalRecords(0);
         setStatusCounts({});
       }
     } catch (error) {
+      if (requestId !== fetchRequestIdRef.current) return;
       console.error("Error fetching subdepartment batches:", error);
       setBatches([]);
       setTotalRecords(0);
       setStatusCounts({});
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-      hasLoadedOnceRef.current = true;
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+        hasLoadedOnceRef.current = true;
+      }
     }
   }, [
     selectedSubDepartment,
@@ -266,6 +283,9 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
   useEffect(() => {
     void fetchBatches();
+    return () => {
+      fetchRequestIdRef.current += 1;
+    };
   }, [fetchBatches]);
 
   useEffect(() => {

@@ -59,6 +59,7 @@ export type DateFieldProps = {
   placeholder?: string;
   minDate?: string;
   maxDate?: string;
+  clearable?: boolean;
   minTime?: string;
   requiresMinDateTime?: boolean;
   blockedByDateTimeDependency?: boolean;
@@ -82,6 +83,7 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
       placeholder,
       minDate,
       maxDate,
+      clearable = false,
       blockedByDateTimeDependency = false,
       sx,
       inputSx,
@@ -125,6 +127,11 @@ export const DateField = React.forwardRef<HTMLInputElement, DateFieldProps>(
         }}
         slotProps={{
           ...pickerSlotProps,
+          field: {
+            ...pickerSlotProps.field,
+            clearable,
+            onClear: () => onChange?.(""),
+          },
           textField: {
             ...pickerSlotProps.textField,
             inputRef: ref ?? inputRef,

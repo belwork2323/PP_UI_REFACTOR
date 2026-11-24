@@ -4,6 +4,7 @@ export class ProjectListItemModel {
   projectDescription: string = "";
   projectDate: string = "";
   createdOn: string = "";
+  status: string;
 
   static fromApi(data: any): ProjectListItemModel {
     const item = new ProjectListItemModel();
@@ -12,6 +13,7 @@ export class ProjectListItemModel {
     item.projectDescription = data?.projectDescription || "";
     item.projectDate = data?.projectDate || "";
     item.createdOn = data?.createdOn || "";
+    item.status = data?.isActive ? "Active" : "Inactive";
     return item;
   }
 }

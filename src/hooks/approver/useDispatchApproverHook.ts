@@ -86,6 +86,14 @@ export const useDispatchApproverHook = () => {
     setSelected,
     subDepartment: SUB_DEPARTMENT,
     statusField: "dispatchStatus",
+    // Motor approve is gated by active motor WAITING_FOR_APPROVAL (requestMotorApprove).
+    // Form may be REJECTED after another motor was rejected — still allow this motor.
+    isItemActionable: (item) => {
+      const motor = item.detailView?.motors?.find((m) => m.motorId === activeMotorId);
+      return (
+        String(motor?.motorSubmissionStatus ?? "").toUpperCase() === "WAITING_FOR_APPROVAL"
+      );
+    },
     submitChangeStatus: submitMotorChangeStatus,
     buildChangeStatusPayload: () => ({
       motorId: activeMotorId ?? undefined,

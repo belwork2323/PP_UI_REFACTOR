@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Alert, Box, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -460,6 +460,17 @@ const QCForm = ({
           isTabEnabled={isPartialNavTabEnabled}
           getTabDisabledReason={getPartialNavTabDisabledReason}
         />
+      ) : null}
+
+      {!isBlocked &&
+      activePartialItem?.status === "REJECTED" &&
+      activePartialItem.rejectionReason ? (
+        <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+          <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+            {STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
+          </Typography>
+          {activePartialItem.rejectionReason}
+        </Alert>
       ) : null}
 
       {showFormBody ? (

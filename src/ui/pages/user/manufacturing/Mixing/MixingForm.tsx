@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -1505,6 +1506,11 @@ const MixingForm = ({
         mixCardStatusById[activeMixCardId]?.mixCardSubmissionStatus)
       : undefined) ?? "TO_BE_INITIATED";
 
+  const activeMixCardRejectionReason =
+    activeMixCardId != null
+      ? String(mixCardStatusById[activeMixCardId]?.rejectionReason ?? "").trim() || null
+      : null;
+
   const activeUnitEnabled = activePremix
     ? isMixCardWorkflowEnabled("PREMIX", activePremix.premixNo)
     : activeFinalMix
@@ -1517,31 +1523,22 @@ const MixingForm = ({
       ? !(checkMixCardEditable?.(activeMixCardId) ?? !isMixCardLocked(activeMixCardStatus))
       : false);
 
-  const combinedNavTabs = useMemo(
-    () =>
-      combinedNavItems.map((item) => {
-        const cardNo =
-          item.kind === "PREMIX"
-            ? String(premixCards[item.cardIndex]?.premixNo ?? "")
-            : String(finalMixCards[item.cardIndex]?.mixNo ?? "");
-        const status = resolveStatus(item.kind, cardNo);
-        const selected =
-          activeNavItem?.kind === item.kind && activeNavItem.cardIndex === item.cardIndex;
-        return {
-          id: item.id,
-          label: item.label,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              showIcon={false}
-              variant="embedded"
-              onAccent={selected}
-            />
-          ),
-        };
-      }),
-    [activeNavItem, combinedNavItems, finalMixCards, premixCards, resolveStatus, statusConfig],
+  const combinedNavUnits = useMemo(
+    () => combinedNavItems.map((item) => ({ id: item.id, label: item.label })),
+    [combinedNavItems],
+  );
+
+  const activeMixNavId = activeNavItem?.id ?? null;
+
+  const getMixNavStatus = useCallback(
+    (navId: string) => {
+      const item = combinedNavItems.find((nav) => nav.id === navId);
+      if (!item) return "TO_BE_INITIATED";
+      const cardNo = resolveNavCardNo(item);
+      if (!cardNo) return "TO_BE_INITIATED";
+      return resolveStatus(item.kind, cardNo);
+    },
+    [combinedNavItems, resolveNavCardNo, resolveStatus],
   );
 
   const finalApprovalRows = useMemo(
@@ -1729,11 +1726,16 @@ const MixingForm = ({
         <MixingCardNavigation
           sectionTitle={S.STAGE_NAV_TITLE}
           sectionHint={S.STAGE_NAV_HINT}
-          tabs={combinedNavTabs}
-          activeIndex={activeCardIndex}
-          onActiveIndexChange={handleActiveCardIndexChange}
-          isTabDisabled={(_, index) => {
-            const item = combinedNavItems[index];
+          units={combinedNavUnits}
+          activeId={activeMixNavId}
+          onActiveIdChange={(id) => {
+            const index = combinedNavItems.findIndex((item) => item.id === id);
+            if (index >= 0) handleActiveCardIndexChange(index);
+          }}
+          getStatus={getMixNavStatus}
+          statusConfig={statusConfig}
+          isUnitDisabled={(id) => {
+            const item = combinedNavItems.find((nav) => nav.id === id);
             if (!item) return true;
             const cardNo =
               item.kind === "PREMIX"
@@ -1742,8 +1744,8 @@ const MixingForm = ({
             if (cardNo == null || cardNo === "") return true;
             return !isMixCardWorkflowEnabled(item.kind, cardNo);
           }}
-          tabTooltip={(_, index) => {
-            const item = combinedNavItems[index];
+          unitTooltip={(id) => {
+            const item = combinedNavItems.find((nav) => nav.id === id);
             if (!item) return undefined;
             if (item.kind === "PREMIX") {
               const orderedPremixNos = premixCards.map((card) => card.premixNo);
@@ -1829,6 +1831,15 @@ const MixingForm = ({
                 label={S.VIEW_STATUS}
               />
             </Stack>
+
+            {activeMixCardStatus === "REJECTED" && activeMixCardRejectionReason ? (
+              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                  {STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
+                </Typography>
+                {activeMixCardRejectionReason}
+              </Alert>
+            ) : null}
 
             {activePremix ? (
               <PremixStageCard

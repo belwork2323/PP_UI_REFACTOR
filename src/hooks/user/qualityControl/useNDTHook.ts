@@ -79,8 +79,7 @@ const normalizeBatch = (batch: any): NDTBatch => ({
   rejectionReason: batch?.rejectionReason ?? null,
 });
 
-const resolveNDTFormId = (batch?: NDTBatch | null) =>
-  String(batch?.formId ?? "").trim() || null;
+const resolveNDTFormId = (batch?: NDTBatch | null) => String(batch?.formId ?? "").trim() || null;
 
 /** Saved NDT form / batch metadata is loaded only when resuming or editing — not on first fill. */
 const isNdtContinueFillingStatus = (status?: string | null) => {
@@ -94,10 +93,7 @@ const isNdtContinueFillingStatus = (status?: string | null) => {
 const buildAddedMotorsFromForm = (formData: NDTFormState): NDTAddedMotor[] =>
   buildNDTAddedMotors(formData);
 
-const resolveBatchMotorEntries = (
-  batch: NDTBatch | null,
-  batchDetails: any,
-): NDTAddedMotor[] => {
+const resolveBatchMotorEntries = (batch: NDTBatch | null, batchDetails: any): NDTAddedMotor[] => {
   const collectIds = (source: any): string[] => {
     const ids: string[] = [];
     const push = (value: unknown) => {
@@ -201,8 +197,9 @@ export const useNDTHook = () => {
     {},
   );
   const [motorStatusById, setMotorStatusById] = useState<Record<string, NDTMotorStatusMeta>>({});
-  const [previousStageGate, setPreviousStageGate] =
-    useState<PreviousStageApprovedUnits | null>(null);
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
+  );
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, NDTValidationErrors>
   >({});
@@ -377,18 +374,11 @@ export const useNDTHook = () => {
   );
 
   const openFormWithResolvedData = useCallback(
-    async (
-      batch: NDTBatch,
-      editMode: boolean,
-      options?: { silent?: boolean },
-    ) => {
+    async (batch: NDTBatch, editMode: boolean, options?: { silent?: boolean }) => {
       const silent = Boolean(options?.silent);
       const formId = resolveNDTFormId(batch);
       const shouldFetchDetails =
-        silent ||
-        editMode ||
-        isNdtContinueFillingStatus(batch.ndtStatus) ||
-        Boolean(formId);
+        silent || editMode || isNdtContinueFillingStatus(batch.ndtStatus) || Boolean(formId);
 
       let nextBatch = batch;
       let nextFormData = normalizeNDTFormState(createDefaultNDTFormState(batch.batchId));
@@ -468,9 +458,7 @@ export const useNDTHook = () => {
             return;
           }
 
-          nextFormData = normalizeNDTFormState(
-            NDTDetailsModel.toFormState(detailsResponse.data),
-          );
+          nextFormData = normalizeNDTFormState(NDTDetailsModel.toFormState(detailsResponse.data));
           nextBatch = {
             ...nextBatch,
             formId: detailsResponse.data.formId || formId,
@@ -599,11 +587,7 @@ export const useNDTHook = () => {
           const formatErrors = validateNDTMotorSession(updated, "FORMAT");
           const fullErrors = validateNDTMotorSession(updated, "SUBMIT");
           setMotorValidationErrors((errs) => {
-            const merged = reconcileLiveValidationErrors(
-              errs[motorId],
-              formatErrors,
-              fullErrors,
-            );
+            const merged = reconcileLiveValidationErrors(errs[motorId], formatErrors, fullErrors);
             if (Object.keys(merged).length === 0) {
               if (!errs[motorId]) return errs;
               const copy = { ...errs };
@@ -751,7 +735,9 @@ export const useNDTHook = () => {
         if (intent === "draft") {
           const kept: typeof fieldErrors = {};
           for (const [path, msg] of Object.entries(fieldErrors)) {
-            const text = String(msg ?? "").trim().toLowerCase();
+            const text = String(msg ?? "")
+              .trim()
+              .toLowerCase();
             if (!text || text.includes("required")) continue;
             kept[path] = msg;
           }
@@ -771,8 +757,7 @@ export const useNDTHook = () => {
         });
       }
 
-      const motorSubmissionType: NDTMotorSubmissionType =
-        intent === "draft" ? "DRAFT" : "SUBMIT";
+      const motorSubmissionType: NDTMotorSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
       const isCreateFlow = !resolveNDTFormId(activeBatch);
       const payloadBody = mapNDTPayload(formData, {
         targetMotorIds: [motorId],
@@ -863,10 +848,11 @@ export const useNDTHook = () => {
               if (!id) return;
               updated[id] = {
                 ...updated[id],
-                motorSubmissionType:
-                  entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
+                motorSubmissionType: entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
                 motorSubmissionStatus:
-                  (String(entry.motorSubmissionStatus ?? "").toUpperCase() as NDTMotorSubmissionStatus) ||
+                  (String(
+                    entry.motorSubmissionStatus ?? "",
+                  ).toUpperCase() as NDTMotorSubmissionStatus) ||
                   updated[id]?.motorSubmissionStatus ||
                   "TO_BE_INITIATED",
               };

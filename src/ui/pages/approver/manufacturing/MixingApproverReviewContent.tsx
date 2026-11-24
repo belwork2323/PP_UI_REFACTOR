@@ -25,11 +25,8 @@ import {
   FinalMixDetailPanel,
   PremixDetailPanel,
 } from "../../user/manufacturing/Mixing/components/MixingDetailsContent";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../components/custom/WorkflowUnitStatusTabNav";
 
 const MX = STRINGS.MANUFACTURING.MIXING;
 const {
@@ -124,23 +121,13 @@ const MixingApproverReviewContent = ({
     text: palette.text,
   };
 
-  const mixCardNavTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      mixCards.map((card) => ({
-        id: card.mixCardId,
-        label: card.label,
-        endAdornment: (
-          <PremixStatusChip
-            status={card.mixCardSubmissionStatus as PremixSubmissionStatus}
-            statusConfig={statusConfig}
-            showIcon={false}
-            variant="embedded"
-            onAccent={card.mixCardId === activeMixCardId}
-          />
-        ),
-      })),
-    [activeMixCardId, mixCards, statusConfig],
+  const mixCardUnits = useMemo(
+    () => mixCards.map((card) => ({ id: card.mixCardId, label: card.label })),
+    [mixCards],
   );
+
+  const getMixCardNavStatus = (mixCardId: string) =>
+    mixCards.find((card) => card.mixCardId === mixCardId)?.mixCardSubmissionStatus;
 
   const goToEnabledMixCard = (direction: -1 | 1) => {
     if (enabledMixCards.length === 0) return;
@@ -191,12 +178,14 @@ const MixingApproverReviewContent = ({
       </Box>
 
       <UserWorkflowNavPanel palette={navPalette}>
-        <UserWorkflowTabNav
+        <WorkflowUnitStatusTabNav
           title={MX.MIX_CARD_NAV_TITLE}
           hint={MX.MIX_CARD_APPROVER_NAV_HINT}
-          tabs={mixCardNavTabs}
-          activeIndex={activeMixCardIndex >= 0 ? activeMixCardIndex : 0}
-          onActiveIndexChange={(index) => onActiveMixCardChange(mixCards[index].mixCardId)}
+          units={mixCardUnits}
+          activeId={activeMixCardId}
+          onActiveIdChange={onActiveMixCardChange}
+          getStatus={getMixCardNavStatus}
+          statusConfig={statusConfig}
           palette={navPalette}
           showStepArrows
           onStepBack={() => goToEnabledMixCard(-1)}
@@ -205,14 +194,16 @@ const MixingApproverReviewContent = ({
           disableStepNext={
             enabledMixCardIndex < 0 || enabledMixCardIndex >= enabledMixCards.length - 1
           }
-          isTabDisabled={(_, index) =>
-            isMixCardApproverTabDisabled(mixCards[index]?.mixCardSubmissionStatus)
-          }
-          tabTooltip={(_, index) =>
-            isMixCardApproverTabDisabled(mixCards[index]?.mixCardSubmissionStatus)
+          isUnitDisabled={(id) => {
+            const card = mixCards.find((c) => c.mixCardId === id);
+            return isMixCardApproverTabDisabled(card?.mixCardSubmissionStatus);
+          }}
+          unitTooltip={(id) => {
+            const card = mixCards.find((c) => c.mixCardId === id);
+            return isMixCardApproverTabDisabled(card?.mixCardSubmissionStatus)
               ? MX.MIX_CARD_APPROVER_TAB_DISABLED
-              : undefined
-          }
+              : undefined;
+          }}
         />
       </UserWorkflowNavPanel>
 
@@ -244,9 +235,14 @@ const MixingApproverReviewContent = ({
           </Stack>
 
           {activeMixCard.mixCardSubmissionStatus === "REJECTED" && activeMixCard.rejectionReason ? (
-            <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.25 }}>
-              Rejection reason: {activeMixCard.rejectionReason}
-            </Typography>
+            <Box sx={{ mb: 1.25 }}>
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: palette.danger ?? "#C0392B" }}>
+                Rejection Reason
+              </Typography>
+              <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B" }}>
+                {activeMixCard.rejectionReason}
+              </Typography>
+            </Box>
           ) : null}
 
           {canApproveOrReject && onApprove && onReject ? (

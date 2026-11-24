@@ -150,6 +150,7 @@ export const buildQcApproverPartialState = (
   const divisionStatuses = Array.isArray(root.divisionStatuses) ? root.divisionStatuses : [];
 
   const divisionStatusByFlowKey: Record<string, QcPartialItemStatus> = {};
+  const divisionRejectionByFlowKey: Record<string, string | null> = {};
   divisionStatuses.forEach((entry) => {
     if (!entry || typeof entry !== "object") return;
     const rec = entry as Record<string, unknown>;
@@ -159,7 +160,10 @@ export const buildQcApproverPartialState = (
         subType: String(rec.subType ?? ""),
       }) || String(rec.division ?? "").trim().toUpperCase();
     if (!key) return;
-    divisionStatusByFlowKey[key] = toPartialStatus(rec.status);
+    const status = toPartialStatus(rec.status);
+    divisionStatusByFlowKey[key] = status;
+    const reason = String(rec.rejectionReason ?? rec.rejection_reason ?? "").trim();
+    divisionRejectionByFlowKey[key] = status === "REJECTED" && reason ? reason : null;
   });
 
   // Unit chips from motorStatuses / premixStatuses / finalMixStatuses;
@@ -212,6 +216,10 @@ export const buildQcApproverPartialState = (
           kind: "DIVISION",
           label: formatQcApproverDivisionLabel(normalized),
           status: divisionStatus,
+          rejectionReason:
+            divisionStatus === "REJECTED"
+              ? divisionRejectionByFlowKey[normalized] ?? null
+              : null,
         });
       }
     }

@@ -1,15 +1,20 @@
 import { STRINGS } from "@/app/config/strings";
 import {
   DIM_READING_KEYS,
+  isCasingFileUploadIncomplete,
   isLooseFlapDimensionalParam,
   isUploadedCasingFileReady,
   type RocketMotorCasingFormData,
+  type UploadedFileRef,
 } from "@/data/models/user/RocketMotorCasingFormModel";
+import { formatToIsoDateInput, getTodayInIstDate } from "@utils/dateUtils";
 import { ALPHA_NUM, DIMENSION_ALPHA_NUM, validateFieldState } from "../fieldValidators";
 import type { SubDeptValidationConfig } from "../runValidation";
 import { isRequiredForTier, type ValidationErrors, type ValidationTier } from "../submissionIntent";
+import { VALIDATIONSTRING } from "./validationString";
 
 const M = STRINGS.SOURCING.CASING_FORM.VALIDATION;
+const MAX_STANDARD = VALIDATIONSTRING.LENGTH.MAX_STANDARD;
 
 export const rocketMotorCasingFieldRules = {
   projectName: {
@@ -26,7 +31,12 @@ export const rocketMotorCasingFieldRules = {
     valueType: "text" as const,
     pattern: ALPHA_NUM,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.motorId.required, invalid: M.motorId.invalid },
+    messages: {
+      required: M.motorId.required,
+      invalid: M.motorId.invalid,
+      maxLength: M.motorId.maxLength,
+    },
+    maxLength: MAX_STANDARD,
   },
   casingType: {
     valueType: "text" as const,
@@ -81,7 +91,10 @@ export const rocketMotorCasingFieldRules = {
   insulationCuringDate: {
     valueType: "date" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.insulationCuringDate.required, invalid: M.insulationCuringDate.invalid },
+    messages: {
+      required: M.insulationCuringDate.required,
+      invalid: M.insulationCuringDate.invalid,
+    },
   },
   insulationType: {
     valueType: "text" as const,
@@ -134,12 +147,20 @@ export const rocketMotorCasingFieldRules = {
   radiographyPlanName: {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.radiographyPlanName.required, invalid: M.radiographyPlanName.invalid },
+    messages: {
+      required: M.radiographyPlanName.required,
+      invalid: M.radiographyPlanName.invalid,
+      maxLength: M.radiographyPlanName.maxLength,
+    },
+    maxLength: MAX_STANDARD,
   },
   weightWithoutHarness: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.weightWithoutHarness.required, invalid: M.weightWithoutHarness.invalid },
+    messages: {
+      required: M.weightWithoutHarness.required,
+      invalid: M.weightWithoutHarness.invalid,
+    },
   },
   weightWithHarness: {
     valueType: "number" as const,
@@ -161,7 +182,10 @@ export const rocketMotorCasingFieldRules = {
     valueType: "text" as const,
     pattern: ALPHA_NUM,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.mockTrialCastingStation.required, invalid: M.mockTrialCastingStation.invalid },
+    messages: {
+      required: M.mockTrialCastingStation.required,
+      invalid: M.mockTrialCastingStation.invalid,
+    },
   },
   mockTrialMandrelId: {
     valueType: "text" as const,
@@ -173,12 +197,18 @@ export const rocketMotorCasingFieldRules = {
     valueType: "text" as const,
     pattern: ALPHA_NUM,
     requiredIn: [] as ValidationTier[],
-    messages: { required: M.mockTrialBottomCupId.required, invalid: M.mockTrialBottomCupId.invalid },
+    messages: {
+      required: M.mockTrialBottomCupId.required,
+      invalid: M.mockTrialBottomCupId.invalid,
+    },
   },
   visualInspectionReport: {
     valueType: "file" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.visualInspectionReport.required, invalid: M.visualInspectionReport.invalid },
+    messages: {
+      required: M.visualInspectionReport.required,
+      invalid: M.visualInspectionReport.invalid,
+    },
   },
   dimensionalInspectionReport: {
     valueType: "file" as const,
@@ -204,6 +234,28 @@ const isWithinRange = (value: number, min: number | null, max: number | null): b
   if (min != null && value < min) return false;
   if (max != null && value > max) return false;
   return true;
+};
+
+/** Range-aware out-of-range copy (same templates as manufacturing / RMS-style feedback). */
+const dimensionalOutOfRangeMessage = (
+  min: number | null | undefined,
+  max: number | null | undefined,
+): string => {
+  const hasMin = min != null;
+  const hasMax = max != null;
+  if (hasMin && hasMax) {
+    return VALIDATIONSTRING.OBSERVED_VALUE_RANGE.replace("{min}", String(min)).replace(
+      "{max}",
+      String(max),
+    );
+  }
+  if (hasMin) {
+    return VALIDATIONSTRING.OBSERVED_VALUE_MIN.replace("{min}", String(min));
+  }
+  if (hasMax) {
+    return VALIDATIONSTRING.OBSERVED_VALUE_MAX.replace("{max}", String(max));
+  }
+  return M.dimensionalReading.outOfRange;
 };
 
 const isReferenceRangeNotApplicable = (
@@ -238,8 +290,20 @@ function validateInsulationSpecCell(
   return undefined;
 }
 
-const hasReadyReport = (files: { fileId?: string | null; fileUrl?: string }[] | undefined): boolean =>
+const hasReadyReport = (files: UploadedFileRef[] | undefined): boolean =>
   (files ?? []).some(isUploadedCasingFileReady);
+
+const hasIncompleteReportUpload = (files: UploadedFileRef[] | undefined): boolean =>
+  (files ?? []).some(isCasingFileUploadIncomplete);
+
+const reportUploadError = (
+  files: UploadedFileRef[] | undefined,
+  messages: { required: string; uploadFailed: string },
+): string | undefined => {
+  if (hasReadyReport(files)) return undefined;
+  if (hasIncompleteReportUpload(files)) return messages.uploadFailed;
+  return messages.required;
+};
 
 function resolveCasingFieldPaths(form: RocketMotorCasingFormData) {
   return [
@@ -255,23 +319,43 @@ function resolveCasingFieldPaths(form: RocketMotorCasingFormData) {
     { path: "clearanceDate", value: form.clearanceDate, ruleKey: "clearanceDate" },
     { path: "clearanceAuthority", value: form.clearanceAuthority, ruleKey: "clearanceAuthority" },
     { path: "clearanceDetails", value: form.clearanceDetails, ruleKey: "clearanceDetails" },
-    { path: "insulationCuringDate", value: form.insulationCuringDate, ruleKey: "insulationCuringDate" },
+    {
+      path: "insulationCuringDate",
+      value: form.insulationCuringDate,
+      ruleKey: "insulationCuringDate",
+    },
     { path: "insulationType", value: form.insulationType, ruleKey: "insulationType" },
     { path: "insulationReportNo", value: form.insulationReportNo, ruleKey: "insulationReportNo" },
     { path: "postPptUtDate", value: form.postPptUtDate, ruleKey: "postPptUtDate" },
     { path: "ndtDate", value: form.ndtDate, ruleKey: "ndtDate" },
     { path: "ndtObservations", value: form.ndtObservations, ruleKey: "ndtObservations" },
-    { path: "acemNdtObservations", value: form.acemNdtObservations, ruleKey: "acemNdtObservations" },
+    {
+      path: "acemNdtObservations",
+      value: form.acemNdtObservations,
+      ruleKey: "acemNdtObservations",
+    },
     {
       path: "projectRubberSurfaceObservations",
       value: form.projectRubberSurfaceObservations,
       ruleKey: "projectRubberSurfaceObservations",
     },
     { path: "otherDetails", value: form.otherDetails, ruleKey: "otherDetails" },
-    { path: "radiographyPlanName", value: form.radiographyPlanName, ruleKey: "radiographyPlanName" },
-    { path: "weightWithoutHarness", value: form.weightWithoutHarness, ruleKey: "weightWithoutHarness" },
+    {
+      path: "radiographyPlanName",
+      value: form.radiographyPlanName,
+      ruleKey: "radiographyPlanName",
+    },
+    {
+      path: "weightWithoutHarness",
+      value: form.weightWithoutHarness,
+      ruleKey: "weightWithoutHarness",
+    },
     { path: "weightWithHarness", value: form.weightWithHarness, ruleKey: "weightWithHarness" },
-    { path: "weighscaleEquipment", value: form.weighscaleEquipment, ruleKey: "weighscaleEquipment" },
+    {
+      path: "weighscaleEquipment",
+      value: form.weighscaleEquipment,
+      ruleKey: "weighscaleEquipment",
+    },
     { path: "calibrationDueDate", value: form.calibrationDueDate, ruleKey: "calibrationDueDate" },
     {
       path: "mockTrial.castingStation",
@@ -279,7 +363,11 @@ function resolveCasingFieldPaths(form: RocketMotorCasingFormData) {
       ruleKey: "mockTrialCastingStation",
     },
     { path: "mockTrial.mandrelId", value: form.mockTrial.mandrelId, ruleKey: "mockTrialMandrelId" },
-    { path: "mockTrial.bottomCupId", value: form.mockTrial.bottomCupId, ruleKey: "mockTrialBottomCupId" },
+    {
+      path: "mockTrial.bottomCupId",
+      value: form.mockTrial.bottomCupId,
+      ruleKey: "mockTrialBottomCupId",
+    },
     {
       path: "visualInspectionReport",
       value: form.visualInspectionReportExisting,
@@ -301,6 +389,14 @@ function applyCasingNestedRules(
 ) {
   const submitRequired = isRequiredForTier(["SUBMIT"], tier);
 
+  if (submitRequired && form.calibrationDueDate.trim()) {
+    const dueIso = formatToIsoDateInput(form.calibrationDueDate);
+    const todayIso = formatToIsoDateInput(getTodayInIstDate());
+    if (dueIso && todayIso && dueIso < todayIso) {
+      errors.calibrationDueDate = M.calibrationDueDate.notPast;
+    }
+  }
+
   const mechParams =
     form.insulationSpecifications?.specifications.flatMap((category) => category.parameters) ?? [];
 
@@ -314,7 +410,7 @@ function applyCasingNestedRules(
     const isThermal = category.includes("thermal");
     const row = isThermal
       ? form.thermalProperties[code]
-      : form.mechanicalProperties[code] ?? form.thermalProperties[code];
+      : (form.mechanicalProperties[code] ?? form.thermalProperties[code]);
 
     if (!isThermal) {
       const reportedPath = `mechanicalProperties.${code}.reported`;
@@ -363,16 +459,16 @@ function applyCasingNestedRules(
   });
 
   (form.radiographyPlanRows ?? []).forEach((row, index) => {
-    (["sections", "orientations", "sfd", "normalExposures", "tangentialExposures"] as const).forEach(
-      (field) => {
-        const text = String(row[field] ?? "").trim();
-        if (submitRequired && !text) {
-          errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.required;
-        } else if (text && !isFiniteNumber(text)) {
-          errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.invalid;
-        }
-      },
-    );
+    (
+      ["sections", "orientations", "sfd", "normalExposures", "tangentialExposures"] as const
+    ).forEach((field) => {
+      const text = String(row[field] ?? "").trim();
+      if (submitRequired && !text) {
+        errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.required;
+      } else if (text && !isFiniteNumber(text)) {
+        errors[`radiographyPlanRows.${index}.${field}`] = M.radiographyPlanRow.invalid;
+      }
+    });
     const detector = String(row.detectorType ?? "").trim();
     if (submitRequired && !detector) {
       errors[`radiographyPlanRows.${index}.detectorType`] = M.radiographyPlanRow.detectorRequired;
@@ -393,7 +489,10 @@ function applyCasingNestedRules(
     const remarkPath = `visualInspection.${index}.remark`;
     if (submitRequired && !String(row.observations ?? "").trim()) {
       errors[obsPath] = M.visualObservation.required;
-    } else if (String(row.observations ?? "").trim() && !ALPHA_NUM.test(String(row.observations).trim())) {
+    } else if (
+      String(row.observations ?? "").trim() &&
+      !ALPHA_NUM.test(String(row.observations).trim())
+    ) {
       errors[obsPath] = M.visualObservation.invalid;
     }
     if (String(row.remark ?? "").trim() && !ALPHA_NUM.test(String(row.remark).trim())) {
@@ -435,7 +534,10 @@ function applyCasingNestedRules(
           row.referenceRange.maxValue,
         )
       ) {
-        errors[arcPath] = M.dimensionalReading.outOfRange;
+        errors[arcPath] = dimensionalOutOfRangeMessage(
+          row.referenceRange.minValue,
+          row.referenceRange.maxValue,
+        );
       }
       if (
         submitRequired &&
@@ -446,7 +548,10 @@ function applyCasingNestedRules(
           row.referenceRange.maxValue,
         )
       ) {
-        errors[axialPath] = M.dimensionalReading.outOfRange;
+        errors[axialPath] = dimensionalOutOfRangeMessage(
+          row.referenceRange.minValue,
+          row.referenceRange.maxValue,
+        );
       }
       return;
     }
@@ -460,7 +565,10 @@ function applyCasingNestedRules(
         isFiniteNumber(value) &&
         !isWithinRange(Number(value), row.referenceRange.minValue, row.referenceRange.maxValue)
       ) {
-        errors[path] = M.dimensionalReading.outOfRange;
+        errors[path] = dimensionalOutOfRangeMessage(
+          row.referenceRange.minValue,
+          row.referenceRange.maxValue,
+        );
       }
     });
   });
@@ -512,15 +620,23 @@ function applyCasingNestedRules(
   });
 
   if (submitRequired) {
-    if (!hasReadyReport(form.visualInspectionReportExisting)) {
-      errors.visualInspectionReport = M.visualInspectionReport.required;
-    }
-    if (!hasReadyReport(form.dimensionalInspectionReportExisting)) {
-      errors.dimensionalInspectionReport = M.dimensionalInspectionReport.required;
-    }
-    if (!hasReadyReport(form.mockTrialReportExisting)) {
-      errors.mockTrialReport = M.mockTrialReport.required;
-    }
+    const visualError = reportUploadError(form.visualInspectionReportExisting, {
+      required: M.visualInspectionReport.required,
+      uploadFailed: M.visualInspectionReport.uploadFailed,
+    });
+    if (visualError) errors.visualInspectionReport = visualError;
+
+    const dimensionalError = reportUploadError(form.dimensionalInspectionReportExisting, {
+      required: M.dimensionalInspectionReport.required,
+      uploadFailed: M.dimensionalInspectionReport.uploadFailed,
+    });
+    if (dimensionalError) errors.dimensionalInspectionReport = dimensionalError;
+
+    const mockTrialError = reportUploadError(form.mockTrialReportExisting, {
+      required: M.mockTrialReport.required,
+      uploadFailed: M.mockTrialReport.uploadFailed,
+    });
+    if (mockTrialError) errors.mockTrialReport = mockTrialError;
   }
 }
 
@@ -539,6 +655,7 @@ export const isCasingUnitComplete = (form: RocketMotorCasingFormData): boolean =
       valueType: fields.motorId.valueType,
       required: true,
       pattern: fields.motorId.pattern,
+      maxLength: fields.motorId.maxLength,
     }) === "valid" &&
     Boolean(form.projectId.trim())
   );
@@ -559,10 +676,17 @@ export const isCasingSubmitComplete = (form: RocketMotorCasingFormData): boolean
     const rule = rocketMotorCasingFieldRules[ruleKey as keyof typeof rocketMotorCasingFieldRules];
     if (!rule) continue;
     const required = isRequiredForTier(rule.requiredIn, "SUBMIT");
+    const lengthRule = rule as {
+      pattern?: RegExp;
+      minLength?: number;
+      maxLength?: number;
+    };
     const state = validateFieldState(value, {
       valueType: rule.valueType,
       required,
-      pattern: rule.pattern,
+      pattern: lengthRule.pattern,
+      minLength: lengthRule.minLength,
+      maxLength: lengthRule.maxLength,
     });
     if (state !== "valid") return false;
   }

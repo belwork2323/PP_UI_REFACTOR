@@ -33,11 +33,8 @@ import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
 } from "../../manufacturing/CasePreparation/components/FinalApprovalMotorDialog";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import NDTFlowBar, { type NDTBeamEnergyOption, type NDTEquipmentOption } from "./NDTFlowBar";
 import NDTMotorTables from "./NDTMotorTables";
 
@@ -273,13 +270,19 @@ const NDTForm = ({
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
 
+  const resolveMotorStatus = (motorId: string) =>
+    getMotorStatus?.(motorId) ??
+    motorStatusById[motorId]?.motorSubmissionStatus ??
+    "TO_BE_INITIATED";
+
   const finalApprovalRows = useMemo(
     () =>
       buildFinalApprovalMotorRows(
         motorStatusById,
         motorCards.map((m) => m.motorId),
+        resolveMotorStatus,
       ),
-    [motorCards, motorStatusById],
+    [getMotorStatus, motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
@@ -292,27 +295,9 @@ const NDTForm = ({
     text: brand.text,
   };
 
-  const motorTabs = useMemo<UserWorkflowNavTab[]>(
-    () =>
-      motorCards.map((entry) => {
-        const status = (getMotorStatus?.(entry.motorId) ??
-          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-          "TO_BE_INITIATED") as NDTMotorSubmissionStatus;
-        return {
-          id: entry.motorId,
-          label: entry.motorId,
-          endAdornment: (
-            <PremixStatusChip
-              status={status as any}
-              statusConfig={statusConfig}
-              showIcon={false}
-              variant="embedded"
-              onAccent={entry.motorId === activeMotorId}
-            />
-          ),
-        };
-      }),
-    [activeMotorId, getMotorStatus, motorCards, motorStatusById, statusConfig],
+  const motorUnits = useMemo(
+    () => motorCards.map((entry) => ({ id: entry.motorId, label: entry.motorId })),
+    [motorCards],
   );
 
   return (
@@ -361,14 +346,25 @@ const NDTForm = ({
       {motorCards.length > 0 && activeMotorEntry ? (
         <Stack spacing={1.25}>
           <UserWorkflowNavPanel palette={navPalette}>
-            <UserWorkflowTabNav
+            <WorkflowUnitStatusTabNav
               title={strings.MOTOR_NAV_TITLE}
               hint={strings.MOTOR_NAV_HINT}
-              tabs={motorTabs}
-              activeIndex={activeMotorIndex}
-              onActiveIndexChange={setActiveMotorIndex}
-              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+              units={motorUnits}
+              activeId={activeMotorId || null}
+              onActiveIdChange={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                if (idx >= 0) setActiveMotorIndex(idx);
+              }}
+              getStatus={resolveMotorStatus}
+              statusConfig={statusConfig}
+              isUnitDisabled={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx < 0 || !motorNavGate.isMotorTabEnabled(idx);
+              }}
+              unitTooltip={(id) => {
+                const idx = motorCards.findIndex((m) => m.motorId === id);
+                return idx >= 0 ? motorNavGate.getMotorTabTooltip(idx) : undefined;
+              }}
               palette={navPalette}
               showStepArrows
               wrapTabs
@@ -432,6 +428,15 @@ const NDTForm = ({
 
             </Stack>
 
+            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
+              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                <Typography component="span" sx={{ fontWeight: 700, display: "block", fontSize: "inherit" }}>
+                  {STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
+                </Typography>
+                {motorStatusById[activeMotorId]?.rejectionReason}
+              </Alert>
+            ) : null}
+
             {activeMotorLocked ? (
               <Box
                 sx={{
@@ -451,12 +456,6 @@ const NDTForm = ({
                       : strings.MOTOR_LOCKED_WAITING}
                 </Typography>
               </Box>
-            ) : null}
-
-            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
-              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-                {motorStatusById[activeMotorId]?.rejectionReason}
-              </Alert>
             ) : null}
 
             {!isCurrentMotorSetupReady ? (

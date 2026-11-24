@@ -11,12 +11,8 @@ import TemporaryPasswordReveal from "@ui/components/common/TemporaryPasswordReve
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
-import {
-  getDisplayName,
-  getUserId,
-  getSubDepts,
-  getStatus,
-} from "@utils/userManagementUtils";
+import { getDisplayName, getUserId, getSubDepts, getStatus } from "@utils/userManagementUtils";
+import { CancelOutlined } from "@mui/icons-material";
 
 const S = STRINGS.USER_MANAGEMENT;
 
@@ -84,7 +80,9 @@ const UserListTable = ({
         label: S.TABLE_COLS[3],
         cellSx: table.cellSubDepts,
         render: (user) => {
-          const normalizedRole = String(user?.role ?? "").trim().toLowerCase();
+          const normalizedRole = String(user?.role ?? "")
+            .trim()
+            .toLowerCase();
           const showNotApplicable =
             normalizedRole === "admin" || normalizedRole === "system manager";
           return showNotApplicable ? (
@@ -162,9 +160,9 @@ const UserListTable = ({
                   <icons.Edit sx={tableCell.editIcon} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Delete user">
+              <Tooltip title="Deactivate user">
                 <IconButton size="small" onClick={() => onDelete(user)} sx={tableCell.deleteButton}>
-                  <icons.Delete sx={tableCell.deleteIcon} />
+                  <CancelOutlined sx={tableCell.deleteIcon} />
                 </IconButton>
               </Tooltip>
             </Box>
@@ -172,7 +170,7 @@ const UserListTable = ({
         },
       },
     ],
-    [tableCell, onEdit, onDelete, onActivate]
+    [tableCell, onEdit, onDelete, onActivate],
   );
 
   return (

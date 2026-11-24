@@ -51,7 +51,6 @@ import RocketCasingDetailDialog from "./components/RocketCasingDetailDialog";
 const BL = STRINGS.SOURCING.BATCH_LIST;
 
 const CASING_TYPES = ["COMPOSITE", "METALLIC"] as const;
-const INSULATION_TYPES = ["ROCASIN", "EPDM"] as const;
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -60,9 +59,12 @@ const {
 } = icons.approver.sourcing.rocketMotorCasing;
 
 const formatListDate = (value?: string) => {
-  if (!value) return "—";
-  const parsed = dayjs(value);
-  return parsed.isValid() ? parsed.format("DD MMM YYYY") : value;
+  const raw = String(value ?? "").trim();
+  if (!raw) return "—";
+  const normalized = formatToUiDate(raw);
+  if (/^\d{2}-\d{2}-\d{4}$/.test(normalized)) return normalized;
+  const parsed = dayjs(raw);
+  return parsed.isValid() ? parsed.format("DD-MM-YYYY") : raw;
 };
 
 const RocketMotorApproverPage = () => {
@@ -86,6 +88,9 @@ const RocketMotorApproverPage = () => {
     listFiltersRecord,
     motorStageOptions,
     motorStagesLoading,
+    insulationTypeOptions,
+    insulationTypesLoading,
+    ensureInsulationTypeOptions,
     statusFilter,
     setStatusFilter,
     statusTabs,
@@ -187,6 +192,7 @@ const RocketMotorApproverPage = () => {
         isOpen={filterOpen}
         onClick={() => {
           if (!filterOpen) syncDraftFromApplied();
+          if (!filterOpen) void ensureInsulationTypeOptions();
           setFilterOpen((open) => !open);
         }}
         sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
@@ -299,16 +305,20 @@ const RocketMotorApproverPage = () => {
           label={BL.FILTERS_INSULATION_TYPE}
           value={draftInsulationType}
           onChange={(event) => setDraftInsulationType(event.target.value)}
+          disabled={insulationTypesLoading}
           sx={filterStyles.fieldWide}
           SelectProps={filterStyles.selectProps}
         >
           <MenuItem value={filterAllLabel}>{BL.FILTERS_ALL_INSULATION}</MenuItem>
-          {INSULATION_TYPES.map((type) => (
+          {insulationTypeOptions.map((type) => (
             <MenuItem key={type} value={type}>
               {type}
             </MenuItem>
           ))}
         </TextField>
+        {insulationTypesLoading ? (
+          <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} />
+        ) : null}
 
         <TextField
           select
@@ -329,7 +339,9 @@ const RocketMotorApproverPage = () => {
         <DateField
           label={BL.FILTERS_FROM_DATE}
           value={formatToUiDate(draftFrom)}
+          maxDate={formatToUiDate(draftTo) || dayjs().format("DD-MM-YYYY")}
           onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
+          clearable
           compact
           error={Boolean(draftDateRangeErrors?.from)}
           helperText={draftDateRangeErrors?.from}
@@ -339,7 +351,9 @@ const RocketMotorApproverPage = () => {
           label={BL.FILTERS_TO_DATE}
           value={formatToUiDate(draftTo)}
           minDate={formatToUiDate(draftFrom)}
+          maxDate={dayjs().format("DD-MM-YYYY")}
           onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
+          clearable
           compact
           error={Boolean(draftDateRangeErrors?.to)}
           helperText={draftDateRangeErrors?.to}
@@ -401,11 +415,18 @@ const RocketMotorApproverPage = () => {
       searchKeys={[
         "motorCasingId",
         "projectId",
+        "projectName",
         "motorStage",
+        "motorStageLabel",
         "motorId",
         "casingType",
         "insulationType",
         "submittedBy",
+        "createdBy.fullName",
+        "createdBy.id",
+        "assignedTo.fullName",
+        "createdOn",
+        "status",
       ]}
       searchPlaceholder={STRINGS.APPROVER.LIST.SEARCH_PLACEHOLDER([
         "motor casing ID",

@@ -249,6 +249,27 @@ export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputP
     },
     ref,
   ) => {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (type === "number" && (event.key === "e" || event.key === "E")) {
+        event.preventDefault();
+        return;
+      }
+      (rest as { onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void }).onKeyDown?.(
+        event,
+      );
+    };
+
+    const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+      if (type === "number") {
+        const pasted = event.clipboardData.getData("text");
+        if (/[eE]/.test(pasted)) {
+          event.preventDefault();
+          return;
+        }
+      }
+      (rest as { onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void }).onPaste?.(event);
+    };
+
     const control = readOnly ? (
       <WorkflowReadOnlyText value={String(value ?? "")} />
     ) : (
@@ -265,11 +286,14 @@ export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputP
         disabled={disabled}
         error={error}
         helperText={helperText}
+        required={required}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         onChange={(event) => onChange?.(event.target.value)}
         sx={castingCuringTableInputSx}
-        required
       />
     );
+
     return fieldPath ? <Box data-cc-field={fieldPath}>{control}</Box> : control;
   },
 );

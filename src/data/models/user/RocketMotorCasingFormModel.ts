@@ -48,6 +48,8 @@ export type UploadedFileRef = {
   isTemp?: boolean;
   /** Local File kept for retry; never JSON-serialized. */
   file?: File | null;
+  /** Last upload failure reason (UI only; not persisted). */
+  errorMessage?: string;
 };
 
 export const newCasingFileLocalId = (): string =>

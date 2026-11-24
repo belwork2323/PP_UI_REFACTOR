@@ -11,10 +11,12 @@ import rawMaterialSourcingController from "@controllers/user/sourcing/rms/rawMat
 import { OPERATION_STATUS, toOperationStatusApiValue } from "@hooks/operationStatus";
 import {
   mapLotListApiRow,
+  rawMaterialLotMatchesSearch,
   RawMaterialLotListRequest,
 } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
+const CLIENT_SEARCH_FETCH_LIMIT = 5000;
 
 export type SubdeptMaterialOption = {
   materialCode: string;
@@ -87,6 +89,7 @@ export const useRawMaterialSourcingList = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const hasLoadedOnceRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [search, setSearch] = useState<string>("");
@@ -166,6 +169,7 @@ export const useRawMaterialSourcingList = () => {
   }, [advancedFilters, statusFilter]);
 
   const fetchLots = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
     if (!subDepartmentId) {
       setLoading(false);
       setIsRefreshing(false);
@@ -178,10 +182,11 @@ export const useRawMaterialSourcingList = () => {
       setIsRefreshing(true);
     }
     try {
+      const isClientSearch = Boolean(debouncedSearch.trim());
       const payload: RawMaterialLotListRequest = {
         subDepartmentId,
-        page: page + 1,
-        limit: rowsPerPage,
+        page: isClientSearch ? 1 : page + 1,
+        limit: isClientSearch ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
       };
       if (statusFilter !== FILTER_ALL) {
         const apiStatus = toOperationStatusApiValue(statusFilter, FILTER_ALL);
@@ -196,15 +201,13 @@ export const useRawMaterialSourcingList = () => {
       if (advancedFilters.manufacturer.trim()) {
         payload.manufacturerName = advancedFilters.manufacturer.trim();
       }
-      if (debouncedSearch.trim()) {
-        payload.search = debouncedSearch.trim();
-      }
       const from = advancedFilters.fromDate;
       const to = advancedFilters.toDate;
       if (from) payload.fromDate = from;
       if (to) payload.toDate = to;
 
       const res = await rawMaterialSourcingController.fetchLotList(payload);
+      if (requestId !== fetchRequestIdRef.current) return;
 
       if (res?.success && res.data) {
         const data = res.data as {
@@ -212,22 +215,46 @@ export const useRawMaterialSourcingList = () => {
           statusCounts?: Record<string, number>;
           pagination?: { totalRecords?: number };
         };
-        const lots = (data.lots ?? []).map((lot, idx) => mapLotListApiRow(lot, idx));
+        const fetchedLots = (data.lots ?? []).map((lot, idx) => mapLotListApiRow(lot, idx));
+        const matchingLots = isClientSearch
+          ? fetchedLots.filter((lot) => rawMaterialLotMatchesSearch(lot, debouncedSearch))
+          : fetchedLots;
+        const lots = isClientSearch
+          ? matchingLots.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+          : matchingLots;
+        const totalRecords = isClientSearch
+          ? matchingLots.length
+          : data.pagination?.totalRecords ?? lots.length;
 
         setBatches(lots);
-        setStatusCounts(mapLotListStatusCountsForUi(data.statusCounts, data.pagination?.totalRecords ?? 0));
-        setTotalRecords(data.pagination?.totalRecords ?? 0);
+        setStatusCounts(
+          isClientSearch
+            ? mapLotListStatusCountsForUi(
+                matchingLots.reduce<Record<string, number>>((counts, lot) => {
+                  const key = lot.rmStatus.replace(/\s+/g, "");
+                  counts[key.charAt(0).toLowerCase() + key.slice(1)] =
+                    (counts[key.charAt(0).toLowerCase() + key.slice(1)] ?? 0) + 1;
+                  return counts;
+                }, {}),
+                totalRecords,
+              )
+            : mapLotListStatusCountsForUi(data.statusCounts, totalRecords),
+        );
+        setTotalRecords(totalRecords);
       } else {
         setBatches([]);
         setTotalRecords(0);
         setStatusCounts({});
       }
     } catch (error) {
+      if (requestId !== fetchRequestIdRef.current) return;
       console.error("Error fetching raw material lots:", error);
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-      hasLoadedOnceRef.current = true;
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setIsRefreshing(false);
+        hasLoadedOnceRef.current = true;
+      }
     }
   }, [
     subDepartmentId,

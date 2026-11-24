@@ -1495,6 +1495,7 @@ const CastingMotorPanel = ({
             <FieldLabelWithAsterisk label="Initial Vacuum" required />
             <TableTextInput
               value={value.CASTING_PROCESS.INITIAL_VACUUM}
+              type="number"
               onChange={(e: any) => {
                 const val = typeof e === "string" ? e : (e?.target?.value ?? "");
                 patchCastingProcess({ INITIAL_VACUUM: val });

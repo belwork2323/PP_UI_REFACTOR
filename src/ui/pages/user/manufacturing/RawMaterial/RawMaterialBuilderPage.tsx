@@ -2,11 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RawMaterialMaterialProcessPanel from "./materialProcess/RawMaterialMaterialProcessPanel";
 import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
-import {
-  UserWorkflowNavPanel,
-  UserWorkflowTabNav,
-  type UserWorkflowNavTab,
-} from "../../../../components/custom/UserWorkflowStepPager";
+import { UserWorkflowNavPanel, UserWorkflowTabNav } from "../../../../components/custom/UserWorkflowStepPager";
+import { WorkflowUnitStatusTabNav } from "../../../../components/custom/WorkflowUnitStatusTabNav";
 import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
 import {
@@ -329,28 +326,25 @@ const RawMaterialBuilderForm = ({
 
   const premixTotal = numberOfPremix || groups.length;
 
-  const premixTabs: UserWorkflowNavTab[] = useMemo(
+  const premixUnits = useMemo(
     () =>
-      groups.map((group: { premix: number }) => {
-        const statusMeta = (premixStatusByNo as Record<number, PremixStatusMeta>)?.[group.premix];
-        const active = groups[activePremixIndex]?.premix === group.premix;
-        return {
-          id: `premix-${group.premix}`,
-          label: `${RM.PREMIX_STEP_LABEL} ${group.premix}`,
-          endAdornment: (
-            <PremixStatusChip
-              status={statusMeta?.premixSubmissionStatus}
-              statusConfig={statusConfig}
-              variant="embedded"
-              onAccent={active}
-            />
-          ),
-        };
-      }),
-    [groups, premixStatusByNo, statusConfig, activePremixIndex],
+      groups.map((group: { premix: number }) => ({
+        id: `premix-${group.premix}`,
+        label: `${RM.PREMIX_STEP_LABEL} ${group.premix}`,
+      })),
+    [groups],
   );
 
-  const materialTabs: UserWorkflowNavTab[] = useMemo(
+  const getPremixNavStatus = (unitId: string) => {
+    const premixNo = Number(String(unitId).replace(/^premix-/, ""));
+    if (!Number.isFinite(premixNo)) return "TO_BE_INITIATED";
+    return (premixStatusByNo as Record<number, PremixStatusMeta>)?.[premixNo]?.premixSubmissionStatus;
+  };
+
+  const activePremixUnitId =
+    activePremixGroup != null ? `premix-${activePremixGroup.premix}` : null;
+
+  const materialTabs = useMemo(
     () =>
       activePremixMaterials.map((entry) => ({
         id: `premix-material-${entry.premix}-${entry.materialKey}`,
@@ -378,12 +372,14 @@ const RawMaterialBuilderForm = ({
       {groups.length > 0 && activePremixGroup && activeMaterialEntry && (
         <Stack spacing={1.25} mb={2}>
           <UserWorkflowNavPanel palette={navPalette}>
-            <UserWorkflowTabNav
+            <WorkflowUnitStatusTabNav
               title={RM.PREMIX_NAV_TITLE}
               hint={RM.PREMIX_NAV_HINT}
-              tabs={premixTabs}
-              activeIndex={activePremixIndex}
-              onActiveIndexChange={(index) => {
+              units={premixUnits}
+              activeId={activePremixUnitId}
+              onActiveIdChange={(id) => {
+                const index = groups.findIndex((group) => `premix-${group.premix}` === id);
+                if (index < 0) return;
                 setActivePremixIndex(index);
                 setActiveMaterialIndex(0);
                 const premixNo = Number(groups[index]?.premix);
@@ -391,6 +387,8 @@ const RawMaterialBuilderForm = ({
                   onPreferredPremixNoChange?.(premixNo);
                 }
               }}
+              getStatus={getPremixNavStatus}
+              statusConfig={statusConfig}
               palette={navPalette}
               showStepArrows
               mb={1}

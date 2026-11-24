@@ -1,8 +1,4 @@
-import {
-  DECIMAL_MAX_LENGTH,
-  decimalFractionDigits,
-  decimalMaxLengthFor,
-} from "./inputLimits";
+import { DECIMAL_MAX_LENGTH, decimalFractionDigits, decimalMaxLengthFor } from "./inputLimits";
 
 export const ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/;
 export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
@@ -18,7 +14,7 @@ export const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
 export const isFiniteNumber = (value: unknown): boolean => {
   const text = str(value).replace(/,/g, "");
-  if (!text) return false;
+  if (!text || /[eE]/.test(text)) return false;
   return Number.isFinite(Number(text));
 };
 
@@ -114,7 +110,7 @@ export const validateFieldState = (
 
   // 1. Number Validation (Validates numerical value)
   if (options.valueType === "number") {
-    if (!isFiniteNumber(text)) return "invalid";
+    if (/[eE]/.test(text) || !isFiniteNumber(text)) return "invalid";
 
     const compact = text.replace(/,/g, "");
 
@@ -129,10 +125,7 @@ export const validateFieldState = (
       if (compact.length > limit) return "maxLength";
     }
 
-    if (
-      options.maxDecimals !== undefined &&
-      decimalFractionDigits(compact) > options.maxDecimals
-    ) {
+    if (options.maxDecimals !== undefined && decimalFractionDigits(compact) > options.maxDecimals) {
       return "invalid";
     }
 

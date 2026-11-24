@@ -18,7 +18,8 @@ const MixingHeader = ({ batch, onBack, theme }: any) => {
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
         statusLabel: headerStatus.statusLabel,
         statusVariant: headerStatus.statusVariant,
-        rejectionReason: headerStatus.rejectionReason,
+        // Per-mix-card rejection reason is shown under the mix card title.
+        rejectionReason: null,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}
