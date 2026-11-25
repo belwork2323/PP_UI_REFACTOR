@@ -442,7 +442,7 @@ export const getCuringPostField = (
     | "DISPATCH_DATE_TIME",
 ) => {
   const value = getField(values, QC_CURING_SECTION_IDS.POST_CURING, field);
-  if (field === "VISUAL_OBSERVATIONS") return normalizeVisualObservations(value);
+  // Do not normalize VISUAL_OBSERVATIONS on read — .trim() would eat spaces while typing.
   if (field === "PRESSURE_PLATE_REMOVAL_DATE_TIME" || field === "DISPATCH_DATE_TIME") {
     return normalizeUiDateTimeValue(value);
   }
@@ -459,8 +459,8 @@ export const setCuringPostField = (
   value: string,
 ) => {
   let next = value;
-  if (field === "VISUAL_OBSERVATIONS") next = normalizeVisualObservations(value);
-  else if (field === "PRESSURE_PLATE_REMOVAL_DATE_TIME" || field === "DISPATCH_DATE_TIME") {
+  // Store raw VISUAL_OBSERVATIONS so trailing spaces survive keystrokes.
+  if (field === "PRESSURE_PLATE_REMOVAL_DATE_TIME" || field === "DISPATCH_DATE_TIME") {
     next = normalizeUiDateTimeValue(value);
   }
   return setField(values, QC_CURING_SECTION_IDS.POST_CURING, field, next);
@@ -471,7 +471,7 @@ export const getCuringSubscaleField = (
   field: QcCuringSubscaleField,
 ) => {
   const value = getField(values, QC_CURING_SECTION_IDS.SUBSCALE, field);
-  if (field === "SUBSCALE_VISUAL_OBSERVATIONS") return normalizeVisualObservations(value);
+  // Do not normalize SUBSCALE_VISUAL_OBSERVATIONS on read — .trim() would eat spaces while typing.
   if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
     return normalizeCycleTimeValue(value);
   }
@@ -484,8 +484,8 @@ export const setCuringSubscaleField = (
   value: string,
 ) => {
   let next = value;
-  if (field === "SUBSCALE_VISUAL_OBSERVATIONS") next = normalizeVisualObservations(value);
-  else if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
+  // Store raw SUBSCALE_VISUAL_OBSERVATIONS so trailing spaces survive keystrokes.
+  if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
     next = normalizeCycleTimeValue(value);
   }
   return setField(values, QC_CURING_SECTION_IDS.SUBSCALE, field, next);
@@ -645,7 +645,10 @@ const buildSubscaleDetailsPayload = (values: SchemaFormValues | null | undefined
       toApiScalar(getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS")) ?? null,
     cartonAverageShoreAHardness:
       toApiScalar(getCuringSubscaleField(values, "CARTON_AVERAGE_SHORE_A_HARDNESS")) ?? null,
-    visualObservations: getCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS") || null,
+    visualObservations:
+      normalizeVisualObservations(
+        getCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS"),
+      ) || null,
     curingTable,
     qaRemarks: qaRemarks || null,
   };
@@ -678,7 +681,9 @@ export const buildCuringMotorDetailPayload = (
   const motorPositioning = getCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME");
 
   const cycleRows = mapCycleRowsForApi(sanitizeCycleRows(getCuringCycleRows(values)), curingType);
-  const visualObservation = getCuringPostField(values, "VISUAL_OBSERVATIONS");
+  const visualObservation = normalizeVisualObservations(
+    getCuringPostField(values, "VISUAL_OBSERVATIONS"),
+  );
   const setupQaRemarks = getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.MOTOR_SETUP).trim();
   const postQaRemarks = getCuringSectionQaRemarks(values, QC_CURING_SECTION_IDS.POST_CURING).trim();
   const postCuringDetails = omitEmpty({
@@ -767,7 +772,7 @@ export const curingMotorDetailToSections = (
     const curingSetup = asRecord(rec.curingSetup) ?? asRecord(asRecord(rec.details)?.curingSetup);
     const setupQaRemarks = pickQaRemarks(rec.qaRemarks, rec.QA_REMARKS);
     const setup = omitEmpty({
-      MOTOR_STAGE: curingSetup?.configuration ?? rec.motorStage,
+      MOTOR_STAGE: rec.motorStage ?? curingSetup?.motorStage,
       CURING_TYPE: curingSetup?.curingType ?? rec.curingType,
       OVEN: curingSetup?.oven ?? rec.oven,
       OVEN_NUMBER:

@@ -82,6 +82,7 @@ const extractFieldValidationMessage = (source: unknown): string | null => {
   return null;
 };
 
+/** Field-level API errors only — never scan success `data` (remarks would steal the toast). */
 const getFieldValidationMessage = (
   response?: {
     message?: string;
@@ -96,12 +97,24 @@ const getFieldValidationMessage = (
   if (!response) return null;
   return (
     extractFieldValidationMessage(response.errorDetails) ||
-    extractFieldValidationMessage(response.error) ||
-    extractFieldValidationMessage(response.data)
+    extractFieldValidationMessage(response.error)
   );
 };
 
-const getResponseMessage = (
+const getSuccessResponseMessage = (
+  response?: {
+    message?: string;
+  } | null,
+  action?: ApproverFormActionType | null,
+) => {
+  const message = String(response?.message ?? "").trim();
+  if (message) return message;
+  if (action === "REJECTED") return "Submission rejected successfully.";
+  if (action === "APPROVED") return "Submission approved successfully.";
+  return "Submission updated successfully.";
+};
+
+const getErrorResponseMessage = (
   response?: {
     message?: string;
     errorCode?: string | null;
@@ -309,7 +322,9 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
         }
         closeDialog({ force: true });
         bumpListVersion();
-        showAlert(getResponseMessage(response), "success", { autoCloseMs: 2000 });
+        showAlert(getSuccessResponseMessage(response, actionType), "success", {
+          autoCloseMs: 2000,
+        });
         return;
       }
 
@@ -322,7 +337,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
 
       // Close action dialog first so GlobalAlert is not covered by it.
       closeDialog({ force: true });
-      showAlert(getResponseMessage(response), "error", { autoCloseMs: 4000 });
+      showAlert(getErrorResponseMessage(response), "error", { autoCloseMs: 4000 });
     } catch (error) {
       setSubmitting(false);
       const status =

@@ -1,7 +1,10 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
+import { toApiDateTime, toUiDateTime } from "../../../data/models/user/castingCuringFieldCodec";
 import {
   QC_PROPELLANT_AVG_COLUMN,
+  QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_FIELD,
+  QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL,
   QC_PROPELLANT_BALLISTIC_PRESET,
   QC_PROPELLANT_INTERFACE_PRESET,
   QC_PROPELLANT_MECHANICAL_GRAPH_FIELD,
@@ -27,6 +30,8 @@ const tableKey = (sectionId: string) => formKey(sectionId, sectionId);
 const columnsKey = (sectionId: string) => formKey(sectionId, "FM_COLUMNS");
 const mechanicalGraphKey = () =>
   formKey(QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES, QC_PROPELLANT_MECHANICAL_GRAPH_FIELD);
+const ballisticDateOfTestKey = () =>
+  formKey(QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION, QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_FIELD);
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -276,6 +281,40 @@ const emptyBallisticRows = (columns: readonly string[] = buildQcPropellantFmColu
     ...emptyFmValues(columns),
   })) as QcPropellantBallisticRow[];
 
+const isBallisticDateOfTestRow = (row: Record<string, unknown> | null) =>
+  Boolean(
+    row &&
+      labelsMatch(
+        row.DETAILS ?? row.details,
+        QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL,
+      ),
+  );
+
+/** Legacy drafts stored Date of Test as the first ballisticDetails row. */
+const pickLegacyBallisticDateOfTest = (rows: unknown[]): string => {
+  for (const item of rows) {
+    const row = asRecord(item);
+    if (!isBallisticDateOfTestRow(row)) continue;
+    const specification = pickEditableString(row?.SPECIFICATION, row?.specification).trim();
+    if (specification) return specification;
+    for (const [key, value] of Object.entries(row ?? {})) {
+      if (FIXED_PROPERTY_KEYS.has(key) || typeof value === "object") continue;
+      const text = pickEditableString(value).trim();
+      if (text) return text;
+    }
+  }
+  return "";
+};
+
+const stripBallisticDateOfTestRows = (rows: unknown[]): unknown[] =>
+  rows.filter((item) => !isBallisticDateOfTestRow(asRecord(item)));
+
+const normalizeBallisticDateOfTestUi = (value: unknown): string => {
+  const raw = pickEditableString(value).trim();
+  if (!raw) return "";
+  return toUiDateTime(raw) || raw;
+};
+
 const overlayPropertyRows = (
   presets: QcPropellantPropertyRow[],
   saved: unknown,
@@ -387,10 +426,23 @@ export const createInitialPropellantValues = (fmCount = 1): SchemaFormValues => 
     [columnsKey(QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES)]: fmColumns,
     [tableKey(QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE)]: emptySsbrRows(fmColumns),
     [columnsKey(QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE)]: fmColumns,
+    [ballisticDateOfTestKey()]: "",
     [tableKey(QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION)]: emptyBallisticRows(bemColumns),
     [columnsKey(QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION)]: bemColumns,
   };
 };
+
+export const getPropellantBallisticDateOfTest = (
+  values: SchemaFormValues | null | undefined,
+): string => normalizeBallisticDateOfTestUi(values?.[ballisticDateOfTestKey()]);
+
+export const setPropellantBallisticDateOfTest = (
+  values: SchemaFormValues | null | undefined,
+  value: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [ballisticDateOfTestKey()]: normalizeBallisticDateOfTestUi(value),
+});
 
 export const getPropellantFmColumns = (
   values: SchemaFormValues | undefined,
@@ -666,10 +718,20 @@ export const hydratePropellantValuesFromSections = (
 
     if (sectionId === QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION) {
       const sectionData = extractSectionDataRecord(section);
+      const fromApi = pickEditableString(
+        sectionData?.dateOfTest,
+        sectionData?.DATE_OF_TEST,
+      ).trim();
+      const legacy = fromApi ? "" : pickLegacyBallisticDateOfTest(rows);
+      const dateRaw = fromApi || legacy;
+      values[ballisticDateOfTestKey()] = dateRaw
+        ? normalizeBallisticDateOfTestUi(dateRaw)
+        : "";
+      const tableRows = stripBallisticDateOfTestRows(rows);
       const savedBemColumns = asArray(sectionData?.bemColumns)
         .map((item) => String(item ?? "").trim())
         .filter(isQcPropellantBemColumnId);
-      const fromRows = resolveHydrateFmColumns(rows, fmCount, true, bemColumns);
+      const fromRows = resolveHydrateFmColumns(tableRows, fmCount, true, bemColumns);
       const nextColumns = sortQcPropellantBemColumns([
         ...new Set([
           ...savedBemColumns,
@@ -683,7 +745,7 @@ export const hydratePropellantValuesFromSections = (
           )
         : fromRows;
       values[columnsKey(sectionId)] = mergedColumns;
-      values[tableKey(sectionId)] = overlayBallisticRows(rows, mergedColumns);
+      values[tableKey(sectionId)] = overlayBallisticRows(tableRows, mergedColumns);
     }
   }
 
@@ -787,20 +849,25 @@ const serializeBurnRateDetails = (values: SchemaFormValues | undefined) => {
 
 const serializeBallisticDetails = (values: SchemaFormValues | undefined) => {
   const columns = getPropellantBallisticColumns(values);
-  return getPropellantBallisticRows(values).map((row) => {
-    const payload: Record<string, unknown> = { DETAILS: row.DETAILS };
-    const specification = String(row.SPECIFICATION ?? "").trim();
-    if (specification) payload.SPECIFICATION = specification;
-    const qaRemarks = String(row.QA_REMARKS ?? "").trim();
-    if (qaRemarks) payload.QA_REMARKS = qaRemarks;
-    // Always emit every BEM column key so FM_1_BEM_NO_2+ survive save/reload
-    // even when some cells are blank.
-    columns.forEach((columnId) => {
-      const value = toApiScalar(row[columnId], false);
-      payload[columnId] = value !== undefined ? value : "";
+  return getPropellantBallisticRows(values)
+    .filter(
+      (row) =>
+        !labelsMatch(row.DETAILS, QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL),
+    )
+    .map((row) => {
+      const payload: Record<string, unknown> = { DETAILS: row.DETAILS };
+      const specification = String(row.SPECIFICATION ?? "").trim();
+      if (specification) payload.SPECIFICATION = specification;
+      const qaRemarks = String(row.QA_REMARKS ?? "").trim();
+      if (qaRemarks) payload.QA_REMARKS = qaRemarks;
+      // Always emit every BEM column key so FM_1_BEM_NO_2+ survive save/reload
+      // even when some cells are blank.
+      columns.forEach((columnId) => {
+        const value = toApiScalar(row[columnId], false);
+        payload[columnId] = value !== undefined ? value : "";
+      });
+      return payload;
     });
-    return payload;
-  });
 };
 
 export const buildPropellantMotorPayload = (
@@ -809,6 +876,7 @@ export const buildPropellantMotorPayload = (
   motorSubmissionType: QcPropellantMotorSubmissionType = "DRAFT",
 ): Record<string, unknown> => {
   const mechanicalGraph = toFileIdListPayload(getPropellantMechanicalGraph(values));
+  const ballisticDateOfTest = toApiDateTime(getPropellantBallisticDateOfTest(values));
   return {
     motorId,
     motorSubmissionType,
@@ -841,6 +909,7 @@ export const buildPropellantMotorPayload = (
       {
         processType: QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION,
         data: {
+          ...(ballisticDateOfTest ? { dateOfTest: ballisticDateOfTest } : {}),
           ballisticDetails: serializeBallisticDetails(values),
           bemColumns: getPropellantBallisticColumns(values),
         },
@@ -961,6 +1030,7 @@ export const propellantMotorDetailToSections = (
       const bemColumns = asArray(data.bemColumns)
         .map((item) => String(item ?? "").trim())
         .filter(isQcPropellantBemColumnId);
+      const dateOfTest = pickEditableString(data.dateOfTest, data.DATE_OF_TEST).trim();
       return [
         withMotor({
           sectionId: QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION,
@@ -969,6 +1039,9 @@ export const propellantMotorDetailToSections = (
             {
               [QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION]: ballisticRows,
               ...(bemColumns.length ? { bemColumns } : {}),
+              ...(dateOfTest
+                ? { dateOfTest, DATE_OF_TEST: dateOfTest }
+                : {}),
             },
           ],
         }),

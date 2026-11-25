@@ -81,7 +81,7 @@ export const isQcExperimentalAlwaysEnabledDivision = (
 };
 
 export const QC_EXPERIMENTAL_DIVISION_BLOCKED_REASON =
-  "No motor linked to this subscale batch — this division is not applicable.";
+  "Not applicable to Subscale Experimental — no motor is linked to this batch type.";
 
 /**
  * Subscale batches do not run manufacturing subdepartments — skip mfg auto-populate

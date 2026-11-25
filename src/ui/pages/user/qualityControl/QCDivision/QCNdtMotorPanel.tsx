@@ -57,6 +57,7 @@ import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_t
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 import { fieldError } from "@/data/validation/adapters/qcNdtDivision.validation";
+import { isQcSubscaleBatch } from "../../../../../hooks/user/qualityControl/qcBatchType";
 
 const BRAND = QC_DIVISION_BRAND;
 const NDT_S = STRINGS.QUALITY_CONTROL.NDT;
@@ -697,6 +698,9 @@ type QCNdtMotorPanelProps = {
   disabled?: boolean;
   headerActions?: ReactNode;
   validationErrors?: Record<string, string> | null;
+  /** From QC batch context — hide manufacturing Remarks on subscale batches. */
+  batchType?: string | null;
+  subBatchType?: string | null;
 };
 
 const QCNdtMotorPanel = ({
@@ -707,6 +711,7 @@ const QCNdtMotorPanel = ({
   disabled = false,
   headerActions,
   validationErrors = null,
+  batchType = null,
 }: QCNdtMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
   const radiographyRows = useMemo(() => getNdtRadiographyDetailRows(values), [values]);
@@ -716,6 +721,8 @@ const QCNdtMotorPanel = ({
   const signedReport = getNdtSignedReport(values);
   const additionalRemarks = getNdtAdditionalRemarks(values);
   const qaRemarks = getNdtQaRemarks(values);
+  // Subscale (Qual/Experimental) has no manufacturing NDT remarks seed — show QA Remarks only.
+  const hideManufacturingRemarks = isQcSubscaleBatch(batchType);
 
   const patchValues = useCallback(
     (updater: (prev: SchemaFormValues) => SchemaFormValues) => {
@@ -814,6 +821,16 @@ const QCNdtMotorPanel = ({
         <SectionCard title={QC_NDT_SECTION_TITLES.SIGNED_NDT_REPORT} readOnly={readOnly}>
           <Stack spacing={1.25}>
             <Box sx={{ minWidth: 220, maxWidth: 480 }} data-qc-field="SIGNED_REPORT">
+              <Typography
+                component="div"
+                sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}
+              >
+                <FieldLabelWithAsterisk
+                  label={QC_NDT_FIELD_LABELS.SIGNED_REPORT}
+                  required
+                  sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
+              </Typography>
               <QCDivisionFileField
                 files={signedReport}
                 onChange={patchSignedReport}
@@ -829,17 +846,19 @@ const QCNdtMotorPanel = ({
                 />
               ) : null}
             </Box>
-            <Box>
-              <Typography
-                sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}
-              >
-                {QC_NDT_FIELD_LABELS.ADDITIONAL_REMARKS}
-              </Typography>
-              <QCDivisionReadOnlyValue
-                value={additionalRemarks}
-                muted={!additionalRemarks.trim()}
-              />
-            </Box>
+            {!hideManufacturingRemarks ? (
+              <Box>
+                <Typography
+                  sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}
+                >
+                  {QC_NDT_FIELD_LABELS.ADDITIONAL_REMARKS}
+                </Typography>
+                <QCDivisionReadOnlyValue
+                  value={additionalRemarks}
+                  muted={!additionalRemarks.trim()}
+                />
+              </Box>
+            ) : null}
             {readOnly ? (
               <Box>
                 <Typography

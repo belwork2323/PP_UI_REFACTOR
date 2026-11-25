@@ -443,14 +443,17 @@ const QCMixingDetailsTable = ({
                             <TextField
                               size="small"
                               fullWidth
-                              type="number"
+                              type="text"
                               value={row.PREMIX_QTY ?? ""}
                               onChange={(event) =>
                                 updateSharedField("PREMIX_QTY", event.target.value)
                               }
                               sx={tableFieldSx}
                               error={Boolean(err("details.0.PREMIX_QTY"))}
-                              inputProps={{ "data-qc-field": "details.0.PREMIX_QTY" }}
+                              inputProps={{
+                                inputMode: "decimal",
+                                "data-qc-field": "details.0.PREMIX_QTY",
+                              }}
                             />
                             <FieldErrorText message={err("details.0.PREMIX_QTY")} />
                           </Box>,
@@ -527,7 +530,7 @@ const QCMixingDetailsTable = ({
                               <TextField
                                 size="small"
                                 fullWidth
-                                type="number"
+                                type="text"
                                 value={row[field] ?? ""}
                                 onChange={(event) =>
                                   updateRowField(rowIndex, field, event.target.value)
@@ -535,6 +538,7 @@ const QCMixingDetailsTable = ({
                                 sx={tableFieldSx}
                                 error={Boolean(err(`details.${rowIndex}.${field}`))}
                                 inputProps={{
+                                  inputMode: "decimal",
                                   "data-qc-field": `details.${rowIndex}.${field}`,
                                 }}
                               />

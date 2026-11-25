@@ -186,8 +186,12 @@ export const QC_PROPELLANT_SSBR_PRESET = [
   { PROPERTY: "Ultrasonic Burn Rate (mm/s)", kind: "data" as const, locked: true },
 ];
 
+/** Section-level ballistic Date of Test (outside the table). */
+export const QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_FIELD = "DATE_OF_TEST";
+
+export const QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL = "Date of Test";
+
 export const QC_PROPELLANT_BALLISTIC_PRESET = [
-  { DETAILS: "Date of Test" },
   { DETAILS: "Net propellant weight (kg)" },
   { DETAILS: "Tb (s)" },
   { DETAILS: "Pmax (ksc)" },

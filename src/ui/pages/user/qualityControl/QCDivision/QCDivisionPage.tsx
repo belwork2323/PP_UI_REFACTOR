@@ -101,6 +101,7 @@ const QualityControlPage = () => {
     weightmentValidationAttempt,
     processingFieldErrors,
     processingValidationFocusRequest,
+    clearProcessingValidationFocus,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,
@@ -130,6 +131,8 @@ const QualityControlPage = () => {
     getPartialNavTabDisabledReason,
     isDivisionNavTabEnabled,
     getDivisionNavTabDisabledReason,
+    handleDisabledDivisionTabClick,
+    batchContext,
   } = hookState;
 
   const formDetailsTheme = isFormFieldsReadOnly;
@@ -234,6 +237,8 @@ const QualityControlPage = () => {
 
           <QCForm
             batch={activeBatch}
+            batchType={batchContext?.batchType}
+            subBatchType={batchContext?.subBatchType}
             divisionAutoPopulateData={divisionAutoPopulateData}
             mixingQualityChecksByStage={mixingQualityChecksByStage}
             formData={formData}
@@ -269,6 +274,7 @@ const QualityControlPage = () => {
             getPartialNavTabDisabledReason={getPartialNavTabDisabledReason}
             isDivisionNavTabEnabled={isDivisionNavTabEnabled}
             getDivisionNavTabDisabledReason={getDivisionNavTabDisabledReason}
+            onDisabledDivisionTabClick={handleDisabledDivisionTabClick}
             isEditMode={isEditMode}
             readOnly={readOnly}
             fieldsReadOnly={formDetailsTheme}
@@ -317,6 +323,7 @@ const QualityControlPage = () => {
             weightmentValidationAttempt={weightmentValidationAttempt}
             processingFieldErrors={processingFieldErrors}
             processingValidationFocusRequest={processingValidationFocusRequest}
+            onClearProcessingValidationFocus={clearProcessingValidationFocus}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}
             navApprovalActions={
               !readOnly

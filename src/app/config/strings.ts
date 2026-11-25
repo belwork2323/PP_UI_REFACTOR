@@ -1744,7 +1744,7 @@ export const STRINGS = {
         },
         weightmentWeight: {
           required: "Weight transferred is required",
-          invalid: "Enter a valid number",
+          invalid: "Enter a positive number (greater than 0)",
         },
         weightmentContainerType: {
           required: "Container type is required",
@@ -1756,7 +1756,7 @@ export const STRINGS = {
         },
         weightmentWeighScale: {
           required: "Weigh scale number is required",
-          invalid: "Enter a valid number",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
         },
         weightmentWeighingDatetime: {
           required: "Weighing date and time is required",

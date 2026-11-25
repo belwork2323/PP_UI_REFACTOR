@@ -30,7 +30,12 @@ const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "number",
   requiredIn,
   pattern: S.PATTERNS.FLOAT,
-  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  positiveOnly: true,
+  messages: {
+    required: S.FIELD_REQUIRED,
+    invalid: "Enter a positive number",
+    minVal: "Enter a positive number",
+  },
 });
 
 const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
@@ -47,9 +52,9 @@ export type QcMixingValidationTarget = {
 
 export const qcMixingValidationFields: Record<string, FieldRuleConfig> = {
   // Shared header (Premix / Final Mix details)
-  // Bowl may be "Bowl No.2", numeric id, or master code from mixer config
+  // Bowl may be "Bowl No.2", numeric id, or master code — must include a letter/digit
   // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
-  bowlNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  bowlNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL_REQUIRE_ALNUM),
   dateOfPremix: date(["SUBMIT"]),
   dateOfFinalMix: date(["SUBMIT"]),
   // Auto-seeded as "MX-1 & BLD-1" (mixer + building), not a bare building code

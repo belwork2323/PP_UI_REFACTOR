@@ -231,11 +231,22 @@ export const toQcSubscaleArticleTypeApi = (value: unknown): string => {
 };
 
 export const formatQcCuringMotorStageLabel = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const rec = value as Record<string, unknown>;
+    const named = String(
+      rec.motorStageName ?? rec.name ?? rec.label ?? "",
+    ).trim();
+    if (named) return /^stage\s/i.test(named) ? named : formatQcCuringMotorStageLabel(named);
+    const id = Number(rec.motorStageId ?? rec.id ?? rec.motorStage);
+    if (Number.isFinite(id) && id >= 0) return `Stage ${id}`;
+    return "";
+  }
   const raw = String(value ?? "").trim();
-  if (!raw) return "";
+  if (!raw || raw.toLowerCase() === "null" || raw === "[object Object]") return "";
   if (/^stage\s/i.test(raw)) return raw;
   const numeric = Number(raw);
-  if (Number.isFinite(numeric) && numeric > 0) return `Stage ${numeric}`;
+  if (Number.isFinite(numeric) && numeric >= 0) return `Stage ${numeric}`;
   return raw;
 };
 

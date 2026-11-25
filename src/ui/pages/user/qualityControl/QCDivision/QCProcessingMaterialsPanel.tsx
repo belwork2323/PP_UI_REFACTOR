@@ -91,6 +91,7 @@ type QCProcessingMaterialsPanelProps = {
     entryId: string;
     fieldPath: string;
   } | null;
+  onClearProcessingValidationFocus?: () => void;
   unitActions?: QCDivisionEntryUnitActions | null;
 };
 
@@ -114,6 +115,7 @@ const QCProcessingMaterialsPanel = ({
   validationAttempt = { format: false, unit: false, submit: false },
   processingFieldErrors = {},
   processingValidationFocusRequest = null,
+  onClearProcessingValidationFocus,
   unitActions = null,
 }: QCProcessingMaterialsPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -136,23 +138,41 @@ const QCProcessingMaterialsPanel = ({
     setActiveMaterialIndex((prev) => Math.min(prev, materialEntries.length - 1));
   }, [materialEntries.length]);
 
-  // RMP parity: switch material tab then focus the first invalid lot field.
+  // RMP parity: switch material tab then focus the first invalid lot field once.
+  // Clear the request after focus so subsequent edits do not steal the cursor.
+  const focusRequestId = processingValidationFocusRequest?.id;
+  const focusRequestEntryId = processingValidationFocusRequest?.entryId;
+  const focusRequestFieldPath = processingValidationFocusRequest?.fieldPath;
   useEffect(() => {
-    if (!processingValidationFocusRequest?.entryId) return;
-    const idx = materialEntries.findIndex(
-      (entry) => entry.entryId === processingValidationFocusRequest.entryId,
-    );
+    if (!focusRequestEntryId || !focusRequestFieldPath) return;
+    const idx = materialEntries.findIndex((entry) => entry.entryId === focusRequestEntryId);
     if (idx >= 0) setActiveMaterialIndex(idx);
-    const fieldPath = processingValidationFocusRequest.fieldPath;
+    let cancelled = false;
     let tries = 0;
     const tryFocus = () => {
+      if (cancelled) return;
       tries += 1;
-      if (focusRmpField(fieldPath)) return;
+      if (focusRmpField(focusRequestFieldPath)) {
+        onClearProcessingValidationFocus?.();
+        return;
+      }
       if (tries < 8) window.setTimeout(tryFocus, 50);
+      else onClearProcessingValidationFocus?.();
     };
     const timer = window.setTimeout(tryFocus, 80);
-    return () => clearTimeout(timer);
-  }, [processingValidationFocusRequest, materialEntries]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // Intentionally keyed on focusRequestId — not materialEntries — to avoid re-focus on edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- materialEntries length only for tab switch
+  }, [
+    focusRequestId,
+    focusRequestEntryId,
+    focusRequestFieldPath,
+    onClearProcessingValidationFocus,
+    materialEntries.length,
+  ]);
 
   const activeEntry = materialEntries[activeMaterialIndex] ?? null;
   const activeSchema = activeEntry ? getSchemaForDivisionEntry(formData, activeEntry) : null;
@@ -212,24 +232,25 @@ const QCProcessingMaterialsPanel = ({
     };
   }, [batchPayload, divisionAutoPopulateData]);
 
-  const sheetLotIdsForActive = useMemo(
+  // ID-sheet lots only — do not include selected lots or approved fallback collapses.
+  const idSheetLotIdsForActive = useMemo(
     () =>
       lotOptionsForMaterial(
         identificationSheet?.materials,
         activeEntry?.materialCode,
-        (activeEntry?.savedProcess?.lotDetails ?? [])
-          .map((lot) => String(lot.lotId ?? "").trim())
-          .filter(Boolean),
       ),
-    [
-      identificationSheet?.materials,
-      activeEntry?.materialCode,
-      activeEntry?.savedProcess?.lotDetails,
-    ],
+    [identificationSheet?.materials, activeEntry?.materialCode],
   );
   const approvedLotFallback = useQcApprovedLotOptions(
     activeEntry?.materialCode,
-    sheetLotIdsForActive,
+    idSheetLotIdsForActive,
+  );
+  const selectedLotIdsForActive = useMemo(
+    () =>
+      (activeEntry?.savedProcess?.lotDetails ?? [])
+        .map((lot) => String(lot.lotId ?? "").trim())
+        .filter(Boolean),
+    [activeEntry?.savedProcess?.lotDetails],
   );
 
   // Seed QC-owned weighment from autopopulate/batch once — table shows API rows first;
@@ -678,12 +699,7 @@ const QCProcessingMaterialsPanel = ({
                   lotOptions={lotOptionsForMaterial(
                     identificationSheet?.materials,
                     activeEntry.materialCode,
-                    [
-                      ...(activeEntry.savedProcess?.lotDetails ?? [])
-                        .map((lot) => String(lot.lotId ?? "").trim())
-                        .filter(Boolean),
-                      ...approvedLotFallback,
-                    ],
+                    [...selectedLotIdsForActive, ...approvedLotFallback],
                   )}
                   quantityPerPremix={quantityPerPremixForMaterial(
                     identificationSheet?.materials,

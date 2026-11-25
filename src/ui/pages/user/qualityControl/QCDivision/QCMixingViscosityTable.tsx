@@ -205,12 +205,15 @@ const QCMixingViscosityTable = ({
                       <TextField
                         size="small"
                         fullWidth
-                        type="number"
+                        type="text"
                         value={row.TIME ?? ""}
                         onChange={(event) => updateRow(index, "TIME", event.target.value)}
                         sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
                         error={Boolean(err(`viscosityRows.${index}.TIME`))}
-                        inputProps={{ "data-qc-field": `viscosityRows.${index}.TIME` }}
+                        inputProps={{
+                          inputMode: "decimal",
+                          "data-qc-field": `viscosityRows.${index}.TIME`,
+                        }}
                       />
                       <FieldErrorText message={err(`viscosityRows.${index}.TIME`)} />
                     </Box>
@@ -224,12 +227,13 @@ const QCMixingViscosityTable = ({
                       <TextField
                         size="small"
                         fullWidth
-                        type="number"
+                        type="text"
                         value={row.VISCOSITY_VALUE ?? ""}
                         onChange={(event) => updateRow(index, "VISCOSITY_VALUE", event.target.value)}
                         sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
                         error={Boolean(err(`viscosityRows.${index}.VISCOSITY_VALUE`))}
                         inputProps={{
+                          inputMode: "decimal",
                           "data-qc-field": `viscosityRows.${index}.VISCOSITY_VALUE`,
                         }}
                       />
@@ -276,17 +280,21 @@ const QCMixingViscosityTable = ({
             <QCDivisionReadOnlyValue value={qaRemarks} />
           </>
         ) : (
-          <TextField
-            label="QA Remarks"
-            size="small"
-            fullWidth
-            multiline
-            minRows={2}
-            value={qaRemarks}
-            onChange={(event) => onChange(setViscosityQaRemarks(values, event.target.value))}
-            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
-            inputProps={{ "data-qc-field": "viscosityQaRemarks" }}
-          />
+          <>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}>
+              QA Remarks
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              value={qaRemarks}
+              onChange={(event) => onChange(setViscosityQaRemarks(values, event.target.value))}
+              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
+              inputProps={{ "data-qc-field": "viscosityQaRemarks" }}
+            />
+          </>
         )}
       </Box>
     </Box>

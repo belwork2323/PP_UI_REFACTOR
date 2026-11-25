@@ -21,6 +21,12 @@ const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig =
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
+
 export type QcPropellantValidationTarget = {
   entryId?: string;
   values: SchemaFormValues | Record<string, unknown>;
@@ -37,6 +43,8 @@ export const qcPropellantValidationFields: Record<string, FieldRuleConfig> = {
   /** Std Dev is blank with a single FM sample (auto-stat); format-only until ≥2 samples. */
   stdDevOptional: number([]),
   qaRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  /** Section-level Ballistic Date of Test (outside the table). */
+  dateOfTest: dateTime(["SUBMIT"]),
   ballisticSpec: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
   // Every FM / BEM No cell is required on SUBMIT (headers show asterisk).
   ballisticValue: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -69,6 +77,16 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
   resolveFieldPaths: (target) => {
     const values = asRecord(target.values) ?? {};
     const fields: Array<{ path: string; value: unknown; ruleKey: string }> = [];
+
+    const dateOfTestValue =
+      values["BALLISTIC_EVALUATION::DATE_OF_TEST"] ??
+      values["BALLISTIC_EVALUATION.DATE_OF_TEST"] ??
+      values.DATE_OF_TEST;
+    fields.push({
+      path: "BALLISTIC_EVALUATION.DATE_OF_TEST",
+      value: dateOfTestValue,
+      ruleKey: "dateOfTest",
+    });
 
     for (const [key, val] of Object.entries(values)) {
       const arr = asArray(val);

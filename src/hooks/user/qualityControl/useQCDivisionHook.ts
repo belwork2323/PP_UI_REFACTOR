@@ -207,6 +207,7 @@ import {
   applyCuringDivisionDetailsSeed,
   buildInitialCuringValuesForMotor,
   resolveCuringSubTypeFromDivisionDetails,
+  seedCuringMotorStageFromBatch,
 } from "./qcCuringDivisionDetails";
 import {
   applyDeCoringDivisionDetailsSeed,
@@ -3125,6 +3126,11 @@ export const useQCDivisionHook = () => {
                 if (motorSections.length) {
                   schemaValues = hydrateCuringValuesFromSections(motorSections);
                 }
+                schemaValues = seedCuringMotorStageFromBatch(
+                  schemaValues,
+                  latestBatchDetailsRef.current ?? activeBatchRef.current,
+                  { onlyIfEmpty: true, divisionPayload: seedPayload },
+                );
                 entryValues = {
                   ...entryValues,
                   [entryId]: {
@@ -3146,6 +3152,8 @@ export const useQCDivisionHook = () => {
           ) {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const curingBatchPayload =
+              latestBatchDetailsRef.current ?? activeBatchRef.current;
             updateFormData((prev) => {
               let entryValues = { ...(prev.divisionEntryValues ?? {}) };
               for (const entryId of existingIds) {
@@ -3157,7 +3165,7 @@ export const useQCDivisionHook = () => {
                       entryValues[entryId]?.schemaValues,
                       seedPayload,
                       item.motorId!,
-                      { onlyIfEmpty: true },
+                      { onlyIfEmpty: true, batchPayload: curingBatchPayload },
                     ),
                   },
                 };
@@ -3807,6 +3815,8 @@ export const useQCDivisionHook = () => {
           if (loader.division === "CURING") {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const curingBatchPayload =
+              latestBatchDetailsRef.current ?? activeBatchRef.current;
 
             const curingSubType =
               normalizeQcCuringType(
@@ -3827,12 +3837,22 @@ export const useQCDivisionHook = () => {
               if (motorSections.length) {
                 initialValues = hydrateCuringValuesFromSections(motorSections);
               }
+              initialValues = seedCuringMotorStageFromBatch(initialValues, curingBatchPayload, {
+                onlyIfEmpty: true,
+                divisionPayload: seedPayload,
+              });
             } else if (item.motorId) {
               initialValues = buildInitialCuringValuesForMotor(
                 seedPayload,
                 item.motorId,
                 curingSubType,
+                { batchPayload: curingBatchPayload },
               );
+            } else {
+              initialValues = seedCuringMotorStageFromBatch(initialValues, curingBatchPayload, {
+                onlyIfEmpty: true,
+                divisionPayload: seedPayload,
+              });
             }
 
             const entry = buildEntryFromSelection(
@@ -5971,6 +5991,8 @@ export const useQCDivisionHook = () => {
             }
 
             if (entry.kind === "CURING_MOTOR") {
+              const curingBatchPayload =
+                latestBatchDetailsRef.current ?? activeBatchRef.current;
               const sectionsToHydrate =
                 entry.savedSections ??
                 (resolvedData.savedSections ?? []).filter((s) => {
@@ -5982,7 +6004,11 @@ export const useQCDivisionHook = () => {
                 });
               if (sectionsToHydrate.length > 0) {
                 entryValues[entry.entryId] = {
-                  schemaValues: hydrateCuringValuesFromSections(sectionsToHydrate),
+                  schemaValues: seedCuringMotorStageFromBatch(
+                    hydrateCuringValuesFromSections(sectionsToHydrate),
+                    curingBatchPayload,
+                    { onlyIfEmpty: true },
+                  ),
                 };
               } else if (
                 !entryValues[entry.entryId]?.schemaValues ||
@@ -6019,8 +6045,22 @@ export const useQCDivisionHook = () => {
                           manufacturingPayload,
                           entry.motorId,
                           curingSubType,
+                          { batchPayload: curingBatchPayload },
                         )
-                      : createInitialCuringValues(curingSubType),
+                      : seedCuringMotorStageFromBatch(
+                          createInitialCuringValues(curingSubType),
+                          curingBatchPayload,
+                          { onlyIfEmpty: true },
+                        ),
+                };
+              } else {
+                entryValues[entry.entryId] = {
+                  ...entryValues[entry.entryId],
+                  schemaValues: seedCuringMotorStageFromBatch(
+                    entryValues[entry.entryId].schemaValues,
+                    curingBatchPayload,
+                    { onlyIfEmpty: true },
+                  ),
                 };
               }
               continue;
@@ -7638,6 +7678,15 @@ export const useQCDivisionHook = () => {
     ],
   );
 
+  const handleDisabledDivisionTabClick = useCallback(
+    (reason: string) => {
+      const message = String(reason ?? "").trim();
+      if (!message) return;
+      showAlert(message, "warning");
+    },
+    [showAlert],
+  );
+
   // Division-level lock applies only to Raw Material Revalidation (no unit nav).
   const isRevalidationDivisionActive =
     activeDivisionTabKey === "RAW_MATERIAL_REVALIDATION" ||
@@ -7920,6 +7969,7 @@ export const useQCDivisionHook = () => {
     getPartialNavTabDisabledReason,
     isDivisionNavTabEnabled,
     getDivisionNavTabDisabledReason,
+    handleDisabledDivisionTabClick,
     partialItemLoading,
     divisionGroupStatusByFlowKey,
     actionLoading,
@@ -7969,6 +8019,7 @@ export const useQCDivisionHook = () => {
     postCureValidationAttempt,
     processingFieldErrors,
     processingValidationFocusRequest,
+    clearProcessingValidationFocus: () => setProcessingValidationFocusRequest(null),
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
     handleProcessingProcessChange,

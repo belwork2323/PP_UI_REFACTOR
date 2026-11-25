@@ -1,16 +1,13 @@
-import { normalizeRocketCasingListStatus } from "../user/RocketMotorCasingProcurementModel";
+import {
+  formatMotorStageLabel,
+  normalizeRocketCasingListStatus,
+} from "../user/RocketMotorCasingProcurementModel";
 import { SOURCING_LOT_STATUS_FILTER_VALUES } from "../../../hooks/operationStatus";
 
 /** Match the user-side Rocket Motor Casing list; omit workflow states that aren't useful filters here. */
 export const ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS = SOURCING_LOT_STATUS_FILTER_VALUES;
 
-export const formatMotorStageLabel = (motorStage: string | number | null | undefined): string => {
-  if (motorStage === null || motorStage === undefined || motorStage === "") return "—";
-  const raw = String(motorStage).trim();
-  if (!raw) return "—";
-  if (/^stage\s/i.test(raw)) return raw;
-  return `Stage ${raw}`;
-};
+export { formatMotorStageLabel };
 
 export type RocketMotorCasingApproverRow = {
   projectId: string;

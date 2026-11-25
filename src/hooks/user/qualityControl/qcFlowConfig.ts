@@ -221,9 +221,9 @@ export type QcDivisionCatalogNavTab = {
 };
 
 /**
- * Flatten GET /divisions into enabled top-level tabs.
+ * Flatten GET /divisions into top-level tabs.
  * Parents with nested types become separate tabs (no parent tab).
- * Disabled parents/types are omitted.
+ * Catalog-disabled rows stay visible — runtime enablement disables them (do not hide).
  */
 /** Preferred tab order for late-added divisions (defense if Mongo displayOrder lags). */
 export const QC_NAV_TAB_ORDER: Record<string, number> = {
@@ -242,15 +242,57 @@ export const QC_NAV_TAB_ORDER: Record<string, number> = {
   WEIGHTMENT: 13,
 };
 
+const sortQcDivisionNavTabs = (tabs: QcDivisionCatalogNavTab[]) =>
+  [...tabs].sort((a, b) => {
+    const orderA = QC_NAV_TAB_ORDER[a.tabKey] ?? QC_NAV_TAB_ORDER[a.flowKey] ?? 1000;
+    const orderB = QC_NAV_TAB_ORDER[b.tabKey] ?? QC_NAV_TAB_ORDER[b.flowKey] ?? 1000;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.label.localeCompare(b.label);
+  });
+
+/** Ensure known divisions (esp. STF) appear even if Mongo catalog omits them. */
+const backfillMissingQcDivisionNavTabs = (
+  tabs: QcDivisionCatalogNavTab[],
+): QcDivisionCatalogNavTab[] => {
+  const existing = new Set(tabs.map((tab) => tab.tabKey));
+  const next = [...tabs];
+
+  for (const type of QC_RAW_MATERIAL_TYPE_OPTIONS) {
+    if (existing.has(type.value)) continue;
+    next.push({
+      tabKey: type.value,
+      flowKey: "RAW_MATERIAL",
+      rawMaterialType: type.value,
+      label: type.label,
+      divisionId: 0,
+    });
+    existing.add(type.value);
+  }
+
+  for (const option of QC_DIVISION_OPTIONS) {
+    if (option.value === "RAW_MATERIAL") continue;
+    if (existing.has(option.value)) continue;
+    next.push({
+      tabKey: option.value,
+      flowKey: option.value,
+      rawMaterialType: "",
+      label: option.label,
+      divisionId: 0,
+    });
+    existing.add(option.value);
+  }
+
+  return next;
+};
+
 export const toQcDivisionNavTabs = (
   catalog: QcDivisionCatalogItem[] | undefined,
 ): QcDivisionCatalogNavTab[] => {
   const tabs: QcDivisionCatalogNavTab[] = [];
   for (const item of catalog ?? []) {
-    if (item.disabled) continue;
-    const enabledTypes = (item.types ?? []).filter((type) => !type.disabled);
-    if (enabledTypes.length) {
-      for (const type of enabledTypes) {
+    const types = item.types ?? [];
+    if (types.length) {
+      for (const type of types) {
         const typeLabel =
           QC_DIVISION_OPTIONS.find((option) => option.value === type.value)?.label ??
           (item.value === "RAW_MATERIAL"
@@ -275,12 +317,7 @@ export const toQcDivisionNavTabs = (
       divisionId: item.divisionId,
     });
   }
-  return tabs.sort((a, b) => {
-    const orderA = QC_NAV_TAB_ORDER[a.tabKey] ?? QC_NAV_TAB_ORDER[a.flowKey] ?? 1000;
-    const orderB = QC_NAV_TAB_ORDER[b.tabKey] ?? QC_NAV_TAB_ORDER[b.flowKey] ?? 1000;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.label.localeCompare(b.label);
-  });
+  return sortQcDivisionNavTabs(backfillMissingQcDivisionNavTabs(tabs));
 };
 
 export const resolveQcRawMaterialTypeOptions = (

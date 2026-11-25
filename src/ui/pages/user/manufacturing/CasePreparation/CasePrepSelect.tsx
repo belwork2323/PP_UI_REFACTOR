@@ -26,6 +26,8 @@ type CasePrepSelectProps = {
   required?: boolean;
   error?: boolean;
   helperText?: string | null;
+  /** When true, skip the built-in label (parent already renders one). */
+  hideLabel?: boolean;
   /** Validation focus target (`data-cp-field`). */
   dataCpField?: string;
 };
@@ -43,6 +45,7 @@ const CasePrepSelect = ({
   required = false,
   error = false,
   helperText = null,
+  hideLabel = false,
   dataCpField,
 }: CasePrepSelectProps) => {
   const cpTheme = theme.manufacturing?.casePreparation;
@@ -61,9 +64,11 @@ const CasePrepSelect = ({
 
   return (
     <Box sx={flowBar.selectField?.(width)} {...(dataCpField ? { "data-cp-field": dataCpField } : {})}>
-      <Typography component="label" sx={flowBar.selectLabel}>
-        {required ? <FieldLabelWithAsterisk label={label} required /> : label}
-      </Typography>
+      {!hideLabel ? (
+        <Typography component="label" sx={flowBar.selectLabel}>
+          {required ? <FieldLabelWithAsterisk label={label} required /> : label}
+        </Typography>
+      ) : null}
       {readOnly ? (
         <WorkflowReadOnlyText
           value={selectedOption?.label ?? selectValue}

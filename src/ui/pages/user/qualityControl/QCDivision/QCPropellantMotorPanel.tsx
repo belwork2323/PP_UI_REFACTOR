@@ -19,9 +19,11 @@ import {
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
+import { DateTimeField } from "../../../../components/common/DateField";
 import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_PROPELLANT_AVG_COLUMN,
+  QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL,
   QC_PROPELLANT_ROW_UPLOAD_FIELD,
   QC_PROPELLANT_SECTION_IDS,
   QC_PROPELLANT_SECTION_TITLES,
@@ -38,11 +40,13 @@ import {
   addPropellantBemColumn,
   applyPropellantRowStats,
   getPropellantBallisticColumns,
+  getPropellantBallisticDateOfTest,
   getPropellantBallisticRows,
   getPropellantFmColumns,
   getPropellantMechanicalGraph,
   getPropellantPropertyRows,
   removePropellantBemColumn,
+  setPropellantBallisticDateOfTest,
   setPropellantBallisticRows,
   setPropellantMechanicalGraph,
   setPropellantPropertyRows,
@@ -83,18 +87,93 @@ const cellSx = {
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
 
+const ballisticDateTimeFieldSx = {
+  mb: 0,
+  "& .MuiOutlinedInput-root": {
+    fontSize: "0.72rem",
+    minHeight: "36px",
+  },
+  "& .MuiOutlinedInput-input": {
+    py: "6px",
+    fontSize: "0.72rem",
+  },
+};
+
+type BallisticFieldRowProps = {
+  label: string;
+  children: ReactNode;
+  readOnly?: boolean;
+  required?: boolean;
+  error?: string;
+};
+
+const BallisticFieldRow = ({
+  label,
+  children,
+  readOnly = false,
+  required = false,
+  error,
+}: BallisticFieldRowProps) => (
+  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+    <Typography
+      component="div"
+      sx={{
+        fontSize: readOnly ? "0.65rem" : "0.72rem",
+        fontWeight: readOnly ? 800 : 700,
+        letterSpacing: readOnly ? "0.02em" : undefined,
+        textTransform: readOnly ? "uppercase" : undefined,
+        color: readOnly ? BRAND.primary : BRAND.textSub,
+        minWidth: { sm: 160 },
+      }}
+    >
+      {required ? (
+        <FieldLabelWithAsterisk
+          label={label}
+          required
+          sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+        />
+      ) : (
+        label
+      )}
+    </Typography>
+    <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 320 } }}>
+      {children}
+      {!readOnly ? <FieldErrorText message={error} /> : null}
+    </Box>
+  </Stack>
+);
+
 const SectionCard = ({
   title,
   children,
   readOnly = false,
   actions = null,
+  required = false,
 }: {
   title: string;
   children: ReactNode;
   readOnly?: boolean;
   actions?: ReactNode;
-}) =>
-  readOnly ? (
+  required?: boolean;
+}) => {
+  const titleNode = required ? (
+    <FieldLabelWithAsterisk
+      label={title}
+      required
+      sx={{
+        display: "inline",
+        fontSize: "inherit",
+        fontWeight: "inherit",
+        color: "inherit",
+        letterSpacing: "inherit",
+        mb: 0,
+      }}
+    />
+  ) : (
+    title
+  );
+
+  return readOnly ? (
     <Box
       sx={{
         border: `1px solid ${BRAND.border}`,
@@ -104,7 +183,7 @@ const SectionCard = ({
       }}
     >
       <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: BRAND.primary, mb: 0.75 }}>
-        {title}
+        {titleNode}
       </Typography>
       {children}
     </Box>
@@ -129,13 +208,14 @@ const SectionCard = ({
         }}
       >
         <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: "#fff", letterSpacing: "0.04em" }}>
-          {title}
+          {titleNode}
         </Typography>
         {actions}
       </Box>
       <Box sx={{ p: 1.5 }}>{children}</Box>
     </Box>
   );
+};
 
 const CellInput = ({
   value,
@@ -766,6 +846,14 @@ const QCPropellantMotorPanel = ({
     [fmCount, values],
   );
   const ballisticRows = useMemo(() => getPropellantBallisticRows(values, fmCount), [fmCount, values]);
+  const ballisticDateOfTest = useMemo(
+    () => getPropellantBallisticDateOfTest(values),
+    [values],
+  );
+  const ballisticDateOfTestError = fieldError(
+    validationErrors ?? undefined,
+    "BALLISTIC_EVALUATION.DATE_OF_TEST",
+  );
   const mechanicalColumns = getPropellantFmColumns(
     values,
     QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES,
@@ -874,21 +962,54 @@ const QCPropellantMotorPanel = ({
             validationErrors={validationErrors}
           />
         </SectionCard>
-        <SectionCard title={QC_PROPELLANT_SECTION_TITLES.BALLISTIC_EVALUATION} readOnly={readOnly}>
-          <BallisticTable
-            rows={ballisticRows}
-            columns={ballisticColumns}
-            onRowsChange={(rows) => patchValues((prev) => setPropellantBallisticRows(prev, rows))}
-            onAddBem={(fmIndex) =>
-              patchValues((prev) => addPropellantBemColumn(prev, fmIndex, fmCount))
-            }
-            onRemoveBem={(columnId) =>
-              patchValues((prev) => removePropellantBemColumn(prev, columnId, fmCount))
-            }
-            readOnly={readOnly}
-            disabled={inputsDisabled}
-            validationErrors={validationErrors}
-          />
+        <SectionCard
+          title={QC_PROPELLANT_SECTION_TITLES.BALLISTIC_EVALUATION}
+          readOnly={readOnly}
+          required
+        >
+          <Stack spacing={1.5}>
+            <BallisticFieldRow
+              label={QC_PROPELLANT_BALLISTIC_DATE_OF_TEST_LABEL}
+              readOnly={readOnly}
+              required
+              error={ballisticDateOfTestError}
+            >
+              {readOnly ? (
+                <QCDivisionReadOnlyValue
+                  value={ballisticDateOfTest}
+                  muted={!ballisticDateOfTest.trim()}
+                />
+              ) : (
+                <Box data-qc-field="BALLISTIC_EVALUATION.DATE_OF_TEST">
+                  <DateTimeField
+                    compact
+                    value={ballisticDateOfTest}
+                    onChange={(next) =>
+                      patchValues((prev) => setPropellantBallisticDateOfTest(prev, next))
+                    }
+                    placeholder="DD-MM-YYYY HH:mm:ss"
+                    inputSx={ballisticDateTimeFieldSx}
+                    error={Boolean(ballisticDateOfTestError)}
+                    disabled={inputsDisabled}
+                  />
+                </Box>
+              )}
+            </BallisticFieldRow>
+            <BallisticTable
+              rows={ballisticRows}
+              columns={ballisticColumns}
+              onRowsChange={(rows) => patchValues((prev) => setPropellantBallisticRows(prev, rows))}
+              onAddBem={(fmIndex) =>
+                patchValues((prev) => addPropellantBemColumn(prev, fmIndex, fmCount))
+              }
+              onRemoveBem={(columnId) =>
+                patchValues((prev) => removePropellantBemColumn(prev, columnId, fmCount))
+              }
+              readOnly={readOnly}
+              disabled={inputsDisabled}
+              validationErrors={validationErrors}
+            />
+          </Stack>
         </SectionCard>
       </Stack>
     </Box>

@@ -3,6 +3,7 @@ import {
   RocketFormData,
   type RocketMotorBatch,
 } from "@hooks/user/sourcing/shared/sourcingWorkflowData";
+import { STRINGS } from "../../../app/config/strings";
 import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
 import {
   buildMockTrialPayload,
@@ -14,6 +15,17 @@ import {
   type RocketMotorCasingMockTrialPayload,
 } from "./RocketMotorCasingFormModel";
 import { isReferenceRangeNotApplicable } from "@data/models/user/sourcing/rms/RawMaterialSourcingModel";
+
+const CASING_CREATE = STRINGS.SOURCING.CASING_CREATE;
+
+/** Display label for motor stage (e.g. `1` → `Stage 1`). */
+export const formatMotorStageLabel = (motorStage: string | number | null | undefined): string => {
+  if (motorStage === null || motorStage === undefined || motorStage === "") return "—";
+  const raw = String(motorStage).trim();
+  if (!raw) return "—";
+  if (/^stage\s/i.test(raw)) return raw;
+  return `Stage ${raw}`;
+};
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>
@@ -127,7 +139,7 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const stage = String(row.motorStage ?? "").trim();
-  const stageLabel = stage && /^stage\b/i.test(stage) ? stage : stage ? `Stage ${stage}` : "";
+  const stageLabel = stage ? formatMotorStageLabel(stage) : "";
 
   const parts: string[] = [
     row.motorCasingId ?? "",
@@ -1005,7 +1017,7 @@ export function mapCasingFormDataToDetailBlocks(
       lotNo: form.motorCasingId || undefined,
       rows: [
         detailRow("Project ID", form.projectId),
-        detailRow("Motor stage", form.motorStageApi),
+        detailRow("Motor stage", formatMotorStageLabel(form.motorStageApi)),
         detailRow("Motor ID", form.motorId),
         ...(form.motorCasingId ? [detailRow("Motor casing ID", form.motorCasingId)] : []),
         detailRow("Casing type", form.casingType),
@@ -1122,7 +1134,7 @@ export function mapCasingFormDataToDetailBlocks(
           "Weight with harness",
           form.weightWithHarness ? `${form.weightWithHarness} kg` : "—",
         ),
-        detailRow("Weighscale equipment", form.weighscaleEquipment),
+        detailRow(CASING_CREATE.WEIGHSCALE, form.weighscaleEquipment),
         detailRow("Calibration due date", form.calibrationDueDate),
       ],
       _columns: CASING_DETAIL_COLS,

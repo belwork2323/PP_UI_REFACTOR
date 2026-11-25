@@ -39,6 +39,8 @@ type QCDivisionNavPanelProps = {
   approvalActions?: QCDivisionNavApprovalActions | null;
   isTabEnabled?: (tabKey: string) => boolean;
   getTabDisabledReason?: (tabKey: string) => string | undefined;
+  /** Soft-disabled tab click (e.g. Experimental N/A) — show reason, do not navigate. */
+  onDisabledTabClick?: (reason: string) => void;
 };
 
 const QCDivisionNavPanel = ({
@@ -50,6 +52,7 @@ const QCDivisionNavPanel = ({
   approvalActions = null,
   isTabEnabled,
   getTabDisabledReason,
+  onDisabledTabClick,
 }: QCDivisionNavPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
   const showApprovalActions = Boolean(approvalActions?.show);
@@ -166,6 +169,13 @@ const QCDivisionNavPanel = ({
           palette={navPalette}
           showStepArrows
           wrapTabs
+          allowDisabledTabClick={Boolean(onDisabledTabClick)}
+          onDisabledTabClick={(_tab, index) => {
+            const tab = tabs[index];
+            if (!tab) return;
+            const reason = getTabDisabledReason?.(tab.tabKey);
+            if (reason) onDisabledTabClick?.(reason);
+          }}
           isTabDisabled={(_tab, index) => {
             const tab = tabs[index];
             if (!tab) return true;

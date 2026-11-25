@@ -44,6 +44,12 @@ type UserWorkflowTabNavProps = {
   disableStepNext?: boolean;
   isTabDisabled?: (tab: UserWorkflowNavTab, index: number) => boolean;
   tabTooltip?: (tab: UserWorkflowNavTab, index: number) => string | undefined;
+  /**
+   * When true, disabled tabs stay clickable (muted) so callers can show a reason.
+   * `onDisabledTabClick` runs instead of changing the active index.
+   */
+  allowDisabledTabClick?: boolean;
+  onDisabledTabClick?: (tab: UserWorkflowNavTab, index: number) => void;
 };
 
 /**
@@ -67,6 +73,8 @@ export const UserWorkflowTabNav = ({
   disableStepNext,
   isTabDisabled,
   tabTooltip,
+  allowDisabledTabClick = false,
+  onDisabledTabClick,
 }: UserWorkflowTabNavProps) => {
   if (tabs.length === 0) return null;
 
@@ -146,29 +154,49 @@ export const UserWorkflowTabNav = ({
             const active = index === safeIndex;
             const disabled = isTabDisabled?.(tab, index) ?? false;
             const tooltip = tabTooltip?.(tab, index);
+            const softDisabled = disabled && allowDisabledTabClick;
+            const hardDisabled = disabled && !allowDisabledTabClick;
             const button = (
               <Button
                 key={tab.id}
                 size="small"
                 variant={active ? "contained" : "outlined"}
-                disabled={disabled}
-                onClick={() => onActiveIndexChange(index)}
+                disabled={hardDisabled}
+                aria-disabled={softDisabled || undefined}
+                onClick={() => {
+                  if (softDisabled) {
+                    onDisabledTabClick?.(tab, index);
+                    return;
+                  }
+                  onActiveIndexChange(index);
+                }}
                 sx={{
                   whiteSpace: "nowrap",
                   flexShrink: 0,
                   textTransform: "none",
                   fontWeight: 700,
-                  ...(active
+                  ...(softDisabled
                     ? {
-                        background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
+                        borderColor: alpha(palette.border, 0.55),
+                        color: alpha(palette.textSub ?? palette.primary, 0.55),
+                        opacity: 0.72,
+                        cursor: "pointer",
                         "&:hover": {
-                          background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
+                          borderColor: alpha(palette.border, 0.7),
+                          background: alpha(palette.surface, 0.5),
                         },
                       }
-                    : {
-                        borderColor: alpha(palette.border, 0.9),
-                        color: palette.text ?? palette.primary,
-                      }),
+                    : active
+                      ? {
+                          background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
+                          "&:hover": {
+                            background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
+                          },
+                        }
+                      : {
+                          borderColor: alpha(palette.border, 0.9),
+                          color: palette.text ?? palette.primary,
+                        }),
                 }}
               >
                 <Stack direction="row" alignItems="center" gap={0.75}>

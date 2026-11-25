@@ -33,6 +33,8 @@ const { science: ScienceRoundedIcon } = icons.user.qualityControl.qcDivision.for
 
 type QCFormProps = {
   batch?: { batchId?: string } | null;
+  batchType?: string | null;
+  subBatchType?: string | null;
   divisionAutoPopulateData?: Record<string, unknown> | null;
   mixingQualityChecksByStage?: {
     PREMIX: QcMixingQualityCheckDefinition[];
@@ -71,6 +73,7 @@ type QCFormProps = {
   getPartialNavTabDisabledReason?: (index: number) => string | undefined;
   isDivisionNavTabEnabled?: (tabKey: string) => boolean;
   getDivisionNavTabDisabledReason?: (tabKey: string) => string | undefined;
+  onDisabledDivisionTabClick?: (reason: string) => void;
   isEditMode?: boolean;
   readOnly?: boolean;
   /** Approved / view-details theme (uppercase labels, read-only values). */
@@ -135,6 +138,7 @@ type QCFormProps = {
     entryId: string;
     fieldPath: string;
   } | null;
+  onClearProcessingValidationFocus?: () => void;
   onRemoveDivisionEntry: (entryId: string) => void;
   navApprovalActions?: QCDivisionNavApprovalActions | null;
   unitActions?: QCDivisionEntryUnitActions | null;
@@ -143,6 +147,8 @@ type QCFormProps = {
 
 const QCForm = ({
   batch,
+  batchType = null,
+  subBatchType = null,
   divisionAutoPopulateData = null,
   mixingQualityChecksByStage = { PREMIX: [], FINAL_MIX: [] },
   formData,
@@ -178,6 +184,7 @@ const QCForm = ({
   getPartialNavTabDisabledReason,
   isDivisionNavTabEnabled,
   getDivisionNavTabDisabledReason,
+  onDisabledDivisionTabClick,
   isEditMode = false,
   readOnly = false,
   fieldsReadOnly = false,
@@ -224,6 +231,7 @@ const QCForm = ({
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
   processingFieldErrors = {},
   processingValidationFocusRequest = null,
+  onClearProcessingValidationFocus,
   onRemoveDivisionEntry,
   navApprovalActions = null,
   unitActions = null,
@@ -391,6 +399,7 @@ const QCForm = ({
         approvalActions={navApprovalActions}
         isTabEnabled={isDivisionNavTabEnabled}
         getTabDisabledReason={getDivisionNavTabDisabledReason}
+        onDisabledTabClick={onDisabledDivisionTabClick}
       />
 
       {formLockMessage ? (
@@ -484,6 +493,8 @@ const QCForm = ({
           <Box data-testid="qc-form-container">
             <QCDivisionFormBody
               batch={batch}
+              batchType={batchType}
+              subBatchType={subBatchType}
               divisionAutoPopulateData={divisionAutoPopulateData}
               mixingQualityChecksByStage={mixingQualityChecksByStage}
               formData={bodyFormData}
@@ -509,6 +520,7 @@ const QCForm = ({
               weightmentValidationAttempt={weightmentValidationAttempt}
               processingFieldErrors={processingFieldErrors}
               processingValidationFocusRequest={processingValidationFocusRequest}
+              onClearProcessingValidationFocus={onClearProcessingValidationFocus}
               onRemoveDivisionEntry={onRemoveDivisionEntry}
               activePartialItem={activePartialItem}
               unitActions={unitActions}

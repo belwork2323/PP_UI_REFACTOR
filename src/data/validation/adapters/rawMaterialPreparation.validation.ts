@@ -393,11 +393,20 @@ export const firstRmpValidationErrorMessage = (
   return firstValidationError(weightmentErrors);
 };
 
+/** Positive decimal weight (no hex/signs/trailing junk). */
+const POSITIVE_WEIGHT = /^\d+(\.\d+)?$/;
+const isPositiveWeightNumber = (value: unknown): boolean => {
+  const text = str(value).replace(/,/g, "");
+  if (!POSITIVE_WEIGHT.test(text)) return false;
+  const num = Number(text);
+  return Number.isFinite(num) && num > 0;
+};
+
 const WEIGHTMENT_ROW_CHECKS: Array<{
   key: keyof RawMaterialPrepWeightmentDetail;
   requiredMsg: string;
   invalidMsg?: string;
-  kind: "text" | "number" | "datetime" | "alphaNum";
+  kind: "text" | "number" | "positiveNumber" | "datetime" | "alphaNum";
 }> = [
   {
     key: "materialCode",
@@ -419,13 +428,13 @@ const WEIGHTMENT_ROW_CHECKS: Array<{
     key: "weighScaleNumber",
     requiredMsg: M.weightmentWeighScale.required,
     invalidMsg: M.weightmentWeighScale.invalid,
-    kind: "number",
+    kind: "alphaNum",
   },
   {
     key: "weightTransferred",
     requiredMsg: M.weightmentWeight.required,
     invalidMsg: M.weightmentWeight.invalid,
-    kind: "number",
+    kind: "positiveNumber",
   },
   {
     key: "weighingDateTime",
@@ -434,6 +443,25 @@ const WEIGHTMENT_ROW_CHECKS: Array<{
     kind: "datetime",
   },
 ];
+
+const applyWeightmentFieldFormatError = (
+  check: (typeof WEIGHTMENT_ROW_CHECKS)[number],
+  text: string,
+): string | undefined => {
+  if (check.kind === "number" && !isFiniteNumber(text)) {
+    return check.invalidMsg ?? M.weightmentWeight.invalid;
+  }
+  if (check.kind === "positiveNumber" && !isPositiveWeightNumber(text)) {
+    return check.invalidMsg ?? M.weightmentWeight.invalid;
+  }
+  if (check.kind === "datetime" && !isValidUiDateTime(text)) {
+    return check.invalidMsg ?? M.weightmentWeighingDatetime.invalid;
+  }
+  if (check.kind === "alphaNum" && !ALPHA_NUM.test(text)) {
+    return check.invalidMsg ?? M.weightmentContainerNumber.invalid;
+  }
+  return undefined;
+};
 
 /** Live FORMAT checks for a weighment row / mixer field (non-empty values only). */
 export function validateWeightmentLiveFormat(
@@ -464,13 +492,8 @@ export function validateWeightmentLiveFormat(
       const text = str(row[check.key]);
       if (!text) continue;
       const path = weightmentPath(rowIndex, check.key);
-      if (check.kind === "number" && !isFiniteNumber(text)) {
-        errors[path] = check.invalidMsg ?? M.weightmentWeight.invalid;
-      } else if (check.kind === "datetime" && !isValidUiDateTime(text)) {
-        errors[path] = check.invalidMsg ?? M.weightmentWeighingDatetime.invalid;
-      } else if (check.kind === "alphaNum" && !ALPHA_NUM.test(text)) {
-        errors[path] = check.invalidMsg ?? M.weightmentContainerNumber.invalid;
-      }
+      const formatError = applyWeightmentFieldFormatError(check, text);
+      if (formatError) errors[path] = formatError;
     }
   });
 
@@ -547,12 +570,9 @@ export function validateWeightmentForSubmit(
         const path = weightmentPath(rowIndex, check.key);
         if (!text) {
           errors[path] = check.requiredMsg;
-        } else if (check.kind === "number" && !isFiniteNumber(text)) {
-          errors[path] = check.invalidMsg ?? M.weightmentWeight.invalid;
-        } else if (check.kind === "datetime" && !isValidUiDateTime(text)) {
-          errors[path] = check.invalidMsg ?? M.weightmentWeighingDatetime.invalid;
-        } else if (check.kind === "alphaNum" && !ALPHA_NUM.test(text)) {
-          errors[path] = check.invalidMsg ?? M.weightmentContainerNumber.invalid;
+        } else {
+          const formatError = applyWeightmentFieldFormatError(check, text);
+          if (formatError) errors[path] = formatError;
         }
       }
 

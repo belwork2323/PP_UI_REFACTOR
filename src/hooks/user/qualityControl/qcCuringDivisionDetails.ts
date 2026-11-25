@@ -19,6 +19,7 @@ import {
   QC_CURING_SECTION_IDS,
   type QcCuringSubType,
 } from "./qcCuringConfig";
+import { resolveBatchDetailsRoot } from "./qcBatchContext";
 import { resolveManufacturingDivisionDetailsPayload } from "./qcHardwareDivisionDetails";
 
 type ManufacturingSection = {
@@ -280,10 +281,50 @@ const mapPostCuringFromManufacturing = (
 
 const pickFirstValue = (...candidates: unknown[]): string => {
   for (const candidate of candidates) {
+    if (candidate == null) continue;
+    if (typeof candidate === "object" && !Array.isArray(candidate)) {
+      const labeled = formatQcCuringMotorStageLabel(candidate);
+      if (labeled) return labeled;
+      continue;
+    }
     const value = String(candidate ?? "").trim();
-    if (value && value.toLowerCase() !== "null") return value;
+    if (value && value.toLowerCase() !== "null" && value !== "[object Object]") return value;
   }
   return "";
+};
+
+/** Resolve motor stage from batch details (main + subscale), same source as manufacturing curing. */
+export const resolveCuringMotorStageFromBatch = (
+  batchPayload: unknown,
+  divisionPayload?: unknown,
+): string => {
+  const batch =
+    resolveBatchDetailsRoot(batchPayload) ??
+    resolveBatchDetailsRoot(asRecord(divisionPayload)?.__batchDetails) ??
+    resolveBatchDetailsRoot(divisionPayload);
+
+  return formatQcCuringMotorStageLabel(
+    pickFirstValue(
+      batch?.motorStageName,
+      batch?.motorStage,
+      batch?.motorType,
+      asRecord(batch?.identificationSheet)?.motorStage,
+      asRecord(asRecord(batch?.identificationSheet)?.metadata)?.motorStage,
+    ),
+  );
+};
+
+export const seedCuringMotorStageFromBatch = (
+  values: SchemaFormValues,
+  batchPayload: unknown,
+  options?: { onlyIfEmpty?: boolean; divisionPayload?: unknown },
+): SchemaFormValues => {
+  const onlyIfEmpty = options?.onlyIfEmpty ?? true;
+  const key = formKey(QC_CURING_SECTION_IDS.MOTOR_SETUP, "MOTOR_STAGE");
+  if (onlyIfEmpty && !isValueEmpty(values[key])) return values;
+  const label = resolveCuringMotorStageFromBatch(batchPayload, options?.divisionPayload);
+  if (!label) return values;
+  return { ...values, [key]: label };
 };
 
 const mapMotorSetupFromManufacturing = (
@@ -291,6 +332,7 @@ const mapMotorSetupFromManufacturing = (
   sections: ManufacturingSection[],
   payload: unknown,
   motorId: string,
+  batchPayload?: unknown,
 ): Record<string, string> => {
   const root = resolveManufacturingDivisionDetailsPayload(payload);
   const details = asRecord(root?.data) ?? root;
@@ -314,6 +356,7 @@ const mapMotorSetupFromManufacturing = (
       setupSection?.MOTOR_STAGE,
       details?.motorStage,
       root?.motorStage,
+      resolveCuringMotorStageFromBatch(batchPayload, payload),
     ),
   );
 
@@ -431,6 +474,7 @@ const applyManufacturingCuringFieldSeed = (
   payload: unknown,
   motorId: string,
   onlyIfEmpty: boolean,
+  batchPayload?: unknown,
 ): SchemaFormValues => {
   let next = { ...values };
 
@@ -439,7 +483,13 @@ const applyManufacturingCuringFieldSeed = (
     if (hasValue(incoming)) next[key] = String(incoming);
   };
 
-  const setup = mapMotorSetupFromManufacturing(motor, sections, payload, motorId);
+  const setup = mapMotorSetupFromManufacturing(
+    motor,
+    sections,
+    payload,
+    motorId,
+    batchPayload,
+  );
   mergeField(formKey(QC_CURING_SECTION_IDS.MOTOR_SETUP, "MOTOR_STAGE"), setup.MOTOR_STAGE);
   mergeField(formKey(QC_CURING_SECTION_IDS.MOTOR_SETUP, "CURING_TYPE"), setup.CURING_TYPE);
   mergeField(formKey(QC_CURING_SECTION_IDS.MOTOR_SETUP, "OVEN"), setup.OVEN);
@@ -519,42 +569,69 @@ export const applyCuringDivisionDetailsSeed = (
   base: SchemaFormValues,
   payload: unknown,
   motorId: string,
-  options?: { onlyIfEmpty?: boolean },
+  options?: { onlyIfEmpty?: boolean; batchPayload?: unknown },
 ): SchemaFormValues => {
   const onlyIfEmpty = options?.onlyIfEmpty ?? false;
+  const batchPayload = options?.batchPayload;
   const motor = findCuringMotorRecord(payload, motorId);
-  if (!motor) return base;
-
-  const sections = extractMotorSections(motor);
   let next = { ...base };
 
-  if (sectionsLookLikeQcCuring(sections)) {
-    const hydrated = hydrateCuringValuesFromSections(sections as SchemaSectionSubmission[]);
-    if (onlyIfEmpty) {
-      Object.entries(hydrated).forEach(([key, value]) => {
-        if (isValueEmpty(next[key])) next[key] = value;
-      });
+  if (motor) {
+    const sections = extractMotorSections(motor);
+
+    if (sectionsLookLikeQcCuring(sections)) {
+      const hydrated = hydrateCuringValuesFromSections(sections as SchemaSectionSubmission[]);
+      if (onlyIfEmpty) {
+        Object.entries(hydrated).forEach(([key, value]) => {
+          if (isValueEmpty(next[key])) next[key] = value;
+        });
+      } else {
+        next = { ...next, ...hydrated };
+      }
+      // Overlay motor-level metadata (oven, ovenNumber, stage, type) even when
+      // sections are QC-shaped — those fields live on the motor, not in sections.
+      next = applyManufacturingCuringFieldSeed(
+        next,
+        motor,
+        sections,
+        payload,
+        motorId,
+        true,
+        batchPayload,
+      );
     } else {
-      next = { ...next, ...hydrated };
+      next = applyManufacturingCuringFieldSeed(
+        next,
+        motor,
+        sections,
+        payload,
+        motorId,
+        onlyIfEmpty,
+        batchPayload,
+      );
     }
-    // Overlay motor-level metadata (oven, ovenNumber, stage, type) even when
-    // sections are QC-shaped — those fields live on the motor, not in sections.
-    next = applyManufacturingCuringFieldSeed(next, motor, sections, payload, motorId, true);
-    return next;
   }
 
-  return applyManufacturingCuringFieldSeed(next, motor, sections, payload, motorId, onlyIfEmpty);
+  // Main + subscale: always fall back to batch motor stage when still empty.
+  return seedCuringMotorStageFromBatch(next, batchPayload ?? payload, {
+    onlyIfEmpty: true,
+    divisionPayload: payload,
+  });
 };
 
 export const buildInitialCuringValuesForMotor = (
   payload: unknown,
   motorId: string,
   subType?: QcCuringSubType | "",
+  options?: { batchPayload?: unknown },
 ): SchemaFormValues => {
   const resolvedSubType =
     subType || resolveCuringSubTypeFromDivisionDetails(payload, motorId) || "NORMAL";
   let values = createInitialCuringValues(resolvedSubType);
-  values = applyCuringDivisionDetailsSeed(values, payload, motorId, { onlyIfEmpty: false });
+  values = applyCuringDivisionDetailsSeed(values, payload, motorId, {
+    onlyIfEmpty: false,
+    batchPayload: options?.batchPayload,
+  });
   if (!getCuringSetupField(values, "CURING_TYPE")) {
     values = setCuringSetupField(values, "CURING_TYPE", resolvedSubType);
   }

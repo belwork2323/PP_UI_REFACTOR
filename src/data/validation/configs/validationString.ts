@@ -11,7 +11,7 @@ export const VALIDATIONSTRING = {
   PATTERNS: {
     ONLY_DIGITS: /^\d+$/, // Positive integers only (e.g., 123)
     INTEGER: /^-?\d+$/, // Positive and negative integers (e.g., -123, 123)
-    FLOAT: /^\d*\.?\d*$/, // Positive and negative decimals (e.g., 12.34, -0.5)
+    FLOAT: /^\d*\.?\d*$/, // Unsigned decimals (e.g., 12.34, 0.5) — no leading minus
     SIGNED_FLOAT: /^-?\d*(\.\d+)?$/, // Decimals allowing optional leading integer part (e.g., .5, -.5)
     ONLY_LETTERS: /^[A-Za-z]+$/, // Alphabets only (no spaces/numbers)
     ALPHANUMERIC: /^[A-Za-z0-9]+$/, // Letters and numbers only
@@ -31,6 +31,9 @@ export const VALIDATIONSTRING = {
       /^[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*(?:\s*&\s*[A-Za-z0-9]+(?:[-_/][A-Za-z0-9]+)*)*$/,
     /** Remarks/observations + science symbols; # & + @ not allowed */
     ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,\-_()/:%°±≤≥µμ²³⁻]+$/,
+    /** Same charset as ALPHABET_WITH_SPECIAL but requires ≥1 letter/digit (rejects lone "-" / junk). */
+    ALPHABET_WITH_SPECIAL_REQUIRE_ALNUM:
+      /^(?=.*[A-Za-z0-9])[A-Za-z0-9\s.,\-_()/:%°±≤≥µμ²³⁻]+$/,
     SPECIFICATION_WITH_TOLERANCE: /^[A-Za-z0-9\s.,_()#/:+±%\-@°≤≥µμ²³⁻]+$/, // e.g. 28 - 34%, ≤0.5%, @25°C
     SIGNED_FLOAT_WITH_2_DECIMAL: /^-?\d+(\.\d{1,2})?$/,
     SIGNED_FLOAT_WITH_5_DECIMAL: /^-?\d+(\.\d{1,5})?$/,

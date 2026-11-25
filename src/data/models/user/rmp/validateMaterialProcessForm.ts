@@ -43,7 +43,9 @@ const validateLotDetails = (
       const qty = str(row.quantity).replace(/,/g, "");
       return Boolean(lotId) && isFiniteNumber(qty) && Number(qty) > 0;
     });
-    if (!hasComplete) {
+    // Only pre-stamp when there are no rows — otherwise the per-row loop
+    // sets field-specific errors (avoids sticky lotId error after select).
+    if (!hasComplete && list.length === 0) {
       errors["lotDetails.0.lotId"] = errors["lotDetails.0.lotId"] ?? "This Field is required";
       errors["lotDetails.0.quantity"] =
         errors["lotDetails.0.quantity"] ?? "This Field is required";

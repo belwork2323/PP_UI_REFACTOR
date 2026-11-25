@@ -55,7 +55,8 @@ export const qcCastingValidationFields: Record<string, FieldRuleConfig> = {
   rhPercent: number(["SUBMIT"]),
   vacuumMaintained: number(["SUBMIT"]),
 
-  finalMixBowlNo: text(["SUBMIT"], S.PATTERNS.CASTING_BOWL_LABEL),
+  // Free-text / number entry (subscale Qual); main-batch may still hydrate "FINAL_MIX … / …" labels.
+  finalMixBowlNo: text(["SUBMIT"]),
   propellantQty: number(["SUBMIT"]),
   initialUnloadingViscosity: number(["SUBMIT"]),
   castingStartTime: dateTime(["SUBMIT"]),

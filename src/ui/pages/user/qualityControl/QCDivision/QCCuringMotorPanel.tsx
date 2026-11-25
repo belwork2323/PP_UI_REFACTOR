@@ -22,8 +22,10 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
+import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
+import { buildCuringOvenNoOptions } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import {
   mapOvensToOptions,
   resolveOvenLabel,
@@ -522,14 +524,24 @@ const SetupFieldCell = ({
   readOnly = false,
   required = false,
   error,
+  minWidth,
 }: {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
   required?: boolean;
   error?: string;
+  minWidth?: number | string;
 }) => (
-  <Box sx={{ flex: 1, minWidth: 0 }}>
+  <Box
+    sx={{
+      flex: 1,
+      minWidth: minWidth ?? 0,
+      display: "flex",
+      flexDirection: "column",
+      gap: 0.5,
+    }}
+  >
     {required && !readOnly ? (
       <FieldLabelWithAsterisk
         label={label}
@@ -538,7 +550,11 @@ const SetupFieldCell = ({
           fontSize: "0.72rem",
           fontWeight: 700,
           color: BRAND.textSub,
-          mb: 0.5,
+          mb: 0,
+          lineHeight: 1.25,
+          minHeight: "2.5em",
+          display: "flex",
+          alignItems: "flex-end",
         }}
       />
     ) : (
@@ -549,13 +565,17 @@ const SetupFieldCell = ({
           letterSpacing: readOnly ? "0.02em" : undefined,
           textTransform: readOnly ? "uppercase" : undefined,
           color: readOnly ? BRAND.primary : BRAND.textSub,
-          mb: 0.5,
+          mb: 0,
+          lineHeight: 1.25,
+          minHeight: "2.5em",
+          display: "flex",
+          alignItems: "flex-end",
         }}
       >
         {label}
       </Typography>
     )}
-    {children}
+    <Box sx={{ width: "100%", minWidth: 0 }}>{children}</Box>
     {!readOnly && error ? <FieldErrorText message={error} /> : null}
   </Box>
 );
@@ -729,6 +749,14 @@ const QCCuringMotorPanel = ({
   const oven = useMemo(() => getCuringSetupField(values, "OVEN"), [values]);
   const ovenLabel = useMemo(() => resolveOvenLabel(oven, ovenOptions), [oven, ovenOptions]);
   const ovenNumber = useMemo(() => getCuringSetupField(values, "OVEN_NUMBER"), [values]);
+  const selectedOven = useMemo(
+    () => ovenOptions.find((option) => option.value === oven) ?? null,
+    [oven, ovenOptions],
+  );
+  const ovenNoOptions = useMemo(
+    () => buildCuringOvenNoOptions(selectedOven?.noOfOvenAvailable),
+    [selectedOven?.noOfOvenAvailable],
+  );
   const motorPositioningDateTime = useMemo(
     () => getCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME"),
     [values],
@@ -870,7 +898,7 @@ const QCCuringMotorPanel = ({
           <Stack
             direction={{ xs: "column", lg: "row" }}
             spacing={{ xs: 1.5, lg: 2 }}
-            alignItems={{ lg: "flex-start" }}
+            alignItems={{ lg: "flex-end" }}
             flexWrap="wrap"
             useFlexGap
           >
@@ -880,17 +908,69 @@ const QCCuringMotorPanel = ({
             <SetupFieldCell label="Type of Curing" readOnly>
               <QCDivisionReadOnlyValue value={curingTypeLabel} muted={!curingTypeLabel.trim()} />
             </SetupFieldCell>
-            <SetupFieldCell label="Oven" readOnly>
-              <QCDivisionReadOnlyValue value={ovenLabel} muted={!ovenLabel.trim()} />
+            <SetupFieldCell
+              label="Oven"
+              readOnly={readOnly}
+              required={!readOnly}
+              minWidth={160}
+            >
+              {readOnly ? (
+                <QCDivisionReadOnlyValue value={ovenLabel} muted={!ovenLabel.trim()} />
+              ) : (
+                <Box data-qc-field="OVEN">
+                  <CasePrepSelect
+                    label="Oven"
+                    hideLabel
+                    value={oven}
+                    placeholder="Select oven"
+                    options={ovenOptions}
+                    width="100%"
+                    theme={manufacturingTheme}
+                    required
+                    onChange={(next) => {
+                      let updated = setCuringSetupField(values, "OVEN", next);
+                      updated = setCuringSetupField(updated, "OVEN_NUMBER", "");
+                      onChange(updated);
+                    }}
+                  />
+                </Box>
+              )}
             </SetupFieldCell>
-            <SetupFieldCell label="Oven Number" readOnly>
-              <QCDivisionReadOnlyValue value={ovenNumber} muted={!ovenNumber.trim()} />
+            <SetupFieldCell
+              label="Oven Number"
+              readOnly={readOnly}
+              required={!readOnly}
+              error={err("OVEN_NUMBER")}
+              minWidth={160}
+            >
+              {readOnly ? (
+                <QCDivisionReadOnlyValue value={ovenNumber} muted={!ovenNumber.trim()} />
+              ) : (
+                <Box data-qc-field="OVEN_NUMBER">
+                  <CasePrepSelect
+                    label="Oven Number"
+                    hideLabel
+                    value={ovenNumber}
+                    placeholder={oven ? "Select oven number" : "Select oven first"}
+                    options={ovenNoOptions}
+                    width="100%"
+                    theme={manufacturingTheme}
+                    required
+                    disabled={!oven}
+                    error={Boolean(err("OVEN_NUMBER"))}
+                    onChange={(next) =>
+                      onChange(setCuringSetupField(values, "OVEN_NUMBER", next))
+                    }
+                  />
+                </Box>
+              )}
             </SetupFieldCell>
             <SetupFieldCell
               label="Date & Time of positioning of rocket motor in Oven"
               readOnly={readOnly}
               required
               error={err("MOTOR_POSITIONING_DATE_TIME")}
+              minWidth={220}
             >
               {readOnly ? (
                 <QCDivisionReadOnlyValue
@@ -964,12 +1044,26 @@ const QCCuringMotorPanel = ({
               )}
             </FieldRow>
             <FieldRow label="Date & Time Of Removal Of Pressure Plate" readOnly={readOnly}>
-              {renderTextField(
-                pressurePlateRemovalDateTime,
-                (next) =>
-                  onChange(setCuringPostField(values, "PRESSURE_PLATE_REMOVAL_DATE_TIME", next)),
-                readOnly,
-                { fieldPath: "PRESSURE_PLATE_REMOVAL_DATE_TIME" },
+              {readOnly ? (
+                <QCDivisionReadOnlyValue
+                  value={pressurePlateRemovalDateTime}
+                  muted={!pressurePlateRemovalDateTime.trim()}
+                />
+              ) : (
+                <Box data-qc-field="PRESSURE_PLATE_REMOVAL_DATE_TIME">
+                  <DateTimeField
+                    compact
+                    value={pressurePlateRemovalDateTime}
+                    onChange={(next) =>
+                      onChange(
+                        setCuringPostField(values, "PRESSURE_PLATE_REMOVAL_DATE_TIME", next),
+                      )
+                    }
+                    placeholder="DD-MM-YYYY HH:mm:ss"
+                    inputSx={setupDateTimeFieldSx}
+                    error={Boolean(err("PRESSURE_PLATE_REMOVAL_DATE_TIME"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <FieldRow label="Shore A Hardness" readOnly={readOnly} required error={err("SHORE_A_HARDNESS")}>
@@ -984,15 +1078,30 @@ const QCCuringMotorPanel = ({
                 },
               )}
             </FieldRow>
-            <FieldRow label="Date & Time Of Dispatch Of Motor For De-coring" readOnly={readOnly} required error={err("DISPATCH_DATE_TIME")}>
-              {renderTextField(
-                dispatchDateTime,
-                (next) => onChange(setCuringPostField(values, "DISPATCH_DATE_TIME", next)),
-                readOnly,
-                {
-                  error: Boolean(err("DISPATCH_DATE_TIME")),
-                  fieldPath: "DISPATCH_DATE_TIME",
-                },
+            <FieldRow
+              label="Date & Time Of Dispatch Of Motor For De-coring"
+              readOnly={readOnly}
+              required
+              error={err("DISPATCH_DATE_TIME")}
+            >
+              {readOnly ? (
+                <QCDivisionReadOnlyValue
+                  value={dispatchDateTime}
+                  muted={!dispatchDateTime.trim()}
+                />
+              ) : (
+                <Box data-qc-field="DISPATCH_DATE_TIME">
+                  <DateTimeField
+                    compact
+                    value={dispatchDateTime}
+                    onChange={(next) =>
+                      onChange(setCuringPostField(values, "DISPATCH_DATE_TIME", next))
+                    }
+                    placeholder="DD-MM-YYYY HH:mm:ss"
+                    inputSx={setupDateTimeFieldSx}
+                    error={Boolean(err("DISPATCH_DATE_TIME"))}
+                  />
+                </Box>
               )}
             </FieldRow>
             <Box data-qc-field="POST_CURING_DETAILS.qaRemarks">

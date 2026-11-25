@@ -114,6 +114,8 @@ type QCDivisionEntryPanelProps = {
   liquidSchema?: SchemaDocumentV2 | null;
   subDepartmentId?: number;
   batchId?: string;
+  batchType?: string | null;
+  subBatchType?: string | null;
   divisionAutoPopulateData?: Record<string, unknown> | null;
   mixingQualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null;
   batchPayload?: unknown;
@@ -145,6 +147,8 @@ const QCDivisionEntryPanel = ({
   liquidSchema = null,
   subDepartmentId,
   batchId,
+  batchType = null,
+  subBatchType = null,
   divisionAutoPopulateData = null,
   mixingQualityCheckDefinitions = null,
   batchPayload = null,
@@ -629,6 +633,8 @@ const QCDivisionEntryPanel = ({
         disabled={fieldsDisabled}
         headerActions={headerActions}
         validationErrors={validationErrors}
+        batchType={batchType}
+        subBatchType={subBatchType}
       />
     );
   }

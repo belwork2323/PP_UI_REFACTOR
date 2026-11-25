@@ -61,6 +61,8 @@ const resolveVisibleEntries = (
 
 export type QCDivisionFormBodyProps = {
   batch?: { batchId?: string } | null;
+  batchType?: string | null;
+  subBatchType?: string | null;
   divisionAutoPopulateData?: Record<string, unknown> | null;
   mixingQualityChecksByStage?: {
     PREMIX: QcMixingQualityCheckDefinition[];
@@ -105,6 +107,7 @@ export type QCDivisionFormBodyProps = {
     entryId: string;
     fieldPath: string;
   } | null;
+  onClearProcessingValidationFocus?: () => void;
   onRemoveDivisionEntry: (entryId: string) => void;
   /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
   hideEntryGroupNav?: boolean;
@@ -117,6 +120,8 @@ export type QCDivisionFormBodyProps = {
 
 const QCDivisionFormBody = ({
   batch,
+  batchType = null,
+  subBatchType = null,
   divisionAutoPopulateData = null,
   mixingQualityChecksByStage = { PREMIX: [], FINAL_MIX: [] },
   formData,
@@ -144,6 +149,7 @@ const QCDivisionFormBody = ({
   weightmentValidationAttempt = { format: false, unit: false, submit: false },
   processingFieldErrors = {},
   processingValidationFocusRequest = null,
+  onClearProcessingValidationFocus,
   onRemoveDivisionEntry,
   unitActions = null,
   canResetPostCureSetup = false,
@@ -529,6 +535,7 @@ const QCDivisionFormBody = ({
               validationAttempt={weightmentValidationAttempt}
               processingFieldErrors={processingFieldErrors}
               processingValidationFocusRequest={processingValidationFocusRequest}
+              onClearProcessingValidationFocus={onClearProcessingValidationFocus}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
             />
         ) : (
@@ -546,6 +553,8 @@ const QCDivisionFormBody = ({
                 liquidSchema={entry.kind === "BOTH_PREMIX" ? bothPremixLiquidSchema : undefined}
                 subDepartmentId={subDepartmentId}
                 batchId={batch?.batchId}
+                batchType={batchType}
+                subBatchType={subBatchType}
                 divisionAutoPopulateData={divisionAutoPopulateData}
                 mixingQualityCheckDefinitions={
                   entry.kind === "MIXING_PREMIX"
