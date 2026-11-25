@@ -63,6 +63,8 @@ export const systemManagerController = {
   getChartData: async (filterType: string, startDate: string, endDate: string) => {
     try {
       const resp = await fetchSMChartData({ filterType, startDate, endDate });
+      console.log(resp);
+
       if (resp?.success && resp.data) {
         return {
           success: true,

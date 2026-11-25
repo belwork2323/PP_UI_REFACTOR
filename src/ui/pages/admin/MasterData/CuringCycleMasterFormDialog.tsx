@@ -38,6 +38,7 @@ import { visibleValidationError } from "./masterDataValidationUtils";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
 const S = STRINGS.MASTER_DATA;
+const MAX_STEP_DURATION_MINUTES = 99999; // put this near the top of the file
 
 type Props = {
   open: boolean;
@@ -87,6 +88,10 @@ const StepsEditor = ({
         step.durationMinutes !== "",
         showErrors,
       );
+      const durationValue =
+        typeof step.durationMinutes === "number" && Number.isFinite(step.durationMinutes)
+          ? String(step.durationMinutes)
+          : "";
       return (
         <Box
           key={`${step.stepId ?? "new"}-${idx}`}
@@ -132,13 +137,16 @@ const StepsEditor = ({
             />
             <CasePrepTextField
               label={S.CURING_CYCLES.STEP_DURATION}
-              value={step.durationMinutes === "" ? "" : String(step.durationMinutes)}
+              value={durationValue}
               disabled={disabled || locked}
               error={Boolean(durationError)}
               helperText={durationError ?? null}
               width="100%"
               theme={theme}
               onChange={(value) => {
+                if (!/^\d*$/.test(value)) return;
+                if (value !== "" && Number(value) > MAX_STEP_DURATION_MINUTES) return;
+
                 const next = [...steps];
                 next[idx] = {
                   ...step,

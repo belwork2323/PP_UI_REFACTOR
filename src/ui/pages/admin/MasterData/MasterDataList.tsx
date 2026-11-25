@@ -525,6 +525,9 @@ const MasterDataList = ({
         onSearchChange={onSearchChange}
         onRefresh={onRefresh}
         refreshDisabled={refreshDisabled}
+        searchPlaceholder={
+          selectedType === "motor-stages" ? S.MOTOR_STAGES.SEARCH_PLACEHOLDER : undefined
+        }
         t={t}
         showMotorStageFilters={selectedType === "motor-stages"}
         projectFilter={projectFilter}

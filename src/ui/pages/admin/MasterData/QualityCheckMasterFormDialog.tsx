@@ -93,10 +93,15 @@ const ParametersEditor = ({
         if (param.specification.unitId != null) {
           return String(param.specification.unitId);
         }
-        const unitLabel = String(param.specification.unit ?? "").trim().toLowerCase();
+        const unitLabel = String(param.specification.unit ?? "")
+          .trim()
+          .toLowerCase();
         if (!unitLabel) return "";
         const match = unitOptions.find(
-          (item) => String(item.label ?? "").trim().toLowerCase() === unitLabel,
+          (item) =>
+            String(item.label ?? "")
+              .trim()
+              .toLowerCase() === unitLabel,
         );
         return match ? String(match.value) : "";
       })();
@@ -118,7 +123,8 @@ const ParametersEditor = ({
       );
       const unitError = visibleValidationError(
         rawErr?.unit,
-        param.specification.unitId != null || String(param.specification.unit ?? "").trim().length > 0,
+        param.specification.unitId != null ||
+          String(param.specification.unit ?? "").trim().length > 0,
         showErrors,
       );
       const samplesError = visibleValidationError(
@@ -126,9 +132,11 @@ const ParametersEditor = ({
         param.noOfSamples !== "",
         showErrors,
       );
-      const hasFieldError = Boolean(
-        nameError || minError || maxError || unitError || samplesError,
-      );
+      const hasFieldError = Boolean(nameError || minError || maxError || unitError || samplesError);
+      const samplesValue =
+        typeof param.noOfSamples === "number" && Number.isFinite(param.noOfSamples)
+          ? String(param.noOfSamples)
+          : "";
 
       return (
         <Box
@@ -170,7 +178,7 @@ const ParametersEditor = ({
               />
               <CasePrepTextField
                 label={S.QUALITY_CHECKS.PARAM_SAMPLES}
-                value={param.noOfSamples === "" ? "" : String(param.noOfSamples)}
+                value={samplesValue}
                 disabled={disabled || locked}
                 required={!locked}
                 error={Boolean(samplesError)}
@@ -178,6 +186,8 @@ const ParametersEditor = ({
                 width="100%"
                 theme={theme}
                 onChange={(value) => {
+                  if (!/^\d*$/.test(value)) return;
+
                   const next = [...params];
                   next[idx] = {
                     ...param,
@@ -201,6 +211,7 @@ const ParametersEditor = ({
                 error={Boolean(minError)}
                 helperText={minError ?? null}
                 width="100%"
+                required
                 theme={theme}
                 onChange={(value) => {
                   const sanitized = sanitizeMasterDataDecimalInput(value);
@@ -220,6 +231,7 @@ const ParametersEditor = ({
                 error={Boolean(maxError)}
                 helperText={maxError ?? null}
                 width="100%"
+                required
                 theme={theme}
                 onChange={(value) => {
                   const sanitized = sanitizeMasterDataDecimalInput(value);
@@ -237,6 +249,7 @@ const ParametersEditor = ({
                   label={S.QUALITY_CHECKS.PARAM_UNIT}
                   value={resolvedUnitValue}
                   placeholder="Select unit"
+                  required
                   disabled={disabled || unitLocked || unitLoading}
                   options={unitOptions}
                   width="100%"

@@ -46,7 +46,7 @@ export default function StageStatusPanel({ stageData, t, strings }: Props) {
 
   return (
     <Box sx={sp.inner}>
-      <Box sx={sp.summaryRow}>
+      {/* <Box sx={sp.summaryRow}>
         <Box>
           <Typography sx={sp.summarySubLabel}>{strings.TOTAL_BATCHES}</Typography>
           <Typography sx={sp.summaryTotal}>{totalBatches}</Typography>
@@ -54,7 +54,7 @@ export default function StageStatusPanel({ stageData, t, strings }: Props) {
         <Box sx={sp.periodBadge}>
           <Typography sx={sp.periodText}>{periodLabel}</Typography>
         </Box>
-      </Box>
+      </Box> */}
 
       {stages.length > 0 && strings.DISTRIBUTION_LABEL && (
         <Typography sx={sp.distributionLabel}>{strings.DISTRIBUTION_LABEL}</Typography>

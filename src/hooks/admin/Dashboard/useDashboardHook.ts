@@ -36,7 +36,7 @@ function useDashboardGlobalFilterSection(mode: string) {
   const [statsLoading, setStatsLoading] = useState(false);
   const [stats, setStats] = useState<any>(null);
   const [chartData, setChartData] = useState<any>(null);
-  const [chartUpdatedAt, setChartUpdatedAt] = useState<Date | null>(null);
+  const [chartUpdatedAt, setChartUpdatedAt] = useState<String | Date | null>(null);
 
   const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
   const [customStartDate, setCustomStartDateState] = useState("");
@@ -141,7 +141,6 @@ function useDashboardGlobalFilterSection(mode: string) {
           globalDateBounds.endDate,
         ),
       ]);
-
       setStats({ kpis: enrichDashboardKpis(fetchedStats?.data?.kpis ?? []) });
       setChartData(
         fetchedCharts?.data?.charts ??
@@ -151,7 +150,7 @@ function useDashboardGlobalFilterSection(mode: string) {
             qcPassRate: [],
           },
       );
-      setChartUpdatedAt(fetchedCharts?.timestamp ? new Date(fetchedCharts.timestamp) : new Date());
+      setChartUpdatedAt(fetchedCharts?.timestamp ? fetchedCharts?.timestamp : new Date());
     } finally {
       setStatsLoading(false);
       setLoading(false);
@@ -355,6 +354,7 @@ export default function useDashboardHook(mode: string) {
   global.registerTableFilterClear(() => {
     batches.clearBatchesFilters();
   });
+  console.log(global);
 
   return {
     loading: global.loading,

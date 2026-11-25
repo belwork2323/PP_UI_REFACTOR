@@ -77,210 +77,230 @@ const MasterDataQualityCheckParamsEditor = ({
     {params.length ? (
       <Stack spacing={1.5}>
         {params.map((param, idx) => {
-      const locked = isEdit && Boolean(param.isExisting);
-      const unitMissing =
-        param.specification.unitId == null && !String(param.specification.unit ?? "").trim();
-      const unitLocked = locked && !unitMissing;
-      const resolvedUnitValue = (() => {
-        if (param.specification.unitId != null) {
-          return String(param.specification.unitId);
-        }
-        const unitLabel = String(param.specification.unit ?? "").trim().toLowerCase();
-        if (!unitLabel) return "";
-        const match = unitOptions.find(
-          (item) => String(item.label ?? "").trim().toLowerCase() === unitLabel,
-        );
-        return match ? String(match.value) : "";
-      })();
-      const rawErr = paramErrors?.[idx];
-      const nameError = visibleValidationError(
-        rawErr?.parameterName,
-        param.parameterName.trim().length > 0,
-        showErrors,
-      );
-      const minError = visibleValidationError(
-        rawErr?.minValue,
-        masterDataNumericFieldHasValue(param.specification.minValue),
-        showErrors,
-      );
-      const maxError = visibleValidationError(
-        rawErr?.maxValue,
-        masterDataNumericFieldHasValue(param.specification.maxValue),
-        showErrors,
-      );
-      const unitError = visibleValidationError(
-        rawErr?.unit,
-        param.specification.unitId != null || String(param.specification.unit ?? "").trim().length > 0,
-        showErrors,
-      );
-      const samplesError = visibleValidationError(
-        rawErr?.noOfSamples,
-        param.noOfSamples !== "",
-        showErrors,
-      );
-      const hasFieldError = Boolean(
-        nameError || minError || maxError || unitError || samplesError,
-      );
+          const locked = isEdit && Boolean(param.isExisting);
+          const unitMissing =
+            param.specification.unitId == null && !String(param.specification.unit ?? "").trim();
+          const unitLocked = locked && !unitMissing;
+          const resolvedUnitValue = (() => {
+            if (param.specification.unitId != null) {
+              return String(param.specification.unitId);
+            }
+            const unitLabel = String(param.specification.unit ?? "")
+              .trim()
+              .toLowerCase();
+            if (!unitLabel) return "";
+            const match = unitOptions.find(
+              (item) =>
+                String(item.label ?? "")
+                  .trim()
+                  .toLowerCase() === unitLabel,
+            );
+            return match ? String(match.value) : "";
+          })();
+          const rawErr = paramErrors?.[idx];
+          const nameError = visibleValidationError(
+            rawErr?.parameterName,
+            param.parameterName.trim().length > 0,
+            showErrors,
+          );
+          const minError = visibleValidationError(
+            rawErr?.minValue,
+            masterDataNumericFieldHasValue(param.specification.minValue),
+            showErrors,
+          );
+          const maxError = visibleValidationError(
+            rawErr?.maxValue,
+            masterDataNumericFieldHasValue(param.specification.maxValue),
+            showErrors,
+          );
+          const unitError = visibleValidationError(
+            rawErr?.unit,
+            param.specification.unitId != null ||
+              String(param.specification.unit ?? "").trim().length > 0,
+            showErrors,
+          );
+          const samplesError = visibleValidationError(
+            rawErr?.noOfSamples,
+            param.noOfSamples !== "",
+            showErrors,
+          );
+          const hasFieldError = Boolean(
+            nameError || minError || maxError || unitError || samplesError,
+          );
+          const samplesValue =
+            typeof param.noOfSamples === "number" && Number.isFinite(param.noOfSamples)
+              ? String(param.noOfSamples)
+              : "";
 
-      return (
-        <Box
-          key={`${param.parameterId || "new"}-${idx}`}
-          sx={{
-            display: "flex",
-            gap: 1,
-            alignItems: "flex-start",
-            p: 1.5,
-            border: "1px solid",
-            borderColor: hasFieldError ? "error.main" : "divider",
-            borderRadius: 1.5,
-            bgcolor: locked ? "action.hover" : "background.paper",
-            opacity: !param.isActive ? 0.72 : 1,
-          }}
-        >
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+          return (
             <Box
+              key={`${param.parameterId || "new"}-${idx}`}
               sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 120px" },
+                display: "flex",
                 gap: 1,
+                alignItems: "flex-start",
+                p: 1.5,
+                border: "1px solid",
+                borderColor: hasFieldError ? "error.main" : "divider",
+                borderRadius: 1.5,
+                bgcolor: locked ? "action.hover" : "background.paper",
+                opacity: !param.isActive ? 0.72 : 1,
               }}
             >
-              <CasePrepTextField
-                label={S.QUALITY_CHECKS.PARAM_NAME}
-                value={param.parameterName}
-                disabled={disabled || locked}
-                required={!locked}
-                error={Boolean(nameError)}
-                helperText={nameError ?? null}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  const next = [...params];
-                  next[idx] = { ...param, parameterName: value };
-                  onChange(next);
-                }}
-              />
-              <CasePrepTextField
-                label={S.QUALITY_CHECKS.PARAM_SAMPLES}
-                value={param.noOfSamples === "" ? "" : String(param.noOfSamples)}
-                disabled={disabled || locked}
-                required={!locked}
-                error={Boolean(samplesError)}
-                helperText={samplesError ?? null}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  const next = [...params];
-                  next[idx] = {
-                    ...param,
-                    noOfSamples: value === "" ? "" : Number(value),
-                  };
-                  onChange(next);
-                }}
-              />
-            </Box>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-                gap: 1,
-              }}
-            >
-              <CasePrepTextField
-                label={S.QUALITY_CHECKS.PARAM_MIN}
-                value={param.specification.minValue}
-                disabled={disabled || locked}
-                error={Boolean(minError)}
-                helperText={minError ?? null}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  const sanitized = sanitizeMasterDataDecimalInput(value);
-                  if (sanitized === null) return;
-                  const next = [...params];
-                  next[idx] = {
-                    ...param,
-                    specification: { ...param.specification, minValue: sanitized },
-                  };
-                  onChange(next);
-                }}
-              />
-              <CasePrepTextField
-                label={S.QUALITY_CHECKS.PARAM_MAX}
-                value={param.specification.maxValue}
-                disabled={disabled || locked}
-                error={Boolean(maxError)}
-                helperText={maxError ?? null}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  const sanitized = sanitizeMasterDataDecimalInput(value);
-                  if (sanitized === null) return;
-                  const next = [...params];
-                  next[idx] = {
-                    ...param,
-                    specification: { ...param.specification, maxValue: sanitized },
-                  };
-                  onChange(next);
-                }}
-              />
-              <Box>
-                <CasePrepSearchableSelect
-                  label={S.QUALITY_CHECKS.PARAM_UNIT}
-                  value={resolvedUnitValue}
-                  placeholder="Select unit"
-                  disabled={disabled || unitLocked || unitLoading}
-                  options={unitOptions}
-                  width="100%"
-                  theme={theme}
-                  onChange={(value) => {
-                    const option = unitOptions.find((item) => item.value === value);
-                    const next = [...params];
-                    next[idx] = {
-                      ...param,
-                      specification: {
-                        ...param.specification,
-                        unitId: value === "" ? null : Number(value),
-                        unit: option ? String(option.label ?? "") : "",
-                      },
-                    };
-                    onChange(next);
+              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "1fr 120px" },
+                    gap: 1,
                   }}
-                />
-                {unitError ? (
-                  <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.5 }}>
-                    {unitError}
-                  </Typography>
-                ) : null}
+                >
+                  <CasePrepTextField
+                    label={S.QUALITY_CHECKS.PARAM_NAME}
+                    value={param.parameterName}
+                    disabled={disabled || locked}
+                    required={!locked}
+                    error={Boolean(nameError)}
+                    helperText={nameError ?? null}
+                    width="100%"
+                    theme={theme}
+                    onChange={(value) => {
+                      const next = [...params];
+                      next[idx] = { ...param, parameterName: value };
+                      onChange(next);
+                    }}
+                  />
+                  <CasePrepTextField
+                    label={S.QUALITY_CHECKS.PARAM_SAMPLES}
+                    value={samplesValue}
+                    disabled={disabled || locked}
+                    required={!locked}
+                    error={Boolean(samplesError)}
+                    helperText={samplesError ?? null}
+                    width="100%"
+                    theme={theme}
+                    onChange={(value) => {
+                      // digits only; ignore letters, e, +, -, ., spaces
+                      if (!/^\d*$/.test(value)) return;
+
+                      const next = [...params];
+                      next[idx] = {
+                        ...param,
+                        noOfSamples: value === "" ? "" : Number(value),
+                      };
+                      onChange(next);
+                    }}
+                  />
+                </Box>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
+                    gap: 1,
+                  }}
+                >
+                  <CasePrepTextField
+                    label={S.QUALITY_CHECKS.PARAM_MIN}
+                    value={param.specification.minValue}
+                    disabled={disabled || locked}
+                    error={Boolean(minError)}
+                    helperText={minError ?? null}
+                    width="100%"
+                    theme={theme}
+                    required
+                    onChange={(value) => {
+                      const sanitized = sanitizeMasterDataDecimalInput(value);
+                      if (sanitized === null) return;
+                      const next = [...params];
+                      next[idx] = {
+                        ...param,
+                        specification: { ...param.specification, minValue: sanitized },
+                      };
+                      onChange(next);
+                    }}
+                  />
+                  <CasePrepTextField
+                    label={S.QUALITY_CHECKS.PARAM_MAX}
+                    value={param.specification.maxValue}
+                    disabled={disabled || locked}
+                    error={Boolean(maxError)}
+                    helperText={maxError ?? null}
+                    width="100%"
+                    theme={theme}
+                    required
+                    onChange={(value) => {
+                      const sanitized = sanitizeMasterDataDecimalInput(value);
+                      if (sanitized === null) return;
+                      const next = [...params];
+                      next[idx] = {
+                        ...param,
+                        specification: { ...param.specification, maxValue: sanitized },
+                      };
+                      onChange(next);
+                    }}
+                  />
+                  <Box>
+                    <CasePrepSearchableSelect
+                      label={S.QUALITY_CHECKS.PARAM_UNIT}
+                      value={resolvedUnitValue}
+                      placeholder="Select unit"
+                      disabled={disabled || unitLocked || unitLoading}
+                      options={unitOptions}
+                      width="100%"
+                      required
+                      theme={theme}
+                      onChange={(value) => {
+                        const option = unitOptions.find((item) => item.value === value);
+                        const next = [...params];
+                        next[idx] = {
+                          ...param,
+                          specification: {
+                            ...param.specification,
+                            unitId: value === "" ? null : Number(value),
+                            unit: option ? String(option.label ?? "") : "",
+                          },
+                        };
+                        onChange(next);
+                      }}
+                    />
+                    {unitError ? (
+                      <Typography
+                        variant="caption"
+                        color="error"
+                        sx={{ display: "block", mt: 0.5 }}
+                      >
+                        {unitError}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                </Box>
               </Box>
+              <MasterDataEnableDisableField
+                checked={param.isActive}
+                disabled={disabled}
+                labelVariant="caption"
+                minWidth={96}
+                requireConfirmation={locked}
+                confirmName={param.parameterName.trim() || `parameter ${idx + 1}`}
+                onChange={(isActive) => {
+                  const next = [...params];
+                  next[idx] = { ...param, isActive };
+                  onChange(next);
+                }}
+              />
+              {!locked ? (
+                <IconButton
+                  size="small"
+                  disabled={disabled}
+                  onClick={() => onChange(params.filter((_, i) => i !== idx))}
+                  aria-label={S.QUALITY_CHECKS.REMOVE_PARAMETER}
+                  sx={{ mt: 2.75, flexShrink: 0 }}
+                >
+                  <icons.Delete fontSize="small" />
+                </IconButton>
+              ) : null}
             </Box>
-          </Box>
-          <MasterDataEnableDisableField
-            checked={param.isActive}
-            disabled={disabled}
-            labelVariant="caption"
-            minWidth={96}
-            requireConfirmation={locked}
-            confirmName={param.parameterName.trim() || `parameter ${idx + 1}`}
-            onChange={(isActive) => {
-              const next = [...params];
-              next[idx] = { ...param, isActive };
-              onChange(next);
-            }}
-          />
-          {!locked ? (
-            <IconButton
-              size="small"
-              disabled={disabled}
-              onClick={() => onChange(params.filter((_, i) => i !== idx))}
-              aria-label={S.QUALITY_CHECKS.REMOVE_PARAMETER}
-              sx={{ mt: 2.75, flexShrink: 0 }}
-            >
-              <icons.Delete fontSize="small" />
-            </IconButton>
-          ) : null}
-        </Box>
-      );
+          );
         })}
       </Stack>
     ) : null}

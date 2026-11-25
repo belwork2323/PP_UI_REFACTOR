@@ -7,11 +7,36 @@
 
 /** Raw entry from data.{key} → { count, subValue } */
 const STATS_CONFIG = [
-  { key: "totalBatches",    label: "Total Batches",    subLabel: "All registered batches",   variant: "total" },
-  { key: "inProgressBatches", label: "In Progress",    subLabel: "Currently active",          variant: "inProgress" },
-  { key: "completedBatches",  label: "Completed",      subLabel: "Fully processed",           variant: "completed" },
-  { key: "pendingApprovals",  label: "Pending",        subLabel: "Awaiting approval",         variant: "pending" },
-  { key: "rejectedBatches",   label: "Rejected",       subLabel: "Requires attention",        variant: "rejected" },
+  {
+    key: "totalBatches",
+    label: "Total Batches",
+    subLabel: "All registered batches",
+    variant: "total",
+  },
+  {
+    key: "inProgressBatches",
+    label: "In Progress",
+    subLabel: "Currently active",
+    variant: "inProgress",
+  },
+  {
+    key: "completedBatches",
+    label: "Completed",
+    subLabel: "Fully processed",
+    variant: "completed",
+  },
+  {
+    key: "pendingApprovals",
+    label: "Waiting For Approval",
+    subLabel: "Awaiting approval",
+    variant: "pending",
+  },
+  {
+    key: "rejectedBatches",
+    label: "Rejected",
+    subLabel: "Requires attention",
+    variant: "rejected",
+  },
 ];
 
 export class SMStatsModel {
@@ -20,15 +45,17 @@ export class SMStatsModel {
     return STATS_CONFIG.map(({ key, label, subLabel, variant }) => {
       const entry = data?.[key] ?? { count: 0, subValue: 0 };
       const subValue = entry.subValue ?? 0;
-      const subText  = subValue > 0
-        ? `+${subValue} this period`
-        : subValue < 0 ? `${subValue} this period`
-        : "No change this period";
+      const subText =
+        subValue > 0
+          ? `+${subValue} this period`
+          : subValue < 0
+            ? `${subValue} this period`
+            : "No change this period";
       return {
         label,
         subLabel,
         variant,
-        value:    entry.count   ?? 0,
+        value: entry.count ?? 0,
         subValue: entry.subValue ?? 0,
         subText,
       };
@@ -41,19 +68,19 @@ export class SMStatsModel {
 ───────────────────────────────────────────────────────────────────────────── */
 
 export class SMChartDataModel {
-  filterType:         string;
-  timeUnit:           string;
+  filterType: string;
+  timeUnit: string;
   totalActiveBatches: number;
-  stageTotalBatches:  number;
-  weeklyActivity:    { label: string; value: number }[];
-  motorsProcessed:   { label: string; value: number }[];
-  stageProcessed:    { stage: string; batchCount: number; percentage: number }[];
+  stageTotalBatches: number;
+  weeklyActivity: { label: string; value: number }[];
+  motorsProcessed: { label: string; value: number }[];
+  stageProcessed: { stage: string; batchCount: number; percentage: number }[];
 
   constructor(data: Record<string, any>) {
-    this.filterType         = data.filterType         ?? "week";
-    this.timeUnit           = data.timeUnit           ?? "day";
+    this.filterType = data.filterType ?? "week";
+    this.timeUnit = data.timeUnit ?? "day";
     this.totalActiveBatches = data.totalActiveBatches ?? 0;
-    this.weeklyActivity  = Array.isArray(data.weeklyActivity)  ? data.weeklyActivity  : [];
+    this.weeklyActivity = Array.isArray(data.weeklyActivity) ? data.weeklyActivity : [];
     this.motorsProcessed = Array.isArray(data.motorsProcessed) ? data.motorsProcessed : [];
 
     // API v2: stageProcessed is { totalBatches, stages: [{department, batchCount, percentage}] }
@@ -62,7 +89,7 @@ export class SMChartDataModel {
     const rawStages: any[] = sp?.stages ?? (Array.isArray(sp) ? sp : []);
     this.stageTotalBatches = sp?.totalBatches ?? this.totalActiveBatches;
     this.stageProcessed = rawStages.map((s: any) => ({
-      stage:      s.department ?? s.stage ?? "",
+      stage: s.department ?? s.stage ?? "",
       batchCount: s.batchCount ?? 0,
       percentage: s.percentage ?? 0,
     }));
@@ -155,7 +182,11 @@ export class SMActiveBatchModel {
 
   get formattedLastUpdated() {
     if (!this.lastUpdatedOn) return "—";
-    try { return new Date(this.lastUpdatedOn).toLocaleString(); } catch { return this.lastUpdatedOn; }
+    try {
+      return new Date(this.lastUpdatedOn).toLocaleString();
+    } catch {
+      return this.lastUpdatedOn;
+    }
   }
 
   static fromApi(data: Record<string, any>) {
@@ -168,22 +199,22 @@ export class SMActiveBatchModel {
 ───────────────────────────────────────────────────────────────────────────── */
 
 export class SMAlertModel {
-  id:      string;
-  type:    "error" | "warning" | "info";
-  msg:     string;
-  time:    string;
+  id: string;
+  type: "error" | "warning" | "info";
+  msg: string;
+  time: string;
   batchId: string;
   motorId: string;
-  stage:   string;
+  stage: string;
 
   constructor(data: Record<string, any>) {
-    this.id      = data.id      ?? "";
-    this.type    = (data.type   ?? "info") as "error" | "warning" | "info";
-    this.msg     = data.msg     ?? data.message ?? "";
-    this.time    = data.time    ?? data.timestamp ?? "";
+    this.id = data.id ?? "";
+    this.type = (data.type ?? "info") as "error" | "warning" | "info";
+    this.msg = data.msg ?? data.message ?? "";
+    this.time = data.time ?? data.timestamp ?? "";
     this.batchId = data.batchId ?? "";
     this.motorId = data.motorId ?? "";
-    this.stage   = data.stage   ?? "";
+    this.stage = data.stage ?? "";
   }
 
   static fromApi(data: Record<string, any>) {
@@ -192,16 +223,16 @@ export class SMAlertModel {
 }
 
 export class SMAlertSummaryModel {
-  total:   number;
-  error:   number;
+  total: number;
+  error: number;
   warning: number;
-  info:    number;
+  info: number;
 
   constructor(data: Record<string, any>) {
-    this.total   = data.total   ?? 0;
-    this.error   = data.error   ?? 0;
+    this.total = data.total ?? 0;
+    this.error = data.error ?? 0;
     this.warning = data.warning ?? 0;
-    this.info    = data.info    ?? 0;
+    this.info = data.info ?? 0;
   }
 }
 
@@ -211,49 +242,49 @@ export class SMAlertSummaryModel {
 
 // Event type → display color
 const EVENT_COLORS: Record<string, string> = {
-  STAGE_UPDATED:       "#3b82f6",
-  APPROVAL_COMPLETED:  "#22c55e",
-  BATCH_CREATED:       "#06b6d4",
-  BATCH_REJECTED:      "#ef4444",
-  DISPATCH_COMPLETED:  "#8b5cf6",
+  STAGE_UPDATED: "#3b82f6",
+  APPROVAL_COMPLETED: "#22c55e",
+  BATCH_CREATED: "#06b6d4",
+  BATCH_REJECTED: "#ef4444",
+  DISPATCH_COMPLETED: "#8b5cf6",
 };
 
 const EVENT_ICONS: Record<string, string> = {
-  STAGE_UPDATED:       "↑",
-  APPROVAL_COMPLETED:  "✓",
-  BATCH_CREATED:       "+",
-  BATCH_REJECTED:      "✕",
-  DISPATCH_COMPLETED:  "→",
+  STAGE_UPDATED: "↑",
+  APPROVAL_COMPLETED: "✓",
+  BATCH_CREATED: "+",
+  BATCH_REJECTED: "✕",
+  DISPATCH_COMPLETED: "→",
 };
 
 export class SMBlockchainEventModel {
-  transactionId:      string;
-  batchId:            string;
-  eventType:          string;
+  transactionId: string;
+  batchId: string;
+  eventType: string;
   eventStatusMessage: string;
-  department:         string;
-  subDepartment:      string;
-  performedBy:        string;
-  timestamp:          string;
-  blockNumber:        number;
-  channelName:        string;
+  department: string;
+  subDepartment: string;
+  performedBy: string;
+  timestamp: string;
+  blockNumber: number;
+  channelName: string;
   /** UI helpers */
-  color:              string;
-  icon:               string;
+  color: string;
+  icon: string;
 
   constructor(data: Record<string, any>) {
-    this.transactionId      = data.transactionId      ?? "";
-    this.batchId            = data.batchId            ?? "";
-    this.eventType          = data.eventType          ?? "";
+    this.transactionId = data.transactionId ?? "";
+    this.batchId = data.batchId ?? "";
+    this.eventType = data.eventType ?? "";
     this.eventStatusMessage = data.eventStatusMessage ?? data.label ?? "";
-    this.department         = data.department         ?? "";
-    this.subDepartment      = data.subDepartment      ?? "";
-    this.performedBy        = data.performedBy        ?? "";
-    this.timestamp          = data.timestamp          ?? "";
-    this.blockNumber        = data.blockNumber        ?? 0;
-    this.channelName        = data.channelName        ?? "";
+    this.department = data.department ?? "";
+    this.subDepartment = data.subDepartment ?? "";
+    this.performedBy = data.performedBy ?? "";
+    this.timestamp = data.timestamp ?? "";
+    this.blockNumber = data.blockNumber ?? 0;
+    this.channelName = data.channelName ?? "";
     this.color = EVENT_COLORS[data.eventType] ?? "#3b82f6";
-    this.icon  = EVENT_ICONS[data.eventType]  ?? "✦";
+    this.icon = EVENT_ICONS[data.eventType] ?? "✦";
   }
 
   static fromApi(data: Record<string, any>) {
@@ -478,9 +509,7 @@ export class SubDeptStageItemModel {
     const userAudit = audit.user ?? {};
     const approverAudit = audit.approver ?? {};
 
-    this.status = normalizeWorkflowStatus(
-      data.status ?? userAudit.status ?? approverAudit.status,
-    );
+    this.status = normalizeWorkflowStatus(data.status ?? userAudit.status ?? approverAudit.status);
     this.formId = data.formId ?? "";
     this.formStatus = data.formStatus ? normalizeWorkflowStatus(data.formStatus) : "";
     this.completionPercentage = data.completionPercentage ?? 0;
@@ -490,11 +519,7 @@ export class SubDeptStageItemModel {
     this.approvedBy = parseActor(data.approvedBy ?? approverAudit.approvedBy);
     this.approvedOn = data.approvedOn ?? approverAudit.approvedOn ?? null;
     const remarks = data.remarks ?? userAudit.remarks ?? approverAudit.remarks ?? null;
-    this.remarks =
-      remarks ??
-      data.rejectionReason ??
-      approverAudit.rejectionReason ??
-      null;
+    this.remarks = remarks ?? data.rejectionReason ?? approverAudit.rejectionReason ?? null;
   }
 
   get displayProgress(): number {
@@ -559,12 +584,9 @@ export class BatchSubDeptStagesModel {
 
   get timelineEntries(): SubDeptTimelineEntry[] {
     const currentIds = new Set(this.currentStage.map((s) => s.subDepartmentId));
-    const currentById = new Map(
-      this.currentStage.map((s) => [s.subDepartmentId, s] as const),
-    );
+    const currentById = new Map(this.currentStage.map((s) => [s.subDepartmentId, s] as const));
 
-    const ordered =
-      this.stageHistory.length > 0 ? this.stageHistory : this.currentStage;
+    const ordered = this.stageHistory.length > 0 ? this.stageHistory : this.currentStage;
 
     const entries: SubDeptTimelineEntry[] = [];
     const seen = new Set<number>();
@@ -574,9 +596,7 @@ export class BatchSubDeptStagesModel {
       seen.add(item.subDepartmentId);
 
       const isCurrent = currentIds.has(item.subDepartmentId);
-      const activeItem = isCurrent
-        ? (currentById.get(item.subDepartmentId) ?? item)
-        : item;
+      const activeItem = isCurrent ? (currentById.get(item.subDepartmentId) ?? item) : item;
       const variant: SubDeptTimelineEntry["variant"] = isCurrent ? "active" : "done";
 
       entries.push({
@@ -607,56 +627,74 @@ export class BatchSubDeptStagesModel {
 ───────────────────────────────────────────────────────────────────────────── */
 
 export class BatchSubDeptDetailsModel {
-  subDepartmentId:   number;
-  name:              string;
-  departmentId:      number;
-  departmentName:    string;
-  status:            string;
-  submittedBy:       { id: string; role: string; username: string };
-  submittedOn:       string | null;
-  approvedBy:        { id: string; role: string; username: string } | null;
-  approvedOn:        string | null;
-  rejectedBy:        { id: string; role: string; username: string } | null;
-  rejectedOn:        string | null;
-  progressInsights:  {
-    materialsCount: number; totalSpecs: number; filledSpecs: number;
-    completionPercentage: number; allLotsEntered: boolean; isReadyForApproval: boolean;
+  subDepartmentId: number;
+  name: string;
+  departmentId: number;
+  departmentName: string;
+  status: string;
+  submittedBy: { id: string; role: string; username: string };
+  submittedOn: string | null;
+  approvedBy: { id: string; role: string; username: string } | null;
+  approvedOn: string | null;
+  rejectedBy: { id: string; role: string; username: string } | null;
+  rejectedOn: string | null;
+  progressInsights: {
+    materialsCount: number;
+    totalSpecs: number;
+    filledSpecs: number;
+    completionPercentage: number;
+    allLotsEntered: boolean;
+    isReadyForApproval: boolean;
   };
   qualityInsights: {
-    totalTests: number; passed: number; failed: number;
-    passRate: number; nonConformances: any[];
+    totalTests: number;
+    passed: number;
+    failed: number;
+    passRate: number;
+    nonConformances: any[];
   };
   workflowInsights: {
-    currentStatus: string; rejectionReason: string | null;
-    approvalPending: boolean; reworkRequired: boolean; resubmissionCount: number;
+    currentStatus: string;
+    rejectionReason: string | null;
+    approvalPending: boolean;
+    reworkRequired: boolean;
+    resubmissionCount: number;
   };
-  riskInsights:  { riskLevel: string; riskScore: number; riskFactors: string[] };
+  riskInsights: { riskLevel: string; riskScore: number; riskFactors: string[] };
   delayInsights: { isDelayed: boolean; delayInHours: number; delayReason: string | null };
   materialsSummary: {
-    material: string; lotNo: string; totalSpecs: number;
-    passedSpecs: number; failedSpecs: number; blockStatus: string; failures: any[];
+    material: string;
+    lotNo: string;
+    totalSpecs: number;
+    passedSpecs: number;
+    failedSpecs: number;
+    blockStatus: string;
+    failures: any[];
   }[];
   summaryType: string | null;
   hasSummaryKey: boolean;
-  alerts:   any[];
+  alerts: any[];
   timeline: { event: string; by: { id: string; role: string; username: string }; time: string }[];
   documents: {
-    fileId: string; fileName: string; documentType: string;
-    uploadedBy: { id: string; role: string; username: string }; uploadedOn: string;
+    fileId: string;
+    fileName: string;
+    documentType: string;
+    uploadedBy: { id: string; role: string; username: string };
+    uploadedOn: string;
   }[];
 
   constructor(data: Record<string, any>) {
-    this.subDepartmentId  = data.subDepartmentId  ?? 0;
-    this.name             = data.name             ?? "";
-    this.departmentId     = data.departmentId     ?? 0;
-    this.departmentName   = data.departmentName   ?? "";
-    this.status           = data.status           ?? "";
-    this.submittedBy      = data.submittedBy      ?? { id: "", role: "", username: "" };
-    this.submittedOn      = data.submittedOn      ?? null;
-    this.approvedBy       = data.approvedBy       ?? null;
-    this.approvedOn       = data.approvedOn       ?? null;
-    this.rejectedBy       = data.rejectedBy       ?? null;
-    this.rejectedOn       = data.rejectedOn       ?? null;
+    this.subDepartmentId = data.subDepartmentId ?? 0;
+    this.name = data.name ?? "";
+    this.departmentId = data.departmentId ?? 0;
+    this.departmentName = data.departmentName ?? "";
+    this.status = data.status ?? "";
+    this.submittedBy = data.submittedBy ?? { id: "", role: "", username: "" };
+    this.submittedOn = data.submittedOn ?? null;
+    this.approvedBy = data.approvedBy ?? null;
+    this.approvedOn = data.approvedOn ?? null;
+    this.rejectedBy = data.rejectedBy ?? null;
+    this.rejectedOn = data.rejectedOn ?? null;
     const normalizedSummary = BatchSubDeptDetailsModel.normalizeSummaryEntries(data);
 
     this.materialsSummary = normalizedSummary.entries;
@@ -669,70 +707,75 @@ export class BatchSubDeptDetailsModel {
         acc.filled += item.passedSpecs;
         return acc;
       },
-      { total: 0, filled: 0 }
+      { total: 0, filled: 0 },
     );
 
     this.progressInsights = {
-      materialsCount:       data.progressInsights?.materialsCount
-        ?? data.progressInsights?.ingredientsCount
-        ?? this.materialsSummary.length,
-      totalSpecs:           data.progressInsights?.totalSpecs
-        ?? data.progressInsights?.totalParams
-        ?? data.progressInsights?.totalFields
-        ?? summaryTotals.total,
-      filledSpecs:          data.progressInsights?.filledSpecs
-        ?? data.progressInsights?.filledParams
-        ?? data.progressInsights?.filledFields
-        ?? summaryTotals.filled,
-      completionPercentage: data.progressInsights?.completionPercentage
-        ?? (summaryTotals.total > 0 ? Math.round((summaryTotals.filled / summaryTotals.total) * 100) : 0),
-      allLotsEntered:       data.progressInsights?.allLotsEntered
-        ?? (
-          this.summaryType === "materials" || this.summaryType === "casings"
-            ? (this.materialsSummary.length > 0 && this.materialsSummary.every((m) => Boolean(m.lotNo)))
-            : false
-        ),
-      isReadyForApproval:   data.progressInsights?.isReadyForApproval   ?? false,
+      materialsCount:
+        data.progressInsights?.materialsCount ??
+        data.progressInsights?.ingredientsCount ??
+        this.materialsSummary.length,
+      totalSpecs:
+        data.progressInsights?.totalSpecs ??
+        data.progressInsights?.totalParams ??
+        data.progressInsights?.totalFields ??
+        summaryTotals.total,
+      filledSpecs:
+        data.progressInsights?.filledSpecs ??
+        data.progressInsights?.filledParams ??
+        data.progressInsights?.filledFields ??
+        summaryTotals.filled,
+      completionPercentage:
+        data.progressInsights?.completionPercentage ??
+        (summaryTotals.total > 0
+          ? Math.round((summaryTotals.filled / summaryTotals.total) * 100)
+          : 0),
+      allLotsEntered:
+        data.progressInsights?.allLotsEntered ??
+        (this.summaryType === "materials" || this.summaryType === "casings"
+          ? this.materialsSummary.length > 0 && this.materialsSummary.every((m) => Boolean(m.lotNo))
+          : false),
+      isReadyForApproval: data.progressInsights?.isReadyForApproval ?? false,
     };
     this.qualityInsights = {
-      totalTests:       data.qualityInsights?.totalTests       ?? 0,
-      passed:           data.qualityInsights?.passed           ?? 0,
-      failed:           data.qualityInsights?.failed           ?? 0,
-      passRate:         data.qualityInsights?.passRate         ?? 0,
-      nonConformances:  data.qualityInsights?.nonConformances  ?? [],
+      totalTests: data.qualityInsights?.totalTests ?? 0,
+      passed: data.qualityInsights?.passed ?? 0,
+      failed: data.qualityInsights?.failed ?? 0,
+      passRate: data.qualityInsights?.passRate ?? 0,
+      nonConformances: data.qualityInsights?.nonConformances ?? [],
     };
     this.workflowInsights = {
-      currentStatus:     data.workflowInsights?.currentStatus     ?? "",
-      rejectionReason:   data.workflowInsights?.rejectionReason   ?? null,
-      approvalPending:   data.workflowInsights?.approvalPending   ?? false,
-      reworkRequired:    data.workflowInsights?.reworkRequired    ?? false,
+      currentStatus: data.workflowInsights?.currentStatus ?? "",
+      rejectionReason: data.workflowInsights?.rejectionReason ?? null,
+      approvalPending: data.workflowInsights?.approvalPending ?? false,
+      reworkRequired: data.workflowInsights?.reworkRequired ?? false,
       resubmissionCount: data.workflowInsights?.resubmissionCount ?? 0,
     };
-    this.riskInsights  = {
-      riskLevel:   data.riskInsights?.riskLevel   ?? "Low",
-      riskScore:   data.riskInsights?.riskScore   ?? 0,
+    this.riskInsights = {
+      riskLevel: data.riskInsights?.riskLevel ?? "Low",
+      riskScore: data.riskInsights?.riskScore ?? 0,
       riskFactors: data.riskInsights?.riskFactors ?? [],
     };
     this.delayInsights = {
-      isDelayed:    data.delayInsights?.isDelayed    ?? false,
+      isDelayed: data.delayInsights?.isDelayed ?? false,
       delayInHours: data.delayInsights?.delayInHours ?? 0,
-      delayReason:  data.delayInsights?.delayReason  ?? null,
+      delayReason: data.delayInsights?.delayReason ?? null,
     };
-    this.alerts   = data.alerts   ?? [];
+    this.alerts = data.alerts ?? [];
     this.timeline = Array.isArray(data.timeline)
       ? data.timeline.map((e: any) => ({
           event: e.event ?? "",
-          by:    e.by    ?? { id: "", role: "", username: "" },
-          time:  e.time  ?? "",
+          by: e.by ?? { id: "", role: "", username: "" },
+          time: e.time ?? "",
         }))
       : [];
     this.documents = Array.isArray(data.documents)
       ? data.documents.map((d: any) => ({
-          fileId:       d.fileId       ?? "",
-          fileName:     d.fileName     ?? "",
+          fileId: d.fileId ?? "",
+          fileName: d.fileName ?? "",
           documentType: d.documentType ?? "",
-          uploadedBy:   d.uploadedBy   ?? { id: "", role: "", username: "" },
-          uploadedOn:   d.uploadedOn   ?? "",
+          uploadedBy: d.uploadedBy ?? { id: "", role: "", username: "" },
+          uploadedOn: d.uploadedOn ?? "",
         }))
       : [];
   }
@@ -748,7 +791,9 @@ export class BatchSubDeptDetailsModel {
     const directOperations = Array.isArray(data.operationsSummary) ? data.operationsSummary : null;
     const directProcesses = Array.isArray(data.processesSummary) ? data.processesSummary : null;
     const directSections = Array.isArray(data.sectionsSummary) ? data.sectionsSummary : null;
-    const directIngredients = Array.isArray(data.ingredientsSummary) ? data.ingredientsSummary : null;
+    const directIngredients = Array.isArray(data.ingredientsSummary)
+      ? data.ingredientsSummary
+      : null;
     const directCasings = Array.isArray(data.casingsSummary) ? data.casingsSummary : null;
     const directMaterials = Array.isArray(data.materialsSummary) ? data.materialsSummary : null;
 
@@ -776,7 +821,7 @@ export class BatchSubDeptDetailsModel {
               hasIssues: !f?.filled,
             },
             undefined,
-            `Field ${index + 1}`
+            `Field ${index + 1}`,
           );
         }),
       };
@@ -800,11 +845,12 @@ export class BatchSubDeptDetailsModel {
               failedSpecs: Math.max(totalSpecs - passedSpecs, 0),
               blockStatus: op?.blockStatus,
               failures,
-              completionPercentage: totalSpecs > 0 ? Math.round((passedSpecs / totalSpecs) * 100) : 0,
+              completionPercentage:
+                totalSpecs > 0 ? Math.round((passedSpecs / totalSpecs) * 100) : 0,
               hasIssues: op?.hasIssues ?? failures.length > 0,
             },
             undefined,
-            `Operation ${index + 1}`
+            `Operation ${index + 1}`,
           );
         }),
       };
@@ -828,8 +874,8 @@ export class BatchSubDeptDetailsModel {
               hasIssues: p?.hasIssues,
             },
             undefined,
-            `Process ${index + 1}`
-          )
+            `Process ${index + 1}`,
+          ),
         ),
       };
     }
@@ -839,28 +885,32 @@ export class BatchSubDeptDetailsModel {
         type: "sections",
         hasSummaryKey: true,
         entries: directSections.map((s: any, index: number) => {
-          const totalSpecs = s?.totalFields
-            ?? s?.totalActivities
-            ?? s?.totalRows
-            ?? s?.totalDefectTypes
-            ?? s?.totalCount
-            ?? s?.sampleRowsAdded
-            ?? 0;
-          const passedSpecs = s?.filledFields
-            ?? s?.completedActivities
-            ?? s?.filledRows
-            ?? s?.filledDefectTypes
-            ?? s?.filledCount
-            ?? 0;
-          const failedSpecs = s?.notOkCount ?? s?.failedSpecs ?? Math.max(totalSpecs - passedSpecs, 0);
+          const totalSpecs =
+            s?.totalFields ??
+            s?.totalActivities ??
+            s?.totalRows ??
+            s?.totalDefectTypes ??
+            s?.totalCount ??
+            s?.sampleRowsAdded ??
+            0;
+          const passedSpecs =
+            s?.filledFields ??
+            s?.completedActivities ??
+            s?.filledRows ??
+            s?.filledDefectTypes ??
+            s?.filledCount ??
+            0;
+          const failedSpecs =
+            s?.notOkCount ?? s?.failedSpecs ?? Math.max(totalSpecs - passedSpecs, 0);
           const label = s?.section ?? s?.activity ?? `Section ${index + 1}`;
-          const sectionMeta = s?.totalRows != null
-            ? `Rows: ${s.totalRows}`
-            : s?.bowlsAdded != null
-              ? `Bowls: ${s.bowlsAdded}`
-              : s?.dynamicTIntervalsAdded != null
-                ? `Intervals: ${s.dynamicTIntervalsAdded}`
-                : label;
+          const sectionMeta =
+            s?.totalRows != null
+              ? `Rows: ${s.totalRows}`
+              : s?.bowlsAdded != null
+                ? `Bowls: ${s.bowlsAdded}`
+                : s?.dynamicTIntervalsAdded != null
+                  ? `Intervals: ${s.dynamicTIntervalsAdded}`
+                  : label;
 
           return BatchSubDeptDetailsModel.toSummaryEntry(
             {
@@ -875,7 +925,7 @@ export class BatchSubDeptDetailsModel {
               hasIssues: s?.hasIssues ?? (s?.notOkCount ?? 0) > 0,
             },
             undefined,
-            `Section ${index + 1}`
+            `Section ${index + 1}`,
           );
         }),
       };
@@ -901,8 +951,8 @@ export class BatchSubDeptDetailsModel {
               hasIssues: (ing?.failedParams ?? 0) > 0,
             },
             undefined,
-            `Ingredient ${index + 1}`
-          )
+            `Ingredient ${index + 1}`,
+          ),
         ),
       };
     }
@@ -911,7 +961,9 @@ export class BatchSubDeptDetailsModel {
       return {
         type: "casings",
         hasSummaryKey: true,
-        entries: directCasings.map((c: any) => BatchSubDeptDetailsModel.toSummaryEntry(c, "casingId", "Casing")),
+        entries: directCasings.map((c: any) =>
+          BatchSubDeptDetailsModel.toSummaryEntry(c, "casingId", "Casing"),
+        ),
       };
     }
 
@@ -923,7 +975,9 @@ export class BatchSubDeptDetailsModel {
       };
     }
 
-    const genericSummaryKey = Object.keys(data).find((k) => k.endsWith("Summary") && Array.isArray(data[k]));
+    const genericSummaryKey = Object.keys(data).find(
+      (k) => k.endsWith("Summary") && Array.isArray(data[k]),
+    );
     if (!genericSummaryKey) {
       return { type: null, hasSummaryKey: false, entries: [] };
     }
@@ -934,43 +988,45 @@ export class BatchSubDeptDetailsModel {
       type,
       hasSummaryKey: true,
       entries: genericEntries.map((row: any, index: number) =>
-        BatchSubDeptDetailsModel.toSummaryEntry(row, undefined, `Item ${index + 1}`)
+        BatchSubDeptDetailsModel.toSummaryEntry(row, undefined, `Item ${index + 1}`),
       ),
     };
   }
 
-  private static toSummaryEntry(
-    row: any,
-    preferredIdKey?: string,
-    fallbackLabel = ""
-  ) {
-    const name = row?.material
-      ?? (preferredIdKey ? row?.[preferredIdKey] : undefined)
-      ?? row?.name
-      ?? row?.id
-      ?? row?.item
-      ?? fallbackLabel;
+  private static toSummaryEntry(row: any, preferredIdKey?: string, fallbackLabel = "") {
+    const name =
+      row?.material ??
+      (preferredIdKey ? row?.[preferredIdKey] : undefined) ??
+      row?.name ??
+      row?.id ??
+      row?.item ??
+      fallbackLabel;
 
-    const lotOrRef = row?.lotNo
-      ?? row?.batchNo
-      ?? row?.referenceNo
-      ?? (preferredIdKey ? row?.[preferredIdKey] : undefined)
-      ?? "";
+    const lotOrRef =
+      row?.lotNo ??
+      row?.batchNo ??
+      row?.referenceNo ??
+      (preferredIdKey ? row?.[preferredIdKey] : undefined) ??
+      "";
 
     const totalSpecs = row?.totalSpecs ?? 0;
     const passedSpecs = row?.passedSpecs ?? 0;
     const failedFromValues = row?.failedSpecs ?? Math.max(totalSpecs - passedSpecs, 0);
     const failures = row?.failures ?? [];
-    const computedFailed = Math.max(failedFromValues, Array.isArray(failures) ? failures.length : 0);
+    const computedFailed = Math.max(
+      failedFromValues,
+      Array.isArray(failures) ? failures.length : 0,
+    );
 
-    const blockStatus = row?.blockStatus
-      ?? (row?.hasIssues ? "Failed" : undefined)
-      ?? (row?.completionPercentage === 100 ? "Passed" : undefined)
-      ?? (computedFailed > 0 ? "Failed" : "In Progress");
+    const blockStatus =
+      row?.blockStatus ??
+      (row?.hasIssues ? "Failed" : undefined) ??
+      (row?.completionPercentage === 100 ? "Passed" : undefined) ??
+      (computedFailed > 0 ? "Failed" : "In Progress");
 
     return {
-      material:    name ?? "",
-      lotNo:       lotOrRef ?? "",
+      material: name ?? "",
+      lotNo: lotOrRef ?? "",
       totalSpecs,
       passedSpecs,
       failedSpecs: computedFailed,

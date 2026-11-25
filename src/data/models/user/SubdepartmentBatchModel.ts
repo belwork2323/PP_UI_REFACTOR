@@ -145,6 +145,9 @@ export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
   "motorStageLabel",
   "motorType",
   "batchType",
+  "batchTypeName",
+  "subBatchType",
+  "type",
   "priority",
   "projectName",
   "projectId",
@@ -182,11 +185,20 @@ export const subdepartmentBatchMatchesSearch = (batch: Record<string, unknown>, 
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
-  return SUBDEPARTMENT_BATCH_SEARCH_FIELDS.some((field) =>
-    String(getNestedValue(batch, field) ?? "")
-      .toLowerCase()
-      .includes(q),
-  );
+  // Match the batch type's enum (`SUBSCALE`) and display label (`Sub Scale`)
+  // regardless of which spacing the user enters in the search box.
+  const normalizedQuery = q.replace(/[^a-z0-9]/g, "");
+
+  return SUBDEPARTMENT_BATCH_SEARCH_FIELDS.some((field) => {
+    const value = String(getNestedValue(batch, field) ?? "").toLowerCase();
+    if (value.includes(q)) return true;
+    const isBatchTypeField =
+      field === "batchType" ||
+      field === "batchTypeName" ||
+      field === "subBatchType" ||
+      field === "type";
+    return isBatchTypeField && value.replace(/[^a-z0-9]/g, "").includes(normalizedQuery);
+  });
 };
 
 /** POST /user/subdepartment/batch-list request body */
@@ -493,6 +505,9 @@ export function mapSubdepartmentBatchListRow(
       : null;
   const projectId = String(nestedProject?.projectId ?? batch.projectId ?? "").trim();
   const projectName = String(nestedProject?.projectName ?? batch.projectName ?? "").trim();
+  const batchType = [batch.batchType, batch.batchTypeName, batch.subBatchType, batch.type]
+    .map((value) => String(value ?? "").trim())
+    .find(Boolean) ?? "";
 
   const stageLabel =
     stageResolution.stageEntry != null
@@ -516,7 +531,7 @@ export function mapSubdepartmentBatchListRow(
     motorStage,
     motorStageLabel: formatMotorStageLabel(motorStage),
     motorType: motorStage != null ? String(motorStage) : resolveMotorType(batch),
-    batchType: batch.batchType,
+    batchType,
     subBatchType: batch.subBatchType ?? null,
     priority: batch.priority,
     assignedTo: resolveAssignedTo(batch),

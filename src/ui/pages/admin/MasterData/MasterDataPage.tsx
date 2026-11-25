@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Box, Button, Chip } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
@@ -54,6 +54,13 @@ const MasterDataPage = () => {
     hook.selectedType === "beam-energy" || hook.selectedType === "subscale-articles",
   );
   const projectOptions = useProjectForMotorStageOptions(hook.selectedType === "motor-stages");
+  useEffect(() => {
+    hook.setProjectNameById(
+      Object.fromEntries(
+        projectOptions.projects.map(({ projectId, projectName }) => [projectId, projectName]),
+      ),
+    );
+  }, [hook.setProjectNameById, projectOptions.projects]);
   const dynamicAttributeOptions = useMemo(() => {
     const options: Record<string, typeof equipmentTypeOptions.options> = {};
     if (hook.selectedType === "equipment" && equipmentTypeOptions.options.length > 0) {

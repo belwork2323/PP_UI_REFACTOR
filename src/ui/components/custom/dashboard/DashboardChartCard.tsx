@@ -1,8 +1,8 @@
-import { ReactNode } from 'react';
-import { Box, Typography, Divider, SxProps, Theme } from '@mui/material';
-import { icons } from '@app/theme/icons';
-import Card from '@ui/components/common/Card';
-import StackRow from '@ui/components/common/StackRow';
+import { ReactNode } from "react";
+import { Box, Typography, Divider, SxProps, Theme } from "@mui/material";
+import { icons } from "@app/theme/icons";
+import Card from "@ui/components/common/Card";
+import StackRow from "@ui/components/common/StackRow";
 
 interface DashboardChartCardProps {
   cardSx: SxProps<Theme>;
@@ -22,19 +22,28 @@ interface DashboardChartCardProps {
 }
 
 const DashboardChartCard = ({
-  cardSx, headerBoxSx, contentSx,
-  title, subtitle, highlight, timestamp,
-  titleProps, subtitleProps, highlightProps, dividerProps,
-  clockIconSx, timestampProps,
+  cardSx,
+  headerBoxSx,
+  contentSx,
+  title,
+  subtitle,
+  highlight,
+  timestamp,
+  titleProps,
+  subtitleProps,
+  highlightProps,
+  dividerProps,
+  clockIconSx,
+  timestampProps,
   children,
 }: DashboardChartCardProps) => (
   <Card sx={cardSx}>
-    <Box sx={headerBoxSx}>
-      {children}
-    </Box>
+    <Box sx={headerBoxSx}>{children}</Box>
     <Box sx={contentSx}>
       <Typography {...(titleProps as any)}>{title}</Typography>
-      {highlight && highlightProps && <Typography {...(highlightProps as any)}>{highlight}</Typography>}
+      {highlight && highlightProps && (
+        <Typography {...(highlightProps as any)}>{highlight}</Typography>
+      )}
       {subtitle && subtitleProps && <Typography {...(subtitleProps as any)}>{subtitle}</Typography>}
       <Divider {...(dividerProps as any)} />
       <StackRow spacing={0.5}>

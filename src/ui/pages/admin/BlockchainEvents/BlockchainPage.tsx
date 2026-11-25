@@ -33,6 +33,7 @@ const BlockchainEvents = () => {
   const {
     batchesList,
     batchesLoading,
+    pagination,
     eventsFilterOpen,
     setEventsFilterOpen,
     toggleEventsFilterOpen,
@@ -99,7 +100,7 @@ const BlockchainEvents = () => {
           setActiveTab={setBlockchainActiveTab}
           page={blockchainPage}
           rowsPerPage={blockchainRowsPerPage}
-          totalCount={batchesList.length}
+          totalCount={Number(pagination?.totalRecords ?? pagination?.total ?? batchesList.length)}
           onPageChange={onBlockchainPageChange}
           onRowsPerPageChange={onBlockchainRowsPerPageChange}
           blockchainTabOptions={blockchainTabOptions}

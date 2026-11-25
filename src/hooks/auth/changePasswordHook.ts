@@ -44,6 +44,14 @@ export function useChangePasswordForm({
     setErrors((prev) => (prev[field] ? { ...prev, [field]: "" } : prev));
   }, []);
 
+  const resetForm = useCallback(() => {
+    setValues({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+  }, []);
+
   const validate = useCallback(() => {
     const V = STRINGS.AUTH.VALIDATION;
     const next = { ...INITIAL_ERRORS };
@@ -132,5 +140,6 @@ export function useChangePasswordForm({
     submitting,
     setField,
     handleSubmit,
+    resetForm,
   };
 }

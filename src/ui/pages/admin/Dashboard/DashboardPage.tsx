@@ -10,7 +10,7 @@ import DashboardBlockchainSection from "../BlockchainEvents/DashboardBlockchainS
 import DashboardActiveBatchesSection from "./components/DashboardActiveBatchesSection";
 
 /** Admin dashboard: hide Weekly Batch Activity, Motors Processed, QC Pass Rate charts (keep markup). */
-const SHOW_ADMIN_DASHBOARD_CHARTS = false;
+const SHOW_ADMIN_DASHBOARD_CHARTS = true;
 
 export default function DashboardPage() {
   const mode = useThemeStore((s) => s.mode);

@@ -16,7 +16,7 @@ import {
 import type { AppDropdownOption } from "./AppDropdown";
 
 export type AppSearchableDropdownProps = {
-  label?: string;
+  label?: string | ReactNode;
   value: string;
   onChange: (value: string) => void;
   options?: AppDropdownOption[];
@@ -101,8 +101,7 @@ const AppSearchableDropdown = ({
       getOptionLabel={getOptionLabel}
       isOptionEqualToValue={(option, current) => option.value === current.value}
       filterOptions={
-        filterOptions ??
-        ((opts, state) => defaultFilterOptions(opts, state, getOptionLabel))
+        filterOptions ?? ((opts, state) => defaultFilterOptions(opts, state, getOptionLabel))
       }
       renderOption={renderOption}
       renderInput={(params) => (

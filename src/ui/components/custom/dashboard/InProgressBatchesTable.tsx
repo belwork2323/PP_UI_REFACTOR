@@ -84,6 +84,7 @@ const BATCH_COLUMNS = [
   { label: "Status", sortKey: "status" },
   { label: "Created Date", sortKey: "createdOn" },
   { label: "Progress", sortKey: "completion" },
+  { label: "Action", sortKey: "action" },
 ];
 
 export default function InProgressBatchesTable({

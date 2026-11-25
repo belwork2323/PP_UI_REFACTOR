@@ -39,6 +39,7 @@ export default function useMasterDataHook() {
   const [activeFilter, setActiveFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [projectFilter, setProjectFilter] = useState("");
   const [motorStageFilter, setMotorStageFilter] = useState("");
+  const [projectNameById, setProjectNameById] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [nestedRefreshKey, setNestedRefreshKey] = useState(0);
@@ -104,7 +105,9 @@ export default function useMasterDataHook() {
     setLoadingList(true);
     try {
       const resp = await masterDataController.list(selectedType, {
-        search,
+        // Motor-stage search includes project names, which are resolved from
+        // project metadata on the client and are not searchable by this API.
+        search: selectedType === "motor-stages" ? "" : search,
         isActive: activeFilter === "ALL" ? null : activeFilter === "ACTIVE",
       });
       if (resp.success && resp.data) {
@@ -133,7 +136,7 @@ export default function useMasterDataHook() {
     } finally {
       setLoadingList(false);
     }
-  }, [selectedType, search, activeFilter, types]);
+  }, [selectedType, selectedType === "motor-stages" ? "" : search, activeFilter, types]);
 
   useEffect(() => {
     void loadTypes();
@@ -162,6 +165,7 @@ export default function useMasterDataHook() {
 
   const filteredItems = useMemo(() => {
     if (selectedType !== "motor-stages") return items;
+    const query = search.trim().toLocaleLowerCase();
     return items.filter((record) => {
       if (projectFilter && String(record.attributes?.projectId ?? "") !== projectFilter) {
         return false;
@@ -169,9 +173,22 @@ export default function useMasterDataHook() {
       if (motorStageFilter && String(record.attributes?.motorStage ?? "") !== motorStageFilter) {
         return false;
       }
+      if (query) {
+        const projectId = String(record.attributes?.projectId ?? "");
+        const searchable = [
+          record.name,
+          record.code,
+          record.attributes?.motorStage,
+          projectId,
+          projectNameById[projectId],
+        ]
+          .map((value) => String(value ?? "").trim().toLocaleLowerCase())
+          .filter(Boolean);
+        if (!searchable.some((value) => value.includes(query))) return false;
+      }
       return true;
     });
-  }, [items, selectedType, projectFilter, motorStageFilter]);
+  }, [items, selectedType, projectFilter, motorStageFilter, search, projectNameById]);
 
   const motorStageFilterOptions = useMemo(() => {
     if (selectedType !== "motor-stages" || !projectFilter) return [];
@@ -363,6 +380,7 @@ export default function useMasterDataHook() {
       setPage(0);
     },
     projectFilter,
+    setProjectNameById,
     setProjectFilter: (value: string) => {
       setProjectFilter(value);
       setMotorStageFilter("");

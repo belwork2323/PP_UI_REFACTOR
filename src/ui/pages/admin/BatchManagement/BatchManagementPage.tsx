@@ -74,7 +74,8 @@ const BatchManagementPage = () => {
   const deleteTarget = deleteSection.deleteTarget;
   const batchId = deleteTarget ? getBatchId(deleteTarget) : "";
   const motorId = deleteTarget ? getMotorId(deleteTarget) : "";
-  const canDelete = !!deleteSection.deleteReason?.trim();
+  const canDelete =
+    !!deleteSection.deleteReason?.trim() && !deleteSection.deleteReasonError;
   const { draftFilters } = list;
   const total = list.paginationData.totalRecords;
   const shown = list.batches.length;

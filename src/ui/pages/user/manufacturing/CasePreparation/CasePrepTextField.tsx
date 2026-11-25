@@ -18,6 +18,7 @@ type CasePrepTextFieldProps = {
   dataCpField?: string;
   /** Casting & Curing validation focus target (`data-cc-field`). */
   dataCcField?: string;
+  type?: string;
 };
 
 const CasePrepTextField = ({
@@ -34,6 +35,7 @@ const CasePrepTextField = ({
   required = false,
   dataCpField,
   dataCcField,
+  type = "text",
 }: CasePrepTextFieldProps) => {
   const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
   const palette = theme?.palette ?? {};
@@ -58,6 +60,7 @@ const CasePrepTextField = ({
         <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
       ) : (
         <TextField
+          type={type}
           fullWidth
           size="small"
           variant="outlined"

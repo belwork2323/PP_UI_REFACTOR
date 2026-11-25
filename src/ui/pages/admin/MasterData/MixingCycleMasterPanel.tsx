@@ -204,7 +204,7 @@ const MixingCycleMasterPanel = ({
                         <Typography sx={table.bodyText}>{row.mixingCycleName}</Typography>
                         {row.mixingCycleCode ? (
                           <Typography variant="caption" color="text.secondary" display="block">
-                            {row.mixingCycleCode}
+                            {S.MIXING_CYCLES.COL_CODE}: {row.mixingCycleCode}
                           </Typography>
                         ) : null}
                       </TableCell>

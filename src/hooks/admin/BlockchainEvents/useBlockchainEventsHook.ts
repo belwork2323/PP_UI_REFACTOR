@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { dashboardController } from "@controllers/admin/Dashboard/dashboardController";
 import { blockchainEventContrller } from "@/controllers/admin/BlockchainEvents/BlockchainEventController";
 
 export type BlockchainTab = "IN_PROGRESS" | "COMPLETED";
@@ -9,14 +8,55 @@ export const blockchainTabOptions = [
   { value: "COMPLETED", label: "Completed" },
 ];
 
-export function useBlockchainEventsHook(globalDateBounds: { startDate: string; endDate: string }) {
-  const DEFAULT_PANEL_FILTERS = {
-    subDepartment: "All",
-    dateFrom: "",
-    dateTo: "",
-    currentMonthOnly: false,
-  };
+const getNestedValue = (row: Record<string, unknown>, path: string): unknown =>
+  path.split(".").reduce<unknown>((value, key) => {
+    if (value && typeof value === "object") {
+      return (value as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, row);
 
+const BLOCKCHAIN_EVENT_SEARCH_FIELDS = [
+  "batchId",
+  "id",
+  "batchType",
+  "type",
+  "projectName",
+  "systemManager.fullName",
+  "systemManager.id",
+  "systemManagerName",
+  "systemManagerId",
+  "createdOn",
+  "createdAt",
+  "date",
+] as const;
+
+const DEFAULT_PANEL_FILTERS = {
+  subDepartment: "All",
+  dateFrom: "",
+  dateTo: "",
+  currentMonthOnly: false,
+};
+
+export const matchesBlockchainEventSearch = (batch: Record<string, unknown>, query: string) => {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+
+  return BLOCKCHAIN_EVENT_SEARCH_FIELDS.some((field) => {
+    const value = getNestedValue(batch, field);
+    if (String(value ?? "").toLowerCase().includes(needle)) return true;
+
+    // Created Date is rendered with the browser's locale format in the table.
+    if (["createdOn", "createdAt", "date"].includes(field) && value) {
+      const date = new Date(String(value));
+      return !Number.isNaN(date.getTime()) && date.toLocaleDateString().toLowerCase().includes(needle);
+    }
+
+    return false;
+  });
+};
+
+export function useBlockchainEventsHook(globalDateBounds: { startDate: string; endDate: string }) {
   const [batchesLoading, setBatchesLoading] = useState(false);
   const [batchesList, setBatchesList] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>(null);
@@ -58,8 +98,8 @@ export function useBlockchainEventsHook(globalDateBounds: { startDate: string; e
 
   const clearEventsFilters = useCallback(() => {
     setEventsSearchQuery("");
-    setDraftFilters(DEFAULT_PANEL_FILTERS);
-    setAppliedFilters(DEFAULT_PANEL_FILTERS);
+    setDraftFilters({ ...DEFAULT_PANEL_FILTERS });
+    setAppliedFilters({ ...DEFAULT_PANEL_FILTERS });
     setPage(0);
   }, []);
 
@@ -78,26 +118,51 @@ export function useBlockchainEventsHook(globalDateBounds: { startDate: string; e
     setPage(0);
   };
 
+  const handleSearchQueryChange = useCallback((query: string) => {
+    setEventsSearchQuery(query);
+    setPage(0);
+  }, []);
+
   // 1. Fetch Main Batch List API
   const fetchBatches = useCallback(async () => {
     setBatchesLoading(true);
     try {
+      const searchQuery = eventsSearchQuery.trim();
+      const isClientSearch = Boolean(searchQuery);
       const payload = {
-        search: eventsSearchQuery.trim() || undefined,
+        // The endpoint's search is batch-ID oriented. Search the returned batch
+        // fields locally so type, project, manager, and date queries work too.
+        search: undefined,
         status: blockchainActiveTab,
         subDepartment:
           appliedFilters.subDepartment !== "All" ? appliedFilters.subDepartment : undefined,
         startDate: appliedFilters.dateFrom || globalDateBounds.startDate,
         endDate: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonth: appliedFilters.currentMonthOnly,
-        page: page + 1,
-        pageSize: rowsPerPage,
+        page: isClientSearch ? 1 : page + 1,
+        pageSize: isClientSearch ? 5000 : rowsPerPage,
       };
-      console.log("getting called ");
 
       const response = await blockchainEventContrller.getBlockchainEvents(payload);
-      setBatchesList(response?.data?.batches ?? response?.data ?? []);
-      setPagination(response?.data?.pagination ?? null);
+      const fetchedBatches: any[] = response?.data?.batches ?? response?.data ?? [];
+      const apiPagination = response?.data?.pagination ?? null;
+
+      if (isClientSearch) {
+        const matchingBatches = fetchedBatches.filter((batch) =>
+          matchesBlockchainEventSearch(batch, searchQuery),
+        );
+        const totalRecords = matchingBatches.length;
+        setBatchesList(matchingBatches.slice(page * rowsPerPage, (page + 1) * rowsPerPage));
+        setPagination({
+          page: page + 1,
+          pageSize: rowsPerPage,
+          totalRecords,
+          totalPages: Math.ceil(totalRecords / rowsPerPage),
+        });
+      } else {
+        setBatchesList(fetchedBatches);
+        setPagination(apiPagination);
+      }
     } finally {
       setBatchesLoading(false);
     }
@@ -162,7 +227,7 @@ export function useBlockchainEventsHook(globalDateBounds: { startDate: string; e
     setEventsFilterOpen,
     toggleEventsFilterOpen,
     eventsSearchQuery,
-    setEventsSearchQuery,
+    setEventsSearchQuery: handleSearchQueryChange,
     eventsDraftFilters: draftFilters,
     setEventsDraftFilter: setDraftFilter,
     applyEventsFilters,

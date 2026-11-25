@@ -29,6 +29,7 @@ const S = STRINGS.MASTER_DATA;
 
 type Options = {
   activeFilter: "ALL" | "ACTIVE" | "INACTIVE";
+  projectNameById: Record<string, string>;
   refreshKey?: number;
   onListPayloadChange?: (payload: CuringCycleListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
@@ -36,6 +37,7 @@ type Options = {
 
 export default function useCuringCycleMasterHook({
   activeFilter,
+  projectNameById,
   refreshKey = 0,
   onListPayloadChange,
   onStatsChange,
@@ -64,7 +66,6 @@ export default function useCuringCycleMasterHook({
     setLoading(true);
     try {
       const body: Record<string, unknown> = {};
-      if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
       if (projectFilter) body.projectId = projectFilter;
@@ -96,7 +97,7 @@ export default function useCuringCycleMasterHook({
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, motorStageFilter, projectFilter, search]);
+  }, [activeFilter, motorStageFilter, projectFilter]);
 
   useEffect(() => {
     setPage(0);
@@ -104,10 +105,24 @@ export default function useCuringCycleMasterHook({
     void loadList();
   }, [loadList, refreshKey]);
 
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return items;
+    return items.filter((record) =>
+      [
+        projectNameById[record.projectId],
+        record.projectId,
+        record.motorStageName,
+        record.motorStage,
+        record.curingType,
+      ].some((value) => String(value ?? "").trim().toLocaleLowerCase().includes(query)),
+    );
+  }, [items, projectNameById, search]);
+
   const paginated = useMemo(() => {
     const start = page * rowsPerPage;
-    return items.slice(start, start + rowsPerPage);
-  }, [items, page, rowsPerPage]);
+    return filteredItems.slice(start, start + rowsPerPage);
+  }, [filteredItems, page, rowsPerPage]);
 
   const closeInline = () => {
     if (saving) return;
@@ -220,6 +235,7 @@ export default function useCuringCycleMasterHook({
 
   return {
     items,
+    filteredItems,
     paginated,
     listPayload,
     stats,

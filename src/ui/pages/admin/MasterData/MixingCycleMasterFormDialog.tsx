@@ -44,6 +44,7 @@ import {
 } from "@data/models/admin/MasterData/MixingCycleMasterModel";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -144,6 +145,7 @@ const OperationsEditor = ({
                   error={Boolean(opError)}
                   helperText={opError ?? null}
                   width="100%"
+                  required
                   theme={theme}
                   onChange={(value) => {
                     const next = [...ops];
@@ -300,7 +302,7 @@ const MixingCycleMasterFormDialog = ({
                   />
                 ) : (
                   <AppSearchableDropdown
-                    label={S.MIXING_CYCLES.COL_PROJECT}
+                    label={<FieldLabelWithAsterisk label={S.MIXING_CYCLES.COL_PROJECT} required />}
                     value={form.projectId}
                     onChange={(value) =>
                       onChange({
@@ -313,7 +315,7 @@ const MixingCycleMasterFormDialog = ({
                     options={projectOptions}
                     loading={projectLoading}
                     placeholder={S.MIXING_CYCLES.PROJECT_SELECT_PLACEHOLDER}
-                    required
+
                     error={Boolean(projectError)}
                     helperText={projectError}
                     disabled={saving}
@@ -345,7 +347,9 @@ const MixingCycleMasterFormDialog = ({
                   />
                 ) : (
                   <AppDropdown
-                    label={S.MIXING_CYCLES.COL_MOTOR_STAGE}
+                    label={
+                      <FieldLabelWithAsterisk label={S.MIXING_CYCLES.COL_MOTOR_STAGE} required />
+                    }
                     value={form.motorStage === "" ? "" : String(form.motorStage)}
                     onChange={(value) =>
                       onChange({
@@ -357,7 +361,6 @@ const MixingCycleMasterFormDialog = ({
                     options={motorStageOptions}
                     loading={motorStageLoading}
                     placeholder={S.MIXING_CYCLES.MOTOR_STAGE_SELECT_PLACEHOLDER}
-                    required
                     disabled={saving || motorStageLoading || !form.projectId.trim()}
                     error={Boolean(stageError)}
                     helperText={stageError}
@@ -371,15 +374,12 @@ const MixingCycleMasterFormDialog = ({
                   fullWidth
                   size="small"
                   variant="outlined"
-                  label={S.MIXING_CYCLES.COL_NAME}
+                  label={<FieldLabelWithAsterisk label={S.MIXING_CYCLES.COL_NAME} required />}
                   value={form.mixingCycleName}
                   disabled={saving}
-                  required
                   error={Boolean(nameError)}
                   helperText={nameError ?? null}
-                  onChange={(event) =>
-                    onChange({ ...form, mixingCycleName: event.target.value })
-                  }
+                  onChange={(event) => onChange({ ...form, mixingCycleName: event.target.value })}
                   InputLabelProps={appDropdownLabelProps}
                   inputProps={appDropdownInputProps}
                   sx={{ ...appDropdownSx, mb: 0 }}

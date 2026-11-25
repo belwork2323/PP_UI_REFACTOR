@@ -29,13 +29,17 @@ const ChangePasswordDialog = ({ open, onClose }: Props) => {
 
   const form = useChangePasswordForm({
     forced: false,
-    onSuccess: onClose,
+    onSuccess: () => {
+      form.resetForm?.();
+      onClose();
+    },
   });
 
   const handleClose = () => {
-    if (!form.submitting) onClose();
+    if (form.submitting) return;
+    form.resetForm?.();
+    onClose();
   };
-
   return (
     <Dialog
       open={open}

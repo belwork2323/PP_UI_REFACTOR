@@ -4,15 +4,43 @@ import { systemManagerController } from "../../controllers/system_manager/system
 import { SMChartDataModel } from "../../data/models/SystemManagerModel";
 import { DEFAULT_DATE_FILTER_TYPE } from "../../ui/components/custom/dashboard/DashboardDateFilter";
 
+export interface ChartAxisPoint {
+  m: string;
+  day: string;
+  v: number;
+}
+
+export interface DashboardChartSeries {
+  areaData: Array<{ m: string; v: number }>;
+  barData: Array<{ day: string; v: number }>;
+  qcPassRateData: Array<{ label: string; v: number }>;
+  timeUnit?: string;
+  filterType?: string;
+}
+
+interface RawChartPoint {
+  label?: string;
+  day?: string;
+  m?: string;
+  value?: number | string;
+  v?: number | string;
+}
+
 const createEmptyDashboard = (stageConfig: any[]) => ({
-  kpiData: [],
-  stageMetrics: [],
+  kpiData: [] as any[],
+  stageMetrics: [] as any[],
   stageData: { totalBatches: 0, filterType: DEFAULT_DATE_FILTER_TYPE, stages: [] as any[] },
-  activeBatches: [],
-  blockEvents: [],
-  chartData: { areaData: [], barData: [] },
+  activeBatches: [] as any[],
+  blockEvents: [] as any[],
+  chartData: {
+    areaData: [] as Array<{ m: string; v: number }>,
+    barData: [] as Array<{ day: string; v: number }>,
+    qcPassRateData: [] as Array<{ label: string; v: number }>,
+    timeUnit: "month",
+    filterType: "custom",
+  } as DashboardChartSeries,
   stageConfig,
-  chartUpdatedAt: null,
+  chartUpdatedAt: null as Date | null,
 });
 
 const toStageKey = (stageName: string = "") => {
@@ -29,6 +57,38 @@ const toApiDate = (date: Date) => {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const year = date.getFullYear();
   return `${day}-${month}-${year}`;
+};
+
+const toAreaPoints = (points: RawChartPoint[] = []): Array<{ m: string; v: number }> =>
+  points.map((pt) => ({
+    m: pt.m ?? pt.label ?? pt.day ?? "",
+    v: Number(pt.v ?? pt.value ?? 0),
+  }));
+
+const toBarPoints = (points: RawChartPoint[] = []): Array<{ day: string; v: number }> =>
+  points.map((pt) => ({
+    day: pt.day ?? pt.label ?? pt.m ?? "",
+    v: Number(pt.v ?? pt.value ?? 0),
+  }));
+
+const toLabelValuePoints = (points: RawChartPoint[] = []): Array<{ label: string; v: number }> =>
+  points.map((pt) => ({
+    label: pt.label ?? pt.day ?? pt.m ?? "",
+    v: Number(pt.v ?? pt.value ?? 0),
+  }));
+
+const parseChartTimestamp = (raw?: string): Date => {
+  if (!raw) return new Date();
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  // Handles "25-11-2026 11:27:52" (dd-MM-yyyy HH:mm:ss)
+  const match = raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+  if (match) {
+    const [, dd, mm, yyyy, hh = "00", min = "00", ss = "00"] = match;
+    return new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`);
+  }
+  return new Date();
 };
 
 export const getSMDateRange = (
@@ -84,18 +144,21 @@ export const useSMDashboard = (config: {
   stageColors: Record<string, string>;
   kpiVariants: Record<string, { color: string; iconKey: string }>;
 }) => {
-  const [dashboard, setDashboard] = useState(createEmptyDashboard(config.stageConfig));
+  const [dashboard, setDashboard] = useState(() => createEmptyDashboard(config.stageConfig));
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
+
   /** Draft custom dates (picker) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+
   /** Applied custom dates used for API calls */
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
   const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
+
   const hasLoadedOnceRef = useRef(false);
   const lastValidBoundsRef = useRef(getSMDateRange(DEFAULT_DATE_FILTER_TYPE, "", ""));
   const [customApplyToken, setCustomApplyToken] = useState(0);
@@ -124,83 +187,108 @@ export const useSMDashboard = (config: {
       }
       setStatsLoading(true);
 
-      const [statsResult, chartResult, blockchainResult] = await Promise.all([
-        systemManagerController.getStats(apiFilter, startDate, endDate),
-        systemManagerController.getChartData(apiFilter, startDate, endDate),
-        systemManagerController.getBlockchainEvents({
-          systemManagerId,
-          search: "",
-          eventType: "All",
-          department: "All",
-          subDepartment: "All",
-          startDate,
-          endDate,
-          page: 1,
-          pageSize: 5,
-        }),
-      ]);
+      try {
+        const [statsResult, chartResult, blockchainResult] = await Promise.all([
+          systemManagerController.getStats(apiFilter, startDate, endDate),
+          systemManagerController.getChartData(apiFilter, startDate, endDate),
+          systemManagerController.getBlockchainEvents({
+            systemManagerId,
+            search: "",
+            eventType: "All",
+            department: "All",
+            subDepartment: "All",
+            startDate,
+            endDate,
+            page: 1,
+            pageSize: 5,
+          }),
+        ]);
 
-      const stats = statsResult.success ? statsResult.stats : [];
-      const chartData = chartResult.success ? chartResult.chartData : SMChartDataModel.empty();
-      const chartUpdatedAt =
-        chartResult.success && chartResult.timestamp ? new Date(chartResult.timestamp) : new Date();
-      const blockchainEvents = blockchainResult.success ? blockchainResult.events : [];
-      const fallbackStageColor = stageColors.fallback;
-      const fallbackKpiVariant = kpiVariants.fallback;
+        const stats = statsResult.success ? statsResult.stats : [];
+        const modelChartData = chartResult.success
+          ? chartResult.chartData
+          : SMChartDataModel.empty();
+        const rawPayload: any =
+          (chartResult as any)?.data ?? (chartResult as any)?.rawData ?? modelChartData;
 
-      setDashboard({
-        kpiData: stats.map((item: any) => {
-          const variantConfig = kpiVariants[item.variant] ?? fallbackKpiVariant;
+        const areaData = Array.isArray(rawPayload?.motorsProcessed)
+          ? toAreaPoints(rawPayload.motorsProcessed)
+          : toAreaPoints(modelChartData?.lineChartData ?? []);
+        console.log(rawPayload);
 
-          return {
-            label: item.label,
-            value: item.value,
-            sub: item.subText,
-            trend: item.subValue >= 0 ? "up" : "down",
-            color: variantConfig.color,
-            iconKey: variantConfig.iconKey,
-          };
-        }),
-        stageData: {
-          totalBatches: chartData.totalActiveBatches ?? chartData.stageTotalBatches ?? 0,
-          filterType: ft,
-          stages: (chartData.stageProcessed ?? []).map((item: any) => {
-            const key = toStageKey(item.stage);
-            const stageCfg = stageConfig.find((sc: any) => sc.key === key);
+        const barData = Array.isArray(rawPayload?.weeklyActivity)
+          ? toBarPoints(rawPayload.weeklyActivity)
+          : toBarPoints(modelChartData?.barChartData ?? []);
+
+        const qcPassRateData = Array.isArray(rawPayload?.qcPassRate)
+          ? toLabelValuePoints(rawPayload.qcPassRate)
+          : [];
+
+        const rawTimestamp = (chartResult as any)?.timestamp ?? (chartResult as any)?.rawTimestamp;
+        const chartUpdatedAt = chartResult.success ? parseChartTimestamp(rawTimestamp) : new Date();
+
+        const blockchainEvents = blockchainResult.success ? blockchainResult.events : [];
+        const fallbackStageColor = stageColors.fallback;
+        const fallbackKpiVariant = kpiVariants.fallback;
+
+        setDashboard({
+          kpiData: stats.map((item: any) => {
+            const variantConfig = kpiVariants[item.variant] ?? fallbackKpiVariant;
+
             return {
-              stage: item.stage,
-              batchCount: item.batchCount,
-              percentage: item.percentage ?? 0,
-              color: stageColors[key] ?? fallbackStageColor,
-              iconKey: stageCfg?.iconKey ?? "Inventory2",
+              label: item.label,
+              value: item.value,
+              sub: item.subText,
+              trend: item.subValue >= 0 ? "up" : "down",
+              color: variantConfig.color,
+              iconKey: variantConfig.iconKey,
             };
           }),
-        },
-        stageMetrics: (chartData.stageProcessed ?? []).map((item: any) => ({
-          stage: item.stage,
-          completed: item.batchCount,
-          color: stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
-          pct: item.percentage ?? 0,
-        })),
-        activeBatches: [],
-        blockEvents: blockchainEvents.map((event: any) => ({
-          motorId: event.batchId || event.transactionId,
-          label: event.eventStatusMessage,
-          time: event.timestamp,
-          color: event.color,
-          icon: event.icon,
-        })),
-        chartData: {
-          areaData: chartData.lineChartData,
-          barData: chartData.barChartData,
-        },
-        chartUpdatedAt,
-        stageConfig,
-      });
-
-      hasLoadedOnceRef.current = true;
-      setLoading(false);
-      setStatsLoading(false);
+          stageData: {
+            totalBatches:
+              modelChartData.totalActiveBatches ?? modelChartData.stageTotalBatches ?? 0,
+            filterType: ft,
+            stages: (modelChartData.stageProcessed ?? []).map((item: any) => {
+              const key = toStageKey(item.stage);
+              const stageCfg = stageConfig.find((sc: any) => sc.key === key);
+              return {
+                stage: item.stage,
+                batchCount: item.batchCount,
+                percentage: item.percentage ?? 0,
+                color: stageColors[key] ?? fallbackStageColor,
+                iconKey: stageCfg?.iconKey ?? "Inventory2",
+              };
+            }),
+          },
+          stageMetrics: (modelChartData.stageProcessed ?? []).map((item: any) => ({
+            stage: item.stage,
+            completed: item.batchCount,
+            color: stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
+            pct: item.percentage ?? 0,
+          })),
+          activeBatches: [],
+          blockEvents: blockchainEvents.map((event: any) => ({
+            motorId: event.batchId || event.transactionId,
+            label: event.eventStatusMessage,
+            time: event.timestamp,
+            color: event.color,
+            icon: event.icon,
+          })),
+          chartData: {
+            areaData,
+            barData,
+            qcPassRateData,
+            timeUnit: rawPayload?.timeUnit ?? "month",
+            filterType: rawPayload?.filterType ?? apiFilter,
+          },
+          chartUpdatedAt,
+          stageConfig,
+        });
+      } finally {
+        hasLoadedOnceRef.current = true;
+        setLoading(false);
+        setStatsLoading(false);
+      }
     },
     [stageConfig, stageColors, kpiVariants],
   );
@@ -211,25 +299,28 @@ export const useSMDashboard = (config: {
     if (!startDate || !endDate) return;
 
     setAlertsLoading(true);
-    const alertsResult = await systemManagerController.getAlerts({
-      systemManagerId,
-      page: 1,
-      limit: 5,
-      dateRange: { from: startDate, to: endDate },
-    });
-    setAlerts(
-      alertsResult.success
-        ? alertsResult.alerts.map((alert: any) => ({
-            type: alert.type,
-            msg: alert.msg,
-            time: alert.time,
-            batchId: alert.batchId,
-            motorId: alert.motorId,
-            stage: alert.stage,
-          }))
-        : [],
-    );
-    setAlertsLoading(false);
+    try {
+      const alertsResult = await systemManagerController.getAlerts({
+        systemManagerId,
+        page: 1,
+        limit: 5,
+        dateRange: { from: startDate, to: endDate },
+      });
+      setAlerts(
+        alertsResult.success
+          ? alertsResult.alerts.map((alert: any) => ({
+              type: alert.type,
+              msg: alert.msg,
+              time: alert.time,
+              batchId: alert.batchId,
+              motorId: alert.motorId,
+              stage: alert.stage,
+            }))
+          : [],
+      );
+    } finally {
+      setAlertsLoading(false);
+    }
   }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const setFilterType = useCallback((next: string) => {

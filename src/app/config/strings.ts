@@ -288,6 +288,9 @@ export const STRINGS = {
       APPROVED_ON: "Approved On",
       REJECTION_REASON: "Rejection Reason",
       APPROVER_REMARKS: "Approver Remarks",
+      REJECTED_BY: "Rejected By",
+      REJECTED_ON: "Rejected On",
+      REJECTED_REMARKS: "Rejected Remarks",
       AUDIT_DETAILS_SECTION_TITLE: "Audit Details",
       VIEW_FORM_DETAILS: "View Details",
       FORM_DETAILS_TITLE: "Form Details",
@@ -1130,8 +1133,7 @@ export const STRINGS = {
         visualInspectionReport: {
           required: "Visual Inspection Report is required.",
           invalid: "Visual Inspection Report is required.",
-          uploadFailed:
-            "Visual Inspection Report upload failed. Retry or remove the failed file.",
+          uploadFailed: "Visual Inspection Report upload failed. Retry or remove the failed file.",
         },
         dimensionalInspectionReport: {
           required: "Dimension Inspection Report is required.",
@@ -3967,6 +3969,7 @@ export const STRINGS = {
       SPECS_REQUIRED_HINT: "At least one material-level specification is required.",
     },
     MOTOR_STAGES: {
+      SEARCH_PLACEHOLDER: "Search by project name or motor stage…",
       PROJECT_FILTER_LABEL: "Project",
       PROJECT_FILTER_PLACEHOLDER: "All projects",
       MOTOR_STAGE_FILTER_LABEL: "Motor stage",
@@ -4057,7 +4060,7 @@ export const STRINGS = {
       PARAM_UNIT: "Unit",
     },
     CURING_CYCLES: {
-      SEARCH_PLACEHOLDER: "Search by code, project, stage, or curing type…",
+      SEARCH_PLACEHOLDER: "Search by project name, motor stage, or curing type…",
       PROJECT_FILTER_LABEL: "Project",
       PROJECT_FILTER_PLACEHOLDER: "All projects",
       PROJECT_SELECT_PLACEHOLDER: "Select project",
@@ -4353,7 +4356,7 @@ export const STRINGS = {
       { label: "Total Batches", subLabel: "All registered batches", variant: "total" },
       { label: "In Progress", subLabel: "Currently active", variant: "inProgress" },
       { label: "Completed", subLabel: "Fully processed", variant: "completed" },
-      { label: "Pending", subLabel: "Awaiting action", variant: "pending" },
+      { label: "Waiting for Approval", subLabel: "Awaiting action", variant: "pending" },
       { label: "Rejected", subLabel: "Requires attention", variant: "rejected" },
     ],
     TOOLBAR: {
@@ -4660,6 +4663,10 @@ export const STRINGS = {
       },
       WEEKLY_ACTIVITY: { TITLE: "Weekly Activity", SUBTITLE: "Stage transitions this period" },
       STAGE_BREAKDOWN: { TITLE: "Stage Distribution", SUBTITLE: "Batch count by processing stage" },
+      QC_PASS_RATE: {
+        TITLE: "QC Pass Rate",
+        SUBTITLE: "Percentage of batches passing quality control",
+      },
     },
     BATCH_STATUS: {
       SECTION_TITLE: "Batch Status List",

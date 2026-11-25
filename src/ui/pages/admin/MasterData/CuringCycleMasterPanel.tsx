@@ -76,9 +76,17 @@ const CuringCycleMasterPanel = ({
     options: projectOptions,
     loading: projectLoading,
   } = useProjectForMotorStageOptions(true);
+  const projectNameById = useMemo(
+    () =>
+      Object.fromEntries(
+        projectSelectOptions.map(({ projectId, projectName }) => [projectId, projectName]),
+      ),
+    [projectSelectOptions],
+  );
   const { options: curingTypeOptions } = useCuringTypeOptions();
   const hook = useCuringCycleMasterHook({
     activeFilter,
+    projectNameById,
     refreshKey,
     onListPayloadChange,
     onStatsChange,
@@ -248,7 +256,7 @@ const CuringCycleMasterPanel = ({
         </TableContainer>
         <TablePagination
           component="div"
-          count={hook.items.length}
+          count={hook.filteredItems.length}
           page={hook.page}
           onPageChange={(_e, p) => hook.setPage(p)}
           rowsPerPage={hook.rowsPerPage}

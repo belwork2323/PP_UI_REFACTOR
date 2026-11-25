@@ -5,10 +5,7 @@ import {
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import { formatMotorStageLabel } from "@data/models/admin/MasterData/MixingCycleMasterModel";
-import {
-  isMixTypeValue,
-  MIX_TYPE_OPTIONS,
-} from "@data/models/admin/MasterData/mixTypeOptions";
+import { isMixTypeValue, MIX_TYPE_OPTIONS } from "@data/models/admin/MasterData/mixTypeOptions";
 import {
   firstFieldErrorMessage,
   validateReferenceRangeFields,
@@ -175,7 +172,9 @@ export const getQualityCheckFieldErrors = (
   if (!isEdit && !errors.mixType && !errors.motorStage) {
     const mix = form.mixType.trim();
     const stage = Number(form.motorStage);
-    const duplicate = existing.some((item) => item.mixType.trim() === mix && item.motorStage === stage);
+    const duplicate = existing.some(
+      (item) => item.mixType.trim() === mix && item.motorStage === stage,
+    );
     if (duplicate) {
       errors.mixType = `Quality check already exists for ${mix} and stage ${stage}`;
     }

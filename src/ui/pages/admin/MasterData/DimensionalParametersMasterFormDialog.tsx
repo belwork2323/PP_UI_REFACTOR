@@ -110,20 +110,24 @@ const ParameterRowsEditor = ({
         onChange(rows.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
       };
 
-      const rowKey = row.parameterId != null ? `parameter-${row.parameterId}` : `parameter-new-${index}`;
+      const rowKey =
+        row.parameterId != null ? `parameter-${row.parameterId}` : `parameter-new-${index}`;
+      const rowErrorMessages = [nameError, minError, maxError].filter(Boolean) as string[];
+      const readOnly = Boolean(disabled || locked);
 
       return (
         <Box
           key={rowKey}
           sx={{
             border: "1px solid",
-            borderColor: nameError || minError || maxError ? "error.main" : "divider",
+            borderColor: rowErrorMessages.length > 0 ? "error.main" : "divider",
             borderRadius: 1.5,
             p: 1.5,
             bgcolor: locked ? "action.hover" : "background.paper",
             opacity: locked && !row.isActive ? 0.72 : 1,
           }}
         >
+          {/* Fields row: all fields aligned to the top */}
           <Box
             sx={{
               display: "grid",
@@ -132,16 +136,26 @@ const ParameterRowsEditor = ({
                 md: "minmax(160px, 1.4fr) 90px 90px minmax(120px, 160px) auto auto",
               },
               gap: 1.25,
-              alignItems: "flex-end",
+              alignItems: "flex-start",
             }}
           >
-            {locked ? (
-              <Box sx={{ pb: 0.5 }}>
+            {readOnly ? (
+              <Box sx={{ pb: 0.5, minWidth: 0 }}>
                 <Typography variant="caption" color="text.secondary" display="block">
-                  {S.DIMENSIONAL_PARAMETERS.EXISTING_PARAMETER_LABEL}
+                  {locked
+                    ? S.DIMENSIONAL_PARAMETERS.EXISTING_PARAMETER_LABEL
+                    : S.DIMENSIONAL_PARAMETERS.COL_NAME}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {row.paramName}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {row.paramName || "-"}
                 </Typography>
               </Box>
             ) : (
@@ -149,20 +163,18 @@ const ParameterRowsEditor = ({
                 label={S.DIMENSIONAL_PARAMETERS.COL_NAME}
                 required={editable}
                 value={row.paramName}
-                disabled={disabled || locked}
                 error={Boolean(nameError)}
-                helperText={nameError}
                 width="100%"
                 theme={theme}
                 onChange={(value) => updateRow({ paramName: value })}
               />
             )}
+
             <CasePrepTextField
               label={S.DIMENSIONAL_PARAMETERS.COL_MIN}
               value={row.minValue}
               disabled={disabled || locked}
               error={Boolean(minError)}
-              helperText={minError}
               width="100%"
               theme={theme}
               onChange={(value) => {
@@ -171,12 +183,12 @@ const ParameterRowsEditor = ({
                 updateRow({ minValue: next });
               }}
             />
+
             <CasePrepTextField
               label={S.DIMENSIONAL_PARAMETERS.COL_MAX}
               value={row.maxValue}
               disabled={disabled || locked}
               error={Boolean(maxError)}
-              helperText={maxError}
               width="100%"
               theme={theme}
               onChange={(value) => {
@@ -185,6 +197,7 @@ const ParameterRowsEditor = ({
                 updateRow({ maxValue: next });
               }}
             />
+
             <CasePrepSearchableSelect
               label={S.DIMENSIONAL_PARAMETERS.COL_UNIT}
               value={row.unitId}
@@ -201,6 +214,7 @@ const ParameterRowsEditor = ({
                 });
               }}
             />
+
             <MasterDataEnableDisableField
               checked={row.isActive}
               disabled={disabled}
@@ -214,13 +228,14 @@ const ParameterRowsEditor = ({
                 updateRow({ isActive: checked });
               }}
             />
+
             {!locked && (!isEditMode ? rows.length > 1 : true) ? (
               <IconButton
                 size="small"
                 disabled={disabled}
                 onClick={() => onChange(rows.filter((_, idx) => idx !== index))}
                 aria-label={S.DIMENSIONAL_PARAMETERS.REMOVE_PARAMETER}
-                sx={{ mb: 0.5 }}
+                sx={{ mt: 2.5 }}
               >
                 <icons.Delete fontSize="small" />
               </IconButton>
@@ -228,6 +243,22 @@ const ParameterRowsEditor = ({
               <Box sx={{ width: 40 }} />
             )}
           </Box>
+
+          {rowErrorMessages.length > 0 && (
+            <Box sx={{ mt: 1 }}>
+              {rowErrorMessages.map((message) => (
+                <Typography
+                  key={message}
+                  variant="caption"
+                  color="error"
+                  display="block"
+                  sx={{ wordBreak: "break-word" }}
+                >
+                  {message}
+                </Typography>
+              ))}
+            </Box>
+          )}
         </Box>
       );
     })}
@@ -310,9 +341,7 @@ const DimensionalParametersMasterFormDialog = ({
     onClose();
   };
 
-  const stageLabel = editForm
-    ? formatMotorStageLabel(editForm.motorType, motorStageOptions)
-    : "";
+  const stageLabel = editForm ? formatMotorStageLabel(editForm.motorType, motorStageOptions) : "";
   const projectLabel = editForm
     ? String(
         projectOptions.find((o) => o.value === editForm.projectId)?.label ||
@@ -398,7 +427,9 @@ const DimensionalParametersMasterFormDialog = ({
               renderOption={(props, option) => (
                 <Box component="li" {...props} key={option.value}>
                   <Box sx={batchModal.projectOption}>
-                    <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                    <Typography sx={batchModal.projectOptionName}>
+                      {String(option.label)}
+                    </Typography>
                     <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
                   </Box>
                 </Box>

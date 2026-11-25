@@ -11,14 +11,12 @@ const ROUTE_IMPORTS: Record<string, RouteImporter> = {
   "centre-head": () => import("@/ui/pages/centrehead/Dashboard/CentreheadDashboardPage"),
   "system-manager": () => import("../../ui/pages/systemManager/SystemManagerDashboard"),
   user: () => import("../../ui/pages/user/UserDashboard"),
-  "approver/sourcing": () =>
-    import("../../ui/pages/approver/sourcing/SourcingApproverDashboard"),
+  "approver/sourcing": () => import("../../ui/pages/approver/sourcing/SourcingApproverDashboard"),
   "approver/manufacturing": () =>
     import("../../ui/pages/approver/manufacturing/ManufacturingApproverDashboard"),
   "approver/quality": () =>
     import("../../ui/pages/approver/qualityControl/QualityControlApproverDashboard"),
-  "approver/dispatch": () =>
-    import("../../ui/pages/approver/dispatch/DispatchApproverDashboard"),
+  "approver/dispatch": () => import("../../ui/pages/approver/dispatch/DispatchApproverDashboard"),
   "change-password": () => import("../../ui/pages/auth/ChangePasswordPage"),
 };
 

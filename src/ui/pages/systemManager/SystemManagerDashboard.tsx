@@ -4,65 +4,39 @@
 // stageConfig is fetched and passed directly to BatchDetailPopup.
 
 import React, { useMemo, useState } from "react";
-import {
-  Box,
-  Typography,
-  Stack,
-  Avatar,
-  Chip,
-  Divider,
-  Badge,
-  CircularProgress,
-  Collapse,
-  TextField,
-  InputAdornment,
-  IconButton,
-} from "@mui/material";
+import { Box, Typography, Stack, CircularProgress } from "@mui/material";
 import { LineChart, BarChart } from "@mui/x-charts";
 import Menu from "@mui/material/Menu";
 
 import getSystemManagerTheme from "../../../app/theme/custom_themes/system_manager/sysDashboard_theme";
-import { getSharedTheme } from "../../../app/theme/custom_themes/shared/shared_theme";
 import { icons } from "../../../app/theme/icons";
 import { STRINGS } from "../../../app/config/strings";
 import { Panel, PanelHeader, AlertIcon } from "./components/SystemManagerWidgets";
 import { useThemeStore } from "../../../app/store/themeStore";
 import useSMDashboard from "../../../hooks/system_manager/useSMDashboardHook";
-import useSMInProgressBatches from "../../../hooks/system_manager/useSMInProgressBatchesHook";
 import useSMNotificationMenu from "../../../hooks/system_manager/useSMNotificationMenuHook";
 import DashboardChartCard from "../../components/custom/dashboard/DashboardChartCard";
 import { DashKPICard } from "../../components/custom/dashboard/DashKPICard";
 import DashboardDateFilter, {
   getDateFilterDisplayLabel,
 } from "../../components/custom/dashboard/DashboardDateFilter";
-import InProgressBatchesTable from "../../components/custom/dashboard/InProgressBatchesTable";
 import FilterToggleButton from "../../components/common/FilterToggleButton";
-import FilterSelect from "../../components/common/FilterSelect";
 import BatchDetailPopup from "./components/BatchDetails";
 import StageStatusPanel from "./components/StageStatusPanel";
-import ToggleTabs from "@/ui/components/common/ToggleTabs";
-import { BatchTab, batchTabOptions } from "@/hooks/admin/Dashboard/useDashboardHook";
-import AdminListShell from "@/ui/components/custom/admin/AdminListShell";
-import AdminListFilterPanel from "@/ui/components/custom/admin/AdminListFilterPanel";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
+import useDashboardHook from "@/hooks/admin/Dashboard/useDashboardHook";
+import DashboardActiveBatchesSection from "../admin/Dashboard/components/DashboardActiveBatchesSection";
+import { InProgressBatchRow } from "@/ui/components/custom/dashboard/InProgressBatchesTable";
 
 const {
   CheckCircle,
-  RadioButtonUnchecked,
   TrendingUp,
   Schedule,
-  Notifications,
-  MoreVert,
   Inventory2,
-  Science,
-  Verified,
-  LocalShipping,
   AssignmentTurnedIn,
   Block,
   Error: ErrorIconMUI,
   Warning,
-  Search,
-  Close,
 } = icons.systemManager;
 
 // ── Icon resolution maps ──────────────────────────────────────────────────────
@@ -85,14 +59,12 @@ function resolveKpiIcon(iconKey) {
 export default function SystemManagerDashboard() {
   const mode = useThemeStore((s) => s.mode);
   const t = useMemo(() => getSystemManagerTheme(mode), [mode]);
-  const sharedTh = useMemo(() => getSharedTheme(mode), [mode]);
   const adminTh = useMemo(() => getDashboardTheme(mode), [mode]);
   const S = STRINGS.SYSTEM_MANAGER_DASHBOARD;
-  const DP = STRINGS.DASHBOARD_PAGE;
-  const shellTheme = {
-    batchListShell: adminTh.batchListShell,
-    filterToggle: adminTh.filterToggle,
-  };
+  const strings = STRINGS.DASHBOARD_PAGE;
+  const { filterMenuProps, filterMenuItemSx } = adminTh;
+
+  // System Manager hook: Date Filter, KPIs, Stage Status, Charts
   const {
     dashboard,
     alerts,
@@ -107,12 +79,50 @@ export default function SystemManagerDashboard() {
     setCustomEndDate,
     applyCustomDateFilter,
     clearDateFilter,
-    dateBounds,
     loadAlerts,
   } = useSMDashboard(t.dashboardConfig);
 
-  const { kpiData, stageMetrics, stageData, blockEvents, chartData, stageConfig, chartUpdatedAt } =
-    dashboard;
+  // Admin hook: Batch Table state & APIs only
+  const {
+    activeBatchesLoading,
+    filterOpen,
+    setFilterOpen,
+    toggleFilterOpen,
+    searchQuery,
+    setSearchQuery,
+    batchDraftFilters,
+    setBatchDraftFilter,
+    applyBatchFilters,
+    filteredBatches,
+    activeFilterCount,
+    clearBatchesFilters,
+    subDepartments,
+    toggleCurrentMonth,
+    batchStatusTab,
+    setBatchStatusTab,
+    batchTabOptions,
+  } = useDashboardHook(mode);
+
+  // Local pagination state for Admin Active Batches Section
+  const [batchPage, setBatchPage] = useState(0);
+  const [batchRowsPerPage, setBatchRowsPerPage] = useState(10);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+
+  const handleBatchPageChange = (_event: unknown, newPage: number) => {
+    setBatchPage(newPage);
+  };
+
+  const handleBatchRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setBatchRowsPerPage(parseInt(event.target.value, 10));
+    setBatchPage(0);
+  };
+
+  const paginatedBatches = filteredBatches.slice(
+    batchPage * batchRowsPerPage,
+    batchPage * batchRowsPerPage + batchRowsPerPage,
+  );
+
+  const { kpiData, stageData, chartData, stageConfig, chartUpdatedAt } = dashboard;
   const chartTheme = t.sharedCharts;
 
   const chartTimestamp = (() => {
@@ -127,51 +137,8 @@ export default function SystemManagerDashboard() {
 
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType !== S.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0;
-  const { filterMenuProps, filterMenuItemSx } = sharedTh;
 
-  const {
-    batchFilterOpen,
-    setBatchFilterOpen,
-    toggleBatchFilterOpen,
-
-    batchSearch,
-    setBatchSearch,
-
-    batchDraftFilters,
-    setBatchDraftFilter,
-
-    activeBatchFilterCount,
-    clearBatchFilters,
-
-    filteredInProgressRows,
-
-    stageOptions,
-    typeOptions,
-    statusOptions,
-
-    selectedBatch,
-    handleViewDetails,
-    closeBatchDetails,
-
-    batchesLoading,
-
-    page,
-    rowsPerPage,
-    totalRecords,
-
-    handlePageChange,
-    handleRowsPerPageChange,
-
-    activeTab,
-    setActiveTab,
-    applyBatchFilters,
-  } = useSMInProgressBatches(t.dashboardConfig.stageColors, {
-    filterType: dateBounds.apiFilter,
-    startDate: dateBounds.startDate,
-    endDate: dateBounds.endDate,
-  });
-
-  const { notifAnchor, handleNotifOpen, handleNotifClose } = useSMNotificationMenu(loadAlerts);
+  const { notifAnchor, handleNotifClose } = useSMNotificationMenu(loadAlerts);
 
   const [hoverLineIdx, setHoverLineIdx] = useState<number | null>(null);
   const [pinnedLineIdx, setPinnedLineIdx] = useState<number | null>(null);
@@ -184,6 +151,13 @@ export default function SystemManagerDashboard() {
     typeof activeLineIdx === "number" ? chartData.areaData[activeLineIdx] : null;
   const activeBarPoint = typeof activeBarIdx === "number" ? chartData.barData[activeBarIdx] : null;
 
+  const [hoverQcIdx, setHoverQcIdx] = useState<number | null>(null);
+  const [pinnedQcIdx, setPinnedQcIdx] = useState<number | null>(null);
+
+  const qcPassRateData = chartData.qcPassRateData ?? [];
+  const activeQcIdx = pinnedQcIdx ?? hoverQcIdx;
+  const activeQcPoint =
+    typeof activeQcIdx === "number" ? (qcPassRateData[activeQcIdx] ?? null) : null;
   if (loading) {
     return (
       <Box sx={{ ...t.page, ...t.dashboardLayout.loadingPage }}>
@@ -192,8 +166,10 @@ export default function SystemManagerDashboard() {
     );
   }
 
-  const isRefreshing = statsLoading || batchesLoading;
-
+  const isRefreshing = statsLoading || activeBatchesLoading;
+  const handleViewBatchDetails = (row: InProgressBatchRow) => {
+    setSelectedBatch(row);
+  };
   return (
     <Box sx={{ ...t.page, ...t.dashboardLayout.pageRelative }}>
       {isRefreshing && (
@@ -206,21 +182,15 @@ export default function SystemManagerDashboard() {
           <CircularProgress size={44} />
         </Box>
       )}
+
       {/* ── Page Header ── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Box>
           <Typography sx={t.pageHeader.title}>{S.PAGE.TITLE}</Typography>
         </Box>
-        {/* <Stack direction="row" gap={1} alignItems="center">
-          <Badge badgeContent={alerts.length} color="error" invisible={alerts.length === 0}>
-            <Box sx={t.pageHeader.notifBox} onClick={handleNotifOpen}>
-              <Notifications sx={t.pageHeader.notifIcon} />
-            </Box>
-          </Badge>
-        </Stack> */}
       </Stack>
 
-      {/* ── Date Range Selector ── */}
+      {/* ── System Manager Date Range Selector ── */}
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label={S.DATE_FILTER.LABEL}
@@ -256,16 +226,15 @@ export default function SystemManagerDashboard() {
         )}
       </Box>
 
-      {/* ── KPI Row ── */}
+      {/* ── System Manager KPI Row ── */}
       <Box sx={t.dashboardLayout.kpiGrid}>
-        {kpiData.map(({ label, value, sub, trend, color, iconKey }) => {
+        {kpiData.map(({ label, value, color, iconKey }) => {
           const Icon = resolveKpiIcon(iconKey);
           return (
             <DashKPICard
               key={label}
               label={label}
               value={value}
-              // sub={sub}
               Icon={Icon}
               bg={color}
               cardSx={t.sharedDashboard.kpiCard.cardSx}
@@ -280,21 +249,22 @@ export default function SystemManagerDashboard() {
         })}
       </Box>
 
-      {/* ── Middle Row: Stage Status + Charts ── */}
+      {/* ── System Manager Middle Row: Stage Status + Charts ── */}
       <Box sx={t.dashboardLayout.middleGrid}>
         <Panel t={t}>
           <PanelHeader
             title={S.STAGE_STATUS.TITLE}
-            meta={
-              <Typography sx={t.dashboardLayout.stageMetaText}>
-                {stageData.totalBatches} batches
-              </Typography>
-            }
+            // meta={
+            //   <Typography sx={t.dashboardLayout.stageMetaText}>
+            //     {stageData.totalBatches} batches
+            //   </Typography>
+            // }
             t={t}
           />
           <StageStatusPanel stageData={stageData} t={t} strings={S.STAGE_STATUS} />
         </Panel>
 
+        {/* ── Motors Processed (LineChart <- chartData.areaData) ── */}
         <DashboardChartCard
           cardSx={chartTheme.cardSx}
           headerBoxSx={chartTheme.headerBox(chartTheme.headers.line)}
@@ -364,6 +334,7 @@ export default function SystemManagerDashboard() {
           />
         </DashboardChartCard>
 
+        {/* ── Activity / Throughput (BarChart <- chartData.barData) ── */}
         <DashboardChartCard
           cardSx={chartTheme.cardSx}
           headerBoxSx={chartTheme.headerBox(chartTheme.headers.bar)}
@@ -429,150 +400,110 @@ export default function SystemManagerDashboard() {
             sx={chartTheme.barChartSx}
           />
         </DashboardChartCard>
-      </Box>
 
-      {/* ── Bottom Row: In Progress Batches ── */}
-      <Box sx={t.dashboardLayout.bottomGrid}>
-        <InProgressBatchesTable
-          rows={filteredInProgressRows}
-          loading={batchesLoading}
-          theme={adminTh}
-          title={
-            activeTab === "COMPLETED"
-              ? STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_COMPLETED_BATCHES
-              : STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_INPOROGRESS_TITLE
-          }
-          emptyText={S.EMPTY_STATES.NO_BATCHES}
-          cardSx={adminTh.card}
-          hideManagerColumns
-          onViewDetails={handleViewDetails}
-          page={page}
-          rowsPerPage={rowsPerPage}
-          totalCount={totalRecords}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          rowsPerPageOptions={[5, 10, 25]}
-          headerContent={
-            <ToggleTabs
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as BatchTab)}
-              options={batchTabOptions}
-            />
-          }
-          filterPanel={
-            <AdminListShell
-              search={batchSearch}
-              onSearchChange={setBatchSearch}
-              searchPlaceholder={S.FILTERS.SEARCH_BATCHES}
-              filterOpen={batchFilterOpen}
-              onFilterToggle={toggleBatchFilterOpen}
-              activeFilterCount={activeBatchFilterCount}
-              filtersToggleLabel={S.FILTERS.BUTTON}
-              resultText={`${filteredInProgressRows.length} / ${totalRecords} records shown`}
-              loading={batchesLoading}
-              hasItems={filteredInProgressRows.length > 0}
-              emptyTitle={S.EMPTY_STATES.NO_BATCHES}
-              filterExtension={
-                <AdminListFilterPanel
-                  title={S.COMMON.FILTERS_TITLE}
-                  activeFilterCount={activeBatchFilterCount}
-                  onClear={clearBatchFilters}
-                  clearLabel={S.FILTERS.CLEAR_ALL}
-                  onClose={() => setBatchFilterOpen(false)}
-                  onApply={applyBatchFilters}
-                  closeLabel={S.COMMON.FILTERS_CLOSE}
-                  applyLabel={S.COMMON.FILTERS_APPLY}
-                  theme={adminTh}
-                >
-                  <FilterSelect
-                    label={DP.FILTERS.STAGE}
-                    value={batchDraftFilters.stage}
-                    onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
-                    options={stageOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    filterPanel
-                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
-                  />
-
-                  <FilterSelect
-                    label={DP.FILTERS.TYPE}
-                    value={batchDraftFilters.batchType}
-                    onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
-                    options={typeOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    filterPanel
-                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
-                  />
-
-                  <FilterSelect
-                    label={DP.FILTERS.STATUS}
-                    value={batchDraftFilters.status}
-                    onChange={(e) => setBatchDraftFilter("status", e.target.value)}
-                    options={statusOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    filterPanel
-                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
-                  />
-                </AdminListFilterPanel>
+        {/* ── QC Pass Rate (BarChart <- chartData.qcPassRateData) ── */}
+        {qcPassRateData.length > 0 && (
+          <DashboardChartCard
+            cardSx={chartTheme.cardSx}
+            headerBoxSx={chartTheme.headerBox(chartTheme.headers.bar)}
+            contentSx={chartTheme.contentSx}
+            title={S.CHARTS.QC_PASS_RATE?.TITLE ?? "QC Pass Rate"}
+            subtitle={S.CHARTS.QC_PASS_RATE?.SUBTITLE ?? "Percentage of batches passing QC"}
+            highlight={activeQcPoint ? `${activeQcPoint.label}: ${activeQcPoint.v}%` : undefined}
+            timestamp={chartTimestamp}
+            titleProps={chartTheme.titleProps}
+            subtitleProps={chartTheme.subtitleProps}
+            highlightProps={chartTheme.highlightProps}
+            dividerProps={chartTheme.dividerProps}
+            clockIconSx={chartTheme.clockIconSx}
+            timestampProps={chartTheme.timestampProps}
+          >
+            <BarChart
+              height={chartTheme.plotHeight}
+              margin={chartTheme.margin.bar}
+              borderRadius={8}
+              grid={{ horizontal: true }}
+              hideLegend
+              axisHighlight={{ x: "band" }}
+              highlightedItem={
+                typeof pinnedQcIdx === "number"
+                  ? { seriesId: "qc-series", dataIndex: pinnedQcIdx }
+                  : undefined
               }
-              theme={shellTheme}
+              onHighlightChange={(item: any) => {
+                if (typeof item?.dataIndex === "number") setHoverQcIdx(item.dataIndex);
+                else setHoverQcIdx(null);
+              }}
+              onAxisClick={(_, axisData: any) => {
+                const idx = axisData?.dataIndex;
+                if (typeof idx === "number") {
+                  setPinnedQcIdx((prev) => (prev === idx ? null : idx));
+                }
+              }}
+              onItemClick={(_, item: any) => {
+                const idx = item?.dataIndex;
+                if (typeof idx === "number") {
+                  setPinnedQcIdx((prev) => (prev === idx ? null : idx));
+                }
+              }}
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: qcPassRateData.map(({ label }) => label),
+                  categoryGapRatio: 0.42,
+                  barGapRatio: 0.15,
+                  ...chartTheme.xAxis,
+                },
+              ]}
+              yAxis={[{ position: "none" }]}
+              series={[
+                {
+                  id: "qc-series",
+                  data: qcPassRateData.map(({ v }) => v),
+                  valueFormatter: (value: number | null) => `${value ?? 0}%`,
+                  ...chartTheme.barSeries,
+                },
+              ]}
+              slotProps={chartTheme.tooltipSlotProps}
+              sx={chartTheme.barChartSx}
             />
-          }
-        />
+          </DashboardChartCard>
+        )}
       </Box>
 
-      {/* ── Block Traceability ── */}
-      <Box sx={t.dashboardLayout.lowerGrid}>
-        <Panel t={t}>
-          <PanelHeader
-            title={S.BLOCKCHAIN_EVENTS.SECTION_TITLE}
-            meta={
-              <Chip
-                label={S.BLOCKCHAIN_EVENTS.IMMUTABLE_BADGE}
-                size="small"
-                sx={t.blockTimeline.immutableChip}
-              />
-            }
-            t={t}
-          />
-          <Box sx={t.blockTimeline.inner}>
-            {!blockEvents.length ? (
-              <Typography sx={t.blockTimeline.emptyText}>{S.BLOCKCHAIN_EVENTS.EMPTY}</Typography>
-            ) : (
-              <Stack spacing={0}>
-                {blockEvents.map((e, i) => (
-                  <Stack
-                    key={i}
-                    direction="row"
-                    gap={2}
-                    alignItems="flex-start"
-                    sx={{ pb: i < blockEvents.length - 1 ? 2.5 : 0, position: "relative" }}
-                  >
-                    {i < blockEvents.length - 1 && <Box sx={t.blockTimeline.connector(false)} />}
-                    <Avatar sx={t.blockTimeline.avatar(e.color)}>{e.icon}</Avatar>
-                    <Box>
-                      <Typography sx={t.blockTimeline.motorId(e.color)}>{e.motorId}</Typography>
-                      <Typography sx={t.blockTimeline.label}>{e.label}</Typography>
-                      <Stack direction="row" alignItems="center" gap={0.5} mt={0.4}>
-                        <Schedule sx={t.blockTimeline.timeIcon} />
-                        <Typography sx={t.blockTimeline.timeText}>{e.time}</Typography>
-                      </Stack>
-                    </Box>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-          </Box>
-        </Panel>
-      </Box>
+      {/* ── Admin Batch Table & Hook ── */}
+      <DashboardActiveBatchesSection
+        th={adminTh}
+        t={strings}
+        filterMenuProps={filterMenuProps}
+        filterMenuItemSx={filterMenuItemSx}
+        activeBatchesLoading={activeBatchesLoading}
+        activeBatches={paginatedBatches}
+        filterOpen={filterOpen}
+        setFilterOpen={setFilterOpen}
+        toggleFilterOpen={toggleFilterOpen}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        batchDraftFilters={batchDraftFilters}
+        setBatchDraftFilter={setBatchDraftFilter}
+        applyBatchFilters={applyBatchFilters}
+        filteredBatches={paginatedBatches}
+        activeFilterCount={activeFilterCount}
+        clearBatchesFilters={clearBatchesFilters}
+        subDepartments={subDepartments}
+        toggleCurrentMonth={toggleCurrentMonth}
+        batchStatusTab={batchStatusTab}
+        setBatchStatusTab={setBatchStatusTab}
+        batchTabOptions={batchTabOptions}
+        page={batchPage}
+        rowsPerPage={batchRowsPerPage}
+        totalCount={filteredBatches.length}
+        onPageChange={handleBatchPageChange}
+        onRowsPerPageChange={handleBatchRowsPerPageChange}
+        onViewDetails={handleViewBatchDetails}
+      />
 
-      {/* ── 3-dot Context Menu ── */}
+      {/* ── Notification Menu ── */}
       <Menu
         anchorEl={notifAnchor}
         open={Boolean(notifAnchor)}
@@ -629,7 +560,7 @@ export default function SystemManagerDashboard() {
         <BatchDetailPopup
           batch={selectedBatch}
           stageConfig={stageConfig}
-          onClose={closeBatchDetails}
+          onClose={() => setSelectedBatch(null)}
           t={t}
         />
       )}

@@ -51,6 +51,7 @@ type DashboardActiveBatchesSectionProps = {
   totalCount?: number;
   onPageChange?: (event: unknown, newPage: number) => void;
   onRowsPerPageChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onViewDetails?: any;
 };
 
 export default function DashboardActiveBatchesSection({
@@ -81,6 +82,7 @@ export default function DashboardActiveBatchesSection({
   totalCount,
   onPageChange,
   onRowsPerPageChange,
+  onViewDetails,
 }: DashboardActiveBatchesSectionProps) {
   const shellTheme = {
     batchListShell: th.batchListShell,
@@ -111,6 +113,7 @@ export default function DashboardActiveBatchesSection({
             options={batchTabOptions}
           />
         }
+        onViewDetails={onViewDetails}
         filterPanel={
           <AdminListShell
             search={searchQuery}

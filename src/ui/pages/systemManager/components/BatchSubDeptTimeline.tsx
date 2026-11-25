@@ -19,6 +19,29 @@ const fmtDate = (value?: string | null) => {
   if (Number.isNaN(dt.getTime())) return String(value);
   return dt.toLocaleString();
 };
+const APPROVED_STATUSES = new Set(["APPROVED", "COMPLETELY_APPROVED"]);
+const REJECTED_STATUSES = new Set(["REJECTED"]);
+
+const normalizeStatus = (status?: string | null) =>
+  String(status ?? "")
+    .trim()
+    .replace(/[\s-]+/g, "_");
+
+const isApprovedStatus = (status?: string | null) =>
+  APPROVED_STATUSES.has(normalizeStatus(status).toUpperCase());
+
+const isRejectedStatus = (status?: string | null) =>
+  REJECTED_STATUSES.has(normalizeStatus(status).toUpperCase());
+
+// Labels switch between approved / rejected wording based on the stage status
+const getReviewLabels = (status?: string | null) =>
+  isRejectedStatus(status)
+    ? { by: S.REJECTED_BY, on: S.REJECTED_ON, remarks: S.REJECTED_REMARKS }
+    : { by: S.APPROVED_BY, on: S.APPROVED_ON, remarks: S.APPROVER_REMARKS };
+
+// Review rows are only meaningful once a stage has been approved or rejected
+const hasReviewOutcome = (status?: string | null) =>
+  isRejectedStatus(status) || isApprovedStatus(status);
 
 function DetailRow({ label, value, tl }: { label: string; value: string; tl: any }) {
   return (
@@ -35,6 +58,9 @@ function DetailRow({ label, value, tl }: { label: string; value: string; tl: any
 
 function AuditDetailsSection({ item, tl }: { item: SubDeptStageItemModel; tl: any }) {
   const [open, setOpen] = useState(false);
+  // const labels = getReviewLabels(item.status);
+  const showReview = hasReviewOutcome(item.status);
+  const labels = getReviewLabels(item.status);
 
   return (
     <Box sx={tl.auditPanel}>
@@ -44,19 +70,15 @@ function AuditDetailsSection({ item, tl }: { item: SubDeptStageItemModel; tl: an
       </Box>
       <Collapse in={open} timeout={200} unmountOnExit>
         <Box sx={tl.auditBody}>
-          <DetailRow
-            label={S.SUBMITTED_BY}
-            value={item.submittedBy?.displayName ?? "—"}
-            tl={tl}
-          />
+          <DetailRow label={S.SUBMITTED_BY} value={item.submittedBy?.displayName ?? "—"} tl={tl} />
           <DetailRow label={S.SUBMITTED_ON} value={fmtDate(item.submittedOn)} tl={tl} />
-          <DetailRow
-            label={S.APPROVED_BY}
-            value={item.approvedBy?.displayName ?? "—"}
-            tl={tl}
-          />
-          <DetailRow label={S.APPROVED_ON} value={fmtDate(item.approvedOn)} tl={tl} />
-          <DetailRow label={S.APPROVER_REMARKS} value={item.remarks ?? "—"} tl={tl} />
+          {showReview && (
+            <>
+              <DetailRow label={labels.by} value={item.approvedBy?.displayName ?? "—"} tl={tl} />
+              <DetailRow label={labels.on} value={fmtDate(item.approvedOn)} tl={tl} />
+              <DetailRow label={labels.remarks} value={item.remarks ?? "—"} tl={tl} />
+            </>
+          )}
         </Box>
       </Collapse>
     </Box>
@@ -64,6 +86,9 @@ function AuditDetailsSection({ item, tl }: { item: SubDeptStageItemModel; tl: an
 }
 
 function StageHighlightSummary({ item, tl }: { item: SubDeptStageItemModel; tl: any }) {
+  const labels = getReviewLabels(item.status);
+  const showReview = hasReviewOutcome(item.status);
+
   return (
     <Box sx={tl.currentStageItem}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} mb={0.5}>
@@ -71,12 +96,17 @@ function StageHighlightSummary({ item, tl }: { item: SubDeptStageItemModel; tl: 
         <StatusChip status={item.status} size="small" />
       </Stack>
       <Typography sx={tl.metaText}>
-        {S.SUBMITTED_BY}: {item.submittedBy?.displayName ?? "—"} · {S.APPROVED_BY}:{" "}
-        {item.approvedBy?.displayName ?? "—"}
+        {S.SUBMITTED_BY}: {item.submittedBy?.displayName ?? "—"}
+        {showReview && (
+          <>
+            {" "}
+            · {labels.by}: {item.approvedBy?.displayName ?? "—"}
+          </>
+        )}
       </Typography>
       {item.remarks ? (
         <Typography sx={{ ...tl.metaText, mt: 0.35 }}>
-          {S.APPROVER_REMARKS}: {item.remarks}
+          {labels.remarks}: {item.remarks}
         </Typography>
       ) : null}
     </Box>
@@ -98,7 +128,8 @@ function TimelineEntryCard({
 }) {
   const { item, variant, name } = entry;
   const progress = item.displayProgress;
-  const showViewForm = Boolean(onViewForm) && canViewBatchSubDeptFormDetails(item.status, item.formId);
+  const showViewForm =
+    Boolean(onViewForm) && canViewBatchSubDeptFormDetails(item.status, item.formId);
 
   return (
     <Box sx={tl.timelineItem}>
@@ -212,7 +243,6 @@ export default function BatchSubDeptTimeline({
   }
 
   const entries = data.timelineEntries;
-
   return (
     <Box>
       <Stack direction="row" gap={2} flexWrap="wrap" sx={tl.metaRow}>

@@ -3,13 +3,18 @@ import { Box } from "@mui/material";
 import { LineChart, BarChart } from "@mui/x-charts";
 import DashboardChartCard from "@ui/components/custom/dashboard/DashboardChartCard";
 
+type ChartPoint = {
+  day: string;
+  v: number;
+};
+
 type DashboardChartsSectionProps = {
   th: any;
   t: typeof import("@app/config/strings").STRINGS.DASHBOARD_PAGE;
-  weeklyActivity: any[];
-  motorsProcessed: any[];
-  qcPassRate: any[];
-  chartUpdatedAt: Date | null;
+  weeklyActivity: ChartPoint[];
+  motorsProcessed: ChartPoint[];
+  qcPassRate: ChartPoint[];
+  chartUpdatedAt: Date | String | null;
 };
 
 export default function DashboardChartsSection({
@@ -22,33 +27,48 @@ export default function DashboardChartsSection({
 }: DashboardChartsSectionProps) {
   const chartTheme = th.sharedCharts;
 
+  console.log("Weekly Activity:", weeklyActivity);
+  console.log("Motors Processed:", motorsProcessed);
+  console.log("QC Pass Rate:", qcPassRate);
+
   const [hoverBarIdx, setHoverBarIdx] = useState<number | null>(null);
   const [pinnedBarIdx, setPinnedBarIdx] = useState<number | null>(null);
+
   const [hoverLineIdx, setHoverLineIdx] = useState<number | null>(null);
   const [pinnedLineIdx, setPinnedLineIdx] = useState<number | null>(null);
+
   const [hoverAreaIdx, setHoverAreaIdx] = useState<number | null>(null);
   const [pinnedAreaIdx, setPinnedAreaIdx] = useState<number | null>(null);
 
   const activeBarIdx = pinnedBarIdx ?? hoverBarIdx;
   const activeLineIdx = pinnedLineIdx ?? hoverLineIdx;
   const activeAreaIdx = pinnedAreaIdx ?? hoverAreaIdx;
+
   const activeBarPoint = typeof activeBarIdx === "number" ? weeklyActivity[activeBarIdx] : null;
+
   const activeLinePoint = typeof activeLineIdx === "number" ? motorsProcessed[activeLineIdx] : null;
+
   const activeAreaPoint = typeof activeAreaIdx === "number" ? qcPassRate[activeAreaIdx] : null;
 
   const chartTimestamp = (() => {
     if (!chartUpdatedAt) return "not yet loaded";
-    const timeStr = chartUpdatedAt.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    return `just updated at ${timeStr}`;
-  })();
 
+    if (chartUpdatedAt instanceof Date) {
+      const timeStr = chartUpdatedAt.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+
+      return `just updated at ${timeStr}`;
+    }
+
+    return chartUpdatedAt;
+  })();
   return (
     <Box sx={th.dashboard.chartsGrid}>
+      {/* WEEKLY ACTIVITY / BATCH ACTIVITY */}
       <DashboardChartCard
         cardSx={chartTheme.cardSx}
         headerBoxSx={chartTheme.headerBox(chartTheme.headers.bar)}
@@ -73,25 +93,37 @@ export default function DashboardChartsSection({
           axisHighlight={{ x: "band" }}
           highlightedItem={
             typeof pinnedBarIdx === "number"
-              ? { seriesId: "bar-series", dataIndex: pinnedBarIdx }
+              ? {
+                  seriesId: "bar-series",
+                  dataIndex: pinnedBarIdx,
+                }
               : undefined
           }
           onHighlightChange={(item: any) => {
-            if (typeof item?.dataIndex === "number") setHoverBarIdx(item.dataIndex);
-            else setHoverBarIdx(null);
+            if (typeof item?.dataIndex === "number") {
+              setHoverBarIdx(item.dataIndex);
+            } else {
+              setHoverBarIdx(null);
+            }
           }}
           onAxisClick={(_: any, axisData: any) => {
             const idx = axisData?.dataIndex;
-            if (typeof idx === "number") setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           onItemClick={(_: any, item: any) => {
             const idx = item?.dataIndex;
-            if (typeof idx === "number") setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           xAxis={[
             {
               scaleType: "band",
-              data: weeklyActivity.map((d: any) => d.day),
+              data: weeklyActivity.map((d) => d.day),
               categoryGapRatio: 0.45,
               barGapRatio: 0.18,
               ...chartTheme.xAxis,
@@ -101,7 +133,7 @@ export default function DashboardChartsSection({
           series={[
             {
               id: "bar-series",
-              data: weeklyActivity.map((d: any) => d.v),
+              data: weeklyActivity.map((d) => d.v),
               valueFormatter: (value: number | null) => `${value ?? 0}`,
               ...chartTheme.barSeries,
             },
@@ -111,13 +143,14 @@ export default function DashboardChartsSection({
         />
       </DashboardChartCard>
 
+      {/* MOTORS PROCESSED */}
       <DashboardChartCard
         cardSx={chartTheme.cardSx}
         headerBoxSx={chartTheme.headerBox(chartTheme.headers.line)}
         contentSx={chartTheme.contentSx}
         title={t.CHARTS.MOTORS_PROCESSED.TITLE}
         subtitle={t.CHARTS.MOTORS_PROCESSED.SUBTITLE}
-        highlight={activeLinePoint ? `${activeLinePoint.m}: ${activeLinePoint.v}` : undefined}
+        highlight={activeLinePoint ? `${activeLinePoint.day}: ${activeLinePoint.v}` : undefined}
         timestamp={chartTimestamp}
         titleProps={chartTheme.titleProps}
         subtitleProps={chartTheme.subtitleProps}
@@ -134,29 +167,44 @@ export default function DashboardChartsSection({
           axisHighlight={{ x: "line" }}
           highlightedItem={
             typeof pinnedLineIdx === "number"
-              ? { seriesId: "line-series", dataIndex: pinnedLineIdx }
+              ? {
+                  seriesId: "line-series",
+                  dataIndex: pinnedLineIdx,
+                }
               : undefined
           }
           onHighlightChange={(item: any) => {
-            if (typeof item?.dataIndex === "number") setHoverLineIdx(item.dataIndex);
-            else setHoverLineIdx(null);
+            if (typeof item?.dataIndex === "number") {
+              setHoverLineIdx(item.dataIndex);
+            } else {
+              setHoverLineIdx(null);
+            }
           }}
           onAxisClick={(_: any, axisData: any) => {
             const idx = axisData?.dataIndex;
-            if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           onLineClick={(_: any, item: any) => {
             const idx = item?.dataIndex;
-            if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           onMarkClick={(_: any, item: any) => {
             const idx = item?.dataIndex;
-            if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           xAxis={[
             {
               scaleType: "point",
-              data: motorsProcessed.map((d: any) => d.m),
+              data: motorsProcessed.map((d) => d.day),
               ...chartTheme.xAxis,
             },
           ]}
@@ -164,7 +212,7 @@ export default function DashboardChartsSection({
           series={[
             {
               id: "line-series",
-              data: motorsProcessed.map((d: any) => d.v),
+              data: motorsProcessed.map((d) => d.v),
               valueFormatter: (value: number | null) => `${value ?? 0}`,
               ...chartTheme.lineSeries,
             },
@@ -174,13 +222,14 @@ export default function DashboardChartsSection({
         />
       </DashboardChartCard>
 
+      {/* QC PASS RATE */}
       <DashboardChartCard
         cardSx={chartTheme.cardSx}
         headerBoxSx={chartTheme.headerBox(chartTheme.headers.area)}
         contentSx={chartTheme.contentSx}
         title={t.CHARTS.QC_PASS_RATE.TITLE}
         subtitle={t.CHARTS.QC_PASS_RATE.SUBTITLE}
-        highlight={activeAreaPoint ? `${activeAreaPoint.m}: ${activeAreaPoint.v}%` : undefined}
+        highlight={activeAreaPoint ? `${activeAreaPoint.day}: ${activeAreaPoint.v}%` : undefined}
         timestamp={chartTimestamp}
         titleProps={chartTheme.titleProps}
         subtitleProps={chartTheme.subtitleProps}
@@ -197,29 +246,44 @@ export default function DashboardChartsSection({
           axisHighlight={{ x: "line" }}
           highlightedItem={
             typeof pinnedAreaIdx === "number"
-              ? { seriesId: "area-series", dataIndex: pinnedAreaIdx }
+              ? {
+                  seriesId: "area-series",
+                  dataIndex: pinnedAreaIdx,
+                }
               : undefined
           }
           onHighlightChange={(item: any) => {
-            if (typeof item?.dataIndex === "number") setHoverAreaIdx(item.dataIndex);
-            else setHoverAreaIdx(null);
+            if (typeof item?.dataIndex === "number") {
+              setHoverAreaIdx(item.dataIndex);
+            } else {
+              setHoverAreaIdx(null);
+            }
           }}
           onAxisClick={(_: any, axisData: any) => {
             const idx = axisData?.dataIndex;
-            if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           onLineClick={(_: any, item: any) => {
             const idx = item?.dataIndex;
-            if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           onMarkClick={(_: any, item: any) => {
             const idx = item?.dataIndex;
-            if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+
+            if (typeof idx === "number") {
+              setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+            }
           }}
           xAxis={[
             {
               scaleType: "point",
-              data: qcPassRate.map((d: any) => d.m),
+              data: qcPassRate.map((d) => d.day),
               ...chartTheme.xAxis,
             },
           ]}
@@ -227,7 +291,7 @@ export default function DashboardChartsSection({
           series={[
             {
               id: "area-series",
-              data: qcPassRate.map((d: any) => d.v),
+              data: qcPassRate.map((d) => d.v),
               valueFormatter: (value: number | null) => `${value ?? 0}%`,
               ...chartTheme.areaSeries,
             },

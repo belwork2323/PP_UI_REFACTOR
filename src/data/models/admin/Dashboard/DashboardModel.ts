@@ -98,17 +98,18 @@ export class DashboardModel {
 
   static fromChartDataApi(apiResponse: any) {
     const data = getApiData(apiResponse);
-    const mapChart = (arr: any[], labelKey: string, valueKey = "value") =>
-      (arr || []).map((item) => ({
-        [labelKey]: item.label,
-        v: item[valueKey],
+
+    const mapChart = (arr: any[] = []) =>
+      arr.map((item) => ({
+        day: item.label ?? "",
+        v: Number(item.value ?? 0),
       }));
 
     return {
       charts: {
-        weeklyActivity: mapChart(data.weeklyActivity, "day"),
-        motorsProcessed: mapChart(data.motorsProcessed, "m"),
-        qcPassRate: mapChart(data.qcPassRate, "m"),
+        weeklyActivity: mapChart(data.weeklyActivity),
+        motorsProcessed: mapChart(data.motorsProcessed),
+        qcPassRate: mapChart(data.qcPassRate),
       },
     };
   }
