@@ -185,7 +185,10 @@ function useDashboardGlobalFilterSection(mode: string) {
   };
 }
 
-function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds) {
+function useDashboardActiveBatchesSection(
+  globalDateBounds: DashboardDateBounds,
+  clientSearchFields = false,
+) {
   const DEFAULT_PANEL_FILTERS = {
     stage: "All",
     batchType: "All",
@@ -270,26 +273,60 @@ function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds)
 
     setActiveBatchesLoading(true);
     try {
+      const statusFilter = toOperationStatusApiValue(appliedFilters.status, "All") || "";
+      const shouldFilterBatchRows =
+        clientSearchFields && (Boolean(searchQuery.trim()) || Boolean(statusFilter));
       const payload = buildActiveBatchesFilterPayload({
         searchQuery,
         filterStage: appliedFilters.stage,
         filterBatchType: appliedFilters.batchType,
-        filterStatus: toOperationStatusApiValue(appliedFilters.status, "All") || "",
+        // Stage-level statuses can differ from the batch's current status.
+        // Fetch the unfiltered set and match statuses across all stages below.
+        filterStatus: shouldFilterBatchRows ? "" : statusFilter,
         filterType: globalDateBounds.apiFilter,
         dateFrom: appliedFilters.dateFrom || globalDateBounds.startDate,
         dateTo: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonthOnly: appliedFilters.currentMonthOnly,
         status: activeTab,
-        page: page + 1,
-        pageSize: rowsPerPage,
+        // The dashboard API search does not match project/motor names. Load its
+        // pages without `search` and match those fields below when requested.
+        page: shouldFilterBatchRows ? 1 : page + 1,
+        pageSize: shouldFilterBatchRows ? 100 : rowsPerPage,
       });
+      if (shouldFilterBatchRows) payload.search = "";
       const batchesResponse = await dashboardController.getActiveBatches(payload);
-      setActiveBatches(batchesResponse?.data?.activeBatches ?? []);
-      setPagination(batchesResponse?.data?.pagination ?? null);
+      let rows = batchesResponse?.data?.activeBatches ?? [];
+      let apiPagination = batchesResponse?.data?.pagination ?? null;
+
+      if (shouldFilterBatchRows) {
+        const totalPages = Number(apiPagination?.totalPages ?? 1);
+        for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
+          const nextResponse = await dashboardController.getActiveBatches({ ...payload, page: nextPage });
+          rows = rows.concat(nextResponse?.data?.activeBatches ?? []);
+        }
+        const query = searchQuery.trim().toLocaleLowerCase();
+        rows = rows.filter((batch: any) => {
+          const matchesSearch =
+            !query ||
+            [batch.batchId, batch.motorId, batch.motorType, batch.projectName].some((value) =>
+              String(value ?? "").toLocaleLowerCase().includes(query),
+            );
+          const matchesStatus =
+            !statusFilter ||
+            [batch.status, ...(Array.isArray(batch.stageStatuses) ? batch.stageStatuses : [])].some(
+              (value) => toOperationStatusApiValue(String(value ?? "")) === statusFilter,
+            );
+          return matchesSearch && matchesStatus;
+        });
+        apiPagination = { ...apiPagination, totalRecords: rows.length, totalPages: 1 };
+      }
+
+      setActiveBatches(rows);
+      setPagination(apiPagination);
     } finally {
       setActiveBatchesLoading(false);
     }
-  }, [searchQuery, appliedFilters, activeTab, globalDateBounds, page, rowsPerPage]);
+  }, [searchQuery, appliedFilters, activeTab, globalDateBounds, page, rowsPerPage, clientSearchFields]);
 
   useEffect(() => {
     void fetchBatches();
@@ -334,21 +371,39 @@ function useDashboardLookupsSection() {
   const [subDepartments, setSubDepartments] = useState<string[]>([]);
 
   useEffect(() => {
-    generalController.getSubDepartments().then((resp) => {
-      if (resp?.data) {
-        setSubDepartments(
-          (resp.data as any[]).map((sd: any) => sd.subDepartmentName).filter(Boolean),
+    Promise.all([generalController.getDepartments(), generalController.getSubDepartments()]).then(
+      ([departmentsResp, subDepartmentsResp]) => {
+        const departments = Array.isArray(departmentsResp?.data) ? departmentsResp.data : [];
+        const subDepartments = Array.isArray(subDepartmentsResp?.data)
+          ? subDepartmentsResp.data
+          : [];
+        const sourcingDepartmentIds = new Set(
+          departments
+            .filter((department: any) =>
+              String(department.departmentName ?? "").trim().toLocaleLowerCase() === "sourcing",
+            )
+            .map((department: any) => Number(department.departmentId))
+            .filter((id: number) => Number.isFinite(id)),
         );
-      }
-    });
+
+        setSubDepartments(
+          subDepartments
+            .filter((subDepartment: any) =>
+              !sourcingDepartmentIds.has(Number(subDepartment.departmentId)),
+            )
+            .map((subDepartment: any) => subDepartment.subDepartmentName)
+            .filter(Boolean),
+        );
+      },
+    );
   }, []);
 
   return { subDepartments };
 }
 
-export default function useDashboardHook(mode: string) {
+export default function useDashboardHook(mode: string, clientSearchFields = false) {
   const global = useDashboardGlobalFilterSection(mode);
-  const batches = useDashboardActiveBatchesSection(global.globalDateBounds);
+  const batches = useDashboardActiveBatchesSection(global.globalDateBounds, clientSearchFields);
   const lookups = useDashboardLookupsSection();
 
   global.registerTableFilterClear(() => {

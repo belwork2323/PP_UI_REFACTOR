@@ -122,9 +122,12 @@ export default function InProgressBatchesTable({
     (normalizedRole === "SYSTEM_MANAGER" || normalizedRole === "CENTRE_HEAD") &&
     Boolean(onViewDetails);
 
-  // Compute active columns count dynamically for skeleton and empty state colSpan
+  const isAdmin = normalizedRole === "ADMIN";
+
   const activeColumns = BATCH_COLUMNS.filter(
-    ({ sortKey }) => !hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId"),
+    ({ sortKey }) =>
+      (!hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId")) &&
+      (!isAdmin || sortKey !== "action"),
   );
   const totalColumnCount = activeColumns.length + (canViewDetails ? 1 : 0);
 
@@ -339,11 +342,13 @@ export default function InProgressBatchesTable({
                 <TableCell sx={th.table.cellDate}>
                   <Typography sx={th.table.textMuted}>
                     {p.createdOn
-                      ? new Date(p.createdOn).toLocaleDateString("en-IN", {
+                      ? new Intl.DateTimeFormat("en-GB", {
                           day: "2-digit",
-                          month: "short",
+                          month: "2-digit",
                           year: "numeric",
                         })
+                          .format(new Date(p.createdOn))
+                          .replace(/\//g, "-")
                       : "NA"}
                   </Typography>
                 </TableCell>

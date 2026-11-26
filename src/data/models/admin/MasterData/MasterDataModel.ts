@@ -3,6 +3,7 @@ import {
   parseMasterDataOptionalNumber,
 } from "@data/models/admin/MasterData/masterDataNumericInput";
 import {
+  DEFAULT_BEM_UNIT,
   SUBSCALE_ARTICLES_TYPE,
   composeBemArticleName,
   isSubscaleBemArticle,
@@ -167,18 +168,24 @@ export const mapRecordToForm = (
   schema?: MasterDataTypeDescriptor | null,
 ): MasterDataFormState => {
   const base = createEmptyMasterDataForm(schema);
+  const attributes = {
+    ...base.attributes,
+    ...Object.fromEntries(
+      Object.entries(record.attributes ?? {}).map(([k, v]) => [k, v as string | number | boolean]),
+    ),
+  };
+  const isBemArticle = schema?.type === SUBSCALE_ARTICLES_TYPE && attributes.isBem === true;
+  if (isBemArticle) attributes.bemUnit = DEFAULT_BEM_UNIT;
   return {
     ...base,
     id: record.id,
     code: record.code,
-    name: record.name,
+    name:
+      isBemArticle && attributes.bemSize !== "" && attributes.bemSize != null
+        ? composeBemArticleName(attributes.bemSize as number | string, DEFAULT_BEM_UNIT)
+        : record.name,
     isActive: record.isActive,
-    attributes: {
-      ...base.attributes,
-      ...Object.fromEntries(
-        Object.entries(record.attributes ?? {}).map(([k, v]) => [k, v as string | number | boolean]),
-      ),
-    },
+    attributes,
   };
 };
 

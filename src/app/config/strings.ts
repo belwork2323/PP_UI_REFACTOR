@@ -219,8 +219,8 @@ export const STRINGS = {
     COPYRIGHT:
       "Copyright © 2026 Defence Research & Development Organisation (DRDO). All rights reserved.",
     CREDITS: "Content & Maintenance - DRDO  |  Design & Development - Bharat Electronics Ltd.",
-    VERSION: "v 1.1",
-    VERSION_DATE: "02 Nov 2026",
+    VERSION: "v 1.2",
+    VERSION_DATE: "26 Nov 2026",
     BEL_LABEL: "BEL",
     BEL_ALT: "Bharat Electronics Limited",
   },

@@ -159,7 +159,7 @@ export const routes = [
   },
   {
     path: "/centre-head/projects",
-    element: <CHProjectManagementPage />,
+    element: <ProjectManagementPage />,
     isProtected: true,
     roles: ["CENTRE_HEAD"],
   },

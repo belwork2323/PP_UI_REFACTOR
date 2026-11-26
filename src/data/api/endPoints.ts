@@ -390,7 +390,7 @@ export const USER_STF_ENDPOINTS = {
 };
 
 export const APPROVER_STF_OTHER_BEM_ENDPOINTS = {
-  LIST: `${API_BASE}/approver/bem-motor/list`,
+  LIST: `${API_BASE}/user/stf/bem-motor/list`,
   DETAILS: `${API_BASE}/user/stf/bem-motor/details`,
   APPROVE: `${API_BASE}/approver/bem-motor/change-status`,
 };

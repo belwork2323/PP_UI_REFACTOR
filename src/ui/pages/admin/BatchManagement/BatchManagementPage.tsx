@@ -46,7 +46,6 @@ const BatchManagementPage = () => {
   const t = getBatchManagementTheme(mode);
   const smTheme = useMemo(() => getSystemManagerTheme(mode), [mode]);
   const user = useAuthStore((s) => s.user);
-  console.log(user);
 
   const {
     list,
@@ -74,8 +73,7 @@ const BatchManagementPage = () => {
   const deleteTarget = deleteSection.deleteTarget;
   const batchId = deleteTarget ? getBatchId(deleteTarget) : "";
   const motorId = deleteTarget ? getMotorId(deleteTarget) : "";
-  const canDelete =
-    !!deleteSection.deleteReason?.trim() && !deleteSection.deleteReasonError;
+  const canDelete = !!deleteSection.deleteReason?.trim() && !deleteSection.deleteReasonError;
   const { draftFilters } = list;
   const total = list.paginationData.totalRecords;
   const shown = list.batches.length;

@@ -89,7 +89,7 @@ export default function SystemManagerDashboard() {
     setFilterOpen,
     toggleFilterOpen,
     searchQuery,
-    setSearchQuery,
+    setSearchQuery: updateSearchQuery,
     batchDraftFilters,
     setBatchDraftFilter,
     applyBatchFilters,
@@ -101,7 +101,7 @@ export default function SystemManagerDashboard() {
     batchStatusTab,
     setBatchStatusTab,
     batchTabOptions,
-  } = useDashboardHook(mode);
+  } = useDashboardHook(mode, true);
 
   // Local pagination state for Admin Active Batches Section
   const [batchPage, setBatchPage] = useState(0);
@@ -110,6 +110,11 @@ export default function SystemManagerDashboard() {
 
   const handleBatchPageChange = (_event: unknown, newPage: number) => {
     setBatchPage(newPage);
+  };
+
+  const setSearchQuery = (value: string) => {
+    updateSearchQuery(value);
+    setBatchPage(0);
   };
 
   const handleBatchRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {

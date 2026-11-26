@@ -53,9 +53,9 @@ import {
   type MasterDataTypeDescriptor,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
+  DEFAULT_BEM_UNIT,
   SUBSCALE_ARTICLES_TYPE,
   isSubscaleBemArticle,
-  resolveDefaultBemUnit,
 } from "@data/models/admin/MasterData/subscaleArticleMasterForm";
 import { useAlertStore } from "@app/store/alertStore";
 
@@ -228,33 +228,8 @@ const MasterDataList = ({
   };
 
   const subscaleIsBem = isSubscaleArticles && isSubscaleBemArticle(form);
-  const bemUnitOptions = dynamicAttributeOptions?.bemUnit ?? null;
   const bemSizeField = attributeFields.find((field) => field.key === "bemSize");
   const bemUnitField = attributeFields.find((field) => field.key === "bemUnit");
-
-  // When Unit Master loads, remap a preferred "Kg" default onto the real option value (case/symbol).
-  // Do not refill after the user clears the dropdown — they need an empty value to pick another unit.
-  useEffect(() => {
-    if (!isSubscaleArticles || !subscaleIsBem || !inlineMode) return;
-    if (!bemUnitOptions?.length) return;
-    const current = String(form.attributes.bemUnit ?? "").trim();
-    if (!current) return;
-    const exact = bemUnitOptions.some((opt) => opt.value === current);
-    if (exact) return;
-    const fuzzy = bemUnitOptions.find(
-      (opt) =>
-        opt.value.toLowerCase() === current.toLowerCase() ||
-        String(opt.label).toLowerCase() === current.toLowerCase(),
-    );
-    if (fuzzy) onFormChange("bemUnit", fuzzy.value, true);
-  }, [
-    isSubscaleArticles,
-    subscaleIsBem,
-    inlineMode,
-    bemUnitOptions,
-    form.attributes.bemUnit,
-    onFormChange,
-  ]);
 
   const renderAttributeInput = (field: MasterDataFieldDef) => {
     if (
@@ -263,6 +238,19 @@ const MasterDataList = ({
       !subscaleIsBem
     ) {
       return <Typography sx={table.bodyText}>—</Typography>;
+    }
+
+    if (isSubscaleArticles && subscaleIsBem && field.key === "bemUnit") {
+      return (
+        <AppTextField
+          compact
+          fullWidth
+          value={DEFAULT_BEM_UNIT}
+          disabled
+          inputProps={{ readOnly: true }}
+          sx={cellSx}
+        />
+      );
     }
 
     if (field.key === "projectId") {
@@ -323,11 +311,6 @@ const MasterDataList = ({
             if (isBooleanKind) {
               if (field.key === "isBem" && value === "true") {
                 onFormChange(field.key, true, true);
-                // Ensure Kg from Unit Master is applied once options are available.
-                const defaultUnit = resolveDefaultBemUnit(bemUnitOptions);
-                if (defaultUnit) {
-                  onFormChange("bemUnit", defaultUnit, true);
-                }
                 return;
               }
               onFormChange(field.key, value === "true", true);

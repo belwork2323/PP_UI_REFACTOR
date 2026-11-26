@@ -27,6 +27,7 @@ import { roleConfig } from "@app/theme/roleConfig";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import { getDisplayName } from "@utils/userManagementUtils";
 import { STRINGS } from "@app/config/strings";
+import { USER_ID_PATTERN } from "@/utils/passwordPolicy";
 
 const S = STRINGS.USER_MANAGEMENT;
 
@@ -45,6 +46,10 @@ const validateUserForm = (form: any, isEditMode: boolean) => {
   const username = String(form.username || "").trim();
   if (!username) {
     errors.username = "Username is required";
+  } else if (username.length < 3) {
+    errors.username = "Username must be at least 3 characters long";
+  } else if (username.length > 255) {
+    errors.username = "Username must not exceed 255 characters";
   } else if (!/^[A-Za-z\s]+$/.test(username)) {
     errors.username = "Username must contain only alphabetic characters and spaces";
   }
@@ -55,8 +60,9 @@ const validateUserForm = (form: any, isEditMode: boolean) => {
       errors.userId = "User ID is required";
     } else if (userId.length < 3) {
       errors.userId = "User ID must be at least 3 characters long";
-    } else if (!/^[A-Za-z0-9]+$/.test(userId)) {
-      errors.userId = "User ID must be alphanumeric only (no spaces or special characters)";
+    } else if (!USER_ID_PATTERN.test(userId)) {
+      errors.userId =
+        "User ID must contain only alphanumeric characters, hyphens (-), and underscores (_)";
     }
   }
 

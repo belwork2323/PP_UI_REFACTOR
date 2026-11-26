@@ -39,7 +39,7 @@ export default function DashboardPage() {
     setFilterOpen,
     toggleFilterOpen,
     searchQuery,
-    setSearchQuery,
+    setSearchQuery: updateSearchQuery,
     batchDraftFilters,
     setBatchDraftFilter,
     applyBatchFilters,
@@ -51,11 +51,16 @@ export default function DashboardPage() {
     batchStatusTab,
     setBatchStatusTab,
     batchTabOptions,
-  } = useDashboardHook(mode);
+  } = useDashboardHook(mode, true);
 
   // 🟢 Local state for Active Batches Section Pagination
   const [batchPage, setBatchPage] = useState(0);
   const [batchRowsPerPage, setBatchRowsPerPage] = useState(10);
+
+  const setSearchQuery = (value: string) => {
+    updateSearchQuery(value);
+    setBatchPage(0);
+  };
 
   // Pagination handlers for Active Batches Section
   const handleBatchPageChange = (_event: unknown, newPage: number) => {

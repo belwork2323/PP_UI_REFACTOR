@@ -284,9 +284,7 @@ export function resolveWorkflowStatusFromBatchStages(
       return {
         status: fromCurrent.status,
         rejectionReason:
-          fromCurrent.rejectionReason != null
-            ? String(fromCurrent.rejectionReason)
-            : null,
+          fromCurrent.rejectionReason != null ? String(fromCurrent.rejectionReason) : null,
         stageEntry: fromCurrent,
       };
     }
@@ -297,9 +295,7 @@ export function resolveWorkflowStatusFromBatchStages(
       return {
         status: fromProgress.status,
         rejectionReason:
-          fromProgress.rejectionReason != null
-            ? String(fromProgress.rejectionReason)
-            : null,
+          fromProgress.rejectionReason != null ? String(fromProgress.rejectionReason) : null,
         stageEntry: fromProgress,
       };
     }
@@ -327,8 +323,7 @@ export function resolveWorkflowStatusFromBatchStages(
       batch.subDepartmentStatus ??
       batch.formStatus ??
       batch.currentStatus,
-    rejectionReason:
-      batch.rejectionReason != null ? String(batch.rejectionReason) : null,
+    rejectionReason: batch.rejectionReason != null ? String(batch.rejectionReason) : null,
     stageEntry: null,
   };
 }
@@ -410,19 +405,13 @@ const resolveAssignedTo = (batch: Record<string, unknown>) => {
 
 const isPrematureApprovedStageStatus = (status: unknown): boolean => {
   const api = toApiStatusEnum(status);
-  return (
-    api === "APPROVED" ||
-    api === "COMPLETELY_APPROVED" ||
-    api === "FINAL_APPROVAL_COMPLETED"
-  );
+  return api === "APPROVED" || api === "COMPLETELY_APPROVED" || api === "FINAL_APPROVAL_COMPLETED";
 };
 
 const stageEntryAwaitingApproval = (stageEntry: Record<string, unknown> | null): boolean => {
   if (!stageEntry) return false;
   const hasSubmitted = Boolean(String(stageEntry.submittedAt ?? "").trim());
-  const hasApproved = Boolean(
-    String(stageEntry.approvedAt ?? "").trim() || stageEntry.approvedBy,
-  );
+  const hasApproved = Boolean(String(stageEntry.approvedAt ?? "").trim() || stageEntry.approvedBy);
   return hasSubmitted && !hasApproved;
 };
 
@@ -449,9 +438,7 @@ export function resolveSubdepartmentBatchDisplayStatus(
     batch.formStatus ??
     batch.currentStatus;
 
-  let displayStatus = normalizeSubdepartmentBatchStatus(
-    stageResolution.status ?? fallbackStatus,
-  );
+  let displayStatus = normalizeSubdepartmentBatchStatus(stageResolution.status ?? fallbackStatus);
 
   if (
     stageEntryAwaitingApproval(stageResolution.stageEntry) &&
@@ -462,16 +449,15 @@ export function resolveSubdepartmentBatchDisplayStatus(
     displayStatus === BATCH_STATUS_UNAVAILABLE ||
     !String(stageResolution.status ?? "").trim()
   ) {
-    const submission = String(options?.formSubmissionType ?? "").trim().toUpperCase();
+    const submission = String(options?.formSubmissionType ?? "")
+      .trim()
+      .toUpperCase();
     const formStatus = normalizeSubdepartmentBatchStatus(
       options?.formStatus ?? options?.statusFallback,
     );
     const formApi = toApiStatusEnum(formStatus);
 
-    if (
-      submission === "SUBMIT" &&
-      isPrematureApprovedStageStatus(formApi)
-    ) {
+    if (submission === "SUBMIT" && isPrematureApprovedStageStatus(formApi)) {
       displayStatus = OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL;
     } else if (formStatus && formStatus !== BATCH_STATUS_UNAVAILABLE) {
       displayStatus = formStatus;
@@ -505,9 +491,10 @@ export function mapSubdepartmentBatchListRow(
       : null;
   const projectId = String(nestedProject?.projectId ?? batch.projectId ?? "").trim();
   const projectName = String(nestedProject?.projectName ?? batch.projectName ?? "").trim();
-  const batchType = [batch.batchType, batch.batchTypeName, batch.subBatchType, batch.type]
-    .map((value) => String(value ?? "").trim())
-    .find(Boolean) ?? "";
+  const batchType =
+    [batch.batchType, batch.batchTypeName, batch.subBatchType, batch.type]
+      .map((value) => String(value ?? "").trim())
+      .find(Boolean) ?? "";
 
   const stageLabel =
     stageResolution.stageEntry != null
@@ -581,10 +568,7 @@ export function buildSubdepartmentBatchStatusCountsFromRows(
 
   batches.forEach((batch) => {
     const status = normalizeSubdepartmentBatchStatus(
-      batch.rmStatus ??
-        batch.cpStatus ??
-        batch.status ??
-        batch.workflowStatus,
+      batch.rmStatus ?? batch.cpStatus ?? batch.status ?? batch.workflowStatus,
     );
     const tab = mapDisplayStatusToUiTab(status);
     if (tab && tab in byLabel) {
@@ -609,7 +593,11 @@ const isIgnorableStatusCountKey = (key: string) => {
 /**
  * Map API `statusCounts` camelCase keys onto UI status filter tabs.
  * Batch row statuses are not remapped — only tab counts are bucketed here.
- */
+ */ const sanitizeCount = (value: unknown): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  return Math.max(0, value);
+};
+
 export function mapSubdepartmentBatchStatusCounts(
   server: Record<string, number> | undefined,
   totalRecords: number,
@@ -617,41 +605,25 @@ export function mapSubdepartmentBatchStatusCounts(
 ): Record<string, number> {
   const byLabel = emptyStatusCountLabels();
 
-  Object.entries(server ?? {}).forEach(([key, value]) => {
-    if (typeof value !== "number" || isIgnorableStatusCountKey(key)) return;
-
+  Object.entries(server ?? {}).forEach(([key, rawValue]) => {
+    if (isIgnorableStatusCountKey(key)) return;
+    const value = sanitizeCount(rawValue);
     const tab = mapApiStatusCountKeyToUiTab(key);
-    if (tab) {
+    if (tab && tab in byLabel) {
       byLabel[tab] += value;
     }
   });
 
-  let countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
+  const countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
   const hasServerCounts = countedTotal > 0 || Object.keys(server ?? {}).length > 0;
 
   if (!hasServerCounts && batches.length > 0) {
     return buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
   }
 
-  if (batches.length > 0 && server && typeof server === "object") {
-    const serverTabs = new Set(
-      Object.keys(server)
-        .filter((key) => !isIgnorableStatusCountKey(key) && typeof server[key] === "number")
-        .map((key) => mapApiStatusCountKeyToUiTab(key))
-        .filter(Boolean),
-    );
-    const fromRows = buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
-    (Object.keys(byLabel) as string[]).forEach((status) => {
-      if (!serverTabs.has(status as OperationStatus) && (fromRows[status] ?? 0) > 0) {
-        byLabel[status] = fromRows[status];
-      }
-    });
-    countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
-  }
-
   return {
     ...byLabel,
-    [FILTER_ALL]: countedTotal > 0 ? countedTotal : totalRecords,
+    [FILTER_ALL]: totalRecords > 0 ? totalRecords : countedTotal,
   };
 }
 

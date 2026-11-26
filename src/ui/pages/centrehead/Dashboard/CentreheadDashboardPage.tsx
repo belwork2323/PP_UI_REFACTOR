@@ -21,6 +21,7 @@ import useDashboardHook from "@/hooks/admin/Dashboard/useDashboardHook";
 import DashboardActiveBatchesSection from "../../admin/Dashboard/components/DashboardActiveBatchesSection";
 import useSMNotificationMenu from "@/hooks/centrehead/Dashboard/useCHNotificationMenuHook";
 import useCHDashboard from "@/hooks/centrehead/Dashboard/useCHDashboardHook";
+import { InProgressBatchRow } from "@/ui/components/custom/dashboard/InProgressBatchesTable";
 
 const {
   CheckCircle,
@@ -155,7 +156,9 @@ export default function CHDashboard() {
   }
 
   const isRefreshing = statsLoading || activeBatchesLoading;
-
+  const handleViewBatchDetails = (row: InProgressBatchRow) => {
+    setSelectedBatch(row);
+  };
   return (
     <Box sx={{ ...t.page, ...t.dashboardLayout.pageRelative }}>
       {isRefreshing && (
@@ -412,6 +415,7 @@ export default function CHDashboard() {
         totalCount={filteredBatches.length}
         onPageChange={handleBatchPageChange}
         onRowsPerPageChange={handleBatchRowsPerPageChange}
+        onViewDetails={handleViewBatchDetails}
       />
       {/* ── Block Traceability ── */}
       {/* <Box sx={t.dashboardLayout.lowerGrid}>

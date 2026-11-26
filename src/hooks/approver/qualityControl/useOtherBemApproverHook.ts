@@ -67,10 +67,8 @@ export const useOtherBemApproverHook = () => {
       const response = await otherBemController.fetchOtherBemList({
         page: params?.page ?? page,
         limit: params?.limit ?? limit,
-        filters: {
-          status: apiStatus || undefined,
-          search: params?.search ?? search,
-        },
+        status: apiStatus || undefined,
+        search: params?.search ?? search,
         sort: {
           field: "createdOn",
           direction: "DESC",

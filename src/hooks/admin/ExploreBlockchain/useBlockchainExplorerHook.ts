@@ -44,7 +44,7 @@ const unwrap = <T>(res: any): T => {
 };
 
 const mapChannels = (raw: any): Channel[] => {
-  const list = Array.isArray(raw) ? raw : raw?.channels ?? [];
+  const list = Array.isArray(raw) ? raw : (raw?.channels ?? []);
   return list.map((ch: any) => ({
     channelname: ch.channelname ?? ch.channelName ?? ch.name ?? "",
     channel_genesis_hash:
@@ -56,13 +56,11 @@ const mapStats = (raw: any): BlockchainStats => ({
   latestBlock: Number(raw?.latestBlock ?? raw?.blockHeight ?? raw?.height ?? 0),
   txCount: Number(raw?.txCount ?? raw?.transactionCount ?? raw?.tx_count ?? 0),
   peerCount: Number(raw?.peerCount ?? raw?.peers ?? raw?.peer_count ?? 0),
-  chaincodeCount: Number(
-    raw?.chaincodeCount ?? raw?.chaincodes ?? raw?.chaincode_count ?? 0,
-  ),
+  chaincodeCount: Number(raw?.chaincodeCount ?? raw?.chaincodes ?? raw?.chaincode_count ?? 0),
 });
 
 const mapPeers = (raw: any): Peer[] => {
-  const list = Array.isArray(raw) ? raw : raw?.peers ?? [];
+  const list = Array.isArray(raw) ? raw : (raw?.peers ?? []);
   return list.map((p: any) => {
     const host = p.server_hostname ?? p.serverHostname ?? p.name ?? p.peerName ?? "";
     const statusRaw = String(p.status ?? p.state ?? "DOWN").toUpperCase();
@@ -75,30 +73,68 @@ const mapPeers = (raw: any): Peer[] => {
 };
 
 const mapPie = (raw: any): PieDatum[] => {
-  const list = Array.isArray(raw) ? raw : raw?.rows ?? [];
+  const list = Array.isArray(raw) ? raw : (raw?.rows ?? []);
   return list.map((row: any) => ({
     name: row.creator_msp_id ?? row.name ?? row.org ?? row.organization ?? "Unknown",
     value: Number(row.count ?? row.value ?? row.txCount ?? 0),
   }));
 };
 
+const parseDateTime = (raw: string): Date | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Match DD-MM-YYYY or DD/MM/YYYY with optional HH:mm[:ss]
+  const dmMatch = trimmed.match(
+    /^(\d{2})[-/](\d{2})[-/](\d{4})(?:[T\s]+(\d{2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+
+  if (dmMatch) {
+    const [, dayStr, monthStr, yearStr, hourStr = "00", minuteStr = "00", secondStr = "00"] =
+      dmMatch;
+    const day = Number(dayStr);
+    const month = Number(monthStr);
+    const year = Number(yearStr);
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+    const second = Number(secondStr);
+
+    const dt = new Date(year, month - 1, day, hour, minute, second);
+    // Guard against JS Date rolling over invalid calendar dates like 31-02-2026
+    if (
+      dt.getFullYear() !== year ||
+      dt.getMonth() !== month - 1 ||
+      dt.getDate() !== day ||
+      dt.getHours() !== hour ||
+      dt.getMinutes() !== minute ||
+      dt.getSeconds() !== second
+    ) {
+      return null;
+    }
+    return dt;
+  }
+
+  // Fallback for ISO strings or other Date-parsable formats
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatTimeHHmm = (dt: Date): string => {
+  const hh = String(dt.getHours()).padStart(2, "0");
+  const mm = String(dt.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
 const mapChart = (raw: any): ChartDatum[] => {
-  const list = Array.isArray(raw) ? raw : raw?.rows ?? [];
+  const list = Array.isArray(raw) ? raw : (raw?.rows ?? []);
   return list.map((row: any) => {
     const timeRaw =
       row.datetime ?? row.time ?? row.timestamp ?? row.label ?? row.hour ?? row.minute ?? "";
-    let time = String(timeRaw);
-    // try to show only HH:mm if full ISO
-    if (time.includes("T") || time.length > 12) {
-      try {
-        time = new Date(time).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } catch {
-        // keep original
-      }
-    }
+    const rawStr = String(timeRaw).trim();
+    const dt = parseDateTime(rawStr);
+
+    const time = dt ? formatTimeHHmm(dt) : rawStr;
+
     return {
       time,
       value: Number(row.count ?? row.value ?? row.total ?? 0),
@@ -163,11 +199,7 @@ const useBlockchainExplorerHook = () => {
         const channelList = await fetchChannels();
         setChannels(channelList);
 
-        const hash =
-          channelHash ||
-          selectedChannel ||
-          channelList[0]?.channel_genesis_hash ||
-          "";
+        const hash = channelHash || selectedChannel || channelList[0]?.channel_genesis_hash || "";
 
         if (!hash) {
           setStats(null);
@@ -198,15 +230,7 @@ const useBlockchainExplorerHook = () => {
         setLoading(false);
       }
     },
-    [
-      fetchChannels,
-      fetchStats,
-      fetchPeers,
-      fetchPie,
-      fetchChart,
-      selectedChannel,
-      chartType,
-    ],
+    [fetchChannels, fetchStats, fetchPeers, fetchPie, fetchChart, selectedChannel, chartType],
   );
 
   useEffect(() => {

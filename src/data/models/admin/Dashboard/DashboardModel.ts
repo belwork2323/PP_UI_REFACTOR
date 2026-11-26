@@ -4,6 +4,7 @@
 
 import colors from "@app/theme/colors";
 import { icons } from "@app/theme/icons";
+import { batchTypeFilterToApiValue } from "@/data/models/user/SubdepartmentBatchModel";
 
 const getApiData = (apiResponse: any) => apiResponse?.data ?? apiResponse ?? {};
 
@@ -33,6 +34,7 @@ export type ActiveBatchRowModel = {
   managerId: string;
   managerName: string;
   status: string;
+  stageStatuses?: string[];
   createdOn: string;
   completion: number;
   color: string;
@@ -121,6 +123,10 @@ export class DashboardModel {
     const activeBatches: ActiveBatchRowModel[] = batches.map((b: any) => {
       // Get the last item from currentStage array if present
       const stages = Array.isArray(b.currentStage) ? b.currentStage : [];
+      const allStages = [
+        ...stages,
+        ...(Array.isArray(b.stageProgress) ? b.stageProgress : []),
+      ];
       const lastStage = stages.length > 0 ? stages[stages.length - 1] : null;
 
       // Extract subDepartmentName from the last stage object
@@ -139,6 +145,7 @@ export class DashboardModel {
         managerId: b.systemManager?.id ?? b.systemManagerId ?? "NA",
         managerName: b.systemManager?.fullName ?? b.systemManagerName ?? "NA",
         status: lastStage?.status ?? b.status ?? "NA",
+        stageStatuses: allStages.map((stage: any) => String(stage?.status ?? "")).filter(Boolean),
         createdOn: b.createdOn ?? b.date ?? "",
         completion: typeof b.completion === "number" ? b.completion : 0,
         color: b.color ?? DEFAULT_BATCH_COLOR,
@@ -211,7 +218,7 @@ export const buildActiveBatchesFilterPayload = ({
 }: ActiveBatchesFilterInput) => ({
   search: searchQuery.trim(),
   stage: filterStage,
-  type: filterBatchType,
+  type: filterBatchType === "All" ? "All" : batchTypeFilterToApiValue(filterBatchType),
   status: filterStatus,
   filterType,
   startDate: dateFrom || null,

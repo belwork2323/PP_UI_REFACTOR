@@ -24,6 +24,7 @@ type ProjectManagementListProps = {
   onDelete: (project: any) => void;
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  user?: any;
 };
 
 const ProjectManagementList = ({
@@ -37,8 +38,11 @@ const ProjectManagementList = ({
   onDelete,
   onPageChange,
   onRowsPerPageChange,
+  user,
 }: ProjectManagementListProps) => {
   const { table, tableCell } = t;
+
+  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
 
   const columns = useMemo<AdminManagementColumn<any>[]>(
     () => [
@@ -71,6 +75,7 @@ const ProjectManagementList = ({
         label: S.TABLE_COLS[4],
         render: (project) => {
           const isInactive = String(project.status).toUpperCase() === "INACTIVE";
+
           return (
             <Chip
               size="small"
@@ -92,40 +97,46 @@ const ProjectManagementList = ({
           );
         },
       },
-      {
-        id: "actions",
-        label: S.TABLE_COLS[5],
-        isActions: true,
-        render: (project) => {
-          const isInactive = String(project.status).toUpperCase() === "INACTIVE";
-          if (isInactive) {
-            return null;
-          }
+      ...(isAdmin
+        ? [
+            {
+              id: "actions",
+              label: S.TABLE_COLS[5],
+              isActions: true,
+              render: (project: any) => {
+                const isInactive = String(project.status).toUpperCase() === "INACTIVE";
+                if (isInactive) return null;
 
-          return (
-            <Box sx={tableCell.actionsBox}>
-              <Tooltip title="Edit project">
-                <IconButton size="small" onClick={() => onEdit(project)} sx={tableCell.editButton}>
-                  <icons.Edit sx={tableCell.editIcon} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete project">
-                <IconButton
-                  size="small"
-                  onClick={() => onDelete(project)}
-                  sx={tableCell.deleteButton}
-                >
-                  <icons.Delete sx={tableCell.deleteIcon} />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          );
-        },
-      },
+                return (
+                  <Box sx={tableCell.actionsBox}>
+                    <Tooltip title="Edit project">
+                      <IconButton
+                        size="small"
+                        onClick={() => onEdit(project)}
+                        sx={tableCell.editButton}
+                      >
+                        <icons.Edit sx={tableCell.editIcon} />
+                      </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title="Delete project">
+                      <IconButton
+                        size="small"
+                        onClick={() => onDelete(project)}
+                        sx={tableCell.deleteButton}
+                      >
+                        <icons.Delete sx={tableCell.deleteIcon} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                );
+              },
+            },
+          ]
+        : []),
     ],
-    [onDelete, onEdit, table.bodyText, tableCell],
+    [onDelete, onEdit, table.bodyText, tableCell, isAdmin],
   );
-  console.log(paginated);
 
   return (
     <AdminManagementDataTable

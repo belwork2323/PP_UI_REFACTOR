@@ -20,6 +20,7 @@ import DashboardDateFilter, {
   getDateFilterDisplayLabel,
 } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
+import { useAuthStore } from "@/app/store/authStore";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
 const AC = STRINGS.ADMIN_COMMON;
@@ -52,6 +53,7 @@ const ProjectManagementPage = () => {
   const t = getProjectManagementTheme(mode);
   const { list, stats, form, delete: deleteSection, refresh } = useProjectManagementHook();
   const th = getDashboardTheme(mode);
+  const user = useAuthStore((s) => s.user);
 
   const statRows = S.STATS.map((s) => ({
     ...s,
@@ -190,6 +192,7 @@ const ProjectManagementPage = () => {
             list.setRowsPerPage(+e.target.value);
             list.setPage(0);
           }}
+          user={user}
         />
       </AdminListShell>
 

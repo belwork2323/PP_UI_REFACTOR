@@ -768,7 +768,7 @@ const MotorCasingCreateForm = ({
                 required={req("receivingDate")}
                 value={form.receivingDate}
                 onChange={(v) => patch({ receivingDate: v })}
-                maxDate={getTodayInIstDate()}
+                // maxDate={getTodayInIstDate()}
                 theme={theme}
                 error={validationErrors.receivingDate}
                 fieldPath="receivingDate"
@@ -1404,7 +1404,10 @@ const MotorCasingCreateForm = ({
                               const fieldPath = `dimensionalData.${idx}.looseFlap.${looseKey}`;
                               const fieldValue = row.looseFlap?.[looseKey] ?? "";
                               const fieldError = validationErrors[fieldPath];
-                              const outOfRange = computeIsOutOfRange(fieldValue, row.referenceRange);
+                              const outOfRange = computeIsOutOfRange(
+                                fieldValue,
+                                row.referenceRange,
+                              );
                               const showFailed = Boolean(fieldError || outOfRange);
                               return (
                                 <TableCell
@@ -1418,7 +1421,9 @@ const MotorCasingCreateForm = ({
                                       fullWidth
                                       type="number"
                                       placeholder={
-                                        looseKey === "arcLength" ? S.COL_ARC_LENGTH : S.COL_AXIAL_LENGTH
+                                        looseKey === "arcLength"
+                                          ? S.COL_ARC_LENGTH
+                                          : S.COL_AXIAL_LENGTH
                                       }
                                       value={fieldValue}
                                       onChange={(value) => {
@@ -1433,7 +1438,9 @@ const MotorCasingCreateForm = ({
                                         patch({ dimensionalData: next });
                                       }}
                                       error={showFailed}
-                                      helperText={fieldError ?? (outOfRange ? SPEC_OUT_OF_RANGE : undefined)}
+                                      helperText={
+                                        fieldError ?? (outOfRange ? SPEC_OUT_OF_RANGE : undefined)
+                                      }
                                       FormHelperTextProps={{
                                         sx: {
                                           mx: 0,

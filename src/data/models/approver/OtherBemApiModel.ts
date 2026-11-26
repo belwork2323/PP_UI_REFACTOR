@@ -7,10 +7,8 @@ import type { StfBemStaticTestingDetailsApi } from "@/data/models/user/StfMotorD
 export interface OtherBemListPayload {
   page: number;
   limit: number;
-  filters?: {
-    status?: string;
-    search?: string;
-  };
+  search?: string;
+  status?: string;
   sort?: {
     field: string;
     direction: "ASC" | "DESC";
@@ -174,7 +172,8 @@ export const mapOtherBemDetailsForDisplay = (data: OtherBemDetailRawData): Other
   const stfTestNo = data?.stfTestNo ?? "-";
   const createdBy = personLabel(data?.createdBy);
   const createdOn = data?.createdOn ?? data?.createdAt ?? "-";
-  const updatedBy = personLabel(data?.updatedBy) !== "N/A" ? personLabel(data?.updatedBy) : createdBy;
+  const updatedBy =
+    personLabel(data?.updatedBy) !== "N/A" ? personLabel(data?.updatedBy) : createdBy;
   const updatedOn = data?.updatedOn ?? data?.updatedAt ?? createdOn;
   const staticTestingDetails = data?.staticTestingDetails ?? null;
 

@@ -76,7 +76,13 @@ const NDTApproverDetailDialog = ({
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: theme.dialog.paper }}
+      >
         <Box
           sx={{
             ...theme.dialog.header,

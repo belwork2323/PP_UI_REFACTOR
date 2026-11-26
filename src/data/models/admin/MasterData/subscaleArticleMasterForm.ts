@@ -10,18 +10,6 @@ export const composeBemArticleName = (size: number | string, unit: string): stri
 export const isSubscaleBemArticle = (form: MasterDataFormState): boolean =>
   form.attributes?.isBem === true;
 
-/** Prefer Unit Master option matching Kg (case-insensitive); else DEFAULT_BEM_UNIT. */
-export const resolveDefaultBemUnit = (
-  options?: Array<{ value: string; label: string }> | null,
-): string => {
-  const match = (options ?? []).find((opt) => {
-    const value = String(opt.value ?? "").trim();
-    const label = String(opt.label ?? "").trim();
-    return /^kg$/i.test(value) || /^kg$/i.test(label);
-  });
-  return match?.value ?? DEFAULT_BEM_UNIT;
-};
-
 const composeNameFromAttrs = (
   attributes: MasterDataFormState["attributes"],
 ): string => {
@@ -35,7 +23,6 @@ export const applySubscaleArticleAttributeChange = (
   form: MasterDataFormState,
   key: string,
   value: string | number | boolean,
-  unitOptions?: Array<{ value: string; label: string }> | null,
 ): MasterDataFormState => {
   const attributes: MasterDataFormState["attributes"] = {
     ...form.attributes,
@@ -45,14 +32,17 @@ export const applySubscaleArticleAttributeChange = (
 
   if (key === "isBem") {
     if (value === true) {
-      attributes.bemUnit = attributes.bemUnit || resolveDefaultBemUnit(unitOptions);
+      attributes.bemUnit = DEFAULT_BEM_UNIT;
       name = composeNameFromAttrs(attributes);
     } else {
       attributes.bemSize = "";
       attributes.bemUnit = "";
       name = "";
     }
-  } else if (attributes.isBem === true && (key === "bemSize" || key === "bemUnit")) {
+  } else if (attributes.isBem === true && key === "bemUnit") {
+    attributes.bemUnit = DEFAULT_BEM_UNIT;
+    name = composeNameFromAttrs(attributes);
+  } else if (attributes.isBem === true && key === "bemSize") {
     name = composeNameFromAttrs(attributes);
   }
 

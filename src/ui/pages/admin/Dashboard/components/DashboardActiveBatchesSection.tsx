@@ -167,7 +167,12 @@ export default function DashboardActiveBatchesSection({
                   label={t.FILTERS.STATUS}
                   value={batchDraftFilters.status}
                   onChange={(e) => setBatchDraftFilter("status", e.target.value)}
-                  options={["All", ...Object.values(OPERATION_STATUS)]}
+                  options={[
+                    "All",
+                    ...Object.values(OPERATION_STATUS).filter(
+                      (status) => status !== OPERATION_STATUS.APPROVED,
+                    ),
+                  ]}
                   menuProps={filterMenuProps}
                   itemSx={filterMenuItemSx}
                   showAllOption={false}

@@ -92,10 +92,7 @@ export const canApproverActionEntireNDTForm = (params: {
     return false;
   }
 
-  if (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  ) {
+  if (statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL) {
     return true;
   }
 
@@ -548,8 +545,7 @@ export const normalizeNDTFormState = (input?: Partial<LegacyNDTFormState> | null
 const hasText = (value?: string | null) => Boolean(String(value ?? "").trim());
 const hasFileContent = (ref: FileRef | null | undefined) =>
   Boolean(ref && (isFileReady(ref) || String(ref.fileName ?? "").trim()));
-const hasFiles = (files?: FileRef[] | null) =>
-  (files ?? []).some((ref) => hasFileContent(ref));
+const hasFiles = (files?: FileRef[] | null) => (files ?? []).some((ref) => hasFileContent(ref));
 
 /** Motor has completed FlowBar radiography setup and can show inspection tables. */
 export const isNDTMotorSetupReady = (motor?: NDTMotorSession | null): boolean => {
@@ -614,9 +610,7 @@ export const hasMotorNDTValue = (form: NDTFormState, motorId: string) => {
   return motor ? motorHasValue(motor) : false;
 };
 
-export const collectNdtFileRefsFromForm = (form: {
-  motors?: NDTMotorSession[];
-}): FileRef[] => {
+export const collectNdtFileRefsFromForm = (form: { motors?: NDTMotorSession[] }): FileRef[] => {
   const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
     for (const row of motor.radiographyObservationRows ?? []) {
@@ -634,17 +628,14 @@ export const collectNdtFileRefsFromForm = (form: {
 export const hasIncompleteNdtUploads = (form: { motors?: NDTMotorSession[] }): boolean =>
   collectNdtFileRefsFromForm(form).some(isFileUploadIncomplete);
 
-export const collectTempFileIdsFromNdtForm = (form: {
-  motors?: NDTMotorSession[];
-}): string[] =>
-  [
-    ...new Set(
-      collectNdtFileRefsFromForm(form)
-        .filter((ref) => ref.isTemp !== false)
-        .map((ref) => String(ref.fileId ?? "").trim())
-        .filter(Boolean),
-    ),
-  ];
+export const collectTempFileIdsFromNdtForm = (form: { motors?: NDTMotorSession[] }): string[] => [
+  ...new Set(
+    collectNdtFileRefsFromForm(form)
+      .filter((ref) => ref.isTemp !== false)
+      .map((ref) => String(ref.fileId ?? "").trim())
+      .filter(Boolean),
+  ),
+];
 
 export const validateNDTMotorsForApi = (motors: NDTMotorSession[]): string | null => {
   const list = (motors ?? []).filter((motor) => String(motor.motorId ?? "").trim());

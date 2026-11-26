@@ -51,7 +51,7 @@ const MasterDataPage = () => {
   const hook = useMasterDataHook();
   const equipmentTypeOptions = useEquipmentTypeOptions(hook.selectedType === "equipment");
   const unitListOptions = useEnergyUnitOptions(
-    hook.selectedType === "beam-energy" || hook.selectedType === "subscale-articles",
+    hook.selectedType === "beam-energy",
   );
   const projectOptions = useProjectForMotorStageOptions(hook.selectedType === "motor-stages");
   useEffect(() => {
@@ -68,21 +68,6 @@ const MasterDataPage = () => {
     }
     if (hook.selectedType === "beam-energy" && unitListOptions.options.length > 0) {
       options.energyUnit = unitListOptions.options;
-    }
-    if (hook.selectedType === "subscale-articles" && unitListOptions.options.length > 0) {
-      // Store display symbol in bemUnit (used in "{size} {unit} BEM"); source is Unit Master.
-      const seen = new Set<string>();
-      options.bemUnit = unitListOptions.options
-        .map((opt) => {
-          const label = String(opt.label ?? "").trim();
-          const value = label || String(opt.value ?? "").trim();
-          return { value, label: value };
-        })
-        .filter((opt) => {
-          if (!opt.value || seen.has(opt.value)) return false;
-          seen.add(opt.value);
-          return true;
-        });
     }
     if (hook.selectedType === "motor-stages" && projectOptions.options.length > 0) {
       options.projectId = projectOptions.options;

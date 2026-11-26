@@ -3,7 +3,11 @@ import fonts from "@app/theme/fonts";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import layout from "@app/theme/layout";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { getAdminCommonTheme, getAdminManagementTableCellActions, getAdminManagementTableTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
+import {
+  getAdminCommonTheme,
+  getAdminManagementTableCellActions,
+  getAdminManagementTableTheme,
+} from "@app/theme/custom_themes/admin/admin_common_theme";
 
 const getProjectManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared = getSharedTheme(mode);
@@ -50,7 +54,7 @@ const getProjectManagementTheme = (mode: "light" | "dark" = "light") => {
       innerGrid: {
         ...adminTheme.statsGrid.innerGrid,
         display: "grid",
-        gridTemplateColumns: "repeat(5, minmax(0, 1fr))", // one row
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))", // one row
         // gap: 2,
         width: "100%",
       },
